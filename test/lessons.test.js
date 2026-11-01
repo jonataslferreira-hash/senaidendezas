@@ -1,0 +1,104 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import { LessonLibrary, LIBRARY_KEY, demoLesson, newLesson, newQuestion, validateLesson } from '../src/lessons.js';
+import { Room } from '../src/room.js';
+import { compactLesson } from '../src/assets.js';
+
+function storage(initial) {
+  const values = new Map(initial ? [[LIBRARY_KEY, initial]] : []);
+  return { getItem: key => values.get(key) ?? null, setItem: (key, value) => values.set(key, value) };
+}
+test('biblioteca persiste edição, duplica, importa sem sobrescrever e mantém exclusões após recarregar', () => {
+  const disk = storage(), library = new LessonLibrary(disk);
+  const lesson = newLesson(); lesson.title = 'Geografia'; lesson.slides[0].title = 'Os biomas';
+  const saved = library.save(lesson);
+  const loaded = new LessonLibrary(disk);
+  assert.equal(loaded.lessons.find(l => l.id === saved.id).title, 'Geografia');
+  const duplicate = loaded.duplicate(saved.id);
+  assert.notEqual(duplicate.id, saved.id);
+  duplicate.slides[0].title = 'Outra ideia';
+  assert.equal(loaded.lessons.find(l => l.id === saved.id).slides[0].title, 'Os biomas');
+  const imported = loaded.import(JSON.parse(JSON.stringify(saved)));
+  assert.notEqual(imported.id, saved.id);
+  assert.equal(imported.title, saved.title);
+  for (const l of [...loaded.lessons]) loaded.remove(l.id);
+  assert.deepEqual(new LessonLibrary(disk).lessons, []);
+});
+test('uma sala usa os slides e o quiz da aula, preserva a aula ao reconectar e não envia respostas ou notas aos alunos', () => {
+  let time = 100;
+  const lesson = newLesson();
+  lesson.title = 'Geografia';
+  lesson.slides[0].title = 'Biomas'; lesson.slides[0].note = 'Roteiro privado';
+  lesson.slides.push({ ...lesson.slides[0], id: 'second', title: 'Clima' });
+  const q = newQuestion(); q.text = 'Qual é o bioma?'; q.options = ['A', 'B']; q.correct = 1; q.difficulty = 'Difícil'; q.seconds = 40;
+  lesson.questions = [q];
+  const room = new Room('123456', undefined, () => time, lesson);
+  const p = room.join({ name: 'Ana' });
+  room.control('slide', 1);
+  const student = room.snapshot(p.id);
+  assert.equal(student.lesson.title, 'Geografia');
+  assert.equal(student.lesson.slides[student.slide].title, 'Clima');
+  assert.equal(student.lesson.slides[0].note, undefined);
+  assert.equal(student.lesson.questions, undefined);
+  assert.equal(room.snapshot().lesson.slides[0].note, 'Roteiro privado');
+  room.control('quiz');
+  assert.equal(room.snapshot(p.id).question.text, q.text);
+  assert.equal(room.snapshot(p.id).question.base, 2000);
+  assert.equal(room.snapshot(p.id).question.deadline - time, 40000);
+  assert.equal(room.snapshot(p.id).question.correct, undefined);
+  room.answer(p.id, { choice: 1, questionIndex: 0 });
+  room.control('reveal');
+  assert.equal(room.snapshot(p.id).me.score, 2000);
+  const restored = new Room('123456', JSON.parse(JSON.stringify(room.data)), () => time);
+  assert.equal(restored.lesson.title, 'Geografia');
+  assert.equal(restored.snapshot(p.id).me.score, 2000);
+  restored.control('next');
+  assert.equal(restored.data.phase, 'finished');
+});
+test('aula sem quiz pode ser encerrada e retomada; limites e arquivos inválidos são rejeitados', () => {
+  const lesson = newLesson(), room = new Room('123456', undefined, Date.now, lesson);
+  assert.throws(() => room.control('quiz'), /não tem perguntas/);
+  room.control('finish'); assert.equal(room.data.phase, 'finished');
+  room.control('lesson'); assert.equal(room.data.phase, 'lesson');
+  assert.throws(() => validateLesson({ version: 2 }), /formato/);
+  assert.throws(() => validateLesson({ ...lesson, slides: [] }), /slides/);
+  assert.throws(() => validateLesson({ ...lesson, slides: [{ ...lesson.slides[0], kind: 'image', image: 'javascript:alert(1)' }] }), /imagem/);
+  assert.throws(() => validateLesson({ ...lesson, questions: [{ ...newQuestion(), correct: 8 }] }), /correta/);
+  assert.throws(() => validateLesson({ ...lesson, questions: [{ ...newQuestion(), seconds: 0 }] }), /tempo/);
+  const draft = { ...lesson, title: '', slides: [{ ...lesson.slides[0], title: '' }] };
+  assert.equal(validateLesson(draft, { draft: true }).title, '');
+  assert.throws(() => validateLesson(draft), /título/);
+  assert.equal(validateLesson(demoLesson()).slides.length, 7);
+});
+test('erros de armazenamento não apagam a biblioteca e uma falha de quota não é tratada como salvamento', () => {
+  const disk = storage('conteúdo corrompido');
+  const corrupt = new LessonLibrary(disk);
+  assert.ok(corrupt.warning);
+  assert.throws(() => corrupt.save(newLesson()));
+  assert.equal(disk.getItem(LIBRARY_KEY), 'conteúdo corrompido');
+  const healthyDisk = storage(), healthy = new LessonLibrary(healthyDisk);
+  const before = healthyDisk.getItem(LIBRARY_KEY);
+  healthyDisk.setItem = () => { throw Error('quota'); };
+  assert.throws(() => healthy.save(newLesson()), /não conseguiu salvar/);
+  assert.equal(healthy.lessons.length, 1);
+  assert.equal(healthyDisk.getItem(LIBRARY_KEY), before);
+});
+test('páginas importadas mantêm imagem na apresentação e referências compactas na biblioteca e na sessão', () => {
+  const lesson = newLesson();
+  lesson.slides[0] = { ...lesson.slides[0], kind: 'document', sourceType: 'pdf', image: 'data:image/jpeg;base64,YQ==',
+    assetId: 'asset-00000000-0000-4000-8000-000000000000', imageAlt: 'Uma página', pageWidth: 1920, pageHeight: 1080 };
+  const validated = validateLesson(lesson);
+  assert.equal(validated.slides[0].kind, 'document');
+  const compact = compactLesson(validated);
+  assert.equal(compact.slides[0].image, '');
+  assert.equal(validated.slides[0].image, 'data:image/jpeg;base64,YQ==');
+  assert.equal(validateLesson(compact).slides[0].assetId, lesson.slides[0].assetId);
+  const library = new LessonLibrary(storage());
+  const saved = library.save(validated);
+  assert.equal(saved.slides[0].image, '');
+  assert.equal(saved.slides[0].sourceType, 'pdf');
+  const room = new Room('123456', undefined, Date.now, validated);
+  assert.equal(room.publicLesson().slides[0].image, validated.slides[0].image);
+  assert.throws(() => validateLesson({ ...lesson, slides: [{ ...lesson.slides[0], image: '', assetId: '' }] }), /sem imagem/);
+  assert.throws(() => validateLesson({ ...lesson, slides: [{ ...lesson.slides[0], assetId: '../arquivo' }] }), /Referência/);
+});

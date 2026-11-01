@@ -1,0 +1,31 @@
+{
+  "name": "storage-lab",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Aula interativa sobre HDD e SSD com modelos 3D e quiz em tempo real",
+  "scripts": {
+    "start": "vite --host 0.0.0.0",
+    "dev": "vite --host 0.0.0.0",
+    "build": "vite build --base=./",
+    "preview": "vite preview --host 0.0.0.0",
+    "test:e2e": "playwright test",
+    "test": "node --test test/*.test.js"
+  },
+  "engines": {
+    "node": ">=22.18.0"
+  },
+  "dependencies": {
+    "@office-kit/pptx": "0.28.0",
+    "@office-kit/pptx-preview": "0.21.0",
+    "pdfjs-dist": "6.5.438",
+    "peerjs": "^1.5.5",
+    "qrcode": "^1.5.4",
+    "three": "^0.180.0"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.56.0",
+    "peer": "^1.0.2",
+    "vite": "^7.1.0"
+  }
+}
