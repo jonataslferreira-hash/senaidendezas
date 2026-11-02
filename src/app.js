@@ -1,3 +1,6 @@
+import {presentationSlide,mobileMarkup} from './slide-display.js';
+import {fillAssetImages} from './assets.js';
+import './classroom-display.css';
 import { avatarContent,isPhotoAvatar } from './player-avatar.js';
 import { PptxAnimations } from './pptx-animations.js';
 import { loadPublicPresentation } from './public-presentations.js';
@@ -61,6 +64,8 @@ const trackPlayer = new Audio(); let trackKey = '';
 trackPlayer.dataset.soundtrack = ''; trackPlayer.hidden = true; document.body.append(trackPlayer);
 let demoTimer, toastTimer, controlsTimer, editDraft = null, editIndex = -1, editError = '', imageText = false;
 const presenterSettings = loadPresenterSettings();
+const phoneLayout=matchMedia('(max-width: 800px)');
+phoneLayout.addEventListener('change',()=>{if(state?.phase==='lesson')render();});
 const qrCache = new Map();
 const params = new URLSearchParams(location.search);
 let codeDraft = (params.get('s') || '').replace(/\D/g, '').slice(0, 6);
@@ -73,7 +78,7 @@ function toast(message) {
 }
 function brand() { return `<button class="brand" data-action="home" aria-label="Storage Lab, início"><img class="lab-logo" src="${brandUrl}" alt=""><span>storage<span class="brand-light">lab</span><span class="brand-period">.</span></span></button>`; }
 function header() {
-  return `<header class="header">${brand()}<div class="header-right">${state?`<span class="connection ${status==='online'||demo?'connected':''}"><span></span>${readOnlyPresentation&&demo?'Apresentação':demo?'Prévia':status==='online'?'Ao vivo':'Reconectando'}</span>${host?`<button class="icon-btn" data-action="sound" aria-label="${music?'Desativar':'Ativar'} áudio" title="Áudio da apresentação">${icon(music?'volume':'mute')}</button>`:''}`:''}</div></header>`;
+  return `<header class="header">${brand()}<div class="header-right">${state?`${participants(5,true)}${!host?`<span data-room-controller data-room-code="${esc(state.code)}">${studio.remote.roomButton(state.code)}</span>`:''}<span class="connection ${status==='online'||demo?'connected':''}"><span></span>${readOnlyPresentation&&demo?'Apresentação':demo?'Prévia':status==='online'?'Ao vivo':'Reconectando'}</span>${host?`<button class="icon-btn" data-action="sound" aria-label="${music?'Desativar':'Ativar'} áudio" title="Áudio da apresentação">${icon(music?'volume':'mute')}</button>`:''}`:''}</div></header>`;
 }
 function modelPanel(landing = false) {
   const custom = state && slides[state.slide]?.customModel;
@@ -96,9 +101,11 @@ function joinForm() {
   <label id="avatar-label">Sua identidade no ranking</label><div class="avatar-picker" role="group" aria-labelledby="avatar-label">${photo?`<button type="button" class="avatar ${selectedAvatar===photo?'active':''}" data-avatar="${photo}" aria-label="Usar minha foto de perfil" aria-pressed="${selectedAvatar===photo}">${avatarContent(photo)}</button>`:''}${avatars.map(a => `<button type="button" class="avatar ${a === selectedAvatar ? 'active' : ''}" data-avatar="${a}" aria-label="Avatar ${a}" aria-pressed="${a === selectedAvatar}">${a}</button>`).join('')}</div>
   <button class="btn primary full" type="submit" ${busy ? 'disabled' : ''}>${busy ? 'Conectando…' : 'Entrar na sala'} ${icon('arrow')}</button><p class="form-note">Sem cadastro. Sem download. Só aprender.</p></form>`;
 }
-function participants(limit = 8) {
+function participants(limit = 8, compact = false) {
   const people = state.ranking;
-  return `<div class="participants-strip"><div class="participant-count">${icon('users')} <strong>${people.filter(p => p.online).length}</strong> conectado${people.filter(p => p.online).length === 1 ? '' : 's'}</div><div class="participant-avatars">${people.slice(0, limit).map(p => `<span title="${esc(p.name)}${p.online ? '' : ' · offline'}" class="${p.online ? '' : 'offline'}">${avatarContent(p.avatar)}</span>`).join('')}${people.length > limit ? `<span class="extra-people">+${people.length - limit}</span>` : ''}</div>${host && !demo ? `<button class="text-btn" data-action="share">Convidar turma ${icon('arrow')}</button>` : ''}</div>`;
+  const count=people.filter(p=>p.online).length;
+  if(compact)return `<span class="live-participants" aria-label="${count} participantes conectados">${icon('users')} <strong>${count}</strong> conectado${count===1?'':'s'}</span>`;
+  return `<div class="participants-strip"><div class="participant-count" hidden>${icon('users')} <strong>${people.filter(p => p.online).length}</strong> conectado${people.filter(p => p.online).length === 1 ? '' : 's'}</div><div class="participant-avatars">${people.slice(0, limit).map(p => `<span title="${esc(p.name)}${p.online ? '' : ' · offline'}" class="${p.online ? '' : 'offline'}">${avatarContent(p.avatar)}</span>`).join('')}${people.length > limit ? `<span class="extra-people">+${people.length - limit}</span>` : ''}</div>${host && !demo ? `<button class="text-btn" data-action="share">Convidar turma ${icon('arrow')}</button>` : ''}</div>`;
 }
 function slideMedia(slide) {
   if (slide.kind === 'model') return modelPanel();
@@ -107,29 +114,16 @@ function slideMedia(slide) {
 }
 function presentationTop(documentView=false){return `<div class="${documentView?'document-top':'classroom-top'}"><div class="document-top-actions room-actions">${host ? `<label class="sr-only" for="document-page">Ir para página</label><select id="document-page" aria-label="Ir para página">${slides.map((s, i) => `<option value="${i}" ${state.slide === i ? 'selected' : ''}>${i + 1} · ${esc(s.title)}</option>`).join('')}</select>${presentationTools({ host, demo, state, settings: presenterSettings, imageText, readOnly: readOnlyPresentation, compact: true })}${!demo?`<button class="btn secondary small room-code" data-action="share">SALA <strong>${esc(state.code)}</strong></button>`:''}${readOnlyPresentation && demo ? '<button class="btn secondary small" data-action="connect-public-room">Conectar turma</button>' : ''}<button class="btn secondary small" data-action="fullscreen" aria-label="Apresentar em tela cheia">${icon('expand')} Tela cheia</button>` : '<span class="following-label"><span class="status-dot"></span> Acompanhando o professor</span>'}<button class="btn secondary small exit-presentation" data-action="leave">↩ Sair</button></div></div>`;}
 function documentLesson(slide) {
-  const canvas = slide.kind === 'canvas';
-  return `${header()}<main class="document-classroom">${presentationTop(true)}
+  const canvas = slide.kind === 'canvas',mobile=!host&&phoneLayout.matches;
+  return `${header()}<main class="document-classroom ${mobile?'mobile-companion':''}">${presentationTop(true)}
     ${status !== 'online' && !demo ? '<div class="connection-banner" role="status">Reconectando à sala. <button class="text-btn" data-action="reconnect">Reconectar</button></div>' : ''}
-    <figure class="document-stage ${canvas ? 'canvas-stage' : ''}">${canvas ? canvasMarkup(slide) : `<img src="${esc(slide.image)}" alt="${esc(slide.imageAlt || slide.title)}"><figcaption class="sr-only">${esc(slide.title)}</figcaption>`}</figure>
-    ${!host ? `<button class="student-expand" data-action="fullscreen">⛶ Ampliar slide</button>` : ''}
+    ${mobile?mobileMarkup(slides[state.slide]):`<figure class="document-stage ${canvas ? 'canvas-stage' : ''}">${canvas ? canvasMarkup(slide) : `<img src="${esc(slide.image)}" alt="${esc(slide.imageAlt || slide.title)}"><figcaption class="sr-only">${esc(slide.title)}</figcaption>`}</figure>`}
+    ${!host&&!mobile ? `<button class="student-expand" data-action="fullscreen">⛶ Ampliar slide</button>` : ''}
     ${slide.prompt ? `<section class="document-discussion"><strong>${esc(slide.prompt)}</strong><button class="text-btn" data-action="solution">${solutionOpen ? 'Ocultar' : 'Conferir'} explicação</button>${solutionOpen ? `<p>${esc(slide.answer)}</p>` : ''}</section>` : ''}
     ${host && notesOpen && slide.note ? `<aside class="document-notes">${esc(slide.note)}</aside>` : ''}
-    <footer class="document-footer">${participants()}<div class="document-nav"><span class="slide-counter"><strong>${state.slide + 1}</strong> / ${slides.length}</span>${host ? `${slide.note ? '<button class="text-btn" data-action="notes">Roteiro</button>' : ''}<button class="icon-btn bordered" data-action="previous" aria-label="Slide anterior" ${state.slide === 0 && !(state.animationStep>0) ? 'disabled' : ''}>${icon('left')}</button>${state.slide < slides.length - 1 || pendingPptxBuild() ? `<button class="btn primary small" data-action="next-slide">Próximo ${icon('right')}</button>` : `<button class="btn primary small" data-action="${state.totalQuestions ? 'quiz' : 'finish'}">${state.totalQuestions ? 'Iniciar quiz' : 'Encerrar aula'} ${icon('check')}</button>`}` : '<span class="following-label">Sincronizado com a aula</span>'}</div></footer></main>${shareOpen ? shareDialog() : ''}`;
+    <footer class="document-footer">${participants()}<div class="document-nav"><span class="slide-counter"><strong>${state.slide + 1}</strong> / ${slides.length}</span>${host ? `${state.totalQuestions?'<button class="text-btn" data-action="quiz">Ir para o quiz</button>':''}${slide.note ? '<button class="text-btn" data-action="notes">Roteiro</button>' : ''}<button class="icon-btn bordered" data-action="previous" aria-label="Slide anterior" ${state.slide === 0 && !(state.animationStep>0) ? 'disabled' : ''}>${icon('left')}</button>${state.slide < slides.length - 1 || pendingPptxBuild() ? `<button class="btn primary small" data-action="next-slide">Próximo ${icon('right')}</button>` : `<button class="btn primary small" data-action="${state.totalQuestions ? 'quiz' : 'finish'}">${state.totalQuestions ? 'Iniciar quiz' : 'Encerrar aula'} ${icon('check')}</button>`}` : '<span class="following-label">Sincronizado com a aula</span>'}</div></footer></main>${shareOpen ? shareDialog() : ''}`;
 }
-function lesson() {
-  const slide = slides[state.slide];
-  if (['document', 'canvas'].includes(slide.kind)) return documentLesson(slide);
-  return `${header()}<main class="classroom ${!host ? 'student-class' : ''} ${slide.kind === 'image' ? 'image-slide' : ''}">${presentationTop()}
-    ${status !== 'online' && !demo ? `<div class="connection-banner" role="status">Conexão interrompida. ${esc(statusMessage || 'Tentando reconectar. Se necessário, toque em Reconectar.')} <button class="text-btn" data-action="reconnect">Reconectar</button></div>` : ''}
-    ${!host ? `<div class="mobile-topic"><span class="eyebrow purple-text">${esc(slide.tag)}</span><h1>${esc(slide.title)}</h1></div>` : ''}
-    <div class="lesson-layout ${slide.kind === 'text' ? 'text-lesson' : ''}"><section class="slide-panel"><span class="eyebrow purple-text">${esc(slide.tag)}</span><h1>${esc(slide.title)}</h1><p class="slide-intro">${esc(slide.intro)}</p><ul class="teaching-points">${slide.points.map((p, i) => `<li><span>0${i + 1}</span><p>${esc(p)}</p></li>`).join('')}</ul>
-    ${slide.comparison ? `<div class="comparison"><div><strong>HDD</strong><span>Menor custo por GB</span><span>Ruído e partes móveis</span></div><div><strong>SSD</strong><span>Menor latência</span><span>Silencioso e sem partes móveis</span></div></div>` : ''}
-    ${slide.callout ? `<div class="callout">${icon('bolt')}<p>${esc(slide.callout)}</p></div>` : ''}
-    ${slide.prompt ? `<div class="discussion-prompt"><span class="eyebrow purple-text">PARA CONVERSAR COM A TURMA</span><p>${esc(slide.prompt)}</p></div><button class="text-btn reveal-discussion" data-action="solution">${solutionOpen ? 'Ocultar' : 'Conferir'} explicação ${icon('right')}</button>${solutionOpen ? `<p class="discussion-answer">${esc(slide.answer)}</p>` : ''}` : ''}
-    ${host ? `<div class="presenter-notes"><button data-action="notes" aria-expanded="${notesOpen}">${icon('book')} Roteiro do apresentador ${icon(notesOpen ? 'left' : 'right')}</button>${notesOpen ? `<p>${esc(slide.note)}</p>` : ''}</div>` : '<p class="student-hint">O apresentador conduz os slides. Você explora o modelo do seu jeito.</p>'}</section>${slideMedia(slide)}</div>
-    <div class="lesson-bottom">${participants()}<div class="slide-controls"><span class="slide-counter"><strong>${String(state.slide + 1).padStart(2, '0')}</strong> / ${String(slides.length).padStart(2, '0')}</span><div class="slide-dots">${slides.map((s, i) => `<button ${host ? `data-slide="${i}"` : 'disabled'} class="${i === state.slide ? 'active' : ''}" aria-label="Slide ${i + 1}: ${esc(s.title)}" ${i === state.slide ? 'aria-current="step"' : ''}></button>`).join('')}</div>${host ? `<button class="icon-btn bordered" data-action="previous" aria-label="Slide anterior" ${state.slide === 0 && !(state.animationStep>0) ? 'disabled' : ''}>${icon('left')}</button>${state.slide === slides.length - 1 && !pendingPptxBuild() ? `<button class="btn primary small" data-action="${state.totalQuestions ? 'quiz' : 'finish'}">${state.totalQuestions ? 'Iniciar quiz' : 'Encerrar aula'} ${icon('bolt')}</button>` : `<button class="btn primary small" data-action="next-slide">Próximo ${icon('right')}</button>`}` : '<span class="following-label"><span class="status-dot"></span> Sincronizado com a aula</span>'}</div></div>
-    ${host ? `<div class="presenter-footer"><span>← → para trocar os slides · F para tela cheia</span>${state.totalQuestions ? `<button class="text-btn" data-action="quiz">Ir para o quiz ${icon('trophy')}</button>` : ''}</div>` : ''}</main>${shareOpen ? shareDialog() : ''}`;
-}
+function lesson() { return documentLesson(presentationSlide(slides[state.slide])); }
 function pollMarkup() {
   const p = state.poll, closed = state.phase === 'poll-results';
   return `${header()}<main class="poll-stage"><span class="poll-eyebrow">▥ ENQUETE AO VIVO · SEM PONTUAÇÃO</span><h1>${esc(p.text)}</h1><p>${closed ? 'Votação encerrada. Vamos conversar sobre as escolhas?' : 'Cada opinião abre uma nova conversa.'}</p><div class="poll-options">${p.options.map((option,i) => {
@@ -183,6 +177,8 @@ function render() {
     if (editDraft) app.insertAdjacentHTML('beforeend', liveEditDialog(editDraft, editError));
   }
   app.dataset.transition = state?.phase === 'lesson' ? slides[state.slide]?.transition || 'slide' : 'slide';
+  if(state)app.insertAdjacentHTML('beforeend','<div data-remote-dialog></div>');
+  studio.remote.paint();
   studio.remote.setPresentation(state&&host&&!demo?{code:state.code,title:activeLesson.title,slide:state.slide,total:slides.length,phase:state.phase}:null);
   syncPresentationMode();
   if (editDraft) for (const el of app.querySelectorAll('.header, .classroom, .document-classroom, .presentation-toolbar, .pinned-room-qr')) el.inert = true;
@@ -190,7 +186,8 @@ function render() {
   if (!state && joinNameTouched && draftName!==undefined && document.querySelector('#player-name')) document.querySelector('#player-name').value = draftName;
   const slot = document.querySelector('#viewer-slot');
   if (slot) { slot.append(viewer.el); if (localModel === 'custom' && slides[state.slide]?.customModel) viewer.setCustomModel(slides[state.slide].customModel); else viewer.setModel(localModel, localExploded); requestAnimationFrame(() => viewer.resize()); }
-  canvasModels.mount(state?.phase === 'lesson' && slides[state.slide]?.kind === 'canvas' ? app : null, state?.phase === 'lesson' ? slides[state.slide] : null);
+  canvasModels.mount(state?.phase === 'lesson' ? app : null, state?.phase === 'lesson' ? presentationSlide(slides[state.slide]) : null);
+  fillAssetImages(app);
   if (state && (shareOpen || (host && !demo && presenterSettings.qrVisible && state.phase === 'lesson'))) {
     const url = joinUrl();
     const setQR = src => { if (state && joinUrl() === url) for (const image of document.querySelectorAll('#room-qr, [data-pinned-qr]')) image.src = src; };
@@ -375,7 +372,7 @@ app.addEventListener('click', event => { const button = event.target.closest('[d
 app.addEventListener('click', async e => {
   const button = e.target.closest('button');
   if (!button || button.disabled) return;
-  if (button.dataset.canvasExplode) { canvasModels.toggle(button.dataset.canvasExplode, slides[state.slide]); return; }
+  if (button.dataset.canvasExplode) { canvasModels.toggle(button.dataset.canvasExplode, presentationSlide(slides[state.slide])); return; }
   if (button.dataset.avatar) { avatarChanged=true;selectedAvatar = button.dataset.avatar; render(); }
   else if (button.dataset.model) {
     if (state && !host && button.dataset.model !== state.model) return;

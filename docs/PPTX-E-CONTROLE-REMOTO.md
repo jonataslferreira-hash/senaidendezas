@@ -44,6 +44,30 @@ Com a mesma conta no PC e celular, uma apresentação ao vivo aparece na bibliot
 do celular. O botão de controle abre os comandos. Prévias não são anunciadas
 como apresentações ao vivo. Outra conta não pode entrar no tópico privado.
 
+O mesmo controle também aparece no cabeçalho da sala, depois de entrar pelo QR
+Code: **Controlar slide**. O botão exige que o tópico privado da conta anuncie
+uma apresentação com o mesmo código da sala. Estar na sala como participante,
+por si só, não concede acesso aos comandos.
+
+## Apresentação no PC e conteúdo no celular
+
+Slides antigos de texto, imagem e modelo usam o mesmo quadro visual dos slides
+criados no editor. Essa adaptação não regrava a aula salva. Ao editar um slide
+antigo, o editor usa a mesma composição mostrada na apresentação.
+
+No editor, abra **Atividades e passagem deste slide → Conteúdo no celular**.
+Escolha automático, somente texto, ou uma das imagens/modelos do slide. Essa
+escolha também está em **Editar slide** durante a apresentação e é enviada à
+turma ao salvar. O modo automático prioriza um modelo; depois uma imagem
+desbloqueada, dando preferência à maior. Se o objeto escolhido for removido, a
+exibição volta automaticamente a essa prioridade.
+
+Em telas de até 800 pixels, participantes recebem título legível, mídia em
+destaque e texto adaptado, sem o quadro em miniatura. Modelos mantêm rotação,
+exploração de peças e abertura das camadas. Em telas maiores, a apresentação
+continua completa. PDFs continuam sendo páginas em imagem; não é possível
+extrair seus objetos individuais pelo seletor.
+
 ## Nome, foto e biblioteca
 
 A entrada na sala usa o nome do perfil e oferece a miniatura da foto da conta

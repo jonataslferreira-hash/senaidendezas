@@ -1,3 +1,4 @@
+import {presentationSlide} from './slide-display.js';
 import { audioEditor } from './audio-editor.js';
 import { optimizeImage } from './image-optimize.js';
 import { canvasFromSlide, newElement, canvasThemes } from './canvas-data.js';
@@ -27,7 +28,7 @@ export class SlideDesigner {
   display() {
     if (this.original.kind === 'canvas') return this.original;
     const signature = JSON.stringify(this.original), cached = this.derived.get(this.original.id);
-    if (!cached || cached.signature !== signature) this.derived.set(this.original.id, { signature, slide: canvasFromSlide(copy(this.original)) });
+    if (!cached || cached.signature !== signature) this.derived.set(this.original.id, { signature, slide: this.original.kind==='document'?canvasFromSlide(copy(this.original)):presentationSlide(copy(this.original)) });
     return this.derived.get(this.original.id).slide;
   }
   ensure() {
