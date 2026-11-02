@@ -4,9 +4,9 @@ O editor visual, os modelos próprios, os arquivos de slides, o perfil, a músic
 o lobby e a experiência animada estão implementados. Veja a revisão detalhada
 em [REVISAO-DOS-PEDIDOS.md](REVISAO-DOS-PEDIDOS.md).
 
-A publicação do Worker e a configuração da URL da API ainda são necessárias
-para ativar o R2 real do proprietário. O endereço S3 do bucket não substitui
-a URL da API. Login continua usando Supabase.
+O Worker do R2 foi publicado e sua URL foi configurada localmente e no
+workflow. Falta publicar a atualização do frontend e confirmar o envio
+autenticado pelo site. O login continua usando Supabase.
 
 Depois da revisão atual, evoluir além do quiz:
 

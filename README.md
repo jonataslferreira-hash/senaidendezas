@@ -184,8 +184,10 @@ atual e a nova senha. Fotos são recortadas e otimizadas para WebP de 256×256.
 Veja [docs/PERFIL-E-DESEMPENHO.md](docs/PERFIL-E-DESEMPENHO.md).
 
 O login continua no Supabase. O armazenamento suporta o R2 privado através de
-um Worker que valida esse login. O bucket informado é **storagelab**; falta
-publicar o Worker e configurar `VITE_R2_API_URL` para ativá-lo. O endereço S3
+um Worker que valida esse login. O bucket é **storagelab**; o Worker foi publicado em
+`https://storage-lab-files.lagujf.workers.dev` e a URL foi configurada no ambiente
+local e no workflow. Falta publicar a atualização do frontend e conferir um
+upload autenticado pelo site. O endereço S3
 não deve ser usado diretamente como URL da API. Consulte
 [docs/CLOUDFLARE-R2.md](docs/CLOUDFLARE-R2.md).
 

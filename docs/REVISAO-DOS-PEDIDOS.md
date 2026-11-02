@@ -18,7 +18,7 @@ execução do SQL no Supabase ou implantação do Worker no Cloudflare.
 | Lobby antes do quiz | Personagens, entrada de participantes, trilha opcional e contagem iniciada pelo professor. |
 | Música própria no slide e quiz | Upload, prévia, volume e repetição. O professor controla o áudio; não há várias trilhas tocando nos celulares. |
 | Contas e perfil | Login/cadastro/recuperação Supabase, nome, foto otimizada, bio, instituição, cores, redução de movimento e troca de senha. A foto exige armazenamento ativo. |
-| Arquivos da conta no R2 | Worker privado e configuração do bucket `storagelab` preparados. Precisa publicar e fornecer/configurar a URL do Worker. O endereço S3 não substitui essa URL. |
+| Arquivos da conta no R2 | Worker publicado com o bucket `storagelab`; URL configurada no projeto e no workflow. A consulta sem login foi bloqueada e CORS passou. Falta confirmar o envio autenticado pelo site após publicar o frontend. |
 | Compressão | Imagens otimizadas no envio e aulas comprimidas na nuvem quando houver economia. Processamento de gzip em Web Worker. |
 | Site animado e interativo | Biblioteca clara com demonstração interativa de três etapas, abertura do dispositivo ilustrado, feedback de resposta, movimento entre telas e slides, painéis e pódio. A animação automática termina em 7,6 segundos; o usuário pode repetir. |
 | Reduzir o consumo de CPU | Testes pesados encerrados; 3D sob demanda, limite de quadros e pausa fora da área visível. Preferência de movimento reduzido e testes leves sem WebGL. |

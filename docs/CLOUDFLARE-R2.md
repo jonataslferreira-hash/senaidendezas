@@ -1,6 +1,10 @@
 # R2 privado com login Supabase
 
-Bucket informado: **storagelab**. A configuração da conta e do bucket está
+Bucket informado: **storagelab**.
+Worker publicado: **https://storage-lab-files.lagujf.workers.dev**.
+A consulta sem sessão a `/lessons` retornou 401 e o preflight da origem do
+GitHub Pages retornou 204. O upload autenticado ainda precisa ser testado pela
+conta do proprietário no site. A configuração da conta e do bucket está
 em `cloudflare/wrangler.toml`. O endereço S3 `r2.cloudflarestorage.com` não é
 a URL que o navegador deve usar para carregar os arquivos da conta.
 
@@ -40,9 +44,12 @@ npx wrangler deploy --config cloudflare/wrangler.toml
 
 ## Conectar o site
 
-Defina `VITE_R2_API_URL` com a URL do Worker em `.env.local` e reinicie o Vite.
-No GitHub, cadastre o mesmo valor em **Settings → Secrets and variables →
-Actions → Variables**, depois gere um novo build/publicação. Sem essa URL,
+O `.env.local` foi configurado com o Worker publicado. O Vite recarrega essa
+configuração; se estiver usando outro processo antigo, reinicie-o.
+O workflow do GitHub Pages já usa essa URL como padrão. Uma variável
+`VITE_R2_API_URL` em **Settings → Secrets and variables → Actions → Variables**
+pode sobrescrevê-la; mantenha-a atualizada ou remova um valor antigo. Envie as
+alterações do workflow ao GitHub para gerar o novo build/publicação. Sem essa URL,
 o site continua usando o Supabase Storage e requer seu SQL de configuração.
 
 Não ative acesso público ao bucket ou `r2.dev`. Os pedidos usam o token do
