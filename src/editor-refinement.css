@@ -62,7 +62,7 @@ html[data-appearance] .lesson-chat .chat-message[data-sender-style=minimal]>div{
  .editor-shell .slide-designer{display:flex;flex-direction:column;flex:1;min-height:0}
  html[data-theme][data-ui-style] #app .designer-workspace{display:grid;grid-template-columns:minmax(0,1fr) 250px;grid-template-rows:minmax(0,1fr);align-items:stretch;flex:1;min-height:0;overflow:hidden}
  html[data-theme][data-ui-style] #app .designer-stage-wrap{height:100%;box-sizing:border-box;overflow:auto;overscroll-behavior:contain;padding:24px;min-height:0;container-type:size}
- .editor-shell .designer-stage{width:min(100%,900px,max(1px,calc((100cqh - 88px) * 16 / 9)));margin-inline:auto;max-height:none;height:auto;aspect-ratio:16/9;flex-shrink:0}
+ .editor-shell .designer-stage{width:min(100%,900px,max(1px,calc((100cqh - 88px) * var(--slide-aspect,1.777778))));margin-inline:auto;max-height:none;height:auto;aspect-ratio:var(--slide-aspect,1.777778);flex-shrink:0}
  html[data-theme][data-ui-style] #app .designer-inspector{height:100%;max-height:none;min-height:0;overflow:auto;overscroll-behavior:contain;position:relative;top:auto;border-top:0;box-sizing:border-box}
  .editor-shell .fields-only .designer-inspector{height:auto;max-height:none;overflow:visible}
  html[data-theme][data-ui-style] #app .designer-workspace.fields-only{display:block;overflow:auto}
@@ -80,3 +80,7 @@ html[data-theme][data-ui-style=glass] #app :is(.studio-btn,.studio-account-butto
 html[data-theme][data-ui-style=minimal] #app .studio-shell{font-family:Arial,sans-serif;letter-spacing:.015em}
 html[data-theme][data-ui-style=minimal] #app :is(.lesson-card,.studio-btn,.studio-account-button,.account-dialog,.home-hero,.editor-outline){border-radius:4px;box-shadow:none;backdrop-filter:none;border-width:1px}
 html[data-theme][data-ui-style=minimal] #app .studio-btn.accent{border-radius:4px;background:var(--ui-accent);box-shadow:3px 3px 0 color-mix(in srgb,var(--ui-accent),transparent 75%)}
+
+.pptx-compatibility{flex-shrink:0;max-height:140px;overflow:auto;background:var(--ui-soft);color:var(--ui-ink);padding:8px 14px;font-size:12px}.pptx-compatibility summary{cursor:pointer}.pptx-compatibility ul{padding:10px 18px;line-height:1.5}
+
+.canvas-editing .canvas-object[data-selected=true]{z-index:auto}

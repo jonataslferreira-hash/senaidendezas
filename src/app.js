@@ -1,3 +1,5 @@
+import { avatarContent,isPhotoAvatar } from './player-avatar.js';
+import { PptxAnimations } from './pptx-animations.js';
 import { loadPublicPresentation } from './public-presentations.js';
 import brandUrl from './assets/brand.svg';
 import { PageMotion } from './motion.js';
@@ -48,7 +50,9 @@ const app = document.querySelector('#app');
 const viewer = new HardwareViewer({ defer: true });
 const canvasModels = new CanvasModels();
 const pageMotion = new PageMotion();
+const pptxAnimations=new PptxAnimations();
 let classroom, state, host = false, demo = false, busy = false, selectedAvatar = avatars[0];
+let avatarChanged=false,joinNameTouched=false,joinNameDraft='';
 let shareOpen = false, notesOpen = false, solutionOpen = false, lastSlide = -1, localModel = 'ssd', localExploded = true;
 let status = 'offline', statusMessage = '', timerOffset = 0, music = false, audio, musicTimer, audioStep = 0;
 let readOnlyPresentation=false, publicPresentationToken='', sharedLoading=Boolean(new URLSearchParams(location.search).get('presentation')), sharedError='';
@@ -60,7 +64,7 @@ const presenterSettings = loadPresenterSettings();
 const qrCache = new Map();
 const params = new URLSearchParams(location.search);
 let codeDraft = (params.get('s') || '').replace(/\D/g, '').slice(0, 6);
-const studio = new Studio(app, { render, toast, joinForm, preview, present: lesson => connectSession({ host: true, lesson }) });
+const studio = new Studio(app, { render, toast, joinForm, preview, remoteAction:action, present: lesson => connectSession({ host: true, lesson }) });
 if (codeDraft) studio.view = 'join';
 
 function toast(message) {
@@ -82,16 +86,19 @@ function modelPanel(landing = false) {
     <span class="model-footnote">Modelo didático · proporções e componentes simplificados</span>
   </section>`;
 }
+function pendingPptxBuild(){return Boolean(state&&Math.max(0,...(slides[state.slide]?.animations||[]).map(a=>a.group||0))>(state.animationStep||0));}
 function joinForm() {
+  const user=studio.account.user,photo=studio.account.vault.list().find(s=>s.user.id===user?.id)?.avatar_thumbnail;if(!avatarChanged)selectedAvatar=isPhotoAvatar(photo)?photo:avatars[0];
+  const name=joinNameTouched?joinNameDraft:user?.user_metadata?.display_name||'';
   return `<form id="join-form" class="join-card"><div class="join-card-top"><span class="small-icon">${icon('users')}</span><span class="eyebrow">SEU LUGAR NA AULA</span></div><h2>Entre na experiência<span>.</span></h2><p>Escolha seu avatar. O resto a gente conecta.</p>
   <label for="room-code">Código da sala</label><input id="room-code" name="code" inputmode="numeric" autocomplete="off" pattern="[0-9]{6}" maxlength="6" placeholder="000 000" value="${esc(codeDraft)}" required>
-  <label for="player-name">Como podemos chamar você?</label><input id="player-name" name="name" autocomplete="nickname" maxlength="24" placeholder="Seu nome ou apelido" required>
-  <label id="avatar-label">Sua identidade no ranking</label><div class="avatar-picker" role="group" aria-labelledby="avatar-label">${avatars.map(a => `<button type="button" class="avatar ${a === selectedAvatar ? 'active' : ''}" data-avatar="${a}" aria-label="Avatar ${a}" aria-pressed="${a === selectedAvatar}">${a}</button>`).join('')}</div>
+  <label for="player-name">Como podemos chamar você?</label><input id="player-name" name="name" autocomplete="nickname" maxlength="24" placeholder="Seu nome ou apelido" value="${esc(name.slice(0,24))}" required>
+  <label id="avatar-label">Sua identidade no ranking</label><div class="avatar-picker" role="group" aria-labelledby="avatar-label">${photo?`<button type="button" class="avatar ${selectedAvatar===photo?'active':''}" data-avatar="${photo}" aria-label="Usar minha foto de perfil" aria-pressed="${selectedAvatar===photo}">${avatarContent(photo)}</button>`:''}${avatars.map(a => `<button type="button" class="avatar ${a === selectedAvatar ? 'active' : ''}" data-avatar="${a}" aria-label="Avatar ${a}" aria-pressed="${a === selectedAvatar}">${a}</button>`).join('')}</div>
   <button class="btn primary full" type="submit" ${busy ? 'disabled' : ''}>${busy ? 'Conectando…' : 'Entrar na sala'} ${icon('arrow')}</button><p class="form-note">Sem cadastro. Sem download. Só aprender.</p></form>`;
 }
 function participants(limit = 8) {
   const people = state.ranking;
-  return `<div class="participants-strip"><div class="participant-count">${icon('users')} <strong>${people.filter(p => p.online).length}</strong> conectado${people.filter(p => p.online).length === 1 ? '' : 's'}</div><div class="participant-avatars">${people.slice(0, limit).map(p => `<span title="${esc(p.name)}${p.online ? '' : ' · offline'}" class="${p.online ? '' : 'offline'}">${esc(p.avatar)}</span>`).join('')}${people.length > limit ? `<span class="extra-people">+${people.length - limit}</span>` : ''}</div>${host && !demo ? `<button class="text-btn" data-action="share">Convidar turma ${icon('arrow')}</button>` : ''}</div>`;
+  return `<div class="participants-strip"><div class="participant-count">${icon('users')} <strong>${people.filter(p => p.online).length}</strong> conectado${people.filter(p => p.online).length === 1 ? '' : 's'}</div><div class="participant-avatars">${people.slice(0, limit).map(p => `<span title="${esc(p.name)}${p.online ? '' : ' · offline'}" class="${p.online ? '' : 'offline'}">${avatarContent(p.avatar)}</span>`).join('')}${people.length > limit ? `<span class="extra-people">+${people.length - limit}</span>` : ''}</div>${host && !demo ? `<button class="text-btn" data-action="share">Convidar turma ${icon('arrow')}</button>` : ''}</div>`;
 }
 function slideMedia(slide) {
   if (slide.kind === 'model') return modelPanel();
@@ -107,7 +114,7 @@ function documentLesson(slide) {
     ${!host ? `<button class="student-expand" data-action="fullscreen">⛶ Ampliar slide</button>` : ''}
     ${slide.prompt ? `<section class="document-discussion"><strong>${esc(slide.prompt)}</strong><button class="text-btn" data-action="solution">${solutionOpen ? 'Ocultar' : 'Conferir'} explicação</button>${solutionOpen ? `<p>${esc(slide.answer)}</p>` : ''}</section>` : ''}
     ${host && notesOpen && slide.note ? `<aside class="document-notes">${esc(slide.note)}</aside>` : ''}
-    <footer class="document-footer">${participants()}<div class="document-nav"><span class="slide-counter"><strong>${state.slide + 1}</strong> / ${slides.length}</span>${host ? `${slide.note ? '<button class="text-btn" data-action="notes">Roteiro</button>' : ''}<button class="icon-btn bordered" data-action="previous" aria-label="Slide anterior" ${state.slide === 0 ? 'disabled' : ''}>${icon('left')}</button>${state.slide < slides.length - 1 ? `<button class="btn primary small" data-action="next-slide">Próximo ${icon('right')}</button>` : `<button class="btn primary small" data-action="${state.totalQuestions ? 'quiz' : 'finish'}">${state.totalQuestions ? 'Iniciar quiz' : 'Encerrar aula'} ${icon('check')}</button>`}` : '<span class="following-label">Sincronizado com a aula</span>'}</div></footer></main>${shareOpen ? shareDialog() : ''}`;
+    <footer class="document-footer">${participants()}<div class="document-nav"><span class="slide-counter"><strong>${state.slide + 1}</strong> / ${slides.length}</span>${host ? `${slide.note ? '<button class="text-btn" data-action="notes">Roteiro</button>' : ''}<button class="icon-btn bordered" data-action="previous" aria-label="Slide anterior" ${state.slide === 0 && !(state.animationStep>0) ? 'disabled' : ''}>${icon('left')}</button>${state.slide < slides.length - 1 || pendingPptxBuild() ? `<button class="btn primary small" data-action="next-slide">Próximo ${icon('right')}</button>` : `<button class="btn primary small" data-action="${state.totalQuestions ? 'quiz' : 'finish'}">${state.totalQuestions ? 'Iniciar quiz' : 'Encerrar aula'} ${icon('check')}</button>`}` : '<span class="following-label">Sincronizado com a aula</span>'}</div></footer></main>${shareOpen ? shareDialog() : ''}`;
 }
 function lesson() {
   const slide = slides[state.slide];
@@ -120,7 +127,7 @@ function lesson() {
     ${slide.callout ? `<div class="callout">${icon('bolt')}<p>${esc(slide.callout)}</p></div>` : ''}
     ${slide.prompt ? `<div class="discussion-prompt"><span class="eyebrow purple-text">PARA CONVERSAR COM A TURMA</span><p>${esc(slide.prompt)}</p></div><button class="text-btn reveal-discussion" data-action="solution">${solutionOpen ? 'Ocultar' : 'Conferir'} explicação ${icon('right')}</button>${solutionOpen ? `<p class="discussion-answer">${esc(slide.answer)}</p>` : ''}` : ''}
     ${host ? `<div class="presenter-notes"><button data-action="notes" aria-expanded="${notesOpen}">${icon('book')} Roteiro do apresentador ${icon(notesOpen ? 'left' : 'right')}</button>${notesOpen ? `<p>${esc(slide.note)}</p>` : ''}</div>` : '<p class="student-hint">O apresentador conduz os slides. Você explora o modelo do seu jeito.</p>'}</section>${slideMedia(slide)}</div>
-    <div class="lesson-bottom">${participants()}<div class="slide-controls"><span class="slide-counter"><strong>${String(state.slide + 1).padStart(2, '0')}</strong> / ${String(slides.length).padStart(2, '0')}</span><div class="slide-dots">${slides.map((s, i) => `<button ${host ? `data-slide="${i}"` : 'disabled'} class="${i === state.slide ? 'active' : ''}" aria-label="Slide ${i + 1}: ${esc(s.title)}" ${i === state.slide ? 'aria-current="step"' : ''}></button>`).join('')}</div>${host ? `<button class="icon-btn bordered" data-action="previous" aria-label="Slide anterior" ${state.slide === 0 ? 'disabled' : ''}>${icon('left')}</button>${state.slide === slides.length - 1 ? `<button class="btn primary small" data-action="${state.totalQuestions ? 'quiz' : 'finish'}">${state.totalQuestions ? 'Iniciar quiz' : 'Encerrar aula'} ${icon('bolt')}</button>` : `<button class="btn primary small" data-action="next-slide">Próximo ${icon('right')}</button>`}` : '<span class="following-label"><span class="status-dot"></span> Sincronizado com a aula</span>'}</div></div>
+    <div class="lesson-bottom">${participants()}<div class="slide-controls"><span class="slide-counter"><strong>${String(state.slide + 1).padStart(2, '0')}</strong> / ${String(slides.length).padStart(2, '0')}</span><div class="slide-dots">${slides.map((s, i) => `<button ${host ? `data-slide="${i}"` : 'disabled'} class="${i === state.slide ? 'active' : ''}" aria-label="Slide ${i + 1}: ${esc(s.title)}" ${i === state.slide ? 'aria-current="step"' : ''}></button>`).join('')}</div>${host ? `<button class="icon-btn bordered" data-action="previous" aria-label="Slide anterior" ${state.slide === 0 && !(state.animationStep>0) ? 'disabled' : ''}>${icon('left')}</button>${state.slide === slides.length - 1 && !pendingPptxBuild() ? `<button class="btn primary small" data-action="${state.totalQuestions ? 'quiz' : 'finish'}">${state.totalQuestions ? 'Iniciar quiz' : 'Encerrar aula'} ${icon('bolt')}</button>` : `<button class="btn primary small" data-action="next-slide">Próximo ${icon('right')}</button>`}` : '<span class="following-label"><span class="status-dot"></span> Sincronizado com a aula</span>'}</div></div>
     ${host ? `<div class="presenter-footer"><span>← → para trocar os slides · F para tela cheia</span>${state.totalQuestions ? `<button class="text-btn" data-action="quiz">Ir para o quiz ${icon('trophy')}</button>` : ''}</div>` : ''}</main>${shareOpen ? shareDialog() : ''}`;
 }
 function pollMarkup() {
@@ -132,7 +139,7 @@ function pollMarkup() {
 }
 function rankingTable(full = false) {
   const rank = full ? state.ranking : state.ranking.slice(0, 5);
-  return `<div class="ranking-list">${rank.length ? rank.map((p, i) => `<div class="rank-row ${state.me?.id === p.id ? 'is-me' : ''}"><span class="rank-position">${i === 0 ? '♛' : String(i + 1).padStart(2, '0')}</span><span class="rank-avatar">${esc(p.avatar)}</span><div class="rank-person"><strong>${esc(p.name)}${state.me?.id === p.id ? ' <small>você</small>' : ''}</strong><span>${p.correct} acerto${p.correct === 1 ? '' : 's'}${p.online ? '' : ' · offline'}</span></div><strong class="rank-score">${p.score.toLocaleString('pt-BR')}<small> pts</small></strong></div>`).join('') : '<p class="empty-state">O ranking começa com a primeira resposta.</p>'}</div>`;
+  return `<div class="ranking-list">${rank.length ? rank.map((p, i) => `<div class="rank-row ${state.me?.id === p.id ? 'is-me' : ''}"><span class="rank-position">${i === 0 ? '♛' : String(i + 1).padStart(2, '0')}</span><span class="rank-avatar">${avatarContent(p.avatar)}</span><div class="rank-person"><strong>${esc(p.name)}${state.me?.id === p.id ? ' <small>você</small>' : ''}</strong><span>${p.correct} acerto${p.correct === 1 ? '' : 's'}${p.online ? '' : ' · offline'}</span></div><strong class="rank-score">${p.score.toLocaleString('pt-BR')}<small> pts</small></strong></div>`).join('') : '<p class="empty-state">O ranking começa com a primeira resposta.</p>'}</div>`;
 }
 function quiz() {
   const q = state.question, revealed = state.phase === 'reveal', myAnswer = state.me?.answer;
@@ -150,7 +157,7 @@ function finished() {
   if (!state.totalQuestions) return `${header()}<main class="results"><span class="eyebrow purple-text">IDEIAS COMPARTILHADAS</span><h1>Aula <span>concluída.</span></h1><p>${esc(activeLesson.title)}</p><p>${state.ranking.length} participante(s) fizeram parte desta descoberta.</p><div class="results-actions">${host ? '<button class="btn primary" data-action="back-lesson">Voltar à aula</button>' : ''}<button class="btn secondary" data-action="leave">Voltar ao início</button></div></main>`;
 
   const winners = state.ranking.slice(0, 3);
-  return `${header()}<main class="results"><div class="confetti" aria-hidden="true">${Array.from({ length: 28 }, (_, i) => `<i style="--i:${i}"></i>`).join('')}</div><span class="eyebrow purple-text">${icon('trophy')} MISSÃO CONCLUÍDA</span><h1>Conhecimento que<br>merece um <span>pódio.</span></h1><p>A turma explorou, descobriu e deu um show. Agora, o resultado.</p><div class="podium">${[1, 0, 2].filter(i => winners[i]).map(i => `<div class="podium-person place-${i + 1}"><div class="podium-avatar">${i === 0 ? '<span class="crown">♛</span>' : ''}${esc(winners[i].avatar)}</div><strong>${esc(winners[i].name)}</strong><span>${winners[i].score.toLocaleString('pt-BR')} pts</span><div class="podium-block">${i + 1}<small>${winners[i].correct} acertos</small></div></div>`).join('')}</div><div class="full-ranking"><div class="ranking-title"><h2>Todo mundo faz parte</h2><button class="text-btn" data-action="export">Baixar resultado ${icon('arrow')}</button></div>${rankingTable(true)}</div><div class="results-actions">${host ? '<button class="btn primary" data-action="back-lesson">Voltar à aula</button>' : ''}<button class="btn secondary" data-action="leave">Voltar ao início ${icon('arrow')}</button></div><p class="closing-line">O melhor resultado é sair sabendo um pouco mais. 💜</p></main>`;
+  return `${header()}<main class="results"><div class="confetti" aria-hidden="true">${Array.from({ length: 28 }, (_, i) => `<i style="--i:${i}"></i>`).join('')}</div><span class="eyebrow purple-text">${icon('trophy')} MISSÃO CONCLUÍDA</span><h1>Conhecimento que<br>merece um <span>pódio.</span></h1><p>A turma explorou, descobriu e deu um show. Agora, o resultado.</p><div class="podium">${[1, 0, 2].filter(i => winners[i]).map(i => `<div class="podium-person place-${i + 1}"><div class="podium-avatar">${i === 0 ? '<span class="crown">♛</span>' : ''}${avatarContent(winners[i].avatar)}</div><strong>${esc(winners[i].name)}</strong><span>${winners[i].score.toLocaleString('pt-BR')} pts</span><div class="podium-block">${i + 1}<small>${winners[i].correct} acertos</small></div></div>`).join('')}</div><div class="full-ranking"><div class="ranking-title"><h2>Todo mundo faz parte</h2><button class="text-btn" data-action="export">Baixar resultado ${icon('arrow')}</button></div>${rankingTable(true)}</div><div class="results-actions">${host ? '<button class="btn primary" data-action="back-lesson">Voltar à aula</button>' : ''}<button class="btn secondary" data-action="leave">Voltar ao início ${icon('arrow')}</button></div><p class="closing-line">O melhor resultado é sair sabendo um pouco mais. 💜</p></main>`;
 }
 function joinUrl() {
   let url;
@@ -176,10 +183,11 @@ function render() {
     if (editDraft) app.insertAdjacentHTML('beforeend', liveEditDialog(editDraft, editError));
   }
   app.dataset.transition = state?.phase === 'lesson' ? slides[state.slide]?.transition || 'slide' : 'slide';
+  studio.remote.setPresentation(state&&host&&!demo?{code:state.code,title:activeLesson.title,slide:state.slide,total:slides.length,phase:state.phase}:null);
   syncPresentationMode();
   if (editDraft) for (const el of app.querySelectorAll('.header, .classroom, .document-classroom, .presentation-toolbar, .pinned-room-qr')) el.inert = true;
   if (!state) studio.afterRender();
-  if (!state && draftName && document.querySelector('#player-name')) document.querySelector('#player-name').value = draftName;
+  if (!state && joinNameTouched && draftName!==undefined && document.querySelector('#player-name')) document.querySelector('#player-name').value = draftName;
   const slot = document.querySelector('#viewer-slot');
   if (slot) { slot.append(viewer.el); if (localModel === 'custom' && slides[state.slide]?.customModel) viewer.setCustomModel(slides[state.slide].customModel); else viewer.setModel(localModel, localExploded); requestAnimationFrame(() => viewer.resize()); }
   canvasModels.mount(state?.phase === 'lesson' && slides[state.slide]?.kind === 'canvas' ? app : null, state?.phase === 'lesson' ? slides[state.slide] : null);
@@ -189,6 +197,7 @@ function render() {
     if (qrCache.has(url)) setQR(qrCache.get(url));
     else QRCode.toDataURL(url, { width: 460, margin: 2 }).then(src => { qrCache.set(url, src); setQR(src); }).catch(() => toast('Não foi possível gerar o QR Code. Use o link ou código.'));
   }
+  if(state?.phase==='lesson')pptxAnimations.mount(app,slides[state.slide],activeLesson.id+':'+state.slide,state.animationStep||0);else pptxAnimations.key=null;
   pageMotion.mount(app, { key: state ? `${activeLesson.id}:${state.phase}:${state.slide}:${state.questionIndex}` : `${studio.view}:${studio.draft?.id || ''}:${studio.tab}:${studio.view==='editor'?'editor':studio.index}:${studio.questionIndex}:${studio.visualMode}`, kind: state?.phase || studio.view, slide: state?.slide || 0 });
   updateClock();
   const ticking = ['question', 'countdown'].includes(state?.phase);
@@ -319,8 +328,8 @@ async function action(name) {
     case 'preview': preview(); break;
     case 'connect-public-room': { const lesson=activeLesson;clearInterval(demoTimer);await connectSession({host:true,lesson});break; }
     case 'home': case 'leave': leave(); break;
-    case 'next-slide': control('slide', Math.min(slides.length - 1, state.slide + 1)); break;
-    case 'previous': control('slide', Math.max(0, state.slide - 1)); break;
+    case 'next-slide': if(pendingPptxBuild()){control('animation',(state.animationStep||0)+1);break;}control('slide', Math.min(slides.length - 1, state.slide + 1)); break;
+    case 'previous': if(state.animationStep>0){control('animation',state.animationStep-1);break;}control('slide', Math.max(0, state.slide - 1)); break;
     case 'quiz': music = true; control('quiz'); break;
     case 'poll': control('poll'); break;
     case 'close-poll': control('close-poll'); break;
@@ -367,7 +376,7 @@ app.addEventListener('click', async e => {
   const button = e.target.closest('button');
   if (!button || button.disabled) return;
   if (button.dataset.canvasExplode) { canvasModels.toggle(button.dataset.canvasExplode, slides[state.slide]); return; }
-  if (button.dataset.avatar) { selectedAvatar = button.dataset.avatar; render(); }
+  if (button.dataset.avatar) { avatarChanged=true;selectedAvatar = button.dataset.avatar; render(); }
   else if (button.dataset.model) {
     if (state && !host && button.dataset.model !== state.model) return;
     localModel = button.dataset.model;
@@ -377,6 +386,7 @@ app.addEventListener('click', async e => {
   else if (button.dataset.action) await action(button.dataset.action);
 });
 app.addEventListener('input', e => {
+  if(e.target.id==='player-name'){joinNameTouched=true;joinNameDraft=e.target.value;}if(e.target.id==='room-code')codeDraft=e.target.value.replace(/\D/g,'').slice(0,6);
   const key = e.target.dataset.liveField;
   if (editDraft && e.target.dataset.liveElement) { const el = editDraft.elements.find(el => el.id === e.target.dataset.liveElement); if (el) { el.text = e.target.value; if (el.role === 'title') editDraft.title = el.text.slice(0, 200); } return; }
   if (!key || !editDraft) return;
@@ -505,3 +515,8 @@ app.addEventListener('pointerdown', () => { if (document.fullscreenElement) show
 import './editor-refinement.css';
 
 import './workspace-controls.css';
+
+app.addEventListener('profile-updated',()=>{if(!state&&studio.view==='join')render();});
+app.addEventListener('account-changed',()=>{avatarChanged=false;joinNameTouched=false;joinNameDraft='';selectedAvatar=avatars[0];if(!state&&studio.view==='join')queueMicrotask(render);});
+
+import './account-live.css';

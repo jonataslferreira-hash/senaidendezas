@@ -69,7 +69,7 @@ export class Account {
     try{const {data,error}=await this.client.auth.getUser();if(!error&&data.user?.id===uid&&this.user?.id===uid&&version===(this.preferencesVersion||0)){this.user=data.user;this.settings.applyPreferences();this.settings.refreshAvatar();this.updateProfile(this.root);}}catch{}finally{this.fetchingPreferences=false;}
   }
   profile() { return `<button type="button" class="studio-account-button" data-account-action="open">${this.user ? this.settings.avatar() + `<span>${esc(this.user.user_metadata?.display_name || this.user.email)}</span>` : 'Entrar / Criar conta'}</button>`; }
-  updateProfile(root) { const slot = root.querySelector('[data-account-profile]'); if (slot) slot.innerHTML = this.profile(); }
+  updateProfile(root) { const slot = root.querySelector('[data-account-profile]'); if (slot) slot.innerHTML = this.profile();root.dispatchEvent(new CustomEvent('profile-updated')); }
   show(mode) { this.panelVersion=(this.panelVersion||0)+1;this.closing=false;this.animatePanel=true;this.returnFocus ||= document.activeElement; if (this.mode === 'profile' && mode !== 'profile') this.settings.cancel(); this.mode = mode; if (mode === 'account') this.settings.refreshAvatar(); if (mode === 'profile') this.settings.begin(); this.error = ''; this.message = ''; this.paint(); }
   close() {
     if(this.busy||this.closing)return;

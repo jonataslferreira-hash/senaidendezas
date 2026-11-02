@@ -16,7 +16,7 @@ export function pdfFixture(count = 2) {
   result += 'trailer\n<< /Size ' + (objects.length + 1) + ' /Root 1 0 R >>\nstartxref\n' + xref + '\n%%EOF\n';
   return Buffer.from(result);
 }
-export async function pptxFixture() {
+export async function pptxFixture(animated=false) {
   const pptx = await import('@office-kit/pptx');
   const presentation = pptx.createPresentation();
   for (const [i, title] of ['Professor por um dia', 'HDD e SSD'].entries()) {
@@ -25,7 +25,7 @@ export async function pptxFixture() {
     const text = pptx.addSlideTextBox(slide, { x: pptx.inches(.8), y: pptx.inches(1), w: pptx.inches(10), h: pptx.inches(1.3), text: title });
     pptx.setShapeTextFormat(text, { font: 'Arial', size: 40, color: '#E0C5FF', bold: true });
     const body = pptx.addSlideTextBox(slide, { x: pptx.inches(.8), y: pptx.inches(2.7), w: pptx.inches(10), h: pptx.inches(1.7), text: i ? 'Dados guardados. Ideias conectadas.' : 'Uma aula importada do PowerPoint.' });
-    pptx.setShapeTextFormat(body, { font: 'Arial', size: 26, color: '#FFFFFF' });
+    pptx.setShapeTextFormat(body, { font: 'Arial', size: 26, color: '#FFFFFF' });if(animated)pptx.setShapeAnimation(body,{effect:'fadeIn',start:'click',durationMs:300});
   }
   return Buffer.from(await pptx.savePresentation(presentation));
 }

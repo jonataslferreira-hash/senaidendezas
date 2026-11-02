@@ -60,44 +60,6 @@ async function pdfPages(bytes, { signal, progress }) {
     throw error;
   } finally { signal?.removeEventListener('abort', abort); await loading.destroy().catch(() => {}); }
 }
-async function pptxPages(bytes, { signal, progress }) {
-  const [{ loadPresentation, getSlides }, { renderSlideToSvg }] = await Promise.all([import('@office-kit/pptx'), import('@office-kit/pptx-preview')]);
-  checkSignal(signal);
-  const presentation = await loadPresentation(bytes, { limits: { maxEntries: 10000, maxTotalUncompressedBytes: 150 * 1024 * 1024, maxXmlPartBytes: 8 * 1024 * 1024, maxTotalXmlBytes: 40 * 1024 * 1024 } }), slides = getSlides(presentation);
-  checkCount(slides.length);
-  const measure = document.createElement('canvas').getContext('2d');
-  const result = []; let total = 0;
-  for (const [i, slide] of slides.entries()) {
-    checkSignal(signal); progress(i, slides.length); await breathe();
-    const svg = renderSlideToSvg(presentation, slide, { textLayout: 'svg', resolveFamily: family => family || 'Arial',
-      measureText: (text, spec) => {
-        measure.font = (spec.italic ? 'italic ' : '') + (spec.bold ? 'bold ' : '') + spec.sizePx + 'px "' + spec.family.replace(/["\\]/g, '') + '"';
-        const metrics = measure.measureText(text);
-        return { widthPx: metrics.width + Math.max(0, [...text].length - 1) * spec.letterSpacingPx,
-          ascentPx: metrics.fontBoundingBoxAscent || spec.sizePx * .8, descentPx: metrics.fontBoundingBoxDescent || spec.sizePx * .2 };
-      } });
-    const xml = new DOMParser().parseFromString(svg, 'image/svg+xml'), root = xml.documentElement;
-    if (xml.querySelector('parsererror')) throw Error('Não foi possível desenhar um slide deste PPTX. Exporte-o como PDF e tente novamente.');
-    // Never insert imported SVG markup into the page. Rasterizing an <img>
-    // isolates the SVG and excludes active slide content.
-    if ([...xml.querySelectorAll('[href], [xlink\\:href]')].some(el => /^https?:/i.test(el.getAttribute('href') || el.getAttribute('xlink:href') || ''))) throw Error('O PPTX usa imagens externas. Incorpore as imagens ou exporte como PDF.');
-    const box = (root.getAttribute('viewBox') || '').split(/[\s,]+/).map(Number);
-    const width = box[2] || parseFloat(root.getAttribute('width')), height = box[3] || parseFloat(root.getAttribute('height'));
-    const canvas = canvasFor(width, height), context = canvas.getContext('2d');
-    const url = URL.createObjectURL(new Blob([svg], { type: 'image/svg+xml' }));
-    try {
-      const img = new Image(); img.src = url; await img.decode(); checkSignal(signal);
-      context.fillStyle = '#fff'; context.fillRect(0, 0, canvas.width, canvas.height);
-      context.drawImage(img, 0, 0, canvas.width, canvas.height);
-      const image = encode(canvas); total += image.length;
-      if (total > 44 * 1024 * 1024) throw Error('Os slides renderizados excedem 44 MB. Divida o PPTX em partes menores.');
-      const content = [...xml.querySelectorAll('text')].map(el => el.textContent).join(' ').slice(0, 6000);
-      result.push(pageSlide(image, 'Slide ' + (i + 1), content, 'pptx', canvas.width, canvas.height));
-      progress(i + 1, slides.length);
-    } finally { URL.revokeObjectURL(url); canvas.width = canvas.height = 0; }
-  }
-  return result;
-}
 export async function importSlides(file, { signal, progress = () => {} } = {}) {
   const extension = file.name.split('.').pop().toLowerCase();
   if (!['pdf', 'pptx'].includes(extension)) throw Error('Escolha PDF ou PPTX. Para PPT, ODP, Keynote ou Google Slides, exporte como PDF primeiro.');
@@ -108,7 +70,7 @@ export async function importSlides(file, { signal, progress = () => {} } = {}) {
   if (extension === 'pptx' && (bytes[0] !== 0x50 || bytes[1] !== 0x4b)) throw Error('Este arquivo não parece ser um PPTX válido.');
   const lesson = newLesson();
   lesson.title = file.name.replace(/\.[^.]+$/, '').slice(0, 140);
-  lesson.slides = await (extension === 'pdf' ? pdfPages : pptxPages)(bytes, { signal, progress });
+  lesson.slides = extension==='pptx'?await (await import('./pptx-import.js')).editablePptx(bytes,{signal,progress}):await pdfPages(bytes,{signal,progress});
   lesson.description = file.name.slice(0, 400) + ' · ' + lesson.slides.length + ' slides importados';
   checkSignal(signal);
   return lesson;

@@ -1,6 +1,5 @@
 import { test, expect } from '@playwright/test';
-import { readFile } from 'node:fs/promises';
-import { pdfFixture, pptxFixture } from '../document-fixtures.js';
+import { pdfFixture } from '../document-fixtures.js';
 async function upload(page, name, buffer) {
   await page.getByRole('button', { name: '↑ Importar slides', exact: true }).click();
   await page.locator('#import-slides-file').setInputFiles({ name, mimeType: name.endsWith('.pdf') ? 'application/pdf' : 'application/vnd.openxmlformats-officedocument.presentationml.presentation', buffer });
@@ -41,36 +40,6 @@ test('PDF vira páginas persistidas, apresenta em tela cheia e sincroniza com ce
   expect(await phone.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
   expect(errors).toEqual([]);
   await phoneContext.close(); await hostContext.close();
-});
-test('PPTX mantém páginas, exporta JSON portátil e reabre imagens em outro navegador', async ({ page, browser }) => {
-  await page.goto('/');
-  await upload(page, 'minha-apresentacao.pptx', await pptxFixture());
-  await expect(page.locator('.outline-item')).toHaveCount(2);
-  await expect(page.locator('.imported-notice')).toContainText('animações e vídeos não são importados');
-  await expect(page.locator('.imported-page-preview img')).toHaveJSProperty('naturalWidth', 1920);
-  const downloaded = page.waitForEvent('download');
-  await page.locator('[data-studio-action="export-draft"]').click();
-  const download = await downloaded;
-  const json = JSON.parse(await readFile(await download.path(), 'utf8'));
-  expect(json.slides).toHaveLength(2);
-  expect(json.slides[0].image).toMatch(/^data:image\/jpeg/);
-  expect(json.slides[0].assetId).toBeUndefined();
-  await page.getByRole('button', { name: '▷ Prévia', exact: true }).click();
-  await expect(page.locator('.document-stage img')).toBeVisible();
-  await page.screenshot({ path: 'test-results/imported-pptx.png', fullPage: true });
-  await page.getByRole('button', { name: 'Sair', exact: true }).click();
-  await page.reload();
-  await page.getByRole('button', { name: '▷ Prévia', exact: true }).click();
-  await expect(page.locator('.document-stage img')).toHaveJSProperty('naturalWidth', 1920);
-  const context = await browser.newContext(), other = await context.newPage();
-  await other.goto('/');
-  await other.locator('#import-lesson-file').setInputFiles({ name: 'aula.json', mimeType: 'application/json', buffer: Buffer.from(JSON.stringify(json)) });
-  await expect(other.getByLabel('Título da aula', { exact: true })).toHaveValue('minha-apresentacao');
-  await other.getByRole('button', { name: '▷ Prévia', exact: true }).click();
-  await expect(other.locator('.document-stage img')).toHaveJSProperty('naturalWidth', 1920);
-  await other.getByRole('button', { name: 'Próximo', exact: true }).click();
-  await expect(other.locator('.document-nav .slide-counter')).toContainText('2 / 2');
-  await context.close();
 });
 test('PDF importa no build do GitHub Pages; arquivos inválidos, excesso de páginas e cancelamento preservam a biblioteca', async ({ page }) => {
   const errors = [];

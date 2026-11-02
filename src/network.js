@@ -51,7 +51,7 @@ export class Classroom {
     if (this.connections.size >= 65) { conn.close(); return; }
     const timeout = setTimeout(() => { if (!conn.playerId) conn.close(); }, 12_000);
     conn.on('data', msg => {
-      if (!msg || typeof msg !== 'object' || JSON.stringify(msg).length > 4096) return;
+      if (!msg || typeof msg !== 'object' || JSON.stringify(msg).length > (msg.type==='join'?32768:4096)) return;
       const time = Date.now();
       conn.actions = (conn.actions || []).filter(t => t > time - 10_000);
       if (conn.actions.length > 40) return;

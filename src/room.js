@@ -1,3 +1,4 @@
+import {isPhotoAvatar} from './player-avatar.js';
 import { avatars, defaultQuestions } from './content.js';
 import { demoLesson, validateLesson } from './lessons.js';
 
@@ -24,7 +25,7 @@ export class Room {
       if (this.data.players.length >= 60) throw Error('Esta sala atingiu o limite de 60 participantes.');
       name = String(name || '').trim().replace(/[\x00-\x1f\x7f]/g, '').slice(0, 24);
       if (!name) throw Error('Digite seu nome ou apelido.');
-      p = { id: newToken(), token: newToken(), name, avatar: avatars.includes(avatar) ? avatar : avatars[0], score: 0, correct: 0, answers: {}, online: true };
+      p = { id: newToken(), token: newToken(), name, avatar: avatars.includes(avatar)||isPhotoAvatar(avatar) ? avatar : avatars[0], score: 0, correct: 0, answers: {}, online: true };
       this.data.players.push(p);
     }
     p.online = true;
@@ -39,8 +40,9 @@ export class Room {
       const changedModel = this.slides[d.slide].model !== next.slides[d.slide].model || this.slides[d.slide].kind !== next.slides[d.slide].kind;
       this.lesson = next; this.slides = next.slides; this.questions = next.questions; d.lesson = next;
       if (changedModel) { d.model = next.slides[d.slide].model; d.exploded = false; }
+    } else if(action==='animation'&&d.phase==='lesson'){const max=Math.max(0,...(this.slides[d.slide].animations||[]).map(a=>a.group||0));d.animationStep=Math.max(0,Math.min(max,Math.floor(Number(value)||0)));
     } else if (action === 'slide' && d.phase === 'lesson' && Number.isInteger(value) && value >= 0 && value < this.slides.length) {
-      d.slide = value; d.model = this.slides[value].model; d.exploded = false;
+      d.slide = value;d.animationStep=0; d.model = this.slides[value].model; d.exploded = false;
     } else if (action === 'poll' && d.phase === 'lesson') {
       if (!this.slides[d.slide].poll) throw Error('Adicione uma enquete a este slide no editor.');
       d.phase = 'poll'; d.pollId = newToken(); d.votes = {};
@@ -100,7 +102,7 @@ export class Room {
     const d = this.data, q = this.questions[d.questionIndex], p = d.players.find(p => p.id === id), a = p?.answers[d.questionIndex];
     const revealed = ['reveal', 'finished'].includes(d.phase);
     return {
-      code: d.code, phase: d.phase, slide: d.slide, model: d.model, exploded: d.exploded,
+      code: d.code, phase: d.phase, animationStep:d.animationStep||0, slide: d.slide, model: d.model, exploded: d.exploded,
       questionIndex: d.questionIndex, totalQuestions: this.questions.length, serverTime: this.now(),
       countdownEndsAt: d.phase === 'countdown' ? d.deadline : 0,
       poll: ['poll', 'poll-results'].includes(d.phase) ? { ...this.slides[d.slide].poll, id: d.pollId, total: Object.keys(d.votes).length, choice: p && Object.hasOwn(d.votes, id) ? d.votes[id] : null, counts: this.slides[d.slide].poll.options.map((_, i) => Object.values(d.votes).filter(v => v === i).length) } : null,

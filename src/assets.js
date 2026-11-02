@@ -72,7 +72,7 @@ export async function hydrateLesson(lesson, portable = false) {
 export async function archiveImportedPages(lesson) {
   const slides = copiedSlides(lesson), pending = [], result = { ...lesson, slides, quizAudio: lesson.quizAudio ? { ...lesson.quizAudio } : null };
   for (const node of nodes(slides)) {
-    if (node.image && ['document', 'image'].includes(node.kind || node.type)) pending.push({ node, field: 'image' });
+    if (node.image && (['document', 'image'].includes(node.kind || node.type)||node.kind==='canvas'&&node.sourceType==='pptx')) pending.push({ node, field: 'image' });
     if (node.customModel?.data) pending.push({ node: node.customModel, field: 'data' });
   }
   for (const audio of audioResources(result)) if (audio.data) pending.push({ node: audio, field: 'data' });

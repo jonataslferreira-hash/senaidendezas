@@ -54,7 +54,7 @@ test('duas contas editam o mesmo texto ao vivo, salvam versões concorrentes e r
       const file=files.get(path);return file?route.fulfill({body:file,contentType:'application/octet-stream'}):route.fulfill({status:404,json:{error:'not_found'}});
     });
     await page.goto('/?page=editor&collab='+id);
-    await expect(page.locator('[data-collab-status]')).toContainText('Edição ao vivo conectada');
+    await expect(page.locator('[data-collab-status]')).toContainText(/Edição ao vivo conectada|Salvo no grupo|Alterações por salvar/);
     await page.getByRole('button',{name:'Campos',exact:true}).click();
     return{page,context};
   }

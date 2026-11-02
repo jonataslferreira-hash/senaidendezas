@@ -22,13 +22,13 @@ export async function saveCloudLesson(client, lesson) {
   const packed = await packLesson(lesson); unchanged(s);
   const blob = new Blob([packed.buffer], { type: packed.compressed ? 'application/gzip' : 'application/json' });
   if (blob.size > MAX_CLOUD_BYTES) throw Error('A aula ultrapassa 50 MB. Divida os arquivos antes de enviar.');
-  if (r2ApiUrl) { await r2Request(s, '/lessons/' + id, { method: 'PUT', body: blob, headers: { 'Content-Type': blob.type, 'X-Lesson-Title': encodeURIComponent(lesson.title.slice(0, 140)), 'X-Original-Bytes': String(packed.originalBytes) } }); return { bytes: blob.size, originalBytes: packed.originalBytes, compressed: packed.compressed }; }
+  if (r2ApiUrl) { await r2Request(s, '/lessons/' + id, { method: 'PUT', body: blob, headers: { 'Content-Type': blob.type, 'X-Lesson-Title': encodeURIComponent(lesson.title.slice(0, 140)), 'X-Original-Bytes': String(packed.originalBytes) } }); return { path:'r2:'+id,bytes: blob.size, originalBytes: packed.originalBytes, compressed: packed.compressed }; }
   const path = `${s.uid}/lessons/${id}.json${packed.compressed ? '.gz' : ''}`;
   const { error } = await client.storage.from(CLOUD_BUCKET).upload(path, blob, { contentType: blob.type, upsert: true });
   if (error) throw cloudError(error); unchanged(s);
   const result = await client.from('lesson_files').upsert({ user_id: s.uid, id, title: lesson.title.slice(0, 140), path, bytes: blob.size, updated_at: new Date().toISOString() }, { onConflict: 'user_id,id' });
   if (result.error) throw cloudError(result.error); unchanged(s);
-  return { bytes: blob.size, originalBytes: packed.originalBytes, compressed: packed.compressed };
+  return { path,bytes: blob.size, originalBytes: packed.originalBytes, compressed: packed.compressed };
 }
 export async function listCloudLessons(client) {
   const s = await authenticated(client);
