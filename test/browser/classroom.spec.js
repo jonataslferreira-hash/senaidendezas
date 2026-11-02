@@ -6,6 +6,7 @@ test('aula completa: WebRTC, celular, modelo sincronizado, quiz, reconexão e ra
   const host = await hostContext.newPage(), phone = await phoneContext.newPage();
   const errors = [];
   for (const page of [host, phone]) page.on('pageerror', e => errors.push(e.message));
+  await host.clock.install();
   await host.goto('/?localSignal');
   await expect(host.getByRole('heading', { name: /Sua próxima grande/ })).toBeVisible();
   await host.locator('[data-studio-action="present"]').click();
@@ -33,6 +34,9 @@ test('aula completa: WebRTC, celular, modelo sincronizado, quiz, reconexão e ra
   // fixo impede que a renderização 3D em software esgote o prazo do quiz.
   await host.clock.setFixedTime(new Date());
   await host.getByRole('button', { name: /Ir para o quiz/ }).click();
+  await expect(phone.locator('.quiz-lobby')).toBeVisible();
+  await host.getByRole('button', { name: 'Começar quiz', exact: false }).click();
+  await host.clock.setFixedTime(new Date(Date.now() + 3100));
   const answers = [1, 2, 3, 0, 2];
   for (let i = 0; i < answers.length; i++) {
     await expect(phone.locator('.quiz-count')).toContainText(String(i + 1));

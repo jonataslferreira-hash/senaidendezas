@@ -10,7 +10,8 @@
     "build": "vite build --base=./",
     "preview": "vite preview --host 0.0.0.0",
     "test:e2e": "playwright test",
-    "test": "node --test test/*.test.js"
+    "test": "node --test test/*.test.js",
+    "test:light": "playwright test --config=playwright.light.config.js"
   },
   "engines": {
     "node": ">=22.18.0"
@@ -18,6 +19,7 @@
   "dependencies": {
     "@office-kit/pptx": "0.28.0",
     "@office-kit/pptx-preview": "0.21.0",
+    "@supabase/supabase-js": "^2.118.0",
     "pdfjs-dist": "6.5.438",
     "peerjs": "^1.5.5",
     "qrcode": "^1.5.4",

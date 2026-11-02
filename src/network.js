@@ -82,6 +82,7 @@ export class Classroom {
     conn.on('close', close); conn.on('error', close);
   }
   broadcast() {
+    if (this.stopped) return;
     storage.set('sl-host', { code: this.code, data: { ...this.room.data, lesson: compactLesson(this.room.data.lesson) } });
     this.onState(this.room.snapshot());
     for (const [id, conn] of this.connections) if (conn.open) {
@@ -115,6 +116,9 @@ export class Classroom {
           storage.set('sl-mode', { host: false, code: this.code, name: this.name, avatar: this.avatar });
           this.onStatus('online');
         } else if (msg.type === 'lesson') this.lesson = msg.lesson;
+        else if (msg.type === 'slide-updated' && this.lesson && Number.isInteger(msg.index) && this.lesson.slides[msg.index]) {
+          this.lesson = { ...this.lesson, slides: this.lesson.slides.map((slide, i) => i === msg.index ? { ...slide, ...msg.slide } : slide) };
+        }
         else if (msg.type === 'state') {
           this.onState({ ...msg.state, lesson: this.lesson });
           if (!ready) { ready = true; clearTimeout(timeout); resolve(); }
@@ -135,7 +139,16 @@ export class Classroom {
       conn.on('close', reconnect); conn.on('error', reconnect);
     });
   }
-  control(action, value) { this.room.control(action, value); this.broadcast(); }
+  control(action, value) {
+    const previous = action === 'edit-slide' ? this.room.slides[value?.index] : null;
+    this.room.control(action, value);
+    if (action === 'edit-slide') {
+      const slide = { ...this.room.publicLesson().slides[value.index] };
+      if (slide.image === previous.image) delete slide.image;
+      for (const conn of this.connections.values()) if (conn.open && conn.lessonSent) conn.send({ type: 'slide-updated', index: value.index, slide });
+    }
+    this.broadcast();
+  }
   answer(choice, questionIndex) {
     if (!this.conn?.open) return Promise.reject(Error('Reconectando à sala. Aguarde.'));
     const request = crypto.randomUUID();

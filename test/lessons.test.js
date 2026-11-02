@@ -41,7 +41,7 @@ test('uma sala usa os slides e o quiz da aula, preserva a aula ao reconectar e n
   assert.equal(student.lesson.slides[0].note, undefined);
   assert.equal(student.lesson.questions, undefined);
   assert.equal(room.snapshot().lesson.slides[0].note, 'Roteiro privado');
-  room.control('quiz');
+  room.control('quiz'); room.control('start-quiz'); time += 3000; room.tick();
   assert.equal(room.snapshot(p.id).question.text, q.text);
   assert.equal(room.snapshot(p.id).question.base, 2000);
   assert.equal(room.snapshot(p.id).question.deadline - time, 40000);
@@ -101,4 +101,23 @@ test('páginas importadas mantêm imagem na apresentação e referências compac
   assert.equal(room.publicLesson().slides[0].image, validated.slides[0].image);
   assert.throws(() => validateLesson({ ...lesson, slides: [{ ...lesson.slides[0], image: '', assetId: '' }] }), /sem imagem/);
   assert.throws(() => validateLesson({ ...lesson, slides: [{ ...lesson.slides[0], assetId: '../arquivo' }] }), /Referência/);
+});
+test('editar o slide atual preserva identidade, valida conteúdo e atualiza a sala sem revelar notas', () => {
+  const room = new Room('123456');
+  const player = room.join({ name: 'Ana' });
+  const originalId = room.slides[0].id;
+  room.control('edit-slide', { index: 0, slide: { ...room.slides[0], id: 'outro-id', title: 'Um título novo', note: 'Nota privada', model: 'hdd' } });
+  assert.equal(room.slides[0].id, originalId);
+  assert.equal(room.snapshot().model, 'hdd');
+  assert.equal(room.snapshot(player.id).lesson.slides[0].title, 'Um título novo');
+  assert.equal(room.snapshot(player.id).lesson.slides[0].note, undefined);
+  assert.equal(room.snapshot().lesson.slides[0].note, 'Nota privada');
+  assert.throws(() => room.control('edit-slide', { index: 1, slide: room.slides[1] }), /disponível/);
+  assert.throws(() => room.control('edit-slide', { index: 0, slide: { ...room.slides[0], title: '' } }), /título/);
+  assert.equal(room.slides[0].title, 'Um título novo');
+  const restored = new Room('123456', JSON.parse(JSON.stringify(room.data)));
+  assert.equal(restored.slides[0].title, 'Um título novo');
+  restored.join({ token: player.token });
+  restored.control('quiz');
+  assert.throws(() => restored.control('edit-slide', { index: 0, slide: restored.slides[0] }), /disponível/);
 });

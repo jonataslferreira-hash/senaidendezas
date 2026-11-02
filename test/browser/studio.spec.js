@@ -13,6 +13,7 @@ test('cria, edita, reordena e salva aula; exporta, importa e gerencia a bibliote
   await expect(page.getByRole('heading', { name: /Sua próxima grande/ })).toBeVisible();
   await page.screenshot({ path: 'test-results/studio-library.png', fullPage: true });
   await page.getByRole('button', { name: '+ Nova aula', exact: true }).click();
+  await page.getByRole('button', { name: 'Campos', exact: true }).click();
   await page.getByLabel('Título da aula', { exact: true }).fill('O ciclo da água');
   await page.getByLabel('Descrição', { exact: true }).fill('Ciências · uma aula para explorar');
   await page.getByLabel('Título do slide', { exact: true }).fill('Uma viagem em cada gota');
@@ -49,8 +50,10 @@ test('cria, edita, reordena e salva aula; exporta, importa e gerencia a bibliote
   expect(json.slides[0].image).toMatch(/^data:image\/png/);
   expect(json.questions[0]).toMatchObject({ correct: 1, difficulty: 'Difícil', seconds: 45, base: 2000 });
   await page.reload();
+  await page.locator('.editor-heading [data-studio-action="library"]').click();
   const card = page.locator('.lesson-card').filter({ has: page.getByRole('heading', { name: 'O ciclo da água', exact: true }) });
   await card.locator('[data-studio-action="edit"]').click();
+  await page.getByRole('button', { name: 'Campos', exact: true }).click();
   await expect(page.getByLabel('Título do slide', { exact: true })).toHaveValue('Observe a gota');
   await page.getByRole('tab', { name: /Quiz/ }).click();
   await expect(page.getByLabel('Tempo (segundos)', { exact: true })).toHaveValue('45');
@@ -108,6 +111,8 @@ test('aula personalizada chega a um celular sem biblioteca local, com imagem e q
   await expect(phone.getByRole('heading', { name: 'Observe a imagem', exact: true })).toBeVisible();
   await host.clock.setFixedTime(new Date());
   await host.getByRole('button', { name: 'Iniciar quiz', exact: true }).click();
+  await expect(phone.locator('.quiz-lobby')).toBeVisible();
+  await host.getByRole('button', { name: 'Começar quiz', exact: false }).click();
   await expect(phone.locator('.question-card')).toContainText('Qual é a resposta?');
   await expect(phone.locator('.question-meta')).toContainText('2.000');
   await phone.locator('[data-answer="1"]').click();

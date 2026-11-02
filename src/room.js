@@ -20,7 +20,7 @@ export class Room {
   join({ name, avatar, token } = {}) {
     let p = token && this.data.players.find(p => p.token === token);
     if (!p) {
-      if (this.data.phase !== 'lesson') throw Error('O quiz já começou. Entre na próxima rodada.');
+      if (!['lesson', 'lobby'].includes(this.data.phase)) throw Error('O quiz já começou. Entre na próxima rodada.');
       if (this.data.players.length >= 60) throw Error('Esta sala atingiu o limite de 60 participantes.');
       name = String(name || '').trim().replace(/[\x00-\x1f\x7f]/g, '').slice(0, 24);
       if (!name) throw Error('Digite seu nome ou apelido.');
@@ -33,21 +33,29 @@ export class Room {
   disconnect(id) { const p = this.data.players.find(p => p.id === id); if (p) p.online = false; }
   control(action, value) {
     const d = this.data;
-    if (action === 'slide' && d.phase === 'lesson' && Number.isInteger(value) && value >= 0 && value < this.slides.length) {
+    if (action === 'edit-slide' && d.phase === 'lesson' && value?.index === d.slide) {
+      const nextSlides = this.slides.map((slide, i) => i === value.index ? { ...value.slide, id: slide.id } : slide);
+      const next = validateLesson({ ...this.lesson, slides: nextSlides });
+      const changedModel = this.slides[d.slide].model !== next.slides[d.slide].model || this.slides[d.slide].kind !== next.slides[d.slide].kind;
+      this.lesson = next; this.slides = next.slides; this.questions = next.questions; d.lesson = next;
+      if (changedModel) { d.model = next.slides[d.slide].model; d.exploded = false; }
+    } else if (action === 'slide' && d.phase === 'lesson' && Number.isInteger(value) && value >= 0 && value < this.slides.length) {
       d.slide = value; d.model = this.slides[value].model; d.exploded = false;
-    } else if (action === 'model' && d.phase === 'lesson' && ['hdd', 'ssd', 'nvme'].includes(value)) d.model = value;
+    } else if (action === 'model' && d.phase === 'lesson' && (['hdd', 'ssd', 'nvme'].includes(value) || value === 'custom' && this.slides[d.slide].customModel)) d.model = value;
     else if (action === 'explode' && d.phase === 'lesson') d.exploded = Boolean(value);
     else if (action === 'quiz' && d.phase === 'lesson') {
       if (!this.questions.length) throw Error('Esta aula não tem perguntas de quiz.');
+      Object.assign(d, { phase: 'lobby', questionIndex: -1, startedAt: 0, deadline: 0 });
+    } else if (action === 'start-quiz' && d.phase === 'lobby') {
       if (!d.players.some(p => p.online)) throw Error('Espere pelo menos um participante entrar.');
       for (const p of d.players) { p.score = 0; p.correct = 0; p.answers = {}; }
-      this.startQuestion(0);
+      Object.assign(d, { phase: 'countdown', questionIndex: -1, startedAt: this.now(), deadline: this.now() + 3000 });
     } else if (action === 'reveal' && d.phase === 'question') this.reveal();
     else if (action === 'next' && d.phase === 'reveal') {
       if (d.questionIndex + 1 < this.questions.length) this.startQuestion(d.questionIndex + 1);
       else d.phase = 'finished';
     } else if (action === 'finish' && d.phase === 'lesson') d.phase = 'finished';
-    else if (action === 'lesson' && ['reveal', 'finished'].includes(d.phase)) { d.phase = 'lesson'; d.questionIndex = -1; }
+    else if (action === 'lesson' && ['lobby', 'countdown', 'reveal', 'finished'].includes(d.phase)) { d.phase = 'lesson'; d.questionIndex = -1; }
     else throw Error('Esta ação não está disponível agora.');
   }
   startQuestion(index) {
@@ -72,10 +80,11 @@ export class Room {
     }
     this.data.phase = 'reveal';
   }
-  tick() { if (this.data.phase === 'question' && this.now() >= this.data.deadline) this.reveal(); }
+  tick() { if (this.data.phase === 'countdown' && this.now() >= this.data.deadline) this.startQuestion(0); else if (this.data.phase === 'question' && this.now() >= this.data.deadline) this.reveal(); }
   publicLesson(presenter = false) {
     return { id: this.lesson.id, title: this.lesson.title, description: this.lesson.description, quizCount: this.questions.length,
-      slides: this.slides.map(({ note, ...slide }) => presenter ? { ...slide, note } : slide) };
+      ...(presenter ? { quizAudio: this.lesson.quizAudio } : {}),
+      slides: this.slides.map(({ note, audio, ...slide }) => presenter ? { ...slide, note, audio } : slide) };
   }
   snapshot(id, includeLesson = true) {
     const d = this.data, q = this.questions[d.questionIndex], p = d.players.find(p => p.id === id), a = p?.answers[d.questionIndex];
@@ -83,6 +92,7 @@ export class Room {
     return {
       code: d.code, phase: d.phase, slide: d.slide, model: d.model, exploded: d.exploded,
       questionIndex: d.questionIndex, totalQuestions: this.questions.length, serverTime: this.now(),
+      countdownEndsAt: d.phase === 'countdown' ? d.deadline : 0,
       ...(includeLesson ? { lesson: this.publicLesson(!id) } : {}),
       ranking: d.players.map(({ id, name, avatar, score, correct, online }) => ({ id, name, avatar, score, correct, online })).sort((a, b) => b.score - a.score || b.correct - a.correct || a.name.localeCompare(b.name, 'pt-BR')),
       answeredCount: d.players.filter(p => p.answers[d.questionIndex]).length,

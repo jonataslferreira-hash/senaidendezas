@@ -1,8 +1,14 @@
+import { PageMotion } from './motion.js';
 import { avatars } from './content.js';
-import { demoLesson } from './lessons.js';
+import { demoLesson, validateLesson, clone, imageURL } from './lessons.js';
+import { loadPresenterSettings, savePresenterSettings, presentationTools, pinnedInvite, liveEditDialog, qrCorners } from './presenter.js';
+import './presentation.css';
+import { canvasMarkup, CanvasModels } from './canvas-view.js';
 import { Studio } from './studio.js';
 import './studio.css';
 import './documents.css';
+import { lobbyMarkup } from './lobby.js';
+import './quiz-party.css';
 let activeLesson = demoLesson();
 let slides = activeLesson.slides;
 import { Classroom } from './network.js';
@@ -10,6 +16,7 @@ import { Room } from './room.js';
 import { HardwareViewer } from './models.js';
 import QRCode from 'qrcode';
 import './style.css';
+import './experience.css';
 
 const icons = {
   chip: '<rect x="5" y="5" width="14" height="14" rx="3"/><path d="M9 1v4m6-4v4M9 19v4m6-4v4M1 9h4m-4 6h4m14-6h4m-4 6h4M9 9h6v6H9z"/>',
@@ -36,10 +43,16 @@ const icon = (name, cls = '') => `<svg class="icon ${cls}" viewBox="0 0 24 24" f
 const esc = value => String(value ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const app = document.querySelector('#app');
 const viewer = new HardwareViewer();
+const canvasModels = new CanvasModels();
+const pageMotion = new PageMotion();
 let classroom, state, host = false, demo = false, busy = false, selectedAvatar = avatars[0];
 let shareOpen = false, notesOpen = false, solutionOpen = false, lastSlide = -1, localModel = 'ssd', localExploded = true;
 let status = 'offline', statusMessage = '', timerOffset = 0, music = false, audio, musicTimer, audioStep = 0;
-let demoTimer, toastTimer;
+let clockTimer;
+const trackPlayer = new Audio(); let trackKey = '';
+trackPlayer.dataset.soundtrack = ''; trackPlayer.hidden = true; document.body.append(trackPlayer);
+let demoTimer, toastTimer, controlsTimer, editDraft = null, editIndex = -1, editError = '', imageText = false;
+const presenterSettings = loadPresenterSettings();
 const qrCache = new Map();
 const params = new URLSearchParams(location.search);
 let codeDraft = (params.get('s') || '').replace(/\D/g, '').slice(0, 6);
@@ -52,14 +65,16 @@ function toast(message) {
 }
 function brand() { return `<button class="brand" data-action="home" aria-label="Storage Lab, início"><span class="brand-symbol">${icon('chip')}</span><span>storage<span class="brand-light">lab</span><span class="brand-period">.</span></span></button>`; }
 function header() {
-  return `<header class="header">${brand()}<div class="header-center"><span class="tiny-square"></span> AULA INTERATIVA <span class="divider">/</span> ${esc(activeLesson.title)}</div><div class="header-right">${state ? `<span class="connection ${status === 'online' || demo ? 'connected' : ''}"><span></span>${demo ? 'Prévia local' : status === 'online' ? 'Ao vivo' : 'Reconectando'}</span><button class="icon-btn" data-action="sound" aria-label="${music ? 'Desativar' : 'Ativar'} música do quiz" title="Música do quiz">${icon(music ? 'volume' : 'mute')}</button><button class="icon-btn desktop-only" data-action="fullscreen" aria-label="Tela cheia">${icon('expand')}</button>` : '<span class="senai-badge">SENAI <span>×</span> HARDWARE</span>'}</div></header>`;
+  return `<header class="header">${brand()}<div class="header-center"><span class="tiny-square"></span> AULA INTERATIVA <span class="divider">/</span> ${esc(activeLesson.title)}</div><div class="header-right">${state ? `<span class="connection ${status === 'online' || demo ? 'connected' : ''}"><span></span>${demo ? 'Prévia local' : status === 'online' ? 'Ao vivo' : 'Reconectando'}</span>${host ? `<button class="icon-btn" data-action="sound" aria-label="${music ? 'Desativar' : 'Ativar'} áudio" title="Áudio da apresentação">${icon(music ? 'volume' : 'mute')}</button>` : ''}<button class="icon-btn desktop-only" data-action="fullscreen" aria-label="Tela cheia">${icon('expand')}</button>` : '<span class="senai-badge">SENAI <span>×</span> HARDWARE</span>'}</div></header>`;
 }
 function modelPanel(landing = false) {
+  const custom = state && slides[state.slide]?.customModel;
+  const choices = [['ssd', 'SSD SATA'], ['hdd', 'HDD'], ['nvme', 'SSD NVMe'], ...(custom ? [['custom', 'Meu modelo']] : [])];
   return `<section class="model-panel ${landing ? 'hero-model' : ''}" aria-label="Explorador de hardware em 3D">
     <div class="model-heading"><span class="eyebrow">${icon('cube')} HARDWARE EXPLORER</span><span class="live-pill">3D INTERATIVO</span></div>
-    <div class="model-tabs" role="group" aria-label="Escolher modelo">${[['ssd', 'SSD SATA'], ['hdd', 'HDD'], ['nvme', 'SSD NVMe']].map(([type, label]) => `<button class="model-tab ${localModel === type ? 'active' : ''}" data-model="${type}" aria-pressed="${localModel === type}">${label}</button>`).join('')}</div>
+    <div class="model-tabs" role="group" aria-label="Escolher modelo">${choices.map(([type, label]) => `<button class="model-tab ${localModel === type ? 'active' : ''}" data-model="${type}" aria-pressed="${localModel === type}" ${state && !host && type !== state.model ? 'disabled title="O professor escolhe o modelo deste slide"' : ''}>${label}</button>`).join('')}</div>
     <div id="viewer-slot"></div>
-    <div class="model-actions"><button class="subtle-btn ${localExploded ? 'selected' : ''}" data-action="explode" aria-pressed="${localExploded}">${icon('layers')} ${localExploded ? 'Fechar modelo' : 'Abrir modelo'}</button><button class="icon-btn" data-action="reset-model" aria-label="Restaurar câmera">${icon('refresh')}</button></div>
+    <div class="model-actions"><button ${localModel === 'custom' ? 'hidden' : ''} class="subtle-btn ${localExploded ? 'selected' : ''}" data-action="explode" aria-pressed="${localExploded}">${icon('layers')} ${localExploded ? 'Fechar modelo' : 'Abrir modelo'}</button><button class="icon-btn" data-action="reset-model" aria-label="Restaurar câmera">${icon('refresh')}</button></div>
     <span class="model-footnote">Modelo didático · proporções e componentes simplificados</span>
   </section>`;
 }
@@ -80,17 +95,18 @@ function slideMedia(slide) {
   return '';
 }
 function documentLesson(slide) {
-  return `${header()}<main class="document-classroom"><div class="document-top"><div><span class="eyebrow purple-text">${esc((slide.sourceType || 'SLIDES').toUpperCase())} · ${demo ? 'PRÉVIA' : 'AULA AO VIVO'}</span><h1>${esc(activeLesson.title)}</h1></div><div class="document-top-actions">${host ? `<label class="sr-only" for="document-page">Ir para página</label><select id="document-page" aria-label="Ir para página">${slides.map((s, i) => `<option value="${i}" ${state.slide === i ? 'selected' : ''}>${i + 1} · ${esc(s.title)}</option>`).join('')}</select><button class="btn secondary small" data-action="fullscreen" aria-label="Apresentar em tela cheia">${icon('expand')} Tela cheia</button>` : '<span class="following-label"><span class="status-dot"></span> Acompanhando o professor</span>'}<button class="text-btn" data-action="leave">Sair</button></div></div>
+  const canvas = slide.kind === 'canvas';
+  return `${header()}${presentationTools({ host, demo, state, settings: presenterSettings, imageText })}<main class="document-classroom"><div class="document-top"><div><span class="eyebrow purple-text">${esc((slide.sourceType || (canvas ? 'SLIDE LIVRE' : 'SLIDES')).toUpperCase())} · ${demo ? 'PRÉVIA' : 'AULA AO VIVO'}</span><h1>${esc(activeLesson.title)}</h1></div><div class="document-top-actions">${host ? `<label class="sr-only" for="document-page">Ir para página</label><select id="document-page" aria-label="Ir para página">${slides.map((s, i) => `<option value="${i}" ${state.slide === i ? 'selected' : ''}>${i + 1} · ${esc(s.title)}</option>`).join('')}</select><button class="btn secondary small" data-action="fullscreen" aria-label="Apresentar em tela cheia">${icon('expand')} Tela cheia</button>` : '<span class="following-label"><span class="status-dot"></span> Acompanhando o professor</span>'}<button class="text-btn" data-action="leave">Sair</button></div></div>
     ${status !== 'online' && !demo ? '<div class="connection-banner" role="status">Reconectando à sala. <button class="text-btn" data-action="reconnect">Reconectar</button></div>' : ''}
-    <figure class="document-stage"><img src="${esc(slide.image)}" alt="${esc(slide.imageAlt || slide.title)}"><figcaption class="sr-only">${esc(slide.title)}</figcaption></figure>
+    <figure class="document-stage ${canvas ? 'canvas-stage' : ''}">${canvas ? canvasMarkup(slide) : `<img src="${esc(slide.image)}" alt="${esc(slide.imageAlt || slide.title)}"><figcaption class="sr-only">${esc(slide.title)}</figcaption>`}</figure>
     ${slide.prompt ? `<section class="document-discussion"><strong>${esc(slide.prompt)}</strong><button class="text-btn" data-action="solution">${solutionOpen ? 'Ocultar' : 'Conferir'} explicação</button>${solutionOpen ? `<p>${esc(slide.answer)}</p>` : ''}</section>` : ''}
     ${host && notesOpen && slide.note ? `<aside class="document-notes">${esc(slide.note)}</aside>` : ''}
     <footer class="document-footer">${participants()}<div class="document-nav"><span class="slide-counter"><strong>${state.slide + 1}</strong> / ${slides.length}</span>${host ? `${slide.note ? '<button class="text-btn" data-action="notes">Roteiro</button>' : ''}<button class="icon-btn bordered" data-action="previous" aria-label="Slide anterior" ${state.slide === 0 ? 'disabled' : ''}>${icon('left')}</button>${state.slide < slides.length - 1 ? `<button class="btn primary small" data-action="next-slide">Próximo ${icon('right')}</button>` : `<button class="btn primary small" data-action="${state.totalQuestions ? 'quiz' : 'finish'}">${state.totalQuestions ? 'Iniciar quiz' : 'Encerrar aula'} ${icon('check')}</button>`}` : '<span class="following-label">Sincronizado com a aula</span>'}</div></footer></main>${shareOpen ? shareDialog() : ''}`;
 }
 function lesson() {
   const slide = slides[state.slide];
-  if (slide.kind === 'document') return documentLesson(slide);
-  return `${header()}<main class="classroom ${!host ? 'student-class' : ''}"><div class="classroom-top"><div><span class="eyebrow">${demo ? 'MODO EXPLORAÇÃO' : host ? 'VOCÊ ESTÁ NO CONTROLE' : 'VOCÊ FAZ PARTE DESTA AULA'}</span><h2>${esc(activeLesson.title)}<span class="purple-text">.</span></h2></div><div class="room-actions">${!demo ? `<button class="room-code" data-action="share">SALA <strong>${esc(state.code)}</strong>${icon('copy')}</button>` : '<span class="demo-badge">Prévia · sem transmissão</span>'}<button class="text-btn" data-action="leave">Sair</button></div></div>
+  if (['document', 'canvas'].includes(slide.kind)) return documentLesson(slide);
+  return `${header()}${presentationTools({ host, demo, state, settings: presenterSettings, imageText })}<main class="classroom ${!host ? 'student-class' : ''} ${slide.kind === 'image' ? 'image-slide' : ''}"><div class="classroom-top"><div><span class="eyebrow">${demo ? 'MODO EXPLORAÇÃO' : host ? 'VOCÊ ESTÁ NO CONTROLE' : 'VOCÊ FAZ PARTE DESTA AULA'}</span><h2>${esc(activeLesson.title)}<span class="purple-text">.</span></h2></div><div class="room-actions">${!demo ? `<button class="room-code" data-action="share">SALA <strong>${esc(state.code)}</strong>${icon('copy')}</button>` : '<span class="demo-badge">Prévia · sem transmissão</span>'}<button class="text-btn" data-action="leave">Sair</button></div></div>
     ${status !== 'online' && !demo ? `<div class="connection-banner" role="status">Conexão interrompida. ${esc(statusMessage || 'Tentando reconectar. Se necessário, toque em Reconectar.')} <button class="text-btn" data-action="reconnect">Reconectar</button></div>` : ''}
     ${!host ? `<div class="mobile-topic"><span class="eyebrow purple-text">${esc(slide.tag)}</span><h1>${esc(slide.title)}</h1></div>` : ''}
     <div class="lesson-layout ${slide.kind === 'text' ? 'text-lesson' : ''}"><section class="slide-panel"><span class="eyebrow purple-text">${esc(slide.tag)}</span><h1>${esc(slide.title)}</h1><p class="slide-intro">${esc(slide.intro)}</p><ul class="teaching-points">${slide.points.map((p, i) => `<li><span>0${i + 1}</span><p>${esc(p)}</p></li>`).join('')}</ul>
@@ -115,7 +131,7 @@ function quiz() {
       return `<button class="answer-option answer-${i} ${myAnswer?.choice === i ? 'chosen' : ''} ${good ? 'correct' : ''} ${wrong ? 'incorrect' : ''}" data-answer="${i}" ${canAnswer ? '' : 'disabled'}><span class="answer-letter">${'ABCD'[i]}</span><span>${esc(option)}</span>${good ? icon('check') : wrong ? icon('close') : myAnswer?.choice === i ? icon('check') : ''}</button>`;
     }).join('')}</div>
     ${revealed ? `<div class="answer-explanation"><strong>${myAnswer ? myAnswer.correct ? `Boa! +${myAnswer.points.toLocaleString('pt-BR')} pontos 🎉` : 'Essa não foi. A próxima é sua!' : 'Vamos entender a resposta.'}</strong><p>${esc(q.explanation)}</p></div>` : `<p class="answer-status" role="status">${myAnswer ? `${icon('check')} Resposta registrada. Aguarde a revelação!` : host && !demo ? 'A turma responde pelo celular. A resposta certa aparece ao final do tempo.' : 'Escolha com atenção. Acertos mais rápidos valem mais pontos.'}</p>`}
-    <div class="question-footer"><span>${icon('users')} ${state.answeredCount} de ${state.ranking.length} responderam</span>${host ? `<button class="btn ${revealed ? 'primary' : 'secondary'} small" data-action="${revealed ? 'next-question' : 'reveal'}">${revealed ? state.questionIndex + 1 === state.totalQuestions ? 'Ver resultado' : 'Próxima pergunta' : 'Revelar resposta'} ${icon(revealed ? 'arrow' : 'check')}</button>` : `<span class="waiting-host">${revealed ? 'Aguarde o apresentador avançar' : 'Uma resposta por pergunta'}</span>`}</div></section><aside class="quiz-sidebar"><div class="ranking-title"><span class="small-icon">${icon('trophy')}</span><div><span class="eyebrow">A DISPUTA ESTÁ ON</span><h2>Ranking da turma</h2></div></div>${rankingTable()}<div class="scoring-note"><strong>Como funciona a pontuação?</strong><p>Acertou? Ganha de 50% a 100% dos pontos da pergunta, conforme o tempo restante. Erros e tempo esgotado valem zero.</p><span>Fácil · 1.000 <span>/</span> Média · 1.500 <span>/</span> Difícil · 2.000</span><p>Empates: mais acertos; depois ordem alfabética. A música é opcional e só toca nesta aba.</p></div></aside></div><p class="quiz-music-note">${icon(music ? 'volume' : 'mute')} ${music ? 'Trilha ativada neste dispositivo' : 'Quer uma trilha? Ative o som no topo da página.'}</p></main>${shareOpen ? shareDialog() : ''}`;
+    <div class="question-footer"><span>${icon('users')} ${state.answeredCount} de ${state.ranking.length} responderam</span>${host ? `<button class="btn ${revealed ? 'primary' : 'secondary'} small" data-action="${revealed ? 'next-question' : 'reveal'}">${revealed ? state.questionIndex + 1 === state.totalQuestions ? 'Ver resultado' : 'Próxima pergunta' : 'Revelar resposta'} ${icon(revealed ? 'arrow' : 'check')}</button>` : `<span class="waiting-host">${revealed ? 'Aguarde o apresentador avançar' : 'Uma resposta por pergunta'}</span>`}</div></section><aside class="quiz-sidebar"><div class="ranking-title"><span class="small-icon">${icon('trophy')}</span><div><span class="eyebrow">A DISPUTA ESTÁ ON</span><h2>Ranking da turma</h2></div></div>${rankingTable()}<div class="scoring-note"><strong>Como funciona a pontuação?</strong><p>Acertou? Ganha de 50% a 100% dos pontos da pergunta, conforme o tempo restante. Erros e tempo esgotado valem zero.</p><span>Fácil · 1.000 <span>/</span> Média · 1.500 <span>/</span> Difícil · 2.000</span><p>Empates: mais acertos; depois ordem alfabética. A música é opcional e toca no computador do professor.</p></div></aside></div><p class="quiz-music-note">${icon(music ? 'volume' : 'mute')} ${music ? 'Trilha ativada neste dispositivo' : 'Quer uma trilha? Ative o som no topo da página.'}</p></main>${shareOpen ? shareDialog() : ''}`;
 }
 function finished() {
   if (!state.totalQuestions) return `${header()}<main class="results"><span class="eyebrow purple-text">IDEIAS COMPARTILHADAS</span><h1>Aula <span>concluída.</span></h1><p>${esc(activeLesson.title)}</p><p>${state.ranking.length} participante(s) fizeram parte desta descoberta.</p><div class="results-actions">${host ? '<button class="btn primary" data-action="back-lesson">Voltar à aula</button>' : ''}<button class="btn secondary" data-action="leave">Voltar ao início</button></div></main>`;
@@ -137,18 +153,30 @@ function render() {
   const draftName = form?.querySelector('#player-name')?.value;
   if (form) codeDraft = form.querySelector('#room-code').value;
   viewer.el.remove();
-  app.innerHTML = !state ? studio.markup() : state.phase === 'lesson' ? lesson() : state.phase === 'finished' ? finished() : quiz();
+  app.classList.toggle('quiz-party', Boolean(state && state.phase !== 'lesson'));
+  app.innerHTML = !state ? studio.markup() : state.phase === 'lesson' ? lesson() : ['lobby', 'countdown'].includes(state.phase) ? lobbyMarkup(state, { host, demo, header, shareDialog, shareOpen }) : state.phase === 'finished' ? finished() : quiz();
+  if (state?.phase === 'lesson') {
+    app.insertAdjacentHTML('beforeend', pinnedInvite({ host, demo, state, settings: presenterSettings }));
+    if (editDraft) app.insertAdjacentHTML('beforeend', liveEditDialog(editDraft, editError));
+  }
+  syncPresentationMode();
+  if (editDraft) for (const el of app.querySelectorAll('.header, .classroom, .document-classroom, .presentation-toolbar, .pinned-room-qr')) el.inert = true;
   if (!state) studio.afterRender();
   if (!state && draftName && document.querySelector('#player-name')) document.querySelector('#player-name').value = draftName;
   const slot = document.querySelector('#viewer-slot');
-  if (slot) { slot.append(viewer.el); viewer.setModel(localModel, localExploded); requestAnimationFrame(() => viewer.resize()); }
-  if (shareOpen && state) {
+  if (slot) { slot.append(viewer.el); if (localModel === 'custom' && slides[state.slide]?.customModel) viewer.setCustomModel(slides[state.slide].customModel); else viewer.setModel(localModel, localExploded); requestAnimationFrame(() => viewer.resize()); }
+  canvasModels.mount(state?.phase === 'lesson' && slides[state.slide]?.kind === 'canvas' ? app : null, state?.phase === 'lesson' ? slides[state.slide] : null);
+  if (state && (shareOpen || (host && !demo && presenterSettings.qrVisible && state.phase === 'lesson'))) {
     const url = joinUrl();
-    const setQR = src => { if (document.querySelector('#room-qr') && joinUrl() === url) document.querySelector('#room-qr').src = src; };
+    const setQR = src => { if (state && joinUrl() === url) for (const image of document.querySelectorAll('#room-qr, [data-pinned-qr]')) image.src = src; };
     if (qrCache.has(url)) setQR(qrCache.get(url));
     else QRCode.toDataURL(url, { width: 460, margin: 2 }).then(src => { qrCache.set(url, src); setQR(src); }).catch(() => toast('Não foi possível gerar o QR Code. Use o link ou código.'));
   }
+  pageMotion.mount(app, { key: state ? `${activeLesson.id}:${state.phase}:${state.slide}:${state.questionIndex}` : `${studio.view}:${studio.draft?.id || ''}:${studio.tab}:${studio.index}:${studio.questionIndex}:${studio.visualMode}`, kind: state?.phase || studio.view, slide: state?.slide || 0 });
   updateClock();
+  const ticking = ['question', 'countdown'].includes(state?.phase);
+  if (ticking && !clockTimer) clockTimer = setInterval(updateClock, 100);
+  else if (!ticking && clockTimer) { clearInterval(clockTimer); clockTimer = null; }
   updateMusic();
 }
 function receive(next) {
@@ -177,6 +205,7 @@ function control(action, value) {
 let demoPlayer;
 function preview(lesson = demoLesson()) {
   leave(false); activeLesson = lesson; slides = lesson.slides; demo = true; host = true; status = 'online';
+  studio.writeRoute('preview', lesson.id);
   classroom = new Room('PREVIA', undefined, Date.now, lesson);
   demoPlayer = classroom.join({ name: 'Você', avatar: selectedAvatar }).id;
   receive({ ...classroom.snapshot(demoPlayer), lesson: classroom.publicLesson(true) });
@@ -193,18 +222,24 @@ async function connectSession(mode) {
   try {
     if (host) { await classroom.create(Boolean(mode.resume), mode.lesson); shareOpen = !mode.resume; }
     else await classroom.join(mode.code, mode.name, mode.avatar);
+    studio.writeRoute('present', activeLesson.id);
   } catch (err) {
     classroom.stop(); if (!state) host = false;
     toast(err.message);
   } finally { busy = false; render(); }
 }
 function leave(show = true) {
+  clearInterval(clockTimer); clockTimer = null;
+  editDraft = null; editError = ''; clearTimeout(controlsTimer);
+  if (document.fullscreenElement) document.exitFullscreen().catch(() => {});
   clearInterval(demoTimer); classroom?.stop?.(); classroom = null;
   state = null; host = false; demo = false; shareOpen = false; lastSlide = -1;
   localModel = 'ssd'; localExploded = true; status = 'offline'; stopMusic();
-  if (show) render();
+  if (show) { studio.writeRoute(); render(); }
 }
 function updateClock() {
+  const countdown = document.querySelector('#lobby-countdown');
+  if (countdown && state?.countdownEndsAt) countdown.textContent = Math.max(1, Math.ceil((state.countdownEndsAt - Date.now() - timerOffset) / 1000));
   if (!state?.question) return;
   const q = state.question;
   const remaining = Math.max(0, q.deadline - Date.now() - timerOffset);
@@ -213,10 +248,23 @@ function updateClock() {
   const bar = document.querySelector('#time-bar');
   if (bar) bar.style.width = `${Math.min(100, remaining / (q.deadline - q.startedAt) * 100)}%`;
 }
-function stopMusic() { clearInterval(musicTimer); musicTimer = null; audio?.suspend().catch(() => {}); }
+function stopMusic() { clearInterval(musicTimer); musicTimer = null; audio?.suspend().catch(() => {}); trackPlayer.pause(); trackKey = ''; }
 function updateMusic() {
-  const active = music && state?.phase === 'question';
+  const quizPhase = ['lobby', 'countdown', 'question', 'reveal'].includes(state?.phase);
+  const track = state?.phase === 'lesson' ? slides[state.slide]?.audio : quizPhase ? activeLesson.quizAudio : null;
+  const active = music && host && (quizPhase || state?.phase === 'lesson' && track);
   if (!active) { stopMusic(); return; }
+  if (track?.data) {
+    clearInterval(musicTimer); musicTimer = null; audio?.suspend().catch(() => {});
+    const key = `${state.phase === 'lesson' ? slides[state.slide].id : 'quiz'}:${track.assetId || track.name}:${track.data.length}`;
+    trackPlayer.volume = track.volume; trackPlayer.loop = track.loop;
+    if (trackKey !== key) {
+      trackPlayer.src = track.data; trackKey = key;
+      trackPlayer.play().catch(() => { if (trackKey === key && music) { music = false; render(); toast('O navegador pausou o áudio. Ative o som no topo para tocar.'); } });
+    }
+    return;
+  }
+  trackPlayer.pause(); trackKey = '';
   if (musicTimer) return;
   const Audio = window.AudioContext || window.webkitAudioContext;
   if (!Audio) return;
@@ -251,11 +299,15 @@ async function action(name) {
     case 'home': case 'leave': leave(); break;
     case 'next-slide': control('slide', Math.min(slides.length - 1, state.slide + 1)); break;
     case 'previous': control('slide', Math.max(0, state.slide - 1)); break;
-    case 'quiz': control('quiz'); break;
+    case 'quiz': music = true; control('quiz'); break;
+    case 'start-quiz': control('start-quiz'); break;
     case 'finish': control('finish'); break;
     case 'reveal': control('reveal'); break;
     case 'next-question': control('next'); break;
     case 'back-lesson': control('lesson'); break;
+    case 'edit-current-slide': openLiveEditor(); break;
+    case 'cancel-edit-slide': editDraft = null; editError = ''; render(); showPresentationControls(); break;
+    case 'image-text': imageText = !imageText; syncPresentationMode(); showPresentationControls(); break;
     case 'notes': notesOpen = !notesOpen; render(); break;
     case 'solution': solutionOpen = !solutionOpen; render(); break;
     case 'share': if (!demo) { shareOpen = true; render(); document.querySelector('.close-modal')?.focus(); } break;
@@ -289,18 +341,35 @@ async function action(name) {
 app.addEventListener('click', async e => {
   const button = e.target.closest('button');
   if (!button || button.disabled) return;
+  if (button.dataset.canvasExplode) { canvasModels.toggle(button.dataset.canvasExplode, slides[state.slide]); return; }
   if (button.dataset.avatar) { selectedAvatar = button.dataset.avatar; render(); }
   else if (button.dataset.model) {
+    if (state && !host && button.dataset.model !== state.model) return;
     localModel = button.dataset.model;
     if (state && host) control('model', localModel); else render();
   } else if (button.dataset.slide !== undefined) control('slide', Number(button.dataset.slide));
   else if (button.dataset.answer !== undefined) await answer(Number(button.dataset.answer));
   else if (button.dataset.action) await action(button.dataset.action);
 });
+app.addEventListener('input', e => {
+  const key = e.target.dataset.liveField;
+  if (editDraft && e.target.dataset.liveElement) { const el = editDraft.elements.find(el => el.id === e.target.dataset.liveElement); if (el) { el.text = e.target.value; if (el.role === 'title') editDraft.title = el.text.slice(0, 200); } return; }
+  if (!key || !editDraft) return;
+  if (key === 'image' && !e.target.value && editDraft.image.startsWith('data:')) return;
+  editDraft[key] = key === 'points' ? e.target.value.split('\n').filter(p => p.trim()).slice(0, 12) : e.target.value;
+  if (key === 'image') delete editDraft.assetId;
+  if (key === 'title' && editDraft.kind === 'canvas') { const title = editDraft.elements.find(el => el.role === 'title'); if (title) title.text = editDraft.title; }
+});
 app.addEventListener('change', e => {
+  if (e.target.id === 'live-image-file') { replaceLiveImage(e.target.files[0]); return; }
+  if (state?.phase === 'lesson' && host && !demo) {
+    if (e.target.id === 'pinned-qr-enabled') { presenterSettings.qrVisible = e.target.checked; savePresenterSettings(presenterSettings); render(); showPresentationControls(); }
+    if (e.target.id === 'pinned-qr-corner' && Object.hasOwn(qrCorners, e.target.value)) { presenterSettings.qrCorner = e.target.value; savePresenterSettings(presenterSettings); render(); showPresentationControls(); }
+  }
   if (e.target.id === 'document-page' && host) control('slide', Number(e.target.value));
 });
 app.addEventListener('submit', async e => {
+  if (e.target.id === 'live-edit-form') { e.preventDefault(); saveLiveSlide(); return; }
   if (e.target.id !== 'join-form') return;
   e.preventDefault(); if (busy) return;
   const form = new FormData(e.target);
@@ -309,6 +378,7 @@ app.addEventListener('submit', async e => {
   await connectSession({ host: false, code: codeDraft, name: String(form.get('name')).trim(), avatar: selectedAvatar });
 });
 document.addEventListener('keydown', e => {
+  if (editDraft) { if (e.key === 'Escape') action('cancel-edit-slide'); return; }
   if (/INPUT|TEXTAREA|SELECT/.test(e.target.tagName) || e.ctrlKey || e.metaKey || e.altKey) return;
   if (e.key === 'Escape' && shareOpen) { action('close-share'); return; }
   if (shareOpen || !state) return;
@@ -318,7 +388,69 @@ document.addEventListener('keydown', e => {
     if (e.key === 'ArrowLeft') { e.preventDefault(); action('previous'); }
   }
 });
-setInterval(updateClock, 100);
+function syncPresentationMode() {
+  app.dataset.qrCorner = presenterSettings.qrVisible && !demo ? presenterSettings.qrCorner : 'none';
+  app.classList.toggle('is-presenting', Boolean(document.fullscreenElement && state?.phase === 'lesson'));
+  app.classList.toggle('show-image-text', imageText);
+  requestAnimationFrame(() => viewer.resize());
+}
+function showPresentationControls() {
+  if (!document.fullscreenElement || state?.phase !== 'lesson') return;
+  app.classList.add('presenter-controls-visible');
+  clearTimeout(controlsTimer);
+  controlsTimer = setTimeout(() => app.classList.remove('presenter-controls-visible'), 2200);
+}
+function openLiveEditor() {
+  if (!host || state?.phase !== 'lesson') return;
+  const room = demo ? classroom : classroom.room;
+  editIndex = state.slide; editDraft = clone(room.lesson.slides[editIndex]);
+  editDraft.model = state.model; editError = '';
+  render(); document.querySelector('#live-title')?.focus();
+}
+function saveLiveSlide() {
+  if (!editDraft || !host) return;
+  try {
+    if (state.phase !== 'lesson' || state.slide !== editIndex) throw Error('O slide mudou. Feche a edição e tente novamente.');
+    const room = demo ? classroom : classroom.room;
+    const validated = validateLesson({ ...room.lesson, slides: room.lesson.slides.map((s, i) => i === editIndex ? editDraft : s) });
+    const saved = studio.library.save(validated);
+    if (studio.draft?.id === saved.id) { studio.draft = clone(saved); studio.dirty = false; }
+    solutionOpen = false;
+    classroom.control('edit-slide', { index: editIndex, slide: validated.slides[editIndex] });
+    if (demo) receive({ ...classroom.snapshot(demoPlayer), lesson: classroom.publicLesson(true) });
+    editDraft = null; editError = ''; render(); showPresentationControls();
+    toast('Slide atualizado e salvo na biblioteca.');
+  } catch (error) { editError = error.message; render(); document.querySelector('.live-edit-dialog [role="alert"]')?.scrollIntoView({ block: 'nearest' }); }
+}
+async function replaceLiveImage(file) {
+  if (!file || !editDraft) return;
+  const draft = editDraft;
+  try {
+    if (!['image/png', 'image/jpeg', 'image/webp', 'image/gif'].includes(file.type) || file.size > 1_400_000) throw Error('Escolha PNG, JPEG, WebP ou GIF de até 1,4 MB.');
+    const data = await new Promise((resolve, reject) => {
+      const reader = new FileReader(); reader.onload = () => resolve(reader.result); reader.onerror = () => reject(Error('Não foi possível carregar a imagem.')); reader.readAsDataURL(file);
+    });
+    if (editDraft !== draft) return;
+    editDraft.image = imageURL(data); delete editDraft.assetId; render();
+  } catch (error) { editError = error.message; render(); }
+}
+document.addEventListener('pointermove', e => { if (e.pointerType === 'mouse') showPresentationControls(); });
+document.addEventListener('focusin', e => { if (e.target.closest('.presentation-toolbar')) showPresentationControls(); });
+document.addEventListener('fullscreenchange', () => { syncPresentationMode(); showPresentationControls(); });
+document.addEventListener('visibilitychange', () => { document.documentElement.dataset.pageHidden = String(document.hidden); });
+window.addEventListener('beforeunload', e => { if (editDraft) { e.preventDefault(); e.returnValue = ''; } });
 render();
 const savedSession = Classroom.resume();
-if (savedSession && (!codeDraft || savedSession.code === codeDraft)) connectSession({ ...savedSession, resume: true });
+async function restorePage() {
+  const page = new URLSearchParams(location.search).get('page');
+  try { if (studio.dirty) studio.save(); }
+  catch (error) { studio.writeRoute('editor', studio.draft.id, true); toast(error.message); return; }
+  leave(false); studio.restoreRoute(); render();
+  if (['preview', 'present'].includes(page)) {
+    const id = new URLSearchParams(location.search).get('lesson'), lesson = studio.library.lessons.find(l => l.id === id);
+    if (lesson) try { await studio.launch(lesson, page === 'preview'); } catch (error) { toast(error.message); }
+  }
+}
+window.addEventListener('popstate', restorePage);
+if (savedSession && (!codeDraft || savedSession.code === codeDraft) && !['library', 'editor', 'join', 'preview'].includes(params.get('page'))) connectSession({ ...savedSession, resume: true });
+else if (['preview', 'present'].includes(params.get('page'))) restorePage();

@@ -1,0 +1,46 @@
+import { test, expect } from '@playwright/test';
+test('biblioteca clara tem demonstração animada que termina e responde ao toque; editor mantém navegação', async ({ page }) => {
+  const errors = []; page.on('pageerror', error => errors.push(error.message));
+  await page.setViewportSize({ width: 1440, height: 1000 }); await page.goto('/');
+  await expect(page.locator('.studio-shell')).toHaveCSS('background-color', 'rgb(250, 248, 253)');
+  const showcase = page.locator('[data-showcase]');
+  await expect(showcase).toHaveAttribute('data-playing', 'true');
+  await page.getByRole('button', { name: 'Parar demonstração', exact: true }).click();
+  await expect(showcase).toHaveAttribute('data-playing', 'false');
+  await page.getByRole('button', { name: 'Reproduzir demonstração', exact: true }).click();
+  await expect(showcase).toHaveAttribute('data-step', '2', { timeout: 10000 });
+  await expect(showcase).toHaveClass(/demo-correct/);
+  await expect(showcase).toHaveAttribute('data-playing', 'false', { timeout: 10000 });
+  await page.locator('.showcase-steps [data-showcase-step="0"]').click();
+  await page.getByRole('button', { name: 'Abrir ou fechar o modelo da demonstração', exact: true }).click();
+  await expect(showcase).toHaveClass(/device-open/);
+  await page.locator('.showcase-steps [data-showcase-step="2"]').click();
+  await page.locator('[data-showcase-answer="0"]').click(); await expect(page.locator('[data-demo-answer-status]')).toContainText('Experimente o SSD');
+  await page.locator('[data-showcase-answer="1"]').click(); await expect(showcase).toHaveClass(/demo-correct/);
+  await page.screenshot({ path: 'test-results/experience-desktop.png', fullPage: true, animations: 'disabled' });
+  await page.setViewportSize({ width: 390, height: 844 });
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+  await page.screenshot({ path: 'test-results/experience-mobile.png', fullPage: true, animations: 'disabled' });
+  await page.locator('.lesson-card').first().locator('[data-studio-action="edit"]').click();
+  await expect(page.locator('.slide-designer')).toBeVisible(); await expect(page.locator('#app')).toHaveAttribute('data-scene', 'editor');
+  await expect(page.locator('.editor-form-area')).toHaveCSS('background-color', 'rgb(255, 255, 255)');
+  await page.getByRole('button', { name: 'Campos', exact: true }).click(); await expect(page.getByLabel('Formato do slide', { exact: true })).toBeVisible();
+  await page.getByRole('button', { name: 'Editor visual', exact: true }).click(); await expect(page.locator('.slide-designer')).toBeVisible();
+  await page.goBack(); await expect(page.locator('.studio-library')).toBeVisible();
+  await expect(showcase).toHaveAttribute('data-playing', 'false'); expect(errors).toEqual([]);
+});
+test('movimento reduzido permite usar a demonstração sem iniciar o passeio automático', async ({ page }) => {
+  await page.emulateMedia({ reducedMotion: 'reduce' }); await page.goto('/');
+  await page.getByRole('button', { name: 'Reproduzir demonstração', exact: true }).click();
+  await expect(page.locator('[data-showcase]')).toHaveAttribute('data-playing', 'false');
+  await page.locator('.showcase-steps [data-showcase-step="1"]').click(); await expect(page.locator('[data-showcase]')).toHaveAttribute('data-step', '1');
+  await expect(page.locator('.demo-board-stage')).toHaveCSS('animation-name', 'none');
+});
+test('no celular, a demonstração espera entrar na tela antes de animar', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 }); await page.goto('/');
+  const demo = page.locator('[data-showcase]'); await expect(demo).toBeAttached();
+  await expect(demo).not.toHaveAttribute('data-playing', 'true');
+  await demo.scrollIntoViewIfNeeded(); await expect(demo).toHaveAttribute('data-playing', 'true');
+  await page.getByRole('button', { name: 'Parar demonstração', exact: true }).click();
+  await expect(demo).toHaveAttribute('data-playing', 'false');
+});

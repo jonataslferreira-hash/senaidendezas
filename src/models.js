@@ -21,7 +21,7 @@ export class HardwareViewer {
     try {
       this.renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true, powerPreference: 'low-power' });
     } catch { this.el.querySelector('.model-fallback').hidden = false; return; }
-    this.renderer.setPixelRatio(Math.min(devicePixelRatio, 1.75));
+    this.renderer.setPixelRatio(Math.min(devicePixelRatio, 1.35));
     this.renderer.setClearColor(0x000000, 0);
     this.renderer.outputColorSpace = THREE.SRGBColorSpace;
     this.el.prepend(this.renderer.domElement);
@@ -48,18 +48,28 @@ export class HardwareViewer {
       if (!this.pointer || Math.hypot(e.clientX - this.pointer.x, e.clientY - this.pointer.y) > 8) return;
       const rect = canvas.getBoundingClientRect();
       this.ray.setFromCamera(new THREE.Vector2((e.clientX - rect.left) / rect.width * 2 - 1, -(e.clientY - rect.top) / rect.height * 2 + 1), this.camera);
-      const hit = this.ray.intersectObjects(this.group.children, true).find(hit => hit.object.userData.part);
-      if (hit) this.select(hit.object.userData.part);
+      const hit = this.ray.intersectObjects(this.group.children, true).find(hit => hit.object.userData.part || hit.object.userData.customPart);
+      if (hit?.object.userData.customPart) {
+        this.detail.querySelector('strong').textContent = hit.object.userData.customPart;
+        this.detail.querySelector('p').textContent = 'Peça do modelo enviado. Arraste para girar e use o zoom para explorar.';
+      } else if (hit) this.select(hit.object.userData.part);
     });
     this.observer = new ResizeObserver(() => this.resize()); this.observer.observe(this.el);
-    this.renderer.setAnimationLoop(() => {
-      if (!this.el.isConnected || document.hidden) return;
+    this.controls.addEventListener('change', () => this.invalidate());
+    this.onVisibility = () => { if (!document.hidden) this.invalidate(); else { clearTimeout(this.frameTimer); cancelAnimationFrame(this.frameId); this.frameId = null; this.frameTimer = null; } };
+    document.addEventListener('visibilitychange', this.onVisibility);
+    this.intersection = new IntersectionObserver(entries => { this.inView = entries[0].isIntersecting; if (this.inView) this.invalidate(); }); this.intersection.observe(this.el);
+    this.drawFrame = () => {
+      this.frameId = null; this.frameTimer = null;
+      if (this.disposed || !this.el.isConnected || document.hidden || this.inView === false) return;
       let moving = false;
+      const reduced = document.documentElement.dataset.motion === 'reduced' || matchMedia('(prefers-reduced-motion: reduce)').matches;
       for (const part of this.group.children) if (part.userData.targetY !== undefined) {
         const difference = part.userData.targetY - part.position.y;
         if (Math.abs(difference) > .001) {
-          part.position.y += difference * .09;
-          moving = true;
+          part.position.y += reduced ? difference : difference * .18;
+          moving = !reduced;
+          this.dirty = true;
         } else if (difference !== 0) {
           part.position.y = part.userData.targetY;
           this.dirty = true;
@@ -70,8 +80,14 @@ export class HardwareViewer {
         this.renderer.render(this.scene, this.camera);
         this.dirty = false;
       }
-    });
+      if (moving || cameraMoved) this.invalidate(false);
+    };
     this.setModel('ssd', true);
+  }
+  invalidate(dirty = true) {
+    if (dirty) this.dirty = true;
+    if (this.disposed || !this.renderer || this.frameTimer || this.frameId) return;
+    this.frameTimer = setTimeout(() => { this.frameTimer = null; this.frameId = requestAnimationFrame(this.drawFrame); }, 33);
   }
   select(part) {
     const [title, text] = details[part] || details.casing;
@@ -83,14 +99,16 @@ export class HardwareViewer {
     if (!this.renderer) return;
     const w = this.el.clientWidth, h = this.el.clientHeight - this.detail.offsetHeight - 12;
     if (!w || !h) return;
-    this.renderer.setSize(w, h); this.camera.aspect = w / h; this.camera.updateProjectionMatrix();
-    this.dirty = true;
+    if (this.width !== w || this.height !== h) { this.width = w; this.height = h; this.renderer.setSize(w, h); this.camera.aspect = w / h; this.camera.updateProjectionMatrix(); }
+    this.invalidate();
   }
   reset() { if (this.controls) { this.camera.position.set(6.8, 7.2, 8.2); this.controls.target.set(0, .3, 0); this.controls.update(); } }
   setModel(type, exploded) {
     if (!this.renderer) return;
+    this.scene.environment = null;
     this.dirty = true;
     if (this.type !== type) {
+      this.customKey = null; this.loadVersion = (this.loadVersion || 0) + 1;
       this.group.traverse(o => { o.geometry?.dispose(); if (o.material) { for (const m of Array.isArray(o.material) ? o.material : [o.material]) { m.map?.dispose(); m.dispose(); } } });
       this.group.clear(); this.type = type;
       this.parts = [];
@@ -150,6 +168,49 @@ export class HardwareViewer {
     }
     this.exploded = exploded;
     for (const part of this.group.children) part.userData.targetY = (part.userData.baseY || 0) + (exploded ? part.userData.lift || 0 : 0);
+    this.invalidate();
+  }
+  async setCustomModel(model) {
+    if (!this.renderer || !model) return;
+    const key = model.assetId || model.name + ':' + model.data?.length;
+    if (this.customKey === key) return;
+    this.customKey = key; const version = this.loadVersion = (this.loadVersion || 0) + 1;
+    this.el.dataset.customLoaded = 'loading';
+    this.renderer.domElement.setAttribute('aria-label', 'Modelo 3D enviado. Arraste para girar e toque nas peças.');
+    this.type = 'custom';
+    this.detail.querySelector('strong').textContent = 'Carregando ' + model.name;
+    this.detail.querySelector('p').textContent = 'Preparando o modelo 3D…';
+    try {
+      const { loadCustomObject, disposeObject } = await import('./model-loader.js');
+      const object = await loadCustomObject(model, this.renderer);
+      if (version !== this.loadVersion || this.disposed) { disposeObject(object); return; }
+      if (!this.environment) {
+        const { RoomEnvironment } = await import('three/addons/environments/RoomEnvironment.js');
+        if (version !== this.loadVersion || this.disposed) { disposeObject(object); return; }
+        const room = new RoomEnvironment(), generator = new THREE.PMREMGenerator(this.renderer);
+        this.environment = generator.fromScene(room, .04); room.dispose(); generator.dispose();
+      }
+      this.scene.environment = this.environment.texture;
+      disposeObject(this.group); this.group.clear(); this.group.add(object);
+      this.detail.querySelector('strong').textContent = model.name;
+      this.detail.querySelector('p').textContent = 'Modelo enviado · arraste para girar, aproxime com dois dedos e toque nas peças.';
+      this.reset(); this.dirty = true; this.resize();
+      this.el.dataset.customLoaded = 'true';
+    } catch (error) {
+      if (version !== this.loadVersion || this.disposed) return;
+      this.group.clear(); this.dirty = true; this.el.dataset.customLoaded = 'error';
+      this.invalidate();
+      this.detail.querySelector('strong').textContent = 'Não foi possível abrir o modelo';
+      this.detail.querySelector('p').textContent = error.message;
+    }
+  }
+  dispose() {
+    this.disposed = true; this.loadVersion = (this.loadVersion || 0) + 1;
+    clearTimeout(this.frameTimer); cancelAnimationFrame(this.frameId); this.intersection?.disconnect(); document.removeEventListener('visibilitychange', this.onVisibility);
+    this.observer?.disconnect(); this.controls?.dispose(); this.renderer?.setAnimationLoop(null);
+    this.scene?.traverse(o => { o.geometry?.dispose(); for (const m of o.material ? (Array.isArray(o.material) ? o.material : [o.material]) : []) { for (const v of Object.values(m)) if (v?.isTexture) v.dispose(); m.dispose(); } });
+    this.renderer?.dispose(); this.el.remove();
+    this.environment?.dispose();
   }
   label(text, x, y, z, width, lift, color = '#b4b7c3') {
     const canvas = document.createElement('canvas'); canvas.width = 512; canvas.height = 96;

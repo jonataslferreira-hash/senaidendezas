@@ -5,6 +5,7 @@ async function upload(page, name, buffer) {
   await page.getByRole('button', { name: '↑ Importar slides', exact: true }).click();
   await page.locator('#import-slides-file').setInputFiles({ name, mimeType: name.endsWith('.pdf') ? 'application/pdf' : 'application/vnd.openxmlformats-officedocument.presentationml.presentation', buffer });
   await expect(page.getByLabel('Título da aula', { exact: true })).toBeVisible({ timeout: 60000 });
+  await page.getByRole('button', { name: 'Campos', exact: true }).click();
 }
 test('PDF vira páginas persistidas, apresenta em tela cheia e sincroniza com celular e reconexão do professor', async ({ browser }) => {
   const hostContext = await browser.newContext({ viewport: { width: 1440, height: 1000 } });
@@ -23,7 +24,7 @@ test('PDF vira páginas persistidas, apresenta em tela cheia e sincroniza com ce
   await host.getByRole('button', { name: 'Apresentar em tela cheia', exact: true }).click();
   await expect.poll(() => host.evaluate(() => Boolean(document.fullscreenElement))).toBe(true);
   await host.screenshot({ path: 'test-results/imported-pdf-fullscreen.png' });
-  await host.getByRole('button', { name: 'Apresentar em tela cheia', exact: true }).click();
+  await host.getByRole('button', { name: 'Modo apresentação', exact: true }).click();
   await phone.goto('/?localSignal&s=' + code);
   await phone.getByLabel('Como podemos chamar você?', { exact: true }).fill('Ana PDF');
   await phone.getByRole('button', { name: 'Entrar na sala', exact: true }).click();
@@ -59,7 +60,7 @@ test('PPTX mantém páginas, exporta JSON portátil e reabre imagens em outro na
   await page.screenshot({ path: 'test-results/imported-pptx.png', fullPage: true });
   await page.getByRole('button', { name: 'Sair', exact: true }).click();
   await page.reload();
-  await page.locator('.lesson-card').first().locator('[data-studio-action="preview"]').click();
+  await page.getByRole('button', { name: '▷ Prévia', exact: true }).click();
   await expect(page.locator('.document-stage img')).toHaveJSProperty('naturalWidth', 1920);
   const context = await browser.newContext(), other = await context.newPage();
   await other.goto('/');

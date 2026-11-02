@@ -1,17 +1,21 @@
 # Próximas etapas da plataforma
 
-Ideias registradas pelo usuário para evolução futura, sem implementação nesta etapa:
+O editor visual, os modelos próprios, os arquivos de slides, o perfil, a música,
+o lobby e a experiência animada estão implementados. Veja a revisão detalhada
+em [REVISAO-DOS-PEDIDOS.md](REVISAO-DOS-PEDIDOS.md).
 
-1. Contas de professores e biblioteca de aulas sincronizada entre dispositivos.
-2. Professor conectado no computador e no celular, com o celular como controle
-   remoto autenticado para avançar e voltar slides.
-3. Reações durante a aula.
-4. Criar e disparar quizzes durante a apresentação, além do quiz final.
-5. Outras atividades interativas e ampliação da biblioteca de modelos.
+A publicação do Worker e a configuração da URL da API ainda são necessárias
+para ativar o R2 real do proprietário. O endereço S3 do bucket não substitui
+a URL da API. Login continua usando Supabase.
 
-O controle do professor deverá ser separado da participação de alunos.
-Contas e sincronização exigirão serviços externos ao GitHub Pages; a
-autenticação e a persistência compartilhada ainda precisam ser definidas.
+Depois da revisão atual, evoluir além do quiz:
 
-PDF e PPTX já podem ser importados para a biblioteca local. As páginas são
-apresentadas de forma estática, com sincronização com os alunos e tela cheia.
+1. Enquetes e votação ao vivo.
+2. Nuvem de palavras e respostas curtas.
+3. Associação e ordenação de ideias ou peças.
+4. Reações da turma durante a apresentação.
+5. Criar e disparar atividades em qualquer momento da aula.
+6. Celular do professor como controle remoto autenticado.
+
+Essas atividades ainda não estão disponíveis no produto. A ordem será definida
+na próxima etapa, preservando a separação entre professor e alunos.

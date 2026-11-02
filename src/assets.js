@@ -44,24 +44,48 @@ export async function removePageAssets(ids) {
   });
   for (const id of ids) cache.delete(id);
 }
+function copiedSlides(lesson) {
+  return lesson.slides.map(s => ({ ...s, audio: s.audio ? { ...s.audio } : null, customModel: s.customModel ? { ...s.customModel } : null, elements: s.elements?.map(e => ({ ...e, customModel: e.customModel ? { ...e.customModel } : null })) }));
+}
+function nodes(slides) { return slides.flatMap(s => [s, ...(s.elements || [])]); }
+function audioResources(lesson) { return [lesson.quizAudio, ...lesson.slides.map(s => s.audio)].filter(Boolean); }
+export function lessonAssetIds(lesson) { return [...nodes(lesson.slides).flatMap(n => [n.assetId, n.customModel?.assetId]), ...audioResources(lesson).map(a => a.assetId)].filter(Boolean); }
 export function compactLesson(lesson) {
-  return { ...lesson, slides: lesson.slides.map(s => s.assetId ? { ...s, image: '' } : { ...s }) };
+  const slides = copiedSlides(lesson), result = { ...lesson, slides, quizAudio: lesson.quizAudio ? { ...lesson.quizAudio } : null };
+  for (const node of nodes(slides)) {
+    if (node.assetId) node.image = '';
+    if (node.customModel?.assetId) node.customModel.data = '';
+  }
+  for (const audio of audioResources(result)) if (audio.assetId) audio.data = '';
+  return result;
 }
 export async function hydrateLesson(lesson, portable = false) {
-  const slides = await Promise.all(lesson.slides.map(async s => {
-    const result = { ...s, image: s.image || (s.assetId ? await getPageImage(s.assetId) : '') };
-    if (portable) delete result.assetId;
-    return result;
+  const slides = copiedSlides(lesson), result = { ...lesson, slides, quizAudio: lesson.quizAudio ? { ...lesson.quizAudio } : null };
+  await Promise.all(nodes(slides).map(async node => {
+    if (node.assetId && !node.image) node.image = await getPageImage(node.assetId);
+    if (node.customModel?.assetId && !node.customModel.data) node.customModel.data = await getPageImage(node.customModel.assetId);
+    if (portable) { delete node.assetId; if (node.customModel) delete node.customModel.assetId; }
   }));
-  return { ...lesson, slides };
+  await Promise.all(audioResources(result).map(async audio => { if (audio.assetId && !audio.data) audio.data = await getPageImage(audio.assetId); if (portable) delete audio.assetId; }));
+  return result;
 }
 export async function archiveImportedPages(lesson) {
-  const positions = lesson.slides.flatMap((s, i) => s.kind === 'document' && s.image ? [i] : []);
-  if (!positions.length) return { lesson, ids: [] };
-  const ids = await storePages(positions.map(i => lesson.slides[i].image));
-  const slides = lesson.slides.map(s => ({ ...s }));
-  positions.forEach((position, i) => { slides[position].assetId = ids[i]; slides[position].image = ''; });
-  return { lesson: { ...lesson, slides }, ids };
+  const slides = copiedSlides(lesson), pending = [], result = { ...lesson, slides, quizAudio: lesson.quizAudio ? { ...lesson.quizAudio } : null };
+  for (const node of nodes(slides)) {
+    if (node.image && ['document', 'image'].includes(node.kind || node.type)) pending.push({ node, field: 'image' });
+    if (node.customModel?.data) pending.push({ node: node.customModel, field: 'data' });
+  }
+  for (const audio of audioResources(result)) if (audio.data) pending.push({ node: audio, field: 'data' });
+  if (!pending.length) return { lesson, ids: [] };
+  const ids = await storePages(pending.map(({ node, field }) => node[field]));
+  pending.forEach(({ node, field }, i) => { node.assetId = ids[i]; node[field] = ''; });
+  return { lesson: result, ids };
+}
+export function fillAssetAudio(root) {
+  for (const audio of root.querySelectorAll('audio[data-audio-asset]')) {
+    const id = audio.dataset.audioAsset;
+    getPageImage(id).then(src => { if (audio.isConnected && audio.dataset.audioAsset === id) audio.src = src; }).catch(() => { if (audio.isConnected) audio.insertAdjacentText('afterend', 'Áudio indisponível neste navegador. Importe o JSON completo.'); });
+  }
 }
 export function fillAssetImages(root) {
   for (const image of root.querySelectorAll('img[data-asset-id]')) {

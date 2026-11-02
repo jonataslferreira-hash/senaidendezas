@@ -1,5 +1,8 @@
 import { slides, defaultQuestions } from './content.js';
 import { compactLesson } from './assets.js';
+import { validateCustomModel } from './model-files.js';
+import { colorValue, normalizeElements } from './canvas-data.js';
+import { validateAudio } from './audio-data.js';
 
 export const LIBRARY_KEY = 'storage-lab-lessons-v1';
 export const MAX_LESSON_BYTES = 48 * 1024 * 1024;
@@ -41,9 +44,9 @@ export function validateLesson(input, { draft = false } = {}) {
   if (!Array.isArray(input.questions) || input.questions.length > 50) throw Error('O quiz pode ter até 50 perguntas.');
   const title = text(input.title, 140);
   if (!draft && !title.trim()) throw Error('Dê um título para a aula.');
-  const result = { version: 1, id: text(input.id, 100) || uid(), title, description: text(input.description, 500), updatedAt: Number(input.updatedAt) || 0 };
+  const result = { version: 1, id: text(input.id, 100) || uid(), title, description: text(input.description, 500), updatedAt: Number(input.updatedAt) || 0, quizAudio: validateAudio(input.quizAudio) };
   result.slides = input.slides.map((s, i) => {
-    if (!s || !['text', 'image', 'model', 'document'].includes(s.kind)) throw Error('Tipo inválido no slide ' + (i + 1) + '.');
+    if (!s || !['text', 'image', 'model', 'document', 'canvas'].includes(s.kind)) throw Error('Tipo inválido no slide ' + (i + 1) + '.');
     const title = text(s.title, 200);
     if (!draft && !title.trim()) throw Error('Preencha o título do slide ' + (i + 1) + '.');
     const image = imageURL(s.image);
@@ -52,9 +55,12 @@ export function validateLesson(input, { draft = false } = {}) {
     if (s.kind === 'document' && !image && !assetId) throw Error('A página importada ' + (i + 1) + ' está sem imagem.');
     if (!draft && s.kind === 'image' && !image) throw Error('Adicione a imagem do slide ' + (i + 1) + '.');
     if (!draft && s.kind === 'image' && !text(s.imageAlt, 500).trim()) throw Error('Descreva a imagem do slide ' + (i + 1) + ' para os alunos.');
-    if (s.kind === 'model' && !['ssd', 'hdd', 'nvme'].includes(s.model)) throw Error('Escolha um modelo 3D válido no slide ' + (i + 1) + '.');
-    return { id: text(s.id, 100) || uid(), kind: s.kind, title, tag: text(s.tag, 160), intro: text(s.intro), points: Array.isArray(s.points) ? s.points.slice(0, 12).map(p => text(p, 1000)) : [],
-      callout: text(s.callout, 1000), note: text(s.note), prompt: text(s.prompt, 1000), answer: text(s.answer, 3000), comparison: Boolean(s.comparison), model: ['ssd', 'hdd', 'nvme'].includes(s.model) ? s.model : 'ssd', image, imageAlt: text(s.imageAlt, 500),
+    const customModel = validateCustomModel(s.customModel, draft);
+    if (s.kind === 'model' && !['ssd', 'hdd', 'nvme', 'custom'].includes(s.model)) throw Error('Escolha um modelo 3D válido no slide ' + (i + 1) + '.');
+    if (!draft && s.kind === 'model' && s.model === 'custom' && !customModel) throw Error('Envie o modelo 3D do slide ' + (i + 1) + '.');
+    const elements = s.kind === 'canvas' ? normalizeElements(s.elements, draft, imageURL) : [];
+    return { id: text(s.id, 100) || uid(), kind: s.kind, title, audio: validateAudio(s.audio), tag: text(s.tag, 160), intro: text(s.intro), points: Array.isArray(s.points) ? s.points.slice(0, 12).map(p => text(p, 1000)) : [],
+      callout: text(s.callout, 1000), note: text(s.note), prompt: text(s.prompt, 1000), answer: text(s.answer, 3000), comparison: Boolean(s.comparison), model: ['ssd', 'hdd', 'nvme', 'custom'].includes(s.model) ? s.model : 'ssd', customModel, image, imageAlt: text(s.imageAlt, 500), elements, background: colorValue(s.background, '#171324'),
       ...(assetId ? { assetId } : {}), sourceType: ['pdf', 'pptx'].includes(s.sourceType) ? s.sourceType : '', pageWidth: Math.max(1, Math.min(8000, Number(s.pageWidth) || 1600)), pageHeight: Math.max(1, Math.min(8000, Number(s.pageHeight) || 900)) };
   });
   result.questions = input.questions.map((q, i) => {

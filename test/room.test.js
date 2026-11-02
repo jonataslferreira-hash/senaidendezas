@@ -7,10 +7,10 @@ function setup() {
   const room = new Room('123456', null, () => time);
   const a = room.join({ name: 'Ana', avatar: '🚀' });
   const b = room.join({ name: 'Bruno', avatar: '🤖' });
-  return { room, a, b, advance(ms) { time += ms; } };
+  return { room, a, b, advance(ms) { time += ms; }, startQuiz() { room.control('quiz'); room.control('start-quiz'); time += 3000; room.tick(); } };
 }
 test('sincroniza slides, modelos e camadas sem aceitar índices inválidos', () => {
-  const { room } = setup(); room.control('slide', 1);
+  const { room, startQuiz } = setup(); room.control('slide', 1);
   assert.equal(room.snapshot().model, 'hdd');
   room.control('explode', true); assert.equal(room.snapshot().exploded, true);
   room.control('slide', 2); assert.equal(room.snapshot().exploded, false);
@@ -18,7 +18,7 @@ test('sincroniza slides, modelos e camadas sem aceitar índices inválidos', () 
   assert.throws(() => room.control('model', '__proto__'));
 });
 test('tempo e dificuldade calculam pontos no apresentador, sem revelar acertos antes da hora', () => {
-  const { room, a, b, advance } = setup(); room.control('quiz');
+  const { room, startQuiz, a, b, advance } = setup(); startQuiz();
   const q = questions[0]; room.answer(a.id, { choice: q.correct, questionIndex: 0 });
   advance(q.seconds * 500); room.answer(b.id, { choice: q.correct, questionIndex: 0 });
   const hidden = room.snapshot(a.id);
@@ -30,13 +30,13 @@ test('tempo e dificuldade calculam pontos no apresentador, sem revelar acertos a
   assert.equal(room.snapshot(a.id).question.correct, q.correct);
 });
 test('revelação repetida é rejeitada e não duplica pontos', () => {
-  const { room, a } = setup(); room.control('quiz');
+  const { room, startQuiz, a } = setup(); startQuiz();
   room.answer(a.id, { choice: 1, questionIndex: 0 }); room.control('reveal');
   assert.throws(() => room.control('reveal'));
   assert.equal(room.snapshot(a.id).me.score, 1000);
 });
 test('erros e respostas atrasadas não pontuam; não aceita duplicatas ou pergunta antiga', () => {
-  const { room, a, b, advance } = setup(); room.control('quiz');
+  const { room, startQuiz, a, b, advance } = setup(); startQuiz();
   assert.throws(() => room.answer(a.id, { choice: '1', questionIndex: 0 }));
   room.answer(a.id, { choice: 0, questionIndex: 0 });
   assert.throws(() => room.answer(a.id, { choice: 1, questionIndex: 0 }));
@@ -48,16 +48,16 @@ test('erros e respostas atrasadas não pontuam; não aceita duplicatas ou pergun
   assert.throws(() => room.answer(b.id, { choice: 1, questionIndex: 0 }));
 });
 test('reconecta pela credencial individual e não expõe credenciais a colegas', () => {
-  const { room, a } = setup(); room.disconnect(a.id);
+  const { room, startQuiz, a } = setup(); room.disconnect(a.id);
   assert.equal(room.snapshot().ranking.find(p => p.id === a.id).online, false);
-  room.control('quiz');
+  startQuiz();
   assert.equal(room.join({ token: a.token }).id, a.id);
   assert.throws(() => room.join({ name: 'Outra pessoa' }));
   assert.equal(JSON.stringify(room.snapshot()).includes(a.token), false);
   assert.equal(room.snapshot().ranking.length, 2);
 });
 test('completa cinco perguntas, aplica dificuldade e reinicia uma rodada sem pontos antigos', () => {
-  const { room, a } = setup(); room.control('quiz');
+  const { room, startQuiz, a } = setup(); startQuiz();
   questions.forEach((q, i) => {
     room.answer(a.id, { choice: q.correct, questionIndex: i });
     room.control('reveal'); room.control('next');
@@ -65,12 +65,12 @@ test('completa cinco perguntas, aplica dificuldade e reinicia uma rodada sem pon
   assert.equal(room.snapshot().phase, 'finished');
   assert.equal(room.snapshot(a.id).me.score, 7000);
   assert.equal(room.snapshot().ranking[0].correct, 5);
-  room.control('lesson'); room.control('quiz');
+  room.control('lesson'); startQuiz();
   assert.equal(room.snapshot(a.id).me.score, 0);
   assert.equal(room.snapshot(a.id).me.answer, null);
 });
 test('nomes são limitados; sala restaurada mantém resultados e expira pergunta vencida', () => {
-  const { room, a, advance } = setup(); room.control('quiz');
+  const { room, startQuiz, a, advance } = setup(); startQuiz();
   room.answer(a.id, { choice: 1, questionIndex: 0 }); advance(19000);
   const restored = new Room('123456', structuredClone(room.data), room.now);
   assert.equal(restored.snapshot().phase, 'reveal');

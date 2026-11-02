@@ -1,0 +1,13 @@
+name = "storage-lab-files"
+account_id = "4cdb64404c75086e5ac536d88abd30e6"
+main = "r2-worker.js"
+compatibility_date = "2026-11-01"
+
+[[r2_buckets]]
+binding = "FILES"
+bucket_name = "storagelab"
+
+[vars]
+SUPABASE_URL = "https://qkpgiwjsqtocvjmqinii.supabase.co"
+SUPABASE_PUBLISHABLE_KEY = "sb_publishable_-CT7iCR3355qijcVioyRkA_-Njn3Q4e"
+ALLOWED_ORIGINS = "https://jonataslferreira-hash.github.io,http://localhost:5173,http://127.0.0.1:5173"
