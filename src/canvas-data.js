@@ -9,7 +9,7 @@ export const colorValue = (v, fallback = '#f1eaff') => /^#[0-9a-f]{6}$/i.test(v)
 const number = (v, fallback) => Number.isFinite(Number(v)) ? Number(v) : fallback;
 export function newElement(type, overrides = {}) {
   return { id: crypto.randomUUID(), type, x: 8, y: 15, w: type === 'text' ? 65 : 42, h: type === 'text' ? 18 : 60,
-    text: 'Escreva sua ideia', role: '', fontSize: 36, color: '#f1eaff', bold: false, align: 'left', background: '#b7a0e8', image: '', imageAlt: '', model: 'ssd', customModel: null, locked: false, ...overrides };
+    text: 'Escreva sua ideia', role: '', fontSize: 36, color: '#f1eaff', bold: false, align: 'left', background: '#b7a0e8', image: '', imageAlt: '', imageZoom:1,imageX:0,imageY:0, model: 'ssd', customModel: null, locked: false, ...overrides };
 }
 export function normalizeElements(elements, draft, validateImage) {
   if (!Array.isArray(elements) || elements.length > 40) throw Error('Um slide livre pode ter até 40 elementos.');
@@ -17,16 +17,17 @@ export function normalizeElements(elements, draft, validateImage) {
   const ids = new Set();
   return elements.map(e => {
     if (!e || !['text', 'image', 'model', 'shape'].includes(e.type)) throw Error('O slide contém um elemento inválido.');
-    const w = Math.max(5, Math.min(100, number(e.w, 40))), h = Math.max(5, Math.min(100, number(e.h, 20)));
+    const w = Math.max(5, Math.min(1000, number(e.w, 40))), h = Math.max(5, Math.min(1000, number(e.h, 20)));
     let id = typeof e.id === 'string' && /^[a-zA-Z0-9_-]{1,100}$/.test(e.id) ? e.id : crypto.randomUUID();
     if (ids.has(id)) id = crypto.randomUUID(); ids.add(id);
     const assetId = typeof e.assetId === 'string' && /^asset-[a-f0-9-]{36}$/.test(e.assetId) ? e.assetId : '';
     const image = validateImage(e.image), customModel = validateCustomModel(e.customModel, draft);
     if (!draft && e.type === 'image' && !image && !assetId) throw Error('Carregue a imagem do elemento antes de apresentar.');
     if (!draft && e.type === 'model' && e.model === 'custom' && !customModel) throw Error('Carregue o modelo 3D do elemento antes de apresentar.');
-    return { ...newElement(e.type), id, x: Math.max(0, Math.min(100 - w, number(e.x, 8))), y: Math.max(0, Math.min(100 - h, number(e.y, 15))), w, h,
+    return { ...newElement(e.type), id, x: Math.max(-1000, Math.min(1000, number(e.x, 8))), y: Math.max(-1000, Math.min(1000, number(e.y, 15))), w, h,
       text: String(e.text || '').slice(0, 6000), role: e.role === 'title' ? 'title' : '', fontSize: Math.max(12, Math.min(160, number(e.fontSize, 36))), color: colorValue(e.color), bold: Boolean(e.bold),
       align: ['left', 'center', 'right'].includes(e.align) ? e.align : 'left', background: colorValue(e.background, '#b7a0e8'), image, imageAlt: String(e.imageAlt || '').slice(0, 500),
+      imageZoom:Math.max(1,Math.min(1000,number(e.imageZoom,1))),imageX:Math.max(-100000,Math.min(100000,number(e.imageX,0))),imageY:Math.max(-100000,Math.min(100000,number(e.imageY,0))),
       ...(assetId ? { assetId } : {}), model: ['ssd', 'hdd', 'nvme', 'custom'].includes(e.model) ? e.model : 'ssd', customModel, locked: Boolean(e.locked) };
   });
 }

@@ -20,7 +20,7 @@ export class Room {
   join({ name, avatar, token } = {}) {
     let p = token && this.data.players.find(p => p.token === token);
     if (!p) {
-      if (!['lesson', 'lobby'].includes(this.data.phase)) throw Error('O quiz já começou. Entre na próxima rodada.');
+      if (!['lesson', 'lobby', 'poll', 'poll-results'].includes(this.data.phase)) throw Error('O quiz já começou. Entre na próxima rodada.');
       if (this.data.players.length >= 60) throw Error('Esta sala atingiu o limite de 60 participantes.');
       name = String(name || '').trim().replace(/[\x00-\x1f\x7f]/g, '').slice(0, 24);
       if (!name) throw Error('Digite seu nome ou apelido.');
@@ -41,7 +41,11 @@ export class Room {
       if (changedModel) { d.model = next.slides[d.slide].model; d.exploded = false; }
     } else if (action === 'slide' && d.phase === 'lesson' && Number.isInteger(value) && value >= 0 && value < this.slides.length) {
       d.slide = value; d.model = this.slides[value].model; d.exploded = false;
-    } else if (action === 'model' && d.phase === 'lesson' && (['hdd', 'ssd', 'nvme'].includes(value) || value === 'custom' && this.slides[d.slide].customModel)) d.model = value;
+    } else if (action === 'poll' && d.phase === 'lesson') {
+      if (!this.slides[d.slide].poll) throw Error('Adicione uma enquete a este slide no editor.');
+      d.phase = 'poll'; d.pollId = newToken(); d.votes = {};
+    } else if (action === 'close-poll' && d.phase === 'poll') d.phase = 'poll-results';
+    else if (action === 'model' && d.phase === 'lesson' && (['hdd', 'ssd', 'nvme'].includes(value) || value === 'custom' && this.slides[d.slide].customModel)) d.model = value;
     else if (action === 'explode' && d.phase === 'lesson') d.exploded = Boolean(value);
     else if (action === 'quiz' && d.phase === 'lesson') {
       if (!this.questions.length) throw Error('Esta aula não tem perguntas de quiz.');
@@ -55,7 +59,7 @@ export class Room {
       if (d.questionIndex + 1 < this.questions.length) this.startQuestion(d.questionIndex + 1);
       else d.phase = 'finished';
     } else if (action === 'finish' && d.phase === 'lesson') d.phase = 'finished';
-    else if (action === 'lesson' && ['lobby', 'countdown', 'reveal', 'finished'].includes(d.phase)) { d.phase = 'lesson'; d.questionIndex = -1; }
+    else if (action === 'lesson' && ['lobby', 'countdown', 'reveal', 'finished', 'poll', 'poll-results'].includes(d.phase)) { d.phase = 'lesson'; d.questionIndex = -1; }
     else throw Error('Esta ação não está disponível agora.');
   }
   startQuestion(index) {
@@ -64,6 +68,12 @@ export class Room {
   answer(id, { choice, questionIndex } = {}) {
     this.tick();
     const d = this.data, p = d.players.find(p => p.id === id), q = this.questions[d.questionIndex];
+    if (d.phase === 'poll') {
+      const poll = this.slides[d.slide].poll;
+      if (!p || questionIndex !== d.pollId || !Number.isInteger(choice) || choice < 0 || choice >= poll.options.length) throw Error('Voto inválido ou enquete já mudou.');
+      if (Object.hasOwn(d.votes, id)) throw Error('Seu voto já foi registrado.');
+      d.votes[id] = choice; return;
+    }
     if (!p || d.phase !== 'question' || this.now() >= d.deadline) throw Error('O tempo desta pergunta terminou.');
     if (questionIndex !== d.questionIndex) throw Error('Esta pergunta já mudou.');
     if (!Number.isInteger(choice) || choice < 0 || choice >= q.options.length) throw Error('Resposta inválida.');
@@ -93,6 +103,7 @@ export class Room {
       code: d.code, phase: d.phase, slide: d.slide, model: d.model, exploded: d.exploded,
       questionIndex: d.questionIndex, totalQuestions: this.questions.length, serverTime: this.now(),
       countdownEndsAt: d.phase === 'countdown' ? d.deadline : 0,
+      poll: ['poll', 'poll-results'].includes(d.phase) ? { ...this.slides[d.slide].poll, id: d.pollId, total: Object.keys(d.votes).length, choice: p && Object.hasOwn(d.votes, id) ? d.votes[id] : null, counts: this.slides[d.slide].poll.options.map((_, i) => Object.values(d.votes).filter(v => v === i).length) } : null,
       ...(includeLesson ? { lesson: this.publicLesson(!id) } : {}),
       ranking: d.players.map(({ id, name, avatar, score, correct, online }) => ({ id, name, avatar, score, correct, online })).sort((a, b) => b.score - a.score || b.correct - a.correct || a.name.localeCompare(b.name, 'pt-BR')),
       answeredCount: d.players.filter(p => p.answers[d.questionIndex]).length,

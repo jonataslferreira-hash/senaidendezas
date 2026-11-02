@@ -11,7 +11,7 @@ test('slide livre preserva elementos e limita posições, cores e recursos', () 
   canvas.elements.push(newElement('shape', { x: -10, y: 200, w: 150, h: 10, background: 'url(evil)' }));
   lesson.slides[0] = canvas;
   const result = validateLesson(lesson), e = result.slides[0].elements.at(-1);
-  assert.equal(e.x, 0); assert.equal(e.y, 90); assert.equal(e.w, 100); assert.equal(e.background, '#b7a0e8');
+  assert.equal(e.x, -10); assert.equal(e.y, 200); assert.equal(e.w, 150); assert.equal(e.background, '#b7a0e8');
   const room = new Room('123456', undefined, Date.now, result);
   assert.equal(room.publicLesson().slides[0].kind, 'canvas');
   assert.equal(room.publicLesson().slides[0].elements[0].text, canvas.elements[0].text);

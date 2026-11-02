@@ -40,7 +40,7 @@ drop policy if exists "storage_lab_own_files_delete" on storage.objects;
 create policy "storage_lab_own_files_delete" on storage.objects for delete to authenticated
   using (bucket_id = 'storage-lab-lessons' and (storage.foldername(name))[1] = (select auth.uid()::text));
 insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
-values ('storage-lab-avatars', 'storage-lab-avatars', false, 262144, array['image/webp', 'image/png', 'image/jpeg'])
+values ('storage-lab-avatars', 'storage-lab-avatars', false, 262144, array['image/webp', 'image/png', 'image/jpeg','image/gif'])
 on conflict (id) do update set public = false, file_size_limit = excluded.file_size_limit, allowed_mime_types = excluded.allowed_mime_types;
 drop policy if exists "storage_lab_own_avatar" on storage.objects;
 create policy "storage_lab_own_avatar" on storage.objects for all to authenticated

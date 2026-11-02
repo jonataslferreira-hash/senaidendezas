@@ -20,7 +20,7 @@ test('modelo atual fica bloqueado para o aluno; tela cheia mostra controles por 
   await expect(phone.getByRole('button', { name: 'HDD', exact: true })).toHaveAttribute('aria-pressed', 'true');
   await expect(phone.getByRole('button', { name: 'SSD SATA', exact: true })).toBeDisabled();
   await host.getByLabel('QR Code', { exact: true }).check();
-  await host.getByRole('button', { name: 'Modo apresentação', exact: true }).click();
+  await host.getByRole('button', { name: 'Apresentar em tela cheia', exact: true }).click();
   await expect(host.locator('#app')).toHaveClass(/is-presenting/);
   await expect(host.locator('.pinned-room-qr img')).toHaveAttribute('src', /^data:image/);
   await expect(host.locator('.pinned-room-qr strong')).toContainText(code.slice(0, 3) + ' ' + code.slice(3));
@@ -45,7 +45,7 @@ test('modelo atual fica bloqueado para o aluno; tela cheia mostra controles por 
   await host.mouse.move(700, 500);
   await host.screenshot({ path: 'test-results/native-model-fullscreen.png' });
   await host.mouse.move(710, 510);
-  await host.getByRole('button', { name: 'Modo apresentação', exact: true }).click();
+  await host.getByRole('button', { name: 'Apresentar em tela cheia', exact: true }).click();
   await host.getByRole('button', { name: 'Sair', exact: true }).click();
   await host.reload();
   await host.locator('[data-studio-action="edit"]').click();
@@ -73,7 +73,7 @@ test('slide de imagem do editor ocupa a tela inteira; texto pode ser mostrado, e
   await page.locator('#import-lesson-file').setInputFiles({ name: 'aula.json', mimeType: 'application/json', buffer: Buffer.from(JSON.stringify(lesson)) });
   await expect(page.getByLabel('Título da aula', { exact: true })).toHaveValue(lesson.title);
   await page.getByRole('button', { name: '▷ Prévia', exact: true }).click();
-  await page.getByRole('button', { name: 'Modo apresentação', exact: true }).click();
+  await page.getByRole('button', { name: 'Apresentar em tela cheia', exact: true }).click();
   const box = await page.locator('.lesson-image img').boundingBox();
   expect(box.x).toBe(0); expect(box.y).toBe(0); expect(box.width).toBe(1440); expect(box.height).toBe(1000);
   await expect(page.locator('.slide-panel')).toBeHidden();
@@ -87,6 +87,6 @@ test('slide de imagem do editor ocupa a tela inteira; texto pode ser mostrado, e
   await expect(page.getByRole('heading', { name: 'Os três estados da água', exact: true })).toBeVisible();
   expect(await page.evaluate(() => document.documentElement.scrollHeight <= innerHeight)).toBe(true);
   await page.screenshot({ path: 'test-results/native-text-fullscreen.png' });
-  await page.getByRole('button', { name: 'Modo apresentação', exact: true }).click();
+  await page.getByRole('button', { name: 'Apresentar em tela cheia', exact: true }).click();
   await expect(page.locator('#app')).not.toHaveClass(/is-presenting/);
 });

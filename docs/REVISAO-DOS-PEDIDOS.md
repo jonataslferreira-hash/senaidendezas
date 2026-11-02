@@ -17,10 +17,15 @@ execução do SQL no Supabase ou implantação do Worker no Cloudflare.
 | Alunos acompanharem o professor | A sala sincroniza slides, modelos, quiz e resultados; alunos entram por código ou QR. |
 | Lobby antes do quiz | Personagens, entrada de participantes, trilha opcional e contagem iniciada pelo professor. |
 | Música própria no slide e quiz | Upload, prévia, volume e repetição. O professor controla o áudio; não há várias trilhas tocando nos celulares. |
-| Contas e perfil | Login/cadastro/recuperação Supabase, nome, foto otimizada, bio, instituição, cores, redução de movimento e troca de senha. A foto exige armazenamento ativo. |
+| Colaboração simultânea | Código com Yjs, presença, convites por e-mail e versões no R2. Exige SQL/Worker atualizados; envio de e-mail exige configurar o provedor. Veja COLABORACAO-E-MUSICA.md. |
+| Música pessoal no editor | Cinco faixas fornecidas, player no cabeçalho, CD com cor da capa, upload pessoal e player oficial do Spotify. |
+| Contas e perfil | Login/cadastro/recuperação Supabase, nome, foto com recorte por gestos/câmera e recuperação após reload, bio, instituição, cores, redução de movimento e troca de senha. A foto exige armazenamento ativo. |
 | Arquivos da conta no R2 | Worker publicado com o bucket `storagelab`; URL configurada no projeto e no workflow. A consulta sem login foi bloqueada e CORS passou. Falta confirmar o envio autenticado pelo site após publicar o frontend. |
 | Compressão | Imagens otimizadas no envio e aulas comprimidas na nuvem quando houver economia. Processamento de gzip em Web Worker. |
-| Site animado e interativo | Biblioteca clara com demonstração interativa de três etapas, abertura do dispositivo ilustrado, feedback de resposta, movimento entre telas e slides, painéis e pódio. A animação automática termina em 7,6 segundos; o usuário pode repetir. |
+| Site animado e interativo | Biblioteca com claro/escuro/sistema, chamada principal única, logo de béquer no site e favicon. Caixa e cartões flutuam; Crie → Conecte → Interaja se repete automaticamente. Há pausa manual e respeito ao movimento reduzido. |
+| Enquetes além do quiz | Enquete configurável por slide, 2–4 opções, votos únicos por rodada, resultados ao vivo, encerramento e retorno ao mesmo slide. Sem pontuação. |
+| Ordem e passagem dos slides | Mover, duplicar e excluir também no editor visual; transição por slide: deslizar, dissolver ou nenhuma. Avanço manual. |
+| Tela preta no Pages | Publicação atual abriu no diagnóstico. Build local testado sob /senaidendezas/, sem erro de JS/HTTP; carregamento inicial visível e recuperação se o módulo falhar. Causa da imagem anterior não reproduzida. |
 | Reduzir o consumo de CPU | Testes pesados encerrados; 3D sob demanda, limite de quadros e pausa fora da área visível. Preferência de movimento reduzido e testes leves sem WebGL. |
 
 ## Próximas funcionalidades, depois desta revisão
@@ -28,7 +33,6 @@ execução do SQL no Supabase ou implantação do Worker no Cloudflare.
 O usuário pediu que a plataforma tenha atividades além do quiz. Estão
 registradas como próximas evoluções, sem controles simulados no produto:
 
-- Enquetes e votação ao vivo, sem resposta obrigatoriamente certa.
 - Nuvem de palavras e respostas curtas para discussão.
 - Atividades de associação e ordenação.
 - Reações da turma durante os slides.

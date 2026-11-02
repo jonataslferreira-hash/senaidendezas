@@ -1,24 +1,26 @@
-import { optimizeImage } from './image-optimize.js';
+import {themes,styles,validTheme,validStyle} from './personalization.js';
+import { PhotoEditor } from './photo-editor.js';
 import { putAvatar, getAvatar, removeAvatar } from './cloud-files.js';
 import './profile.css';
 const esc = v => String(v ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const safe = message => Object.assign(Error(message), { userMessage: message });
 export class ProfileSettings {
-  constructor(account) { this.account = account; this.avatarUrl = ''; this.avatarKey = ''; this.draft = null; this.pending = null; }
-  reset() { this.photoVersion = (this.photoVersion || 0) + 1; if (this.pending?.url) URL.revokeObjectURL(this.pending.url); if (this.avatarUrl) URL.revokeObjectURL(this.avatarUrl); this.avatarUrl = ''; this.avatarKey = ''; this.draft = null; this.pending = null; }
+  constructor(account) { this.account = account; this.avatarUrl = ''; this.avatarKey = ''; this.draft = null; this.pending = null; this.photo = new PhotoEditor(this); }
+  reset() { this.photo.reset(); this.photoVersion = (this.photoVersion || 0) + 1; if (this.pending?.url) URL.revokeObjectURL(this.pending.url); if (this.avatarUrl) URL.revokeObjectURL(this.avatarUrl); this.avatarUrl = ''; this.avatarKey = ''; this.draft = null; this.pending = null; }
   begin() { this.photoVersion = (this.photoVersion || 0) + 1; if (this.pending?.url) URL.revokeObjectURL(this.pending.url); this.draft = { ...this.account.user?.user_metadata }; this.pending = null; this.removing = false; }
-  cancel() { this.photoVersion = (this.photoVersion || 0) + 1; if (this.pending?.url && this.pending.url !== this.avatarUrl) URL.revokeObjectURL(this.pending.url); this.pending = null; this.removing = false; }
+  cancel() { this.photo.reset(); this.photoVersion = (this.photoVersion || 0) + 1; if (this.pending?.url && this.pending.url !== this.avatarUrl) URL.revokeObjectURL(this.pending.url); this.pending = null; this.removing = false; }
   applyPreferences() {
     const m = this.account.user?.user_metadata || {};
     const previous = document.documentElement.dataset.motion;
-    const theme = ['violet', 'ocean', 'forest'].includes(m.theme) ? m.theme : 'violet';
+    const theme=validTheme(m.theme);
+    document.documentElement.dataset.uiStyle=validStyle(m.ui_style);
     document.documentElement.dataset.theme = theme;
-    document.documentElement.dataset.motion = m.reduced_motion ? 'reduced' : 'normal';
+    document.documentElement.dataset.motion = this.account.user ? (m.reduced_motion ? 'reduced' : 'normal') : 'system';
     if (previous !== document.documentElement.dataset.motion) document.dispatchEvent(new Event('motion-preference-changed'));
   }
   avatar(big = false) {
     const m = this.account.user?.user_metadata || {}, initial = String(m.display_name || this.account.user?.email || 'P').slice(0, 1).toUpperCase();
-    const url = this.removing ? '' : this.pending?.url || this.avatarUrl;
+    const url = this.removing ? '' : this.pending?.url || this.avatarUrl || (m.avatar_path?this.account.vault.list().find(s=>s.user.id===this.account.user?.id)?.avatar_thumbnail:'');
     return `<span class="profile-avatar ${big ? 'large' : ''}" aria-hidden="${!big}" data-initial="${esc(initial)}">${url ? `<img src="${esc(url)}" alt="${big ? 'Foto de perfil' : ''}">` : ''}</span>`;
   }
   card() {
@@ -26,21 +28,12 @@ export class ProfileSettings {
     return `<div class="profile-card">${this.avatar(true)}<h3>${esc(m.display_name || 'Seu espaço de professor')}</h3><p>${esc(this.account.user?.email)}</p>${m.school ? `<span class="profile-school">⌂ ${esc(m.school)}</span>` : ''}${m.bio ? `<p class="profile-bio">${esc(m.bio)}</p>` : ''}</div><div class="profile-shortcuts"><button type="button" data-account-action="profile">✎ Editar perfil</button><button type="button" data-account-action="password">⌑ Alterar senha</button></div>`;
   }
   form() {
+    if (this.photo.bitmap || this.photo.stream || this.photo.processing) return this.photo.markup();
     const m = this.draft || {};
-    return `<div class="profile-photo-edit">${this.avatar(true)}<div><label class="profile-photo-button">Escolher foto<input type="file" id="profile-photo" accept="image/png,image/jpeg,image/webp"></label><button type="button" data-account-action="remove-photo">Remover foto</button><small>A foto será recortada em quadrado e otimizada.</small></div></div><label for="profile-name">Nome de exibição</label><input id="profile-name" name="display_name" autocomplete="nickname" maxlength="60" value="${esc(m.display_name)}" required><label for="profile-school">Escola ou instituição (opcional)</label><input id="profile-school" name="school" maxlength="80" value="${esc(m.school)}"><label for="profile-bio">Sobre você (opcional)</label><textarea id="profile-bio" name="bio" maxlength="240" placeholder="O que você gosta de ensinar?">${esc(m.bio)}</textarea><label for="profile-theme">Cores do meu espaço</label><select id="profile-theme" name="theme">${[['violet', 'Violeta'], ['ocean', 'Oceano'], ['forest', 'Jardim']].map(([value, label]) => `<option value="${value}" ${m.theme === value ? 'selected' : ''}>${label}</option>`).join('')}</select><label class="profile-checkbox"><input type="checkbox" name="reduced_motion" ${m.reduced_motion ? 'checked' : ''}> Reduzir animações e movimento</label>`;
+    return `<div class="profile-photo-edit">${this.avatar(true)}<div><label class="profile-photo-button">Escolher foto<input type="file" id="profile-photo" accept="image/png,image/jpeg,image/webp,image/gif,video/mp4,video/webm,video/quicktime"></label><button type="button" data-photo-action="camera">▣ Tirar foto</button><input type="file" id="profile-camera-file" accept="image/*" capture="user" hidden><button type="button" data-account-action="remove-photo">Remover foto</button><small>Ajuste o recorte e salve seu perfil para guardar a foto.</small></div></div>${this.photo.markup()}<label for="profile-name">Nome de exibição</label><input id="profile-name" name="display_name" autocomplete="nickname" maxlength="60" value="${esc(m.display_name)}" required><label for="profile-school">Escola ou instituição (opcional)</label><input id="profile-school" name="school" maxlength="80" value="${esc(m.school)}"><label for="profile-bio">Sobre você (opcional)</label><textarea id="profile-bio" name="bio" maxlength="240" placeholder="O que você gosta de ensinar?">${esc(m.bio)}</textarea><label for="profile-theme">Cores do meu espaço</label><select id="profile-theme" name="theme">${themes.map(([value, label]) => `<option value="${value}" ${m.theme === value ? 'selected' : ''}>${label}</option>`).join('')}</select><div class="profile-swatches" aria-label="Paleta de cores">${themes.map(([id,name,color])=>`<button type="button" data-profile-theme="${id}" style="--swatch:${color}" aria-label="Cor ${name}" aria-pressed="${validTheme(m.theme)===id}"></button>`).join('')}</div><label for="profile-style">Estilo do meu espaço</label><select id="profile-style" name="ui_style">${styles.map(([id,name])=>`<option value="${id}" ${validStyle(m.ui_style)===id?'selected':''}>${name}</option>`).join('')}</select><label class="profile-checkbox"><input type="checkbox" name="reduced_motion" ${m.reduced_motion ? 'checked' : ''}> Reduzir animações e movimento</label>`;
   }
-  capture(form) { const values = new FormData(form); this.draft = { ...this.draft, display_name: values.get('display_name') || '', school: values.get('school') || '', bio: values.get('bio') || '', theme: values.get('theme') || 'violet', reduced_motion: values.has('reduced_motion') }; return this.draft; }
-  async choosePhoto(file) {
-    if (!file) return;
-    const uid = this.account.user?.id, version = this.photoVersion = (this.photoVersion || 0) + 1;
-    this.capture(this.account.root.querySelector('#account-form'));
-    const image = await optimizeImage(file, { avatar: true });
-    if (this.account.user?.id !== uid || this.account.mode !== 'profile' || this.photoVersion !== version) return;
-    if (image.size > 256 * 1024) throw safe('Escolha outra foto; o resultado precisa ter até 256 KB.');
-    if (this.pending?.url) URL.revokeObjectURL(this.pending.url);
-    this.pending = { file: image, url: URL.createObjectURL(image) }; this.removing = false; this.account.paint();
-  }
-  removePhoto() { this.photoVersion = (this.photoVersion || 0) + 1; this.capture(this.account.root.querySelector('#account-form')); if (this.pending?.url) URL.revokeObjectURL(this.pending.url); this.pending = null; this.removing = true; this.account.paint(); }
+  capture(form) { if (!form?.querySelector('[name=display_name]')) return this.draft; const values = new FormData(form); this.draft = { ...this.draft, display_name: values.get('display_name') || '', school: values.get('school') || '', bio: values.get('bio') || '', theme: validTheme(values.get('theme')), ui_style:validStyle(values.get('ui_style')), reduced_motion: values.has('reduced_motion') }; return this.draft; }
+  removePhoto() { this.photo.reset(); this.photoVersion = (this.photoVersion || 0) + 1; this.capture(this.account.root.querySelector('#account-form')); if (this.pending?.url) URL.revokeObjectURL(this.pending.url); this.pending = null; this.removing = true; this.account.paint(); }
   async save(values) {
     const uid = this.account.user?.id;
     const name = String(values.get('display_name') || '').trim().slice(0, 60);
@@ -49,13 +42,14 @@ export class ProfileSettings {
     let avatar = previousAvatar;
     if (this.pending) {
       try { avatar = await putAvatar(this.account.client, this.pending.file); }
-      catch { throw safe('A foto não foi salva. Ative o armazenamento da conta e tente novamente. Você já pode salvar o nome sem trocar a foto.'); }
+      catch(error){throw safe(error.message?.includes('GIF')?error.message:'A foto não foi salva. Confira o armazenamento da conta e tente novamente.');}
     }
     if (this.removing) avatar = null;
     if (!uid || this.account.user?.id !== uid) throw safe('A conta mudou. Abra o perfil novamente.');
-    const result = await this.account.client.auth.updateUser({ data: { display_name: name, school: String(values.get('school') || '').trim().slice(0, 80), bio: String(values.get('bio') || '').trim().slice(0, 240), theme: ['violet', 'ocean', 'forest'].includes(values.get('theme')) ? values.get('theme') : 'violet', reduced_motion: values.has('reduced_motion'), avatar_path: avatar } });
+    const result = await this.account.client.auth.updateUser({ data: { display_name: name, school: String(values.get('school') || '').trim().slice(0, 80), bio: String(values.get('bio') || '').trim().slice(0, 240), theme:validTheme(values.get('theme')),ui_style:validStyle(values.get('ui_style')), reduced_motion: values.has('reduced_motion'), avatar_path: avatar } });
     if (this.account.user?.id !== uid) throw safe('A conta mudou. Abra o perfil novamente.');
     if (!result.error) {
+      if (previousAvatar && avatar && previousAvatar !== avatar) await removeAvatar(this.account.client, previousAvatar).catch(() => {});
       if (this.removing) await removeAvatar(this.account.client, previousAvatar).catch(() => {});
       if (this.pending?.url) { if (this.avatarUrl) URL.revokeObjectURL(this.avatarUrl); this.avatarUrl = this.pending.url; }
       else if (this.removing && this.avatarUrl) { URL.revokeObjectURL(this.avatarUrl); this.avatarUrl = ''; }
@@ -77,9 +71,11 @@ export class ProfileSettings {
     try {
       const blob = await getAvatar(this.account.client, path);
       if (this.account.user?.id !== user.id || this.avatarKey !== key) return;
+      if (!blob.size || !blob.type.startsWith('image/')) throw Error('Foto indisponível.');
       if (this.avatarUrl) URL.revokeObjectURL(this.avatarUrl); this.avatarUrl = URL.createObjectURL(blob);
+      try{const bitmap=await createImageBitmap(blob),canvas=document.createElement('canvas');canvas.width=canvas.height=64;const side=Math.min(bitmap.width,bitmap.height);canvas.getContext('2d').drawImage(bitmap,(bitmap.width-side)/2,(bitmap.height-side)/2,side,side,0,0,64,64);bitmap.close();this.account.vault.thumbnail(user.id,canvas.toDataURL('image/webp',.7));}catch{}
       this.account.updateProfile(this.account.root);
       if (this.account.mode === 'account') this.account.paint();
-    } catch { /* The account remains usable even if its private photo is unavailable. */ }
+    } catch { if (this.avatarKey === key) this.avatarKey = ''; /* Allow retry instead of caching a failed request. */ }
   }
 }

@@ -68,10 +68,10 @@ test('editor visual cria texto, move e redimensiona, desfaz, adiciona imagem e 3
   await page.getByRole('button', { name: '▷ Prévia', exact: true }).click();
   await expect(page.locator('.canvas-text').first()).toContainText('Ciência em movimento');
   await expect(page.locator('.canvas-model-slot .hardware-view')).toHaveAttribute('data-custom-loaded', 'true', { timeout: 30000 });
-  await page.getByRole('button', { name: 'Modo apresentação', exact: true }).click();
+  await page.getByRole('button', { name: 'Apresentar em tela cheia', exact: true }).click();
   await page.screenshot({ path: 'test-results/visual-slide-fullscreen.png' });
   await page.mouse.move(710, 510);
-  await page.getByRole('button', { name: 'Modo apresentação', exact: true }).click();
+  await page.getByRole('button', { name: 'Apresentar em tela cheia', exact: true }).click();
   await page.getByRole('button', { name: 'Sair', exact: true }).click();
   await page.reload();
   await expect(page.locator('.slide-designer')).toBeVisible();

@@ -9,16 +9,18 @@ export function loadPresenterSettings() {
 export function savePresenterSettings(settings) {
   try { localStorage.setItem('sl-presenter-settings-v1', JSON.stringify(settings)); } catch { /* works for this presentation even when persistence is unavailable */ }
 }
-export function presentationTools({ host, demo, state, settings, imageText }) {
+export function presentationTools({ host, demo, state, settings, imageText, readOnly = false, compact = false }) {
   if (!host || state?.phase !== 'lesson') return '';
   return `<section class="presentation-toolbar" aria-label="Controles da apresentação">
-    <div class="presentation-navigation"><button class="icon-btn bordered" data-action="previous" aria-label="Voltar slide" ${state.slide === 0 ? 'disabled' : ''}>←</button><span>${state.slide + 1} / ${state.lesson.slides.length}</span><button class="icon-btn bordered" data-action="next-slide" aria-label="Avançar slide" ${state.slide + 1 === state.lesson.slides.length ? 'disabled' : ''}>→</button></div>
-    <button class="btn secondary small" data-action="fullscreen" aria-label="Modo apresentação">⛶ <span class="enter-fullscreen-label">Modo apresentação</span><span class="leave-fullscreen-label">Sair da tela cheia</span></button>
-    <button class="btn secondary small" data-action="edit-current-slide">✎ Editar slide</button>
+    ${compact ? '' : `<div class="presentation-navigation"><button class="icon-btn bordered" data-action="previous" aria-label="Voltar slide" ${state.slide === 0 ? 'disabled' : ''}>←</button><span>${state.slide + 1} / ${state.lesson.slides.length}</span><button class="icon-btn bordered" data-action="next-slide" aria-label="Avançar slide" ${state.slide + 1 === state.lesson.slides.length ? 'disabled' : ''}>→</button></div>`}
+    ${compact ? '' : `<button class="btn secondary small" data-action="fullscreen" aria-label="Modo apresentação">⛶ <span class="enter-fullscreen-label">Tela cheia</span><span class="leave-fullscreen-label">Sair da tela cheia</span></button>`}
+    ${state.lesson.slides[state.slide].poll ? '<button class="btn secondary small" data-action="poll">▥ Abrir enquete</button>' : ''}
+    ${readOnly ? '' : '<button class="btn secondary small" data-action="edit-current-slide">✎ Editar slide</button>'}
     ${state.totalQuestions ? '<button class="btn secondary small presentation-quiz" data-action="quiz">Iniciar quiz</button>' : state.slide + 1 === state.lesson.slides.length ? '<button class="btn secondary small presentation-quiz" data-action="finish">Encerrar aula</button>' : ''}
     ${state.lesson.slides[state.slide].kind === 'image' ? `<button class="btn secondary small image-text-button" data-action="image-text" aria-pressed="${imageText}">${imageText ? 'Ocultar texto' : 'Mostrar texto'}</button>` : ''}
-    <label class="presenter-qr-toggle"><input type="checkbox" id="pinned-qr-enabled" ${settings.qrVisible ? 'checked' : ''} ${demo ? 'disabled' : ''}> QR Code ${demo ? '<small>(na sala ao vivo)</small>' : ''}</label>
-    <label class="sr-only" for="pinned-qr-corner">Canto do QR Code</label><select id="pinned-qr-corner" aria-label="Canto do QR Code" ${demo ? 'disabled' : ''}>${Object.entries(qrCorners).map(([key, label]) => `<option value="${key}" ${settings.qrCorner === key ? 'selected' : ''}>${label}</option>`).join('')}</select>
+    ${demo ? '' : `<label class="presenter-qr-toggle"><input type="checkbox" id="pinned-qr-enabled" ${settings.qrVisible ? 'checked' : ''} ${demo ? 'disabled' : ''}> QR Code ${demo ? '<small>(na sala ao vivo)</small>' : ''}</label>
+    <label class="sr-only" for="pinned-qr-corner">Canto do QR Code</label><select id="pinned-qr-corner" aria-label="Canto do QR Code" ${demo ? 'disabled' : ''}>${Object.entries(qrCorners).map(([key, label]) => `<option value="${key}" ${settings.qrCorner === key ? 'selected' : ''}>${label}</option>`).join('')}</select>`}
+
   </section>`;
 }
 export function pinnedInvite({ host, demo, state, settings }) {

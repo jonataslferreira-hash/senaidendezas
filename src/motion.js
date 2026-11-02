@@ -1,7 +1,8 @@
+import { prefersReducedMotion } from './motion-preference.js';
 export class PageMotion {
   constructor() { this.lastKey = ''; this.players = new Set(); }
   mount(root, { key, kind, slide = 0 }) {
-    const changed = this.lastKey !== key, reduced = document.documentElement.dataset.motion === 'reduced' || matchMedia('(prefers-reduced-motion: reduce)').matches;
+    const changed = this.lastKey !== key, reduced = prefersReducedMotion();
     root.classList.remove('scene-arrive');
     root.dataset.scene = kind;
     if (changed && !reduced) {

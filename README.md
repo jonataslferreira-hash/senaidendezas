@@ -160,10 +160,13 @@ reprodução. O arquivo de música mencionado pelo usuário ainda não foi receb
 
 ### Uma experiência animada, com controle de movimento
 
-A biblioteca usa superfícies claras e uma demonstração interativa: **Crie →
+A aparência pode ser clara, escura ou seguir o sistema pelo menu da conta (clique no seu nome);
+a escolha fica salva neste navegador. A logo de béquer também é o favicon.
+A biblioteca tem uma demonstração interativa: **Crie →
 Conecte → Interaja**. O passeio mostra o slide chegando aos celulares e uma
 resposta ao desafio. É possível abrir o dispositivo ilustrado, escolher etapas,
-responder e repetir. O passeio automático termina em 7,6 segundos e pausa ao
+responder e pausar. As etapas se repetem automaticamente; a caixa e os cartões
+flutuam sem exigir hover. O movimento pausa ao
 sair da área visível, ocultar a aba ou abrir a conta. Sem movimento automático,
 os controles continuam funcionando.
 
@@ -172,6 +175,19 @@ painéis do editor, novos participantes no lobby e chegada ao pódio. Atualizaç
 no mesmo slide não reiniciam a transição da página. A preferência de movimento
 reduzido do sistema e do perfil é respeitada. Não há outro visualizador 3D
 rodando para animar a biblioteca: a demonstração usa HTML, CSS e SVG.
+
+No editor visual, os botões **↑ / ↓**, duplicar e excluir ficam acima do slide.
+Em **Atividades e passagem deste slide**, escolha a transição (deslizar,
+dissolver ou sem animação) e adicione uma **enquete** com 2 a 4 opções.
+Durante a apresentação, **Abrir enquete** recebe votos pelo celular e mostra
+os totais ao vivo; cada participante vota uma vez por rodada, sem pontuação.
+Use **Encerrar votação** e **Voltar ao slide** para continuar a aula.
+Também funciona na prévia, em que você pode testar o voto.
+
+Para verificar o build real no subdiretório do Pages, execute
+`npm run build` e `node test/production-smoke.mjs`. O teste usa um navegador
+sem WebGL e verifica carregamento, logo, favicon, aparência, largura no celular
+e a mensagem de recuperação quando o JavaScript não carrega.
 
 A revisão completa dos pedidos e as limitações atuais estão em
 [docs/REVISAO-DOS-PEDIDOS.md](docs/REVISAO-DOS-PEDIDOS.md).
@@ -322,9 +338,17 @@ O roteiro de 10–12 minutos e as explicações da aula demonstrativa estão em
 [docs/AULA-HDD-SSD.md](docs/AULA-HDD-SSD.md). Esse documento registra a
 demonstração original; use este README para o fluxo atual da plataforma.
 
-Biblioteca compartilhada, controle remoto pelo celular,
-reações e quizzes criados durante a apresentação estão registrados em
+Controle remoto pelo celular, reações e quizzes criados durante a apresentação estão registrados em
 [docs/PROXIMAS-ETAPAS.md](docs/PROXIMAS-ETAPAS.md) como próximas evoluções.
 Cadastro, entrada, recuperação de senha e saída da conta estão implementados.
 A configuração das URLs no painel Supabase e o fluxo futuro de controle estão em
 [docs/CONTAS-E-CONTROLE.md](docs/CONTAS-E-CONTROLE.md).
+
+## Colaboração ao vivo e trilha do editor
+
+O editor inclui colaboração simultânea por convite de e-mail, presença e
+salvamento de versões no R2. A ativação do SQL/Worker, o envio de e-mails e
+a playlist pessoal estão em [COLABORACAO-E-MUSICA.md](docs/COLABORACAO-E-MUSICA.md).
+As cinco faixas de fundo têm volume inicial baixo e slowed. A aparência
+fica no menu da conta; o modo escuro usa fundo cinza e os botões do editor
+têm contraste próprio. O cartão de nova aula divide criar do zero e importar.

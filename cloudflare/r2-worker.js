@@ -1,20 +1,42 @@
+import { handleCollaboration } from './collaboration-worker.js';
+import { handleMusic } from './music-worker.js';
+import { readPublicPresentation, writePublicPresentation } from './presentation-worker.js';
 const MAX_FILE = 50 * 1024 * 1024;
 const defaults = ['https://jonataslferreira-hash.github.io', 'http://localhost:5173', 'http://127.0.0.1:5173'];
 export function createR2Handler(verifyUser = async (token, env) => {
   const response = await fetch((env.SUPABASE_URL || 'https://qkpgiwjsqtocvjmqinii.supabase.co') + '/auth/v1/user', { headers: { apikey: env.SUPABASE_PUBLISHABLE_KEY || 'sb_publishable_-CT7iCR3355qijcVioyRkA_-Njn3Q4e', Authorization: 'Bearer ' + token }, signal: AbortSignal.timeout(10000) });
   if (!response.ok) throw Error('unauthorized'); return response.json();
+}, callRpc = async (token, env, name, args) => {
+  const response = await fetch((env.SUPABASE_URL || 'https://qkpgiwjsqtocvjmqinii.supabase.co') + '/rest/v1/rpc/' + name, { method:'POST', headers:{apikey:env.SUPABASE_PUBLISHABLE_KEY || 'sb_publishable_-CT7iCR3355qijcVioyRkA_-Njn3Q4e', Authorization:'Bearer '+token,'Content-Type':'application/json'},body:JSON.stringify(args),signal:AbortSignal.timeout(10000) });
+  if(!response.ok)throw Error('rpc_failed'); return response.json();
 }) {
   return async function handle(request, env) {
     const origin = request.headers.get('Origin'), allowed = (env.ALLOWED_ORIGINS || defaults.join(',')).split(',').map(s => s.trim());
     if (origin && !allowed.includes(origin)) return new Response('Origin not allowed', { status: 403 });
-    const headers = { 'Access-Control-Allow-Origin': origin || allowed[0], 'Access-Control-Allow-Methods': 'GET,PUT,DELETE,OPTIONS', 'Access-Control-Allow-Headers': 'Authorization,Content-Type,X-Lesson-Title,X-Original-Bytes', 'Cache-Control': 'private, no-store', Vary: 'Origin' };
+    const headers = { 'Access-Control-Allow-Origin': origin || allowed[0], 'Access-Control-Allow-Methods': 'GET,POST,PUT,DELETE,OPTIONS', 'Access-Control-Allow-Headers': 'Authorization,Content-Type,X-Lesson-Title,X-Original-Bytes', 'Cache-Control': 'private, no-store', Vary: 'Origin' };
     const json = (body, status = 200) => Response.json(body, { status, headers });
+    if(new URL(request.url).pathname==='/health'&&request.method==='GET')return json({version:4,collaboration:true,animatedAvatars:true,roles:true,people:true});
     if (request.method === 'OPTIONS') return new Response(null, { status: 204, headers });
+    const publicPresentation=await readPublicPresentation(request,env,headers);if(publicPresentation)return publicPresentation;
     const token = /^Bearer ([A-Za-z0-9_.-]{20,16384})$/.exec(request.headers.get('Authorization') || '')?.[1];
     if (!token) return json({ error: 'unauthorized' }, 401);
     let user;
     try { user = await verifyUser(token, env); } catch { return json({ error: 'unauthorized' }, 401); }
     if (!user || !/^[a-f0-9-]{36}$/i.test(user.id) || !user.email_confirmed_at || user.is_anonymous) return json({ error: 'unauthorized' }, 401);
+    const person=/^\/people\/([a-f0-9-]{36})\/avatar$/i.exec(new URL(request.url).pathname);
+    if(person){
+      if(request.method!=='GET')return json({error:'method_not_allowed'},405);
+      try{
+        const uid=person[1].toLowerCase();
+        if(await callRpc(token,env,'sl_profile_access',{p_user_id:uid})!==true)return json({error:'forbidden'},403);
+        const object=await env.FILES?.get(uid+'/profile/avatar');if(!object)return json({error:'not_found'},404);
+        return new Response(object.body,{headers:{...headers,'Content-Type':object.httpMetadata?.contentType||'image/webp'}});
+      }catch{return json({error:'profiles_not_configured'},503);}
+    }
+    const published=await writePublicPresentation(request,env,user,headers);if(published)return published;
+    const music = await handleMusic(request, env, headers); if (music) return music;
+    const collaboration = await handleCollaboration(request, env, user, headers, (name,args) => callRpc(token,env,name,args));
+    if (collaboration) return collaboration;
     if (!env.FILES) return json({ error: 'storage_not_configured' }, 503);
     const url = new URL(request.url), avatar = url.pathname === '/profile/avatar', match = /^\/lessons\/([a-zA-Z0-9_-]{1,100})$/.exec(url.pathname);
     try {
@@ -40,7 +62,7 @@ export function createR2Handler(verifyUser = async (token, env) => {
       const length = Number(request.headers.get('Content-Length')), type = request.headers.get('Content-Type');
       if (!Number.isSafeInteger(length) || length < 1) return json({ error: 'content_length_required' }, 411);
       if (length > (avatar ? 256 * 1024 : MAX_FILE)) return json({ error: 'too_large' }, 413);
-      if (!(avatar ? ['image/webp', 'image/png', 'image/jpeg'] : ['application/json', 'application/gzip']).includes(type)) return json({ error: 'invalid_type' }, 415);
+      if (!(avatar ? ['image/webp','image/png','image/jpeg','image/gif'] : ['application/json', 'application/gzip']).includes(type)) return json({ error: 'invalid_type' }, 415);
       let title = 'Minha aula'; try { title = decodeURIComponent(request.headers.get('X-Lesson-Title') || title).slice(0, 140); } catch { return json({ error: 'invalid_title' }, 400); }
       await env.FILES.put(key, request.body, { httpMetadata: { contentType: avatar ? type : 'application/json' }, customMetadata: { title, format: type === 'application/gzip' ? 'gzip' : 'raw' } });
       return json({ ok: true });

@@ -1,0 +1,15 @@
+import {test,expect} from '@playwright/test';
+import gifenc from 'gifenc';
+const {GIFEncoder}=gifenc;
+import {mockAccounts} from './auth-fixture.js';
+test('perfil conserva GIF animado, converte vídeo e mostra foto na lista de contas',async({page})=>{
+ await mockAccounts(page);let uploaded,type;
+ await page.route('https://storage-lab-files.lagujf.workers.dev/**',route=>{if(route.request().method()==='PUT'){uploaded=route.request().postDataBuffer();type=route.request().headers()['content-type'];return route.fulfill({json:{ok:true}});}return uploaded?route.fulfill({body:uploaded,contentType:type}):route.fulfill({status:404});});
+ const gif=GIFEncoder();gif.writeFrame(new Uint8Array(32*32),32,32,{palette:[[230,100,120],[80,150,200]],delay:160,repeat:0});gif.writeFrame(new Uint8Array(32*32).fill(1),32,32,{palette:[[230,100,120],[80,150,200]],delay:160});gif.finish();
+ await page.goto('/');await page.getByRole('button',{name:'Ana',exact:true}).click();await page.getByRole('button',{name:/Editar perfil/}).click();await page.locator('#profile-photo').setInputFiles({name:'animated.gif',mimeType:'image/gif',buffer:Buffer.from(gif.bytes())});
+ await expect(page.locator('.profile-photo-edit img')).toBeVisible();await page.getByRole('button',{name:'Salvar perfil',exact:true}).click();expect(type).toBe('image/gif');expect(uploaded.subarray(0,3).toString()).toBe('GIF');await expect(page.locator('.account-switch-row img')).toHaveJSProperty('naturalWidth',64);
+ await page.getByRole('button',{name:/Editar perfil/}).click();const video=await page.evaluate(async()=>{const c=document.createElement('canvas');c.width=c.height=64;const ctx=c.getContext('2d'),stream=c.captureStream(8),rec=new MediaRecorder(stream,{mimeType:'video/webm'}),chunks=[];rec.ondataavailable=e=>chunks.push(e.data);const done=new Promise(resolve=>rec.onstop=resolve);rec.start();for(let i=0;i<8;i++){ctx.fillStyle=i%2?'#e8a277':'#558fbb';ctx.fillRect(0,0,64,64);await new Promise(r=>setTimeout(r,140));}rec.stop();await done;stream.getTracks().forEach(t=>t.stop());const bytes=new Uint8Array(await new Blob(chunks).arrayBuffer());return btoa(String.fromCharCode(...bytes));});
+ await page.locator('#profile-photo').setInputFiles({name:'video.webm',mimeType:'video/webm',buffer:Buffer.from(video,'base64')});await expect(page.getByText(/Preparando animação/)).toBeVisible();await expect(page.locator('.profile-photo-edit img')).toBeVisible({timeout:15000});await page.getByRole('button',{name:'Salvar perfil',exact:true}).click();await expect(page.locator('.account-message')).toHaveText('Perfil atualizado.');expect(type).toBe('image/gif');expect(uploaded.length).toBeLessThan(256*1024);
+ const count=await page.evaluate(async data=>{const decoder=new ImageDecoder({data:Uint8Array.from(atob(data),c=>c.charCodeAt(0)),type:'image/gif'});try{await decoder.tracks.ready;await decoder.completed;return decoder.tracks.selectedTrack.frameCount;}finally{decoder.close();}},uploaded.toString('base64'));expect(count).toBeGreaterThan(1);
+ await page.reload();await expect(page.locator('[data-account-profile] img')).toHaveJSProperty('naturalWidth',160);
+});

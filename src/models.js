@@ -1,3 +1,4 @@
+import { prefersReducedMotion } from './motion-preference.js';
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 
@@ -14,10 +15,15 @@ const details = {
 };
 
 export class HardwareViewer {
-  constructor() {
+  constructor({ defer = false } = {}) {
     this.el = document.createElement('div'); this.el.className = 'hardware-view';
     this.el.innerHTML = '<div class="model-fallback" hidden>Visualização 3D indisponível neste dispositivo. As explicações e o quiz continuam disponíveis.</div><div class="part-detail" aria-live="polite"><span class="part-dot"></span><div><strong>Explore por dentro</strong><p>Arraste para girar · toque em uma peça para descobrir</p></div></div>';
     this.detail = this.el.querySelector('.part-detail');
+    if (!defer) this.initialize();
+  }
+  initialize() {
+    if (this.initialized || this.disposed) return;
+    this.initialized = true;
     try {
       this.renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true, powerPreference: 'low-power' });
     } catch { this.el.querySelector('.model-fallback').hidden = false; return; }
@@ -63,7 +69,7 @@ export class HardwareViewer {
       this.frameId = null; this.frameTimer = null;
       if (this.disposed || !this.el.isConnected || document.hidden || this.inView === false) return;
       let moving = false;
-      const reduced = document.documentElement.dataset.motion === 'reduced' || matchMedia('(prefers-reduced-motion: reduce)').matches;
+      const reduced = prefersReducedMotion();
       for (const part of this.group.children) if (part.userData.targetY !== undefined) {
         const difference = part.userData.targetY - part.position.y;
         if (Math.abs(difference) > .001) {
@@ -104,6 +110,7 @@ export class HardwareViewer {
   }
   reset() { if (this.controls) { this.camera.position.set(6.8, 7.2, 8.2); this.controls.target.set(0, .3, 0); this.controls.update(); } }
   setModel(type, exploded) {
+    this.initialize();
     if (!this.renderer) return;
     this.scene.environment = null;
     this.dirty = true;
@@ -171,6 +178,7 @@ export class HardwareViewer {
     this.invalidate();
   }
   async setCustomModel(model) {
+    this.initialize();
     if (!this.renderer || !model) return;
     const key = model.assetId || model.name + ':' + model.data?.length;
     if (this.customKey === key) return;

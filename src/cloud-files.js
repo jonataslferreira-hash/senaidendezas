@@ -32,7 +32,7 @@ export async function saveCloudLesson(client, lesson) {
 }
 export async function listCloudLessons(client) {
   const s = await authenticated(client);
-  if (r2ApiUrl) { const response = await r2Request(s, '/lessons'); return response.json(); }
+  if (r2ApiUrl) { const response = await r2Request(s, '/lessons'),items=await response.json();unchanged(s);if(!Array.isArray(items))throw Error('A nuvem retornou uma lista inválida. Atualize os arquivos para tentar novamente.');return items; }
   const { data, error } = await client.from('lesson_files').select('id,title,path,bytes,updated_at').eq('user_id', s.uid).order('updated_at', { ascending: false }).limit(500);
   if (error) throw cloudError(error); unchanged(s);
   return (data || []).map(item => ({ ...item, updatedAt: item.updated_at }));
@@ -50,7 +50,7 @@ export async function readCloudLesson(client, path) {
 async function r2Request(s, path, options = {}) {
   if (!r2ApiUrl || !r2ApiUrl.startsWith('https://')) throw Error('O endereço seguro do R2 ainda não foi configurado.');
   const response = await fetch(r2ApiUrl + path, { ...options, headers: { ...options.headers, Authorization: 'Bearer ' + s.token } });
-  unchanged(s); if (!response.ok) throw Error('Não foi possível acessar o R2. Confira a conexão e a configuração da conta.'); return response;
+  unchanged(s);if(response.status===415&&options.body?.type==='image/gif')throw Error('Para salvar GIFs, publique o Worker atualizado no Cloudflare.');if(!response.ok)throw Error('Não foi possível acessar o R2. Confira a conexão e a configuração da conta.'); return response;
 }
 export async function putAvatar(client, file) {
   const s = await authenticated(client);

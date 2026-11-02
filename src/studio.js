@@ -1,3 +1,11 @@
+import { People } from './people.js';
+import {SocialChat} from './social-chat.js';
+import {LessonChat} from './chat.js';
+import { PresentationSharing } from './public-presentations.js';
+import { EditorMusic } from './editor-music.js';
+import { canvasFromSlide } from './canvas-data.js';
+import { GroupsPanel } from './groups.js';
+import brandUrl from './assets/brand.svg';
 import { Showcase, showcaseMarkup, deviceArt } from './showcase.js';
 import { optimizeImage } from './image-optimize.js';
 import { Account } from './auth.js';
@@ -30,21 +38,29 @@ export class Studio {
     this.dirty = false; this.launching = false; this.dialog = null;
     this.metaExpanded = false; this.visualMode = false; this.designer = new SlideDesigner(this);
     this.importDialog = false; this.importing = null; this.importError = '';
-    this.cloudItems = []; this.cloudBusy = false; this.cloudMessage = '';
-    root.addEventListener('account-changed', () => { this.cloudItems = []; this.cloudMessage = ''; this.refreshCloudPanel(); });
+    this.cloudItems = []; this.cloudBusy = false; this.cloudMessage = '';this.cloudLoaded=false;this.cloudRequest=0;
+    root.addEventListener('account-changed', () => { this.cloudRequest++;this.cloudItems=[];this.cloudBusy=false;this.cloudMessage='';this.cloudLoaded=false;this.refreshCloudPanel();if(this.view==='library'&&this.account.user)this.cloudAction('cloud-refresh',{}); });
     try { this.library = new LessonLibrary(); }
     catch {
       this.library = Object.create(LessonLibrary.prototype);
       this.library.lessons = []; this.library.warning = 'O armazenamento do navegador está indisponível. Permita o armazenamento para salvar aulas.';
     }
+    this.sharing = new PresentationSharing(this);
+    this.editorMusic = new EditorMusic(this);
+    this.people=new People(this);this.groups=new GroupsPanel(this);this.chat=new LessonChat(this);this.social=new SocialChat(this);
+    root.addEventListener('before-account-change',event=>{event.detail.tasks.push((async()=>{
+      if(this.groups.live)await this.groups.live.persist();else if(this.draft&&this.dirty){this.library.save(validateLesson(this.draft,{draft:true}));this.dirty=false;}
+    })());});
+    root.addEventListener('click',e=>{const button=e.target.closest('[data-slide-audio-open]');if(!button)return;const panel=root.querySelector('.slide-audio-popover'),rect=button.getBoundingClientRect();panel.style.left=Math.max(8,Math.min(rect.left,innerWidth-380))+'px';panel.style.top=rect.bottom+8+'px';panel.togglePopover();button.setAttribute('aria-expanded',String(panel.matches(':popover-open')));});
     this.restoreRoute();
-    if (!['preview', 'present'].includes(new URLSearchParams(location.search).get('page'))) this.writeRoute(this.view, this.draft?.id, true);
+    if (!new URLSearchParams(location.search).has('presentation') && !new URLSearchParams(location.search).has('collab') && !['preview', 'present'].includes(new URLSearchParams(location.search).get('page'))) this.writeRoute(this.view, this.draft?.id, true);
     root.addEventListener('click', e => {
       const target = e.target.closest('[data-studio-action]');
       if (target && !target.disabled) this.action(target.dataset.studioAction, target).catch(err => callbacks.toast(err.message));
     });
     root.addEventListener('input', e => this.change(e.target));
     root.addEventListener('change', e => {
+      if (this.receivingRemote || !this.root.contains(e.target)) return;
       if (e.target.dataset.audioUpload) this.uploadAudio(e.target.files[0], e.target.dataset.audioUpload).catch(err => callbacks.toast(err.message));
       else if (e.target.dataset.audioVolume || e.target.dataset.audioLoop) {
         const audio = this.audioTarget(e.target.dataset.audioVolume || e.target.dataset.audioLoop);
@@ -61,6 +77,7 @@ export class Studio {
       if (e.key === 'Escape' && this.dialog) { this.dialog = null; callbacks.render(); }
       if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 's' && this.view === 'editor' && this.root.querySelector('.studio-editor')) {
         e.preventDefault();
+        if (this.groups?.live) { this.groups.live.persist().then(() => { callbacks.render(); callbacks.toast('Aula compartilhada salva.'); }).catch(error => callbacks.toast(error.message)); return; }
         try { this.save(); callbacks.render(); callbacks.toast('Aula salva neste navegador.'); } catch (error) { callbacks.toast(error.message); }
       }
     });
@@ -71,6 +88,9 @@ export class Studio {
     for (const key of ['lesson', 'tab', 'slide']) url.searchParams.delete(key);
     if (['editor', 'preview', 'present'].includes(page) && id) url.searchParams.set('lesson', id);
     if (page === 'editor') { if (this.tab === 'quiz') url.searchParams.set('tab', 'quiz'); url.searchParams.set('slide', String(this.index + 1)); }
+    url.searchParams.delete('presentation');
+    if (this.groups?.live && page === 'editor') url.searchParams.set('collab', this.groups.live.row.id);
+    else url.searchParams.delete('collab');
     if (url.href === location.href && !replace) return;
     history[replace ? 'replaceState' : 'pushState']({ storageLab: true }, '', url);
   }
@@ -84,13 +104,13 @@ export class Studio {
   audioTarget(scope) { return scope === 'quiz' ? this.draft.quizAudio : this.draft.slides[this.index].audio; }
   cloudMarkup() {
     if (!cloudConfigured) return '';
-    return `<section class="cloud-library library-section"><div class="library-section-title"><h2>Na minha conta ☁</h2>${this.account.user ? button('cloud-refresh', this.cloudBusy ? 'Carregando…' : 'Atualizar arquivos', 'quiet', this.cloudBusy ? 'disabled' : '') : '<button type="button" class="studio-btn quiet" data-account-action="open">Entrar para acessar</button>'}</div><p class="cloud-status" role="status">${esc(this.cloudMessage || (this.account.user ? 'Salve uma aula na nuvem pelo editor para abrir em outros dispositivos.' : 'Entre na mesma conta para acessar as aulas guardadas na nuvem.'))}</p><div class="cloud-file-list">${this.cloudItems.map((item, i) => `<article><div><strong>${esc(item.title)}</strong><small>${(item.bytes / 1048576).toFixed(1)} MB · ${esc(new Date(item.updatedAt).toLocaleDateString('pt-BR'))}</small></div>${button('cloud-open', 'Abrir cópia no editor ↗', 'quiet', `data-cloud-index="${i}" ${this.cloudBusy ? 'disabled' : ''}`)}</article>`).join('')}</div></section>`;
+    return `<section class="cloud-library library-section"><div class="library-section-title"><h2>Na minha conta ☁</h2>${this.account.user ? button('cloud-refresh', this.cloudBusy ? 'Carregando…' : 'Atualizar arquivos', 'quiet', this.cloudBusy ? 'disabled' : '') : '<button type="button" class="studio-btn quiet" data-account-action="open">Entrar para acessar</button>'}</div><p class="cloud-status" role="status">${esc(this.cloudMessage || (this.account.user ? this.cloudBusy||!this.cloudLoaded?'Consultando aulas na nuvem…':this.cloudItems.length?`${this.cloudItems.length} ${this.cloudItems.length===1?'aula':'aulas'} nesta conta.`:'Nenhuma aula salva na nuvem ainda.' : 'Entre na mesma conta para acessar as aulas guardadas na nuvem.'))}</p><div class="cloud-file-list">${this.cloudItems.map((item, i) => `<article><div><strong>${esc(item.title)}</strong><small>${(item.bytes / 1048576).toFixed(1)} MB · ${esc(new Date(item.updatedAt).toLocaleDateString('pt-BR'))}</small></div>${button('cloud-open', 'Abrir cópia no editor ↗', 'quiet', `data-cloud-index="${i}" ${this.cloudBusy ? 'disabled' : ''}`)}</article>`).join('')}</div></section>`;
   }
   refreshCloudPanel() { const slot = this.root.querySelector('[data-cloud-library]'); if (slot) slot.innerHTML = this.cloudMarkup(); }
   async cloudAction(action, target) {
     if (this.cloudBusy) return;
     if (!this.account.user) { this.account.show('login'); return; }
-    const uid = this.account.user.id; this.cloudBusy = true; this.cloudMessage = ''; this.refreshCloudPanel();
+    const uid = this.account.user.id,request=++this.cloudRequest,current=()=>this.cloudRequest===request&&this.account.user?.id===uid; this.cloudBusy = true; this.cloudMessage = ''; this.refreshCloudPanel();
     const saveButton = this.root.querySelector('[data-studio-action="cloud-save"]');
     if (saveButton) { saveButton.disabled = true; saveButton.textContent = 'Comprimindo e enviando…'; }
     try {
@@ -98,20 +118,22 @@ export class Studio {
         this.save(); const lesson = validateLesson(await hydrateLesson(this.draft, true), { draft: true });
         this.callbacks.toast('Enviando aula e arquivos para sua conta…');
         const stored = await saveCloudLesson(this.account.client, lesson);
+        if(!current())return;
+        try{const items=await listCloudLessons(this.account.client);if(!current())return;this.cloudItems=items;this.cloudLoaded=true;this.cloudMessage=items.length?`${items.length} ${items.length===1?'aula':'aulas'} nesta conta.`:'Aula enviada. Atualize os arquivos para conferir a lista.';}catch{if(!current())return;this.cloudLoaded=true;this.cloudMessage='A aula foi salva, mas a lista não pôde ser atualizada. Clique em Atualizar arquivos.';}
         this.callbacks.toast(stored.compressed ? 'Aula salva na nuvem. Compressão economizou ' + Math.round((1 - stored.bytes / stored.originalBytes) * 100) + '%.' : 'Aula e arquivos salvos na nuvem.');
       } else if (action === 'cloud-refresh') {
         const items = await listCloudLessons(this.account.client);
-        if (this.account.user?.id === uid) { this.cloudItems = items; this.cloudMessage = items.length ? `${items.length} aulas nesta conta.` : 'Nenhuma aula salva na nuvem ainda.'; }
+        if (current()) { this.cloudLoaded=true;this.cloudItems = items; this.cloudMessage = items.length ? `${items.length} ${items.length===1?'aula':'aulas'} nesta conta.` : 'Nenhuma aula salva na nuvem ainda.'; }
       } else if (action === 'cloud-open') {
         const item = this.cloudItems[Number(target.dataset.cloudIndex)]; if (!item) throw Error('Atualize a lista de arquivos.');
         const input = await readCloudLesson(this.account.client, item.path);
-        if (this.account.user?.id !== uid) throw Error('A conta mudou. Atualize a lista.');
+        if (!current()) return;
         const parsed = validateLesson(input, { draft: true }), archived = await archiveImportedPages(parsed);
         try { const saved = this.library.import(archived.lesson); this.open(saved.id); }
         catch (error) { await removePageAssets(archived.ids).catch(() => {}); throw error; }
       }
-    } catch (error) { this.cloudMessage = 'Não foi possível acessar os arquivos. Confira a conexão e tente novamente.'; this.callbacks.toast(error.message || this.cloudMessage); }
-    finally { this.cloudBusy = false; this.callbacks.render(); }
+    } catch (error) { if(current()){this.cloudLoaded=true;this.cloudMessage=error.message||'Não foi possível consultar as aulas. Clique em Atualizar arquivos para tentar novamente.';this.callbacks.toast(this.cloudMessage);} }
+    finally { if(current()){this.cloudBusy = false;if(action==='cloud-refresh'){this.refreshCloudPanel();const save=this.root.querySelector('[data-studio-action=cloud-save]');if(save){save.disabled=false;save.textContent='☁ Salvar na nuvem';}}else this.callbacks.render();} }
   }
   async uploadAudio(file, scope) {
     if (!file) return;
@@ -122,7 +144,7 @@ export class Studio {
     this.markDirty(); this.callbacks.render(); this.callbacks.toast('Áudio adicionado. Use o botão de som ao apresentar.');
   }
   shell(content) {
-    return `<div class="studio-shell"><aside class="studio-rail"><button class="studio-wordmark" data-studio-action="library" aria-label="Storage Lab, biblioteca"><span class="studio-logo">s<span>l</span>.</span><span>storage<span>lab.</span></span></button><div class="rail-label">SEU ESPAÇO DE ENSINO</div><nav>${button('library', '<span>▦</span> Biblioteca de aulas', this.view !== 'join' ? 'rail-link active' : 'rail-link')}${button('join', '<span>↗</span> Entrar em uma sala', this.view === 'join' ? 'rail-link active' : 'rail-link')}</nav><div class="rail-note"><span class="local-dot"></span><strong>Seu espaço, suas ideias.</strong><p>As aulas ficam neste navegador. Exporte uma cópia para levar com você.</p></div><div class="rail-bottom">CRIAR. ENSINAR. CONECTAR.</div></aside><div class="studio-body"><header class="studio-header"><span class="studio-breadcrumb">Meu espaço <span>/</span> ${this.view === 'editor' ? 'Editor de aula' : this.view === 'join' ? 'Participar' : 'Biblioteca'}</span><span data-account-profile>${this.account.profile()}</span></header>${content}</div></div>${this.dialogMarkup()}${this.importMarkup()}<div data-account-dialog></div>`;
+    return `<div class="studio-shell ${this.view === 'editor' ? 'editor-shell' : ''}">${this.view === 'editor' ? '' : `<aside class="studio-rail"><button class="studio-wordmark" data-studio-action="library" aria-label="Storage Lab, biblioteca"><img class="lab-logo" src="${brandUrl}" alt=""><span>storage<span>lab.</span></span></button><div class="rail-label">SEU ESPAÇO DE ENSINO</div><nav>${button('library', '<span>▦</span> Biblioteca de aulas', this.view !== 'join' ? 'rail-link active' : 'rail-link')}${button('join', '<span>↗</span> Entrar em uma sala', this.view === 'join' ? 'rail-link active' : 'rail-link')}<button type="button" class="studio-btn rail-link" data-social-action="open"><span aria-hidden="true">💬</span> Chat <b data-chat-badge class="chat-badge" ${this.social.badge?'':'hidden'}>${this.social.badge||''}</b></button></nav><div class="rail-note"><span class="local-dot"></span><strong>Acesso rápido</strong><div class="rail-quick-actions">${button('new','+ Nova aula','quiet')}${button('upload-slides','↑ Importar slides','quiet')}</div></div><div class="rail-bottom">CRIAR. ENSINAR. CONECTAR.</div></aside>`}<div class="studio-body">${this.view==='editor'?'':`<header class="studio-header"><span class="studio-breadcrumb">Meu espaço <span>/</span> ${this.view === 'editor' ? 'Editor de aula' : this.view === 'join' ? 'Participar' : 'Biblioteca'}</span>${this.view === 'editor' ? this.editorMusic.headerMarkup() : ''}<span data-account-profile>${this.account.profile()}</span></header>`}${content}</div></div>${this.dialogMarkup()}${this.importMarkup()}${this.sharing.markup()}<div data-account-dialog></div><div data-chat-slot>${this.chat.markup()}</div><div data-social-slot>${this.social.markup()}</div>`;
   }
   markup() {
     if (this.view === 'editor') return this.editor();
@@ -131,10 +153,11 @@ export class Studio {
   }
   libraryMarkup() {
     const lessons = this.library.lessons;
-    return this.shell(`<main class="studio-library"><section class="library-heading"><div><span class="studio-kicker">IDEIAS QUE GANHAM VIDA</span><h1>Sua próxima grande <em>aula.</em></h1><p>Crie o conteúdo. Convide a turma. Descubram juntos.</p></div><div class="library-top-actions">${button('upload-slides', '↑ Importar slides', 'quiet')}${button('import', '↓ JSON', 'quiet')}${button('new', '+ Nova aula', 'accent')}</div></section>
-      ${this.library.warning ? `<p class="studio-warning" role="alert">${esc(this.library.warning)}</p>` : ''}
+    return this.shell(`<main class="studio-library">${this.library.warning ? `<p class="studio-warning" role="alert">${esc(this.library.warning)}</p>` : ''}
       ${showcaseMarkup()}
-      <section class="library-section"><div class="library-section-title"><h2>Minha biblioteca <span>${lessons.length}</span></h2><span>Salvas neste navegador</span></div><div class="lesson-card-grid">${lessons.map((l, i) => this.lessonCard(l, i)).join('')}<button class="new-lesson-card" data-studio-action="new"><span>+</span><strong>Uma ideia nova?</strong><small>Comece uma aula do zero</small></button></div></section><div data-cloud-library>${this.cloudMarkup()}</div><footer class="studio-footer"><span>Feito para conectar quem ensina e quem aprende.</span>${button('restore-demo', 'Adicionar exemplo HDD e SSD', 'link')}</footer><input type="file" id="import-lesson-file" accept=".json,application/json" hidden><input type="file" id="import-slides-file" accept=".pdf,.pptx,application/pdf,application/vnd.openxmlformats-officedocument.presentationml.presentation" hidden></main>`);
+
+
+      <section class="library-section"><div class="library-section-title"><h2>Minha biblioteca <span>${lessons.length}</span></h2><span></span></div><div class="lesson-card-grid">${lessons.map((l, i) => this.lessonCard(l, i)).join('')}<div class="new-lesson-card create-import-card"><button class="create-half" data-studio-action="new"><span>+</span><strong>Uma ideia nova?</strong><small>Comece uma aula do zero</small></button><div class="import-half"><span>↥</span><strong>Já tem o conteúdo?</strong><small>Traga seus slides para cá</small><div>${button('upload-slides', 'Importar PDF / PPTX', 'quiet')}${button('import', 'Importar JSON', 'quiet')}</div></div></div></div></section>${this.groups.markup()}<div data-cloud-library>${this.cloudMarkup()}</div><footer class="studio-footer"><span>Feito para conectar quem ensina e quem aprende.</span>${button('restore-demo', 'Adicionar exemplo HDD e SSD', 'link')}</footer><input type="file" id="import-lesson-file" accept=".json,application/json" hidden><input type="file" id="import-slides-file" accept=".pdf,.pptx,application/pdf,application/vnd.openxmlformats-officedocument.presentationml.presentation" hidden></main>`);
   }
   lessonCard(l, index = 0) {
     const demo = l.id === 'hdd-ssd-demo';
@@ -144,14 +167,18 @@ export class Studio {
   }
   editor() {
     const l = this.draft;
-    return this.shell(`<main class="studio-editor ${this.metaExpanded ? 'expanded-meta' : ''}"><div class="editor-heading"><div>${button('library', '← Biblioteca', 'link')}<span class="save-state ${this.dirty ? 'unsaved' : ''}" role="status">${this.dirty ? 'Alterações não salvas' : 'Salvo neste navegador'}</span></div><div class="editor-top-actions">${button('toggle-meta', 'Dados da aula', 'quiet mobile-meta-toggle')}${this.tab === 'slides' ? button('toggle-visual', this.visualMode ? 'Campos' : 'Editor visual', 'quiet') : ''}${button('export-draft', '↓ JSON', 'quiet')}${button('save', 'Salvar aula', 'quiet')}${cloudConfigured ? button('cloud-save', '☁ Salvar na nuvem', 'quiet', this.cloudBusy ? 'disabled' : '') : ''}${button('preview-draft', '▷ Prévia', 'quiet')}${button('present-draft', 'Apresentar ↗', 'accent studio-launch', this.launching ? 'disabled' : '')}</div></div><div class="editor-lesson-meta">${field('Título da aula', 'title', l.title, 'lesson', { attributes: 'maxlength="140"' })}${field('Descrição', 'description', l.description, 'lesson', { attributes: 'maxlength="500" placeholder="Tema, turma ou objetivo da aula"' })}</div><div class="editor-tabs" role="tablist" aria-label="Conteúdo da aula"><button role="tab" aria-selected="${this.tab === 'slides'}" data-studio-action="tab-slides">▤ Slides <span>${l.slides.length}</span></button><button role="tab" aria-selected="${this.tab === 'quiz'}" data-studio-action="tab-quiz">✦ Quiz <span>${l.questions.length}</span></button></div><div class="editor-workspace ${this.visualMode && this.tab === 'slides' ? 'visual-workspace' : ''}"><aside class="editor-outline"><div class="outline-heading"><span>${this.tab === 'slides' ? 'SEQUÊNCIA DA AULA' : 'DESAFIO FINAL'}</span>${button(this.tab === 'slides' ? 'add-slide' : 'add-question', '+', 'outline-add', `aria-label="${this.tab === 'slides' ? 'Adicionar slide' : 'Adicionar pergunta'}"`)}</div><div class="outline-items">${(this.tab === 'slides' ? l.slides : l.questions).map((item, i) => `<button class="outline-item ${i === (this.tab === 'slides' ? this.index : this.questionIndex) ? 'active' : ''}" data-studio-action="${this.tab === 'slides' ? 'select-slide' : 'select-question'}" data-index="${i}"><span>${String(i + 1).padStart(2, '0')}</span><div><strong ${i === (this.tab === 'slides' ? this.index : this.questionIndex) ? 'data-current-label' : ''}>${esc((this.tab === 'slides' ? item.title : item.text) || 'Sem título')}</strong><small>${this.tab === 'slides' ? kindLabel(item.kind) : esc(item.difficulty) + ' · ' + item.seconds + ' s'}</small></div></button>`).join('')}</div></aside><section class="editor-form-area">${audioEditor(this.tab === 'quiz' ? l.quizAudio : l.slides[this.index].audio, this.tab === 'quiz' ? 'quiz' : 'slide')}${this.tab === 'slides' ? (this.visualMode ? this.designer.markup() : this.slideEditor()) : this.quizEditor()}</section><aside class="editor-preview-area"><span class="studio-kicker">UM OLHAR DA TURMA</span><div id="editor-mini-preview">${this.previewMarkup()}</div><p>A prévia completa mostra a apresentação e permite testar o quiz.</p>${button('preview-draft', 'Abrir prévia ↗', 'quiet')}</aside></div></main>`);
+    return this.shell(`<main class="studio-editor ${this.metaExpanded ? 'expanded-meta' : ''}">${this.groups.editorMarkup()}<div class="editor-heading"><div>${button('library', '← Voltar', 'quiet editor-back') + `<strong class="editor-title">${esc(l.title)}</strong>${this.groups.live?`<span class="editor-group-presence" data-collab-status>${this.groups.statusMarkup()}</span>`:''}`}</div><div class="editor-context">${this.editorMusic.headerMarkup()}<span data-account-profile>${this.account.profile()}</span></div></div><div class="editor-command-row"><div class="editor-tabs" role="tablist" aria-label="Conteúdo da aula"><button role="tab" aria-selected="${this.tab === 'slides'}" data-studio-action="tab-slides">▤ Slides e enquetes <span>${l.slides.length}</span></button><button role="tab" aria-selected="${this.tab === 'quiz'}" data-studio-action="tab-quiz">✦ Quiz <span>${l.questions.length}</span></button></div><div class="editor-top-actions"><details class="editor-more"><summary aria-label="Mais opções da aula">···</summary><div>${button('rename-draft','Renomear','quiet','aria-label="Editar título e descrição"')}${button('export-draft','Baixar JSON','quiet')}</div></details>${this.tab === 'slides' ? button('toggle-visual', this.visualMode ? 'Campos' : 'Editor visual', 'quiet') : ''}${button('save', 'Salvar aula', 'quiet')}${cloudConfigured ? button('cloud-save', '☁ Salvar na nuvem', 'quiet', this.cloudBusy ? 'disabled' : '') : ''}${button('preview-draft', '▷ Prévia', 'quiet')}<button type="button" class="studio-btn quiet" data-group-action="share">Colaborar</button><button type="button" class="studio-btn quiet" data-chat-action="open">Chat</button>${button('share-presentation', 'Compartilhar', 'quiet')}${button('present-draft', 'Apresentar ↗', 'accent studio-launch', this.launching ? 'disabled' : '')}</div></div><div class="editor-workspace ${this.visualMode && this.tab === 'slides' ? 'visual-workspace' : ''}"><aside class="editor-outline"><div class="outline-heading"><span>${this.tab === 'slides' ? 'SEQUÊNCIA DA AULA' : 'DESAFIO FINAL'}</span>${button(this.tab === 'slides' ? 'add-slide' : 'add-question', '+', 'outline-add', `aria-label="${this.tab === 'slides' ? 'Adicionar slide' : 'Adicionar pergunta'}"`)}</div><div class="outline-items">${(this.tab === 'slides' ? l.slides : l.questions).map((item, i) => `<button class="outline-item ${i === (this.tab === 'slides' ? this.index : this.questionIndex) ? 'active' : ''}" data-studio-action="${this.tab === 'slides' ? 'select-slide' : 'select-question'}" data-index="${i}"><span>${String(i + 1).padStart(2, '0')}</span><div><strong ${i === (this.tab === 'slides' ? this.index : this.questionIndex) ? 'data-current-label' : ''}>${esc((this.tab === 'slides' ? item.title : item.text) || 'Sem título')}</strong><small>${this.tab === 'slides' ? kindLabel(item.kind) : esc(item.difficulty) + ' · ' + item.seconds + ' s'}</small></div></button>`).join('')}</div></aside><section class="editor-form-area">${this.tab==='quiz'?audioEditor(l.quizAudio,'quiz'):!this.visualMode&&l.slides[this.index].kind!=='canvas'?audioEditor(l.slides[this.index].audio,'slide'):''}${this.tab === 'slides' ? (this.visualMode ? this.itemToolbar('slide', this.index, l.slides.length) + this.designer.markup(false,false) : this.slideEditor()) + this.slideActivities() : this.quizEditor()}</section><aside class="editor-preview-area"><span class="studio-kicker">UM OLHAR DA TURMA</span><div id="editor-mini-preview">${this.previewMarkup()}</div><p>A prévia completa mostra a apresentação e permite testar o quiz.</p>${button('preview-draft', 'Abrir prévia ↗', 'quiet')}</aside></div></main>`);
+  }
+  slideActivities() {
+    const s = this.draft.slides[this.index], poll = s.poll || { text: '', options: ['Concordo', 'Ainda tenho dúvidas'] };
+    return `<details class="editor-details slide-activities"><summary>▥ Atividades e passagem deste slide</summary><p>Faça uma enquete ao vivo: a turma vota pelo celular, sem resposta certa e sem pontos.</p><label><input type="checkbox" data-poll-enabled ${s.poll ? 'checked' : ''}> Adicionar enquete a este slide</label>${s.poll ? `<div class="editor-field"><label for="poll-text">Pergunta da enquete</label><input id="poll-text" data-poll-field="text" maxlength="500" value="${esc(poll.text)}"></div><div class="editor-field"><label for="poll-options">Opções (uma por linha, de 2 a 4)</label><textarea id="poll-options" data-poll-field="options" rows="4">${esc(poll.options.join('\n'))}</textarea></div>` : ''}<div class="editor-field"><label for="slide-transition">Transição ao entrar neste slide</label><select id="slide-transition" data-scope="slide" data-field="transition">${[['slide', 'Deslizar'], ['fade', 'Dissolver'], ['none', 'Sem animação']].map(([value,label]) => `<option value="${value}" ${(s.transition || 'slide') === value ? 'selected' : ''}>${label}</option>`).join('')}</select><small>Use ↑ e ↓ acima do editor para mudar a ordem. A passagem continua sob seu controle.</small></div></details>`;
   }
   itemToolbar(type, i, total) {
-    return `<div class="item-toolbar"><span>${type === 'slide' ? 'SLIDE' : 'PERGUNTA'} ${String(i + 1).padStart(2, '0')}</span><div>${button('move-' + type + '-up', '↑', 'square', `aria-label="Mover ${type === 'slide' ? 'slide' : 'pergunta'} para cima" ${i === 0 ? 'disabled' : ''}`)}${button('move-' + type + '-down', '↓', 'square', `aria-label="Mover ${type === 'slide' ? 'slide' : 'pergunta'} para baixo" ${i >= total - 1 ? 'disabled' : ''}`)}${button('duplicate-' + type, '⧉', 'square', `aria-label="Duplicar ${type === 'slide' ? 'slide' : 'pergunta'}"`)}${button('delete-' + type, 'Excluir', 'link danger-text')}</div></div>`;
+    return `<div class="item-toolbar"><div class="item-identity"><span class="item-number">${type === 'slide' ? 'SLIDE' : 'PERGUNTA'} ${String(i + 1).padStart(2, '0')}</span><span class="save-state ${this.dirty ? 'unsaved' : ''}" role="status">${this.groups.live ? esc(this.groups.live.status) : this.dirty ? 'Alterações não salvas' : 'Salvo'}</span></div>${type==='slide'&&(this.visualMode||this.draft.slides[i].kind==='canvas')?`<div class="item-tools">${this.designer.toolbarMarkup()}</div>`:''}<div class="item-actions">${button('move-' + type + '-up', '↑', 'square', `aria-label="Mover ${type === 'slide' ? 'slide' : 'pergunta'} para cima" ${i === 0 ? 'disabled' : ''}`)}${button('move-' + type + '-down', '↓', 'square', `aria-label="Mover ${type === 'slide' ? 'slide' : 'pergunta'} para baixo" ${i >= total - 1 ? 'disabled' : ''}`)}${button('duplicate-' + type, '⧉', 'square', `aria-label="Duplicar ${type === 'slide' ? 'slide' : 'pergunta'}"`)}${button('delete-' + type, 'Excluir', 'link danger-text')}</div></div>`;
   }
   slideEditor() {
     const s = this.draft.slides[this.index];
-    if (s.kind === 'canvas') return this.designer.markup(true);
+    if (s.kind === 'canvas') return this.itemToolbar('slide',this.index,this.draft.slides.length)+this.designer.markup(true,false);
     if (s.kind === 'document') return this.documentEditor(s);
     return `${this.itemToolbar('slide', this.index, this.draft.slides.length)}<div class="editor-field"><label for="slide-kind">Formato do slide</label><select id="slide-kind" data-scope="slide" data-field="kind">${[['text', 'Texto e ideias'], ['image', 'Imagem e explicação'], ['model', 'Modelo 3D interativo']].map(([v, label]) => `<option value="${v}" ${s.kind === v ? 'selected' : ''}>${label}</option>`).join('')}</select></div>
       ${field('Título do slide', 'title', s.title, 'slide', { attributes: 'maxlength="200"' })}${field('Etiqueta', 'tag', s.tag, 'slide', { attributes: 'maxlength="160" placeholder="Ex.: O ponto de partida"' })}${field('Introdução', 'intro', s.intro, 'slide', { textarea: true })}${field('Ideias principais', 'points', s.points.join('\n'), 'slide', { textarea: true, hint: 'Uma ideia por linha. Até 12 tópicos.' })}
@@ -178,13 +205,26 @@ export class Studio {
   }
   dialogMarkup() {
     if (!this.dialog) return '';
-    const l = this.library.lessons.find(l => l.id === this.dialog.id);
+    const l = this.dialog.type === 'rename-draft' ? this.draft : this.library.lessons.find(l => l.id === this.dialog.id);
     if (!l) return '';
     const deleting = this.dialog.type === 'delete';
-    return `<div class="modal-backdrop"><section class="studio-dialog" role="dialog" aria-modal="true" aria-labelledby="studio-dialog-title"><h2 id="studio-dialog-title">${deleting ? 'Excluir esta aula?' : 'Renomear aula'}</h2><p>${deleting ? `“${esc(l.title)}” será removida deste navegador. Você pode exportar um JSON antes de excluir.` : 'Um bom título já começa a contar a história.'}</p>${!deleting ? '<label for="rename-lesson">Novo nome</label><input id="rename-lesson" maxlength="140" value="' + esc(l.title) + '">' : ''}<div>${button('cancel-dialog', 'Cancelar', 'quiet')}${button(deleting ? 'confirm-delete' : 'confirm-rename', deleting ? 'Excluir aula' : 'Salvar nome', deleting ? 'danger' : 'accent')}</div></section></div>`;
+    if (!deleting && !this.dialog.form) this.dialog.form = { title: l.title, description: l.description || '' };
+    return `<div class="modal-backdrop"><section class="studio-dialog" role="dialog" aria-modal="true" aria-labelledby="studio-dialog-title"><h2 id="studio-dialog-title">${deleting ? 'Excluir esta aula?' : 'Renomear aula'}</h2><p>${deleting ? `“${esc(l.title)}” será removida deste navegador. Você pode exportar um JSON antes de excluir.` : 'Título e descrição da aula.'}</p>${!deleting ? '<label for="rename-lesson">Título da aula</label><input id="rename-lesson" maxlength="140" value="' + esc(this.dialog.form.title) + '"><label for="rename-description">Descrição</label><textarea id="rename-description" maxlength="500">' + esc(this.dialog.form.description) + '</textarea>' : ''}<div>${button('cancel-dialog', 'Cancelar', 'quiet')}${button(deleting ? 'confirm-delete' : 'confirm-rename', deleting ? 'Excluir aula' : 'Salvar alterações', deleting ? 'danger' : 'accent')}</div></section></div>`;
   }
   change(input) {
-    if (this.view !== 'editor' || !input.dataset.scope) return;
+    if (this.receivingRemote || !this.root.contains(input)) return;
+    if (this.dialog?.form && ['rename-lesson', 'rename-description'].includes(input.id)) { this.dialog.form[input.id === 'rename-lesson' ? 'title' : 'description'] = input.value; return; }
+    if (this.view !== 'editor') return;
+    if (input.matches('[data-poll-enabled]')) {
+      this.draft.slides[this.index].poll = input.checked ? { text: 'O que você acha desta ideia?', options: ['Concordo', 'Ainda tenho dúvidas'] } : null;
+      this.markDirty(); this.callbacks.render(); this.root.querySelector('.slide-activities').open = true; return;
+    }
+    if (input.dataset.pollField) {
+      const poll = this.draft.slides[this.index].poll;
+      if (poll) { poll[input.dataset.pollField] = input.dataset.pollField === 'options' ? input.value.split('\n').slice(0,4) : input.value; this.markDirty(); }
+      return;
+    }
+    if (!input.dataset.scope) return;
     const scope = input.dataset.scope, key = input.dataset.field;
     const item = scope === 'lesson' ? this.draft : scope === 'slide' ? this.draft.slides[this.index] : this.draft.questions[this.questionIndex];
     if (input.type === 'radio' && !input.checked) return;
@@ -207,15 +247,17 @@ export class Studio {
     }
   }
   markDirty() {
-    this.dirty = true;
+    this.dirty = true; this.groups?.live?.schedule();
     const status = document.querySelector('.save-state');
     if (status) { status.textContent = 'Alterações não salvas'; status.classList.add('unsaved'); }
   }
   save() {
     if (!this.draft) return;
+    if (this.groups?.live) { this.groups.live.schedule(); return; }
     this.draft = this.library.save(this.draft); this.dirty = false;
   }
   open(id, navigate = true) {
+    this.scrollEditorTop = true;
     this.draft = clone(this.library.lessons.find(l => l.id === id));
     this.index = 0; this.questionIndex = 0; this.tab = 'slides'; this.visualMode = true; this.designer.selected = ''; this.dirty = false; this.view = 'editor';
     if (navigate) this.writeRoute();
@@ -224,6 +266,7 @@ export class Studio {
     if (this.launching) return;
     this.launching = true; this.callbacks.render();
     try {
+      if (this.groups.live) await this.groups.live.persist();
       const validated = validateLesson(await hydrateLesson(lesson));
       this.nativeViewer?.dispose(); this.nativeViewer = null; this.designer.models.mount(null, null);
       await (preview ? this.callbacks.preview(validated) : this.callbacks.present(validated));
@@ -258,8 +301,17 @@ export class Studio {
     if (this.draft !== draft || !draft.slides.includes(slide)) return;
     slide.image = imageURL(result); delete slide.assetId; this.markDirty(); this.callbacks.render();
   }
+  sharePresentation() { this.sharing.show(); }
   afterRender() {
+    if (this.scrollEditorTop && this.view === 'editor') { this.scrollEditorTop = false; window.scrollTo({ top: 0, left: 0, behavior: 'instant' }); }
     this.account.afterRender();
+    const cloudVisible=this.view==='library';
+    if(cloudVisible&&this.account.user&&!this.cloudBusy&&(!this.cloudLoaded||!this.cloudWasVisible))queueMicrotask(()=>{if(this.view==='library'&&this.account.user&&!this.cloudBusy)this.cloudAction('cloud-refresh',{});});
+    this.cloudWasVisible=cloudVisible;
+    this.editorMusic.mountPanel();
+    if(this.groups.live&&!this.groups.canEdit)for(const node of this.root.querySelectorAll('.designer-toolbar,.designer-workspace,.editor-field,.quiz-options-editor,.slide-activities'))node.inert=true;
+    this.groups.afterRender();
+    this.sharing.mount();
     this.showcase.mount();
     fillAssetAudio(this.root);
     fillAssetImages(this.root);
@@ -321,14 +373,17 @@ export class Studio {
     slide.model = 'custom'; slide.customModel = model; this.markDirty(); this.callbacks.render();
   }
   async action(action, target) {
+    if(this.view==='editor'&&this.groups.live&&!this.groups.canEdit&&!['library','select-slide','select-question','tab-slides','tab-quiz','toggle-visual','preview-draft','present-draft','share-presentation','export-draft'].includes(action)){this.callbacks.toast('Sua permissão permite '+(this.groups.role==='commenter'?'comentar':'visualizar')+' esta aula.');return;}
     if (this.importing && action !== 'cancel-import') return;
     if (action.startsWith('cloud-')) { await this.cloudAction(action, target); return; }
     const id = target.dataset.id;
     const lookup = () => this.library.lessons.find(l => l.id === id);
     if (['library', 'join'].includes(action)) {
+      if (this.groups.live) await this.groups.stop();
       if (this.dirty) this.save();
       this.view = action; this.writeRoute(); this.callbacks.render(); return;
     }
+    if (action === 'share-presentation') { await this.sharePresentation(); return; }
     if (action === 'upload-slides') { this.importDialog = true; this.importError = ''; }
     else if (action === 'choose-slides') { document.querySelector('#import-slides-file').click(); return; }
     else if (action === 'cancel-import') {
@@ -336,13 +391,13 @@ export class Studio {
       else this.importDialog = false;
     }
     else if (action === 'new') { const l = this.library.save(newLesson()); this.open(l.id); this.visualMode = true; }
-    else if (action === 'toggle-meta') this.metaExpanded = !this.metaExpanded;
+    else if (action === 'rename-draft') this.dialog = { type: 'rename-draft', id: this.draft.id };
     else if (action === 'remove-audio') { const scope = target.dataset.audioScope; if (scope === 'quiz') this.draft.quizAudio = null; else this.draft.slides[this.index].audio = null; this.markDirty(); }
     else if (action === 'toggle-visual') { this.visualMode = !this.visualMode; this.designer.interacting = ''; }
     else if (action === 'upload-native-model') { this.root.querySelector('#native-model-files').click(); return; }
     else if (action === 'restore-demo') { const l = this.library.restoreDemo(); this.open(l.id); }
     else if (action === 'edit') this.open(id);
-    else if (action === 'save') { this.save(); this.callbacks.toast('Aula salva neste navegador.'); }
+    else if (action === 'save') { if (this.groups.live) { await this.groups.live.persist(); this.callbacks.toast('Aula compartilhada salva.'); } else { this.save(); this.callbacks.toast('Aula salva neste navegador.'); } }
     else if (action === 'duplicate') { this.library.duplicate(id); this.callbacks.toast('Cópia adicionada à biblioteca.'); }
     else if (action === 'rename' || action === 'delete') this.dialog = { type: action, id };
     else if (action === 'cancel-dialog') this.dialog = null;
@@ -355,7 +410,10 @@ export class Studio {
     else if (action === 'confirm-rename') {
       const name = document.querySelector('#rename-lesson').value.trim();
       if (!name) throw Error('Digite o novo nome da aula.');
-      const l = this.library.lessons.find(l => l.id === this.dialog.id); this.library.save({ ...l, title: name }); this.dialog = null;
+      const description = this.root.querySelector('#rename-description').value.trim();
+      if (this.dialog.type === 'rename-draft') { this.draft.title = name; this.draft.description = description; this.markDirty(); }
+      else { const l = this.library.lessons.find(l => l.id === this.dialog.id); this.library.save({ ...l, title: name, description }); }
+      this.dialog = null;
     }
     else if (action === 'import') { document.querySelector('#import-lesson-file').click(); return; }
     else if (action === 'export') { await this.download(lookup()); return; }
@@ -371,7 +429,8 @@ export class Studio {
       const isSlide = action.includes('slide'), list = isSlide ? this.draft.slides : this.draft.questions, indexKey = isSlide ? 'index' : 'questionIndex', i = this[indexKey];
       if (action.startsWith('add-') || action.startsWith('duplicate-')) {
         if (list.length >= (isSlide ? 80 : 50)) throw Error('Você chegou ao limite de ' + (isSlide ? '80 slides.' : '50 perguntas.'));
-        const item = action.startsWith('add-') ? (isSlide ? newSlide() : newQuestion()) : { ...clone(list[i]), id: crypto.randomUUID() };
+        let item = action.startsWith('add-') ? (isSlide ? newSlide() : newQuestion()) : { ...clone(list[i]), id: crypto.randomUUID() };
+        if (isSlide && this.groups.live) item = canvasFromSlide(item);
         const next = action.startsWith('add-') ? list.length : i + 1;
         list.splice(next, 0, item); this[indexKey] = next;
       } else if (action.startsWith('delete-')) {
@@ -384,6 +443,7 @@ export class Studio {
       } else return;
       this.markDirty();
     }
+    if (this.view === 'editor') this.writeRoute(this.view, this.draft.id, true);
     this.callbacks.render();
     if (this.dialog) document.querySelector('#rename-lesson, .studio-dialog button')?.focus();
   }

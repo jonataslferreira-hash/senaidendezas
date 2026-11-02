@@ -1,0 +1,96 @@
+/* The same lilac, mint and peach surfaces as the light theme, adapted to graphite. */
+html[data-appearance=dark] .studio-shell:has(>.studio-body) {
+  --studio-ink:#f3edf8;
+  --studio-muted:#c7bfd2;
+  --studio-line:#544d61;
+  --night-lilac:#59456d;
+  --night-mint:#34544d;
+  --night-peach:#6a4c43;
+  --night-button:linear-gradient(125deg,#c3a2ed,#a9b7e8);
+  background:radial-gradient(ellipse at 100% 0,#51405d24,transparent 48%),#26272c;
+}
+html[data-appearance=dark][data-theme=ocean] .studio-shell:has(>.studio-body) {
+  --night-lilac:#414f71;--night-mint:#30565c;--night-peach:#635247;
+  --night-button:linear-gradient(125deg,#8cd2cb,#a6b9ee);
+}
+html[data-appearance=dark][data-theme=forest] .studio-shell:has(>.studio-body) {
+  --night-lilac:#4d4966;--night-mint:#355944;--night-peach:#68553f;
+  --night-button:linear-gradient(125deg,#9dd4b2,#c3c58d);
+}
+html[data-appearance=dark] .studio-shell .studio-rail {
+  background:linear-gradient(165deg,#37313f,#2c2d32 65%);border-color:#49414f;
+}
+html[data-appearance=dark] .studio-shell .studio-header {
+  background:linear-gradient(110deg,#302d36ed,#2d3035ed);border-color:#4a4354;
+}
+html[data-appearance=dark] .studio-shell .experience-feature {
+  background:radial-gradient(ellipse at 7% 100%,var(--night-mint),transparent 65%),
+    radial-gradient(ellipse at 100% 0,var(--night-peach),transparent 65%),
+    linear-gradient(125deg,var(--night-lilac),#393443 62%);
+  border-color:#8e759c66;box-shadow:inset 0 1px 0 #e5c9ff16,0 18px 55px #14101926;
+}
+html[data-appearance=dark] .studio-shell .experience-copy h2 {color:#faf3ff!important}
+html[data-appearance=dark] .studio-shell .experience-copy h2 em {color:#e3bdf5}
+html[data-appearance=dark] .studio-shell .experience-copy p {color:#ded2e7}
+html[data-appearance=dark] .studio-shell :is(.feature-label,.tour-replay) {color:#dfc9ed}
+html[data-appearance=dark] .studio-shell :is(.studio-btn.accent,.studio-btn.card-present) {
+  background:var(--night-button);color:#292239;border-color:#d6bdf155;
+  box-shadow:0 5px 18px #19102022,inset 0 1px 0 #ffffff36;
+}
+html[data-appearance=dark] .studio-shell :is(.studio-btn.accent,.studio-btn.card-present):hover {
+  filter:brightness(1.09);box-shadow:0 7px 24px #b99be326;
+}
+html[data-appearance=dark] .studio-shell :is(.studio-btn.card-edit,.studio-btn.rail-link.active) {
+  background:linear-gradient(125deg,#584465,#3e3c50);border-color:#9275ad70;color:#eddbff;
+}
+html[data-appearance=dark] .studio-shell .studio-body .lesson-card {
+  background:linear-gradient(145deg,#3b3444,#303238 78%);border-color:#6c587a70;
+  box-shadow:0 7px 25px #15121924;
+}
+html[data-appearance=dark] .studio-shell .studio-body .lesson-card:hover {
+  border-color:#b591d3;box-shadow:0 14px 32px #110d1a38,0 0 0 1px #b294ce16;
+}
+html[data-appearance=dark] .studio-shell .lesson-card-art {
+  background:radial-gradient(ellipse at 100% 0,#ad826b66,transparent 75%),linear-gradient(140deg,#62497a,#493b61);
+}
+html[data-appearance=dark] .studio-shell .lesson-card-art.ideas-art {
+  background:radial-gradient(ellipse at 100% 0,#8e9c5b55,transparent 70%),linear-gradient(135deg,#365c54,#3a4b51);
+}
+html[data-appearance=dark] .studio-shell .lesson-category {
+  color:#ead5fc;background:#211a2f70;border-color:#dec1f34d;
+}
+html[data-appearance=dark] .studio-shell .ideas-art .lesson-category {color:#d1eee0;background:#172c2970;border-color:#a8dcc44d}
+html[data-appearance=dark] .studio-shell .lesson-card-art>div>span:last-child {color:#d5bedf}
+html[data-appearance=dark] .studio-shell .studio-body .new-lesson-card {
+  background:radial-gradient(ellipse at 100% 0,#70567d40,transparent 65%),linear-gradient(155deg,#373342,#303b3a);
+  border-color:#9776b07a;color:#efe1fb;
+}
+html[data-appearance=dark] .studio-shell .new-lesson-card :is(.create-half,.import-half) {color:#f0e5fb}
+html[data-appearance=dark] .studio-shell .new-lesson-card :is(small,.create-half small,.import-half small) {color:#c8bed4}
+html[data-appearance=dark] .studio-shell .new-lesson-card .create-half {border-color:#8b71965e}
+html[data-appearance=dark] .studio-shell .new-lesson-card .create-half:hover {background:#c0a1df12}
+html[data-appearance=dark] .studio-shell .studio-body :is(.cloud-file-list article,.lesson-menu>div) {
+  background:linear-gradient(135deg,#3d3548,#30383c);border-color:#6c587a70;
+}
+/* The animated miniature has its own readable dark surfaces. */
+html[data-appearance=dark] .studio-shell .experience-demo .demo-board {
+  background:linear-gradient(145deg,#4b405b,#373542);border-color:#b49cc46b;
+  box-shadow:0 22px 42px #17101e38,inset 0 1px 0 #ffffff14;
+}
+html[data-appearance=dark] .studio-shell .experience-demo .demo-board h3 {color:#f1e4fb}
+html[data-appearance=dark] .studio-shell .experience-demo :is(.board-eyebrow,.demo-board-top>span,.demo-board-bottom,.demo-device-button>span:last-child) {color:#d2badf;border-color:#ab8cba40}
+html[data-appearance=dark] .studio-shell .experience-demo .stage-connect p,
+html[data-appearance=dark] .studio-shell .experience-demo [data-demo-answer-status] {color:#d9c9e3}
+html[data-appearance=dark] .studio-shell .demo-phone {
+  background:linear-gradient(155deg,#514662,#343440);border-color:#c9b3dd;color:#e8d5f4;
+}
+html[data-appearance=dark] .studio-shell .demo-phone.phone-robot {background:linear-gradient(155deg,#456557,#303d3b);border-color:#b3d3c5}
+html[data-appearance=dark] .studio-shell .demo-phone :is(strong,small,.phone-status) {color:#eadff3}
+html[data-appearance=dark] .studio-shell .demo-phone.phone-robot :is(strong,small,.phone-status) {color:#d5efdf}
+html[data-appearance=dark] .studio-shell .demo-answers button {background:#6b5085;color:#f4e9ff;border-color:#c6a6e15c}
+html[data-appearance=dark] .studio-shell .demo-answers button:last-child {background:#3e6b58;color:#e0f5e9;border-color:#a8d5be66}
+html[data-appearance=dark] .studio-shell .demo-correct .demo-answers button:last-child {background:#a8d7b8;color:#254d36}
+html[data-appearance=dark] .studio-shell .demo-wrong .demo-answers button:first-child {background:#e6b6c6;color:#573143}
+html[data-appearance=dark] .studio-shell .showcase-steps button[aria-pressed=true] {
+  background:linear-gradient(125deg,#7c5c96,#55516f);border-color:#b393cf88;color:#fff2ff;box-shadow:0 4px 16px #25172f24;
+}

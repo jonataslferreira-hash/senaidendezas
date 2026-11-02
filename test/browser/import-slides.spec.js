@@ -24,7 +24,7 @@ test('PDF vira páginas persistidas, apresenta em tela cheia e sincroniza com ce
   await host.getByRole('button', { name: 'Apresentar em tela cheia', exact: true }).click();
   await expect.poll(() => host.evaluate(() => Boolean(document.fullscreenElement))).toBe(true);
   await host.screenshot({ path: 'test-results/imported-pdf-fullscreen.png' });
-  await host.getByRole('button', { name: 'Modo apresentação', exact: true }).click();
+  await host.getByRole('button', { name: 'Apresentar em tela cheia', exact: true }).click();
   await phone.goto('/?localSignal&s=' + code);
   await phone.getByLabel('Como podemos chamar você?', { exact: true }).fill('Ana PDF');
   await phone.getByRole('button', { name: 'Entrar na sala', exact: true }).click();

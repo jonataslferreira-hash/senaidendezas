@@ -25,6 +25,13 @@ export function imageURL(value) {
 export function newSlide() {
   return { id: uid(), kind: 'text', tag: 'Uma nova ideia', title: 'Novo slide', intro: '', points: [], callout: '', note: '', model: 'ssd', image: '', imageAlt: '', prompt: '', answer: '' };
 }
+export function validatePoll(poll, draft = false) {
+  if (poll == null) return null;
+  if (!Array.isArray(poll.options) || poll.options.length < 2 || poll.options.length > 4) throw Error('A enquete precisa de 2 a 4 opções.');
+  const result = { text: text(poll.text, 500), options: poll.options.map(o => text(o, 200)) };
+  if (!draft && (!result.text.trim() || result.options.some(o => !o.trim()))) throw Error('Preencha a pergunta e todas as opções da enquete.');
+  return result;
+}
 export function newQuestion() {
   return { id: uid(), text: 'Nova pergunta', options: ['Alternativa A', 'Alternativa B', 'Alternativa C', 'Alternativa D'], correct: 0, difficulty: 'Fácil', base: 1000, seconds: 20, explanation: '' };
 }
@@ -60,7 +67,8 @@ export function validateLesson(input, { draft = false } = {}) {
     if (!draft && s.kind === 'model' && s.model === 'custom' && !customModel) throw Error('Envie o modelo 3D do slide ' + (i + 1) + '.');
     const elements = s.kind === 'canvas' ? normalizeElements(s.elements, draft, imageURL) : [];
     return { id: text(s.id, 100) || uid(), kind: s.kind, title, audio: validateAudio(s.audio), tag: text(s.tag, 160), intro: text(s.intro), points: Array.isArray(s.points) ? s.points.slice(0, 12).map(p => text(p, 1000)) : [],
-      callout: text(s.callout, 1000), note: text(s.note), prompt: text(s.prompt, 1000), answer: text(s.answer, 3000), comparison: Boolean(s.comparison), model: ['ssd', 'hdd', 'nvme', 'custom'].includes(s.model) ? s.model : 'ssd', customModel, image, imageAlt: text(s.imageAlt, 500), elements, background: colorValue(s.background, '#171324'),
+      poll: validatePoll(s.poll, draft), transition: ['slide', 'fade', 'none'].includes(s.transition) ? s.transition : 'slide',
+      callout: text(s.callout, 1000), note: text(s.note), prompt: text(s.prompt, 1000), answer: text(s.answer, 3000), comparison: Boolean(s.comparison), model: ['ssd', 'hdd', 'nvme', 'custom'].includes(s.model) ? s.model : 'ssd', customModel, image, imageAlt: text(s.imageAlt, 500), elements, visualTheme: ['midnight','paper','sage','ocean'].includes(s.visualTheme)?s.visualTheme:'', background: colorValue(s.background, '#171324'),
       ...(assetId ? { assetId } : {}), sourceType: ['pdf', 'pptx'].includes(s.sourceType) ? s.sourceType : '', pageWidth: Math.max(1, Math.min(8000, Number(s.pageWidth) || 1600)), pageHeight: Math.max(1, Math.min(8000, Number(s.pageHeight) || 900)) };
   });
   result.questions = input.questions.map((q, i) => {

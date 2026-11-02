@@ -1,0 +1,29 @@
+/* Float independently from the transforms that move devices between scenes. */
+.studio-shell .experience-demo[data-playing=true] .demo-board{animation:screen-drift 3.8s ease-in-out infinite}
+.studio-shell .experience-demo[data-playing=true] .demo-phone{animation:phone-drift 3.3s ease-in-out infinite;animation-delay:-1.2s}
+.studio-shell .experience-demo[data-playing=true] .phone-robot{animation-duration:4.1s;animation-delay:-2.8s}
+@keyframes screen-drift{0%,100%{translate:0 10px}50%{translate:0 -26px}}
+@keyframes phone-drift{0%,100%{translate:0 14px}50%{translate:0 -32px}}
+.experience-feature:has([data-playing]) .experience-copy .living-title{display:inline-grid;grid-template-areas:"word";vertical-align:baseline;line-height:1.15}
+.living-title-size,.living-title-current,.living-title>.sr-only{grid-area:word}
+.living-title-size{visibility:hidden;pointer-events:none}
+.living-title-current{justify-self:start;position:relative}
+.living-title-current::after{content:"";display:inline-block;height:.78em;border-right:2px solid currentColor;margin-left:4px;vertical-align:-.02em;animation:typing-caret .75s step-end infinite}
+@keyframes typing-caret{0%,45%{opacity:1}46%,100%{opacity:0}}
+.experience-feature:has([data-playing=false]) .living-title-current::after{animation-play-state:paused}
+.account-dialog[open]{animation:none!important}
+.account-dialog[open][data-panel-arriving]::backdrop{animation:account-shade .35s ease both}
+@keyframes account-shade{from{opacity:0}to{opacity:1}}
+.account-dialog .profile-photo-edit .profile-photo-button,
+html[data-appearance=dark] .account-dialog .profile-photo-edit .profile-photo-button{
+  background:linear-gradient(125deg,#eadcf8,#d7e1f5);color:#362447;border-color:#c4acd9;
+  font-weight:650;min-height:42px;display:inline-flex;align-items:center;
+  transition:box-shadow .25s,transform .25s,filter .25s;
+}
+.account-dialog .profile-photo-edit .profile-photo-button:hover{filter:brightness(1.04);box-shadow:0 5px 18px #9b77ba26;transform:translateY(-2px)}
+.account-dialog :is(.profile-shortcuts button,[data-account-action],.studio-btn){transition:background .25s,box-shadow .25s,transform .25s}
+.account-dialog .profile-shortcuts button:hover{transform:translateY(-2px);box-shadow:0 5px 16px #9b77ba20}
+@media(prefers-reduced-motion:reduce){:root:not([data-motion=normal]) .living-title-current::after,:root:not([data-motion=normal]) .account-dialog[open][data-panel-arriving]::backdrop{animation:none}:root:not([data-motion=normal]) .profile-photo-button,:root:not([data-motion=normal]) .account-dialog .profile-shortcuts button{transform:none!important}}
+html[data-motion=reduced] .living-title-current::after{animation:none}
+
+.studio-shell .experience-demo[data-playing=true] :is(.demo-board,.demo-phone){will-change:transform,translate}

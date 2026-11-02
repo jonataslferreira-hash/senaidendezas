@@ -1,0 +1,11 @@
+import { groupRequest } from './collaboration-api.js';
+import { validTheme, validStyle } from './personalization.js';
+export const escapePerson=value=>String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const hues={violet:275,ocean:195,forest:145,rose:330,sunset:24,amber:43,teal:176,indigo:237};
+export class People {
+ constructor(studio){this.studio=studio;this.cache=new Map();this.pending=new Map();studio.root.addEventListener('account-changed',()=>{this.generation=(this.generation||0)+1;for(const p of this.cache.values())if(p.photo)URL.revokeObjectURL(p.photo);this.cache.clear();this.pending.clear();});}
+ get(id){if(id===this.studio.account.user?.id)return {...this.studio.account.user.user_metadata,photo:this.studio.account.settings.avatarUrl||this.studio.account.vault.list().find(s=>s.user.id===id)?.avatar_thumbnail};return this.cache.get(id)||{};}
+ avatar(id,name='Colaborador'){const p=this.get(id);return `<span class="person-avatar" data-person="${escapePerson(id)}">${p.photo?`<img src="${escapePerson(p.photo)}" alt="${escapePerson(name)}">`:escapePerson(name.slice(0,1).toUpperCase())}</span>`;}
+ bubble(id){const p=this.get(id);return `data-sender-style="${validStyle(p.ui_style)}" style="--sender-hue:${hues[validTheme(p.theme)]}"`;}
+ async load(id){if(!id||id===this.studio.account.user?.id||this.cache.has(id)||this.pending.has(id))return;const generation=this.generation;const task=(async()=>{const {data,error}=await this.studio.account.client.rpc('sl_person_profile',{p_user_id:id});if(error||generation!==this.generation)return;const profile=Array.isArray(data)?data[0]:data;if(!profile){this.cache.set(id,{});return;}this.cache.set(id,profile);if(profile.avatar_path)try{const response=await groupRequest(this.studio.account.client,'/people/'+id+'/avatar'),blob=await response.blob();if(generation!==this.generation||!blob.type.startsWith('image/'))return;profile.photo=URL.createObjectURL(blob);}catch{}if(generation===this.generation){this.studio.social.paint();this.studio.chat.paint();this.studio.groups.paint();}})();this.pending.set(id,task);try{await task;}finally{if(this.pending.get(id)===task)this.pending.delete(id);}}
+}

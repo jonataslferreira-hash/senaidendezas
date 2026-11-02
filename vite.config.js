@@ -6,7 +6,7 @@ const pdfSource = fileURLToPath(new URL('./node_modules/pdfjs-dist/', import.met
 const pdfAssetFolders = ['cmaps', 'standard_fonts', 'wasm'];
 const modelSources = { draco: fileURLToPath(new URL('./node_modules/three/examples/jsm/libs/draco/gltf/', import.meta.url)), basis: fileURLToPath(new URL('./node_modules/three/examples/jsm/libs/basis/', import.meta.url)) };
 export default defineConfig({
-  optimizeDeps: { include: ['pdfjs-dist', '@office-kit/pptx', '@office-kit/pptx-preview', 'three/addons/loaders/GLTFLoader.js', 'three/addons/loaders/OBJLoader.js', 'three/addons/loaders/MTLLoader.js', 'three/addons/loaders/DRACOLoader.js', 'three/addons/loaders/KTX2Loader.js', 'three/addons/libs/meshopt_decoder.module.js'] },
+  optimizeDeps: { include: ['gifenc', 'pdfjs-dist', '@office-kit/pptx', '@office-kit/pptx-preview', 'three/addons/loaders/GLTFLoader.js', 'three/addons/loaders/OBJLoader.js', 'three/addons/loaders/MTLLoader.js', 'three/addons/loaders/DRACOLoader.js', 'three/addons/loaders/KTX2Loader.js', 'three/addons/libs/meshopt_decoder.module.js'] },
   plugins: [{
     name: 'local-pdf-assets',
     configureServer(server) {

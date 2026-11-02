@@ -1,0 +1,20 @@
+import {test,expect} from '@playwright/test';
+test('aluno no celular acompanha slides e responde com áreas de toque, sem WebGL',async({page,context})=>{
+  await page.goto('/?localSignal');await page.locator('.lesson-card [data-studio-action=present]').first().click();
+  await expect(page.locator('#app')).toHaveAttribute('data-role','presenter');
+  const code=await page.locator('.room-actions .room-code strong').innerText();
+  await page.getByRole('button',{name:'Fechar convite',exact:true}).click();
+  const student=await context.newPage();await student.setViewportSize({width:390,height:844});
+  await student.goto('/?localSignal&s='+code);await student.getByLabel('Como podemos chamar você?').fill('Aluno mobile');await student.getByRole('button',{name:'Entrar na sala',exact:false}).click();
+  await expect(student.locator('#app')).toHaveAttribute('data-role','student');
+  await expect(student.locator('.mobile-topic h1')).toBeVisible();
+  expect(await student.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
+  await student.screenshot({path:'test-results/student-mobile-lesson.png',fullPage:true,animations:'disabled'});
+  await page.locator('[data-action=next-slide]:visible').first().click();
+  await expect(student.locator('.mobile-topic h1')).toHaveText('Uma pequena máquina de precisão.');
+  await page.locator('[data-action=quiz]:visible').first().click();await expect(student.locator('.quiz-lobby')).toBeVisible();
+  await page.locator('[data-action=start-quiz]').click();await expect(student.locator('.answer-options')).toBeVisible({timeout:10000});
+  await student.locator('[data-answer="0"]').click();await expect(student.locator('.answer-status')).toContainText('Resposta registrada');
+  await student.screenshot({path:'test-results/student-mobile-quiz.png',fullPage:true,animations:'disabled'});
+  await student.close();
+});
