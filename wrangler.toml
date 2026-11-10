@@ -1,3 +1,4 @@
+# Lets Cloudflare Builds find the file API instead of auto-detecting vite.config.js.
 name = "storage-lab-files"
 account_id = "4cdb64404c75086e5ac536d88abd30e6"
 main = "cloudflare/r2-worker.js"
