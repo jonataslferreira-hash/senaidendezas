@@ -1,10 +1,11 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { canvasFromSlide, newElement } from '../src/canvas-data.js';
+import { MAX_CANVAS_ELEMENTS, canvasFromSlide, newElement } from '../src/canvas-data.js';
 import { newLesson, validateLesson } from '../src/lessons.js';
 import { compactLesson } from '../src/assets.js';
 import { validateCustomModel } from '../src/model-files.js';
 import { Room } from '../src/room.js';
+import { normalizeImageQuery } from '../src/storage-ai-image-search.js';
 test('slide livre preserva elementos e limita posições, cores e recursos', () => {
   const lesson = newLesson();
   const canvas = canvasFromSlide(lesson.slides[0]);
@@ -15,7 +16,7 @@ test('slide livre preserva elementos e limita posições, cores e recursos', () 
   const room = new Room('123456', undefined, Date.now, result);
   assert.equal(room.publicLesson().slides[0].kind, 'canvas');
   assert.equal(room.publicLesson().slides[0].elements[0].text, canvas.elements[0].text);
-  assert.throws(() => validateLesson({ ...lesson, slides: [{ ...canvas, elements: Array.from({ length: 41 }, () => newElement('text')) }] }), /40 elementos/);
+  assert.throws(() => validateLesson({ ...lesson, slides: [{ ...canvas, elements: Array.from({ length: MAX_CANVAS_ELEMENTS + 1 }, () => newElement('text')) }] }), new RegExp(`${MAX_CANVAS_ELEMENTS} elementos`));
   assert.throws(() => validateLesson({ ...lesson, slides: [{ ...canvas, elements: Array.from({ length: 3 }, () => newElement('model')) }] }), /dois modelos/);
 });
 test('conversão leva a mídia para o elemento sem duplicar os bytes no slide', () => {
@@ -38,4 +39,9 @@ test('modelos próprios são validados, persistidos por referência e transporta
   assert.throws(() => validateCustomModel({ ...resource, data: '{"files":[]}' }), /principal/);
   assert.throws(() => validateCustomModel({ ...resource, assetId: '../escape' }), /Referência/);
   assert.throws(() => validateLesson({ ...lesson, slides: [{ ...lesson.slides[0], customModel: null }] }), /Envie/);
+});
+
+test('pedidos de imagem viram consultas curtas e pesquisáveis', () => {
+  assert.equal(normalizeImageQuery('Coloque uma imagem de vários sistemas operacionais nessa página'), 'vários sistemas operacionais');
+  assert.equal(normalizeImageQuery('troque esta foto por um SSD gamer com fundo transparente'), 'SSD gamer');
 });

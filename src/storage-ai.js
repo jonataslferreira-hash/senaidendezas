@@ -1,4 +1,4 @@
-import {canvasFromSlide,newElement,colorValue,applyCanvasTheme,canvasThemes} from './canvas-data.js';
+import {MAX_CANVAS_ELEMENTS,canvasFromSlide,newElement,colorValue,applyCanvasTheme,canvasThemes} from './canvas-data.js';
 import {r2ApiUrl,saveCloudLesson,readCloudLesson} from './cloud-files.js';
 import {archiveImportedPages,fillAssetImages,hydrateLesson,removePageAssets} from './assets.js';
 import {newLesson,newQuestion,newSlide} from './lessons.js';
@@ -10,7 +10,7 @@ import {AI_PHOTO_LIMIT,AI_SLIDE_LIMIT} from './storage-ai-options.js';
 import {canAttachPhoto,prepareSlidePhotos} from './storage-ai-photos.js';
 import {composeAISlide,planSlidePhotos} from './storage-ai-layouts.js';
 import {applyOpenLayout,openLayouts} from './open-slide-layouts.js';
-import {findSlideImage,imageSourceNote} from './storage-ai-image-search.js';
+import {findSlideImage,imageSourceNote,normalizeImageQuery} from './storage-ai-image-search.js';
 import brandMarkUrl from './assets/storage-ai.svg';
 
 const label='<span class="storage-ai-wordmark">storage<strong class="storage-ai-accent">AI</strong></span>';
@@ -99,7 +99,7 @@ async function buildLesson(result,count,photos,onSlide,activities={},imageDefaul
   lesson.slides=[];
   const placements=planSlidePhotos(specs,photos.length);
   const searches=specs.flatMap((spec,index)=>{
-    const query=imageDefault?(text(spec?.imageSearch,120)||text(`${spec?.title||''} ${spec?.body||''}`,120)):'';
+    const query=imageDefault?normalizeImageQuery(text(spec?.imageSearch,120)||text(`${spec?.title||''} ${spec?.body||''}`,120)):'';
     return query?[[index,query]]:[];
   });
   const foundImages=new Map();
@@ -233,7 +233,7 @@ async function applyEdit(slide,result,target,photos=[]) {
     update(element,change);
     if(element.type==='image'&&typeof change.imageSearch==='string'&&change.imageSearch.trim()){
       const transparent=change.imageTransparent===true;
-      const image=await findSlideImage(change.imageSearch,{transparent});
+      const image=await findSlideImage(normalizeImageQuery(change.imageSearch),{transparent});
       if(!image)throw Error(transparent?'Não encontrei uma imagem com fundo transparente. Tente descrever o objeto de outro jeito.':'Não encontrei uma imagem livre para substituir a foto. Tente outra descrição.');
       delete element.assetId;
       Object.assign(element,{image:image.data,imageAlt:image.alt,imageZoom:1,imageX:0,imageY:0});
@@ -245,8 +245,8 @@ async function applyEdit(slide,result,target,photos=[]) {
     }
   }
   if(!target){
-    if(result.imageSearch&&slide.elements.length<40){
-      const image=await findSlideImage(result.imageSearch);
+    if(result.imageSearch&&slide.elements.length<MAX_CANVAS_ELEMENTS){
+      const image=await findSlideImage(normalizeImageQuery(result.imageSearch));
       if(image){
         slide.elements.push(newElement('image',{image:image.data,imageAlt:image.alt,x:56,y:15,w:37,h:70}));
         slide.note=[slide.note,imageSourceNote(image)].filter(Boolean).join('\n\n');
@@ -255,7 +255,7 @@ async function applyEdit(slide,result,target,photos=[]) {
       }
     }
     for(const item of additions){
-      if(slide.elements.length>=40||!['text','shape','model','image'].includes(item?.type))continue;
+      if(slide.elements.length>=MAX_CANVAS_ELEMENTS||!['text','shape','model','image'].includes(item?.type))continue;
       const element=newElement(item.type);
       if(item.type==='image'){
         if(!Number.isInteger(item.photo)||!photos[item.photo])continue;
@@ -286,7 +286,7 @@ function linkedLessonId(session) {
 }
 
 function revisionContext(lesson,history) {
-  const elementLimit=Math.min(40,Math.floor(560/lesson.slides.length));
+  const elementLimit=Math.min(MAX_CANVAS_ELEMENTS,Math.floor(560/lesson.slides.length));
   return {title:lesson.title,history,questions:lesson.questions.map(question=>({text:question.text})),polls:lesson.slides.filter(slide=>slide.poll).map(slide=>({text:slide.poll.text})),slides:lesson.slides.map((slide,index)=>({
     id:slide.id,number:index+1,title:slide.title,background:slide.background,editable:slide.kind==='canvas',
     elements:(slide.elements||[]).slice(0,elementLimit).map(({id,type,text,locked,x,y,w,h})=>({
@@ -980,7 +980,9 @@ export class StorageAI {
     const snapshot=JSON.stringify(designer.original),lessonId=this.studio.draft.id,uid=this.studio.account.user.id;
     const {element}=this.selectedReference(slide);
     if(this.scope==='selection'&&(!element||element.locked))return;
-    const target=this.scope==='selection'?element.id:'';
+    const imageRequest=/\b(?:imagem|foto|figura|ilustra[cç][aã]o)\b/i.test(prompt)&&
+      /\b(?:coloc|adicion|inser|troc|substitu|mud|use|usar)\w*/i.test(prompt);
+    const target=this.scope==='selection'&&(!imageRequest||element?.type==='image')?element.id:'';
     const context={title:slide.title,target,background:slide.background,history:this.editMessages.slice(-4).map(m=>({role:m.role,text:m.text.slice(0,300)})),
       elements:slide.elements.map(({id,type,text,color,background,fontSize,x,y,w,h,locked,imageAlt})=>({id,type,text:text?.slice(0,600),color,background,fontSize,x,y,w,h,locked,...(type==='image'?{imageAlt:imageAlt?.slice(0,120)}:{})}))};
     while(JSON.stringify(context).length>24000){

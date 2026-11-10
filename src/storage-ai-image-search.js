@@ -39,11 +39,29 @@ function imageCredit(info) {
   return {source,author,license:'CC '+variant.toUpperCase()+' '+match[2],licenseUrl:'https://creativecommons.org/licenses/'+variant+'/'+match[2]+'/'};
 }
 
+export function normalizeImageQuery(query) {
+  return String(query||'')
+    .replace(/[“”‘’"]/g,'')
+    .replace(/\b(?:por favor|poderia|pode|quero|quero que|coloque|colocar|adicione|adicionar|insira|inserir|troque|trocar|substitua|substituir)\b/gi,' ')
+    .replace(/\b(?:esta|esse|essa|este|a|o)\s+(?:imagem|foto|figura|ilustração|ilustracao)\s+(?:por|para)\b/gi,' ')
+    .replace(/\b(?:uma?|a|o|as|os)\s+(?:imagem|foto|figura|ilustração|ilustracao)\s+(?:de|sobre)?\b/gi,' ')
+    .replace(/\b(?:imagem|foto|figura|ilustração|ilustracao)\s+(?:de|sobre)\b/gi,' ')
+    .replace(/\b(?:um|uma|o|a)\s+(?=[\p{L}\p{N}])/gu,' ')
+    .replace(/\b(?:nessa|nesta|neste|nesse)\s+(?:página|pagina|slide)\b/gi,' ')
+    .replace(/\b(?:com|de)\s+fundo\s+(?:transparente|removido)\b/gi,' ')
+    .replace(/[^\p{L}\p{N}\s-]/gu,' ')
+    .replace(/\s+/g,' ')
+    .trim()
+    .slice(0,120);
+}
+
 export async function findSlideImage(query, { transparent = false } = {}) {
   if(typeof query!=='string'||!query.trim())return null;
-  const subject=query.trim().slice(0,120);
+  const subject=normalizeImageQuery(query);
+  if(!subject)return null;
   const broader=subject.replace(/\b(?:gaming|gamer|transparent|png)\b/gi,'').replace(/\s+/g,' ').trim();
-  const searches=[subject,broader].filter((term,i,terms)=>term&&terms.indexOf(term)===i);
+  const keywords=broader.split(/\s+/).filter(word=>word.length>2).slice(0,5).join(' ');
+  const searches=[subject,broader,keywords].filter((term,i,terms)=>term&&terms.indexOf(term)===i);
   const formats=transparent?['filemime:png','filemime:svg']:['filetype:bitmap'];
   for(const term of searches)for(const format of formats){
     const params=new URLSearchParams({
@@ -105,7 +123,7 @@ export async function findSlideImage(query, { transparent = false } = {}) {
           const blob=await image.blob();
           if(blob.size>4_000_000||!blob.type.startsWith('image/'))continue;
           if(transparent&&(!['image/png','image/webp','image/svg+xml'].includes(blob.type)||!await hasTransparentBackground(blob)))continue;
-          const file=await optimizeImage(new File([blob],'openverse-image',{type:blob.type}),{maxSide:800});
+          const file=await optimizeImage(new File([blob],'openverse-image',{type:blob.type||'image/jpeg'}),{maxSide:800});
           if(file.size>1_400_000)continue;
           const data=await new Promise((resolve,reject)=>{
             const reader=new FileReader();reader.onload=()=>resolve(reader.result);reader.onerror=reject;reader.readAsDataURL(file);
