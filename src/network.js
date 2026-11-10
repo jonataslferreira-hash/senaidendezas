@@ -7,6 +7,7 @@ const storage = {
   get(k) { try { return JSON.parse(sessionStorage.getItem(k)); } catch { return null; } },
   set(k, v) { try { sessionStorage.setItem(k, JSON.stringify(v)); } catch { /* navegação privada */ } }
 };
+const playerStorage={get(k){try{return JSON.parse(localStorage.getItem(k))||storage.get(k);}catch{return storage.get(k);}},set(k,v){try{localStorage.setItem(k,JSON.stringify(v));}catch{storage.set(k,v);}}};
 function options() {
   // Somente no desenvolvimento: sinalizador local para testes reais de WebRTC.
   if (import.meta.env.DEV && new URLSearchParams(location.search).has('localSignal')) return { host: location.hostname, port: 9000, path: '/', secure: false, debug: 0 };
@@ -17,16 +18,16 @@ export class Classroom {
     this.onState = onState; this.onStatus = onStatus;
     this.connections = new Map(); this.pending = new Map(); this.stopped = false;
   }
-  async create(resume = false, lesson) {
+  async create(resume = false, lesson, startIndex, fromEditor = false) {
     this.host = true;
     const saved = resume && storage.get('sl-host');
     this.code = saved?.code || String(100000 + crypto.getRandomValues(new Uint32Array(1))[0] % 900000);
     if (saved?.data?.lesson) saved.data.lesson = await hydrateLesson(saved.data.lesson);
-    this.room = new Room(this.code, saved?.data, Date.now, lesson);
+    this.room = new Room(this.code, saved?.data, Date.now, lesson, startIndex);
     this.peer = new Peer(prefix + this.code, options());
     await this.open();
     this.peer.on('connection', conn => this.accept(conn));
-    storage.set('sl-mode', { host: true, code: this.code });
+    storage.set('sl-mode', { host: true, code: this.code, fromEditor });
     this.timer = setInterval(() => { const before = this.room.data.phase; this.room.tick(); if (before !== this.room.data.phase) this.broadcast(); }, 100);
     this.broadcast();
     return this.code;
@@ -51,7 +52,7 @@ export class Classroom {
     if (this.connections.size >= 65) { conn.close(); return; }
     const timeout = setTimeout(() => { if (!conn.playerId) conn.close(); }, 12_000);
     conn.on('data', msg => {
-      if (!msg || typeof msg !== 'object' || JSON.stringify(msg).length > (msg.type==='join'?32768:4096)) return;
+      if (!msg || typeof msg !== 'object' || JSON.stringify(msg).length > (['join','profile'].includes(msg.type)?32768:4096)) return;
       const time = Date.now();
       conn.actions = (conn.actions || []).filter(t => t > time - 10_000);
       if (conn.actions.length > 40) return;
@@ -66,6 +67,7 @@ export class Classroom {
           clearTimeout(timeout);
           conn.send({ type: 'joined', ...joined });
           this.broadcast();
+        } else if(msg.type==='profile'&&conn.playerId){this.room.updateProfile(conn.playerId,msg.payload);conn.send({type:'ack',request:msg.request});this.broadcast();
         } else if (msg.type === 'answer' && conn.playerId) {
           this.room.answer(conn.playerId, msg.payload);
           conn.send({ type: 'ack', request: msg.request });
@@ -105,16 +107,18 @@ export class Classroom {
       let ready = false;
       let timeout = setTimeout(() => { conn.close(); reject(Error('A sala não respondeu. Confira se o apresentador está online; tente outra rede se necessário.')); }, 18_000);
       conn.on('open', () => {
-        const saved = storage.get('sl-player-' + this.code);
+        const saved = playerStorage.get('sl-player-' + this.code);
         conn.send({ type: 'join', payload: { name: this.name, avatar: this.avatar, token: saved?.token } });
       });
       conn.on('data', msg => {
         if (msg.type === 'joined') {
           clearTimeout(timeout);
           timeout = setTimeout(() => { conn.close(); reject(Error('A aula demorou demais para chegar. Tente uma conexão melhor ou uma apresentação menor.')); }, 120_000);
-          storage.set('sl-player-' + this.code, { token: msg.token, name: this.name, avatar: this.avatar });
+          playerStorage.set('sl-player-' + this.code, { token: msg.token, name: this.name, avatar: this.avatar });
           storage.set('sl-mode', { host: false, code: this.code, name: this.name, avatar: this.avatar });
+          playerStorage.set('sl-active-player',{host:false,code:this.code,name:this.name,avatar:this.avatar});
           this.onStatus('online');
+        } else if(msg.type==='kicked'){this.stopped=true;clearTimeout(timeout);try{localStorage.removeItem('sl-active-player');sessionStorage.removeItem('sl-mode');}catch{}this.onStatus('removed','Você foi removido da sala pelo professor.');conn.close();
         } else if (msg.type === 'lesson') this.lesson = msg.lesson;
         else if (msg.type === 'slide-updated' && this.lesson && Number.isInteger(msg.index) && this.lesson.slides[msg.index]) {
           this.lesson = { ...this.lesson, slides: this.lesson.slides.map((slide, i) => i === msg.index ? { ...slide, ...msg.slide } : slide) };
@@ -142,6 +146,7 @@ export class Classroom {
   control(action, value) {
     const previous = action === 'edit-slide' ? this.room.slides[value?.index] : null;
     this.room.control(action, value);
+    if(action==='kick'){const conn=this.connections.get(value);if(conn){conn.send({type:'kicked'});this.connections.delete(value);setTimeout(()=>conn.close(),100);}}
     if (action === 'edit-slide') {
       const slide = { ...this.room.publicLesson().slides[value.index] };
       if (slide.image === previous.image) delete slide.image;
@@ -149,6 +154,8 @@ export class Classroom {
     }
     this.broadcast();
   }
+  async updateProfile(name,avatar){await this.request('profile',{name,avatar});this.name=name;this.avatar=avatar;const saved=playerStorage.get('sl-player-'+this.code);playerStorage.set('sl-player-'+this.code,{...saved,name,avatar});const mode={host:false,code:this.code,name,avatar};playerStorage.set('sl-active-player',mode);storage.set('sl-mode',mode);}
+  request(type,payload){if(!this.conn?.open)return Promise.reject(Error('Aguarde a reconexão.'));const request=crypto.randomUUID();return new Promise((resolve,reject)=>{const timeout=setTimeout(()=>{this.pending.delete(request);reject(Error('Não recebemos confirmação.'));},7000);this.pending.set(request,{resolve,reject,timeout});this.conn.send({type,payload,request});});}
   answer(choice, questionIndex) {
     if (!this.conn?.open) return Promise.reject(Error('Reconectando à sala. Aguarde.'));
     const request = crypto.randomUUID();
@@ -162,7 +169,7 @@ export class Classroom {
     this.stopped = true; clearInterval(this.timer); clearTimeout(this.retry);
     for (const p of this.pending.values()) { clearTimeout(p.timeout); p.reject(Error('Você saiu da sala.')); }
     this.pending.clear(); this.conn?.close(); this.peer?.destroy();
-    try { sessionStorage.removeItem('sl-mode'); } catch { /* ignore */ }
+    try { sessionStorage.removeItem('sl-mode');if(!this.host)localStorage.removeItem('sl-active-player'); } catch { /* ignore */ }
   }
-  static resume() { return storage.get('sl-mode'); }
+  static resume() { const saved=storage.get('sl-mode')||playerStorage.get('sl-active-player');const code=new URLSearchParams(location.search).get('s');return code&&saved?.code!==code?null:saved; }
 }

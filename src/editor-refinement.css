@@ -24,10 +24,10 @@ html[data-theme][data-ui-style] #app .designer-stage-wrap{overflow:auto;padding:
 .canvas-editing,.canvas-editing .slide-canvas{overflow:visible!important}
 .canvas-editing .slide-canvas::after{content:'';position:absolute;inset:0;outline:2px solid var(--slide-boundary,#fff);pointer-events:none;z-index:50}
 .canvas-presenting .slide-canvas{overflow:hidden}
-.slide-canvas[data-visual-theme=midnight]{background-image:radial-gradient(ellipse at 90% 10%,#a56aff38,transparent 70%)!important;font-family:'Trebuchet MS',sans-serif}
-.slide-canvas[data-visual-theme=paper]{background-image:repeating-linear-gradient(0deg,transparent 0 31px,#654ca010 32px),linear-gradient(110deg,#ffebd744,transparent)!important;font-family:Georgia,serif}
-.slide-canvas[data-visual-theme=sage]{background-image:radial-gradient(circle at 95% 100%,#a7dfc94a,transparent 50%),linear-gradient(140deg,transparent 60%,#a7dfc918 60%)!important;font-family:'Trebuchet MS',sans-serif}
-.slide-canvas[data-visual-theme=ocean]{background-image:radial-gradient(ellipse at 100% 0,#248aba99,transparent 60%),repeating-linear-gradient(135deg,transparent 0 39px,#8dcaf70c 40px)!important;font-family:Arial,sans-serif}
+:is(.slide-canvas,.background-swatch)[data-visual-theme=midnight]:not([data-custom-background=true]){background-image:radial-gradient(ellipse at 90% 10%,#a56aff38,transparent 70%)!important;font-family:'Trebuchet MS',sans-serif}
+:is(.slide-canvas,.background-swatch)[data-visual-theme=paper]:not([data-custom-background=true]){background-image:repeating-linear-gradient(0deg,transparent 0 31px,#654ca010 32px),linear-gradient(110deg,#ffebd744,transparent)!important;font-family:Georgia,serif}
+:is(.slide-canvas,.background-swatch)[data-visual-theme=sage]:not([data-custom-background=true]){background-image:radial-gradient(circle at 95% 100%,#a7dfc94a,transparent 50%),linear-gradient(140deg,transparent 60%,#a7dfc918 60%)!important;font-family:'Trebuchet MS',sans-serif}
+:is(.slide-canvas,.background-swatch)[data-visual-theme=ocean]:not([data-custom-background=true]){background-image:radial-gradient(ellipse at 100% 0,#248aba99,transparent 60%),repeating-linear-gradient(135deg,transparent 0 39px,#8dcaf70c 40px)!important;font-family:Arial,sans-serif}
 .slide-canvas[data-visual-theme=paper] .canvas-shape{border-radius:0;box-shadow:5px 5px 0 #20233220}
 .slide-canvas[data-visual-theme=sage] .canvas-shape{border-radius:40% 10% 40% 10%}
 .slide-canvas[data-visual-theme=ocean] .canvas-shape{border-radius:24px;border:2px solid #ffffff40}

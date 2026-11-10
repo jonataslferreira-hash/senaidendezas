@@ -15,6 +15,7 @@ test('R2 valida sessão e origem, limita uploads e usa somente a pasta da conta 
   const env = { FILES: {
     async put(key, body, metadata) { keys.push(key); const bytes = await new Response(body).arrayBuffer(); files.set(key, { ...metadata, bytes }); },
     async get(key) { keys.push(key); const object = files.get(key); return object && { ...object, body: new Blob([object.bytes]).stream() }; },
+    async delete(key) { keys.push(key); files.delete(key); },
     async list({ prefix }) { return { objects: [...files].filter(([key]) => key.startsWith(prefix)).map(([key, value]) => ({ key, customMetadata: value.customMetadata, size: value.bytes.byteLength, uploaded: new Date() })), truncated: false }; }
   } };
   const handler = createR2Handler(async () => ({ id: uid, email_confirmed_at: '2026-11-01' }));
@@ -30,6 +31,12 @@ test('R2 valida sessão e origem, limita uploads e usa somente a pasta da conta 
   const zipped = await handler(new Request('https://files.example/lessons/comprimida', { headers }), env);
   assert.equal(zipped.headers.get('Content-Encoding'), 'gzip'); assert.equal((await unpackLesson(await zipped.blob())).notes, 'Aprender. '.repeat(100));
   assert.equal((await handler(new Request('https://files.example/profile/avatar', { method: 'PUT', headers: { ...headers, 'Content-Length': '300000' }, body: '{}' }), env)).status, 413);
+  files.set('other/lessons/aula', {bytes: new ArrayBuffer(0)});
+  const remove = () => handler(new Request('https://files.example/lessons/aula?user_id=other', {method:'DELETE',headers}), env);
+  assert.equal((await remove()).status,200);
+  assert.equal((await remove()).status,200);
+  assert.equal(files.has(uid+'/lessons/aula'),false);
+  assert.equal(files.has('other/lessons/aula'),true);
   const denied = createR2Handler(async () => { throw Error('expired'); });
   assert.equal((await denied(new Request('https://files.example/lessons', { headers }), env)).status, 401);
 });

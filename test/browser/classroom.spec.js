@@ -65,7 +65,8 @@ test('aula completa: WebRTC, celular, modelo sincronizado, quiz, reconexão e ra
 
 test('prévia funciona sem internet de sinalização e não precisa criar sala', async ({ page }) => {
   await page.goto('/');
-  await page.getByRole('button', { name: 'Explorar a aula' }).click();
+  await page.getByRole('button', { name: /Editar aula: HDD e SSD/ }).click();
+  await page.getByRole('button',{name:'Prévia',exact:true}).click();
   await expect(page.getByText('Prévia · sem transmissão')).toBeVisible();
   await page.getByRole('button', { name: /Slide 5:/ }).click();
   await expect(page.getByRole('heading', { name: 'SATA, NVMe e a confusão do M.2.' })).toBeVisible();
@@ -81,7 +82,8 @@ test('build estático funciona no subdiretório do GitHub Pages, inclusive pelo 
   await page.goto('http://127.0.0.1:4173/senaidendezas/?s=123456');
   await expect(page.getByLabel('Código da sala')).toHaveValue('123456');
   await page.locator('.studio-rail .rail-link[data-studio-action="library"]').click();
-  await page.getByRole('button', { name: 'Explorar a aula' }).click();
+  await page.getByRole('button', { name: /Editar aula: HDD e SSD/ }).click();
+  await page.getByRole('button',{name:'Prévia',exact:true}).click();
   await expect(page.getByRole('heading', { name: 'Onde vivem os seus arquivos?' })).toBeVisible();
   await expect(page.locator('canvas')).toBeVisible();
   expect(failures).toEqual([]);

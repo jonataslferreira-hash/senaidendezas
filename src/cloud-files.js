@@ -17,12 +17,22 @@ function cloudError(error) {
   if (String(error.statusCode) === '413') return Error('O arquivo é grande demais para o espaço da conta.');
   return Error('Não foi possível acessar a nuvem. Confira a conexão, a sessão e o espaço disponível.');
 }
-export async function saveCloudLesson(client, lesson) {
+export async function saveCloudLesson(client, lesson, cover = '') {
   const s = await authenticated(client), id = /^[a-zA-Z0-9_-]{1,100}$/.test(lesson.id) ? lesson.id : crypto.randomUUID();
   const packed = await packLesson(lesson); unchanged(s);
   const blob = new Blob([packed.buffer], { type: packed.compressed ? 'application/gzip' : 'application/json' });
   if (blob.size > MAX_CLOUD_BYTES) throw Error('A aula ultrapassa 50 MB. Divida os arquivos antes de enviar.');
-  if (r2ApiUrl) { await r2Request(s, '/lessons/' + id, { method: 'PUT', body: blob, headers: { 'Content-Type': blob.type, 'X-Lesson-Title': encodeURIComponent(lesson.title.slice(0, 140)), 'X-Original-Bytes': String(packed.originalBytes) } }); return { path:'r2:'+id,bytes: blob.size, originalBytes: packed.originalBytes, compressed: packed.compressed }; }
+  if (r2ApiUrl) {
+    await r2Request(s, '/lessons/' + id, { method: 'PUT', body: blob, headers: { 'Content-Type': blob.type, 'X-Lesson-Title': encodeURIComponent(lesson.title.slice(0, 140)), 'X-Original-Bytes': String(packed.originalBytes), ...(lesson.generatedByAI?{'X-Lesson-Origin':'ai'}:{}) } });
+    let coverSynced=true;
+    if(cover){
+      try {
+        const thumbnail=await (await fetch(cover)).blob();
+        await r2Request(s,'/lessons/'+id+'/cover',{method:'PUT',body:thumbnail,headers:{'Content-Type':thumbnail.type}});
+      }catch{unchanged(s);coverSynced=false;}
+    }
+    return {path:'r2:'+id,bytes:blob.size,originalBytes:packed.originalBytes,compressed:packed.compressed,coverSynced};
+  }
   const path = `${s.uid}/lessons/${id}.json${packed.compressed ? '.gz' : ''}`;
   const { error } = await client.storage.from(CLOUD_BUCKET).upload(path, blob, { contentType: blob.type, upsert: true });
   if (error) throw cloudError(error); unchanged(s);
@@ -37,6 +47,14 @@ export async function listCloudLessons(client) {
   if (error) throw cloudError(error); unchanged(s);
   return (data || []).map(item => ({ ...item, updatedAt: item.updated_at }));
 }
+export async function readCloudCover(client,path) {
+  if(!/^r2:[a-zA-Z0-9_-]{1,100}$/.test(path))return null;
+  const s=await authenticated(client);
+  const response=await r2Request(s,'/lessons/'+path.slice(3)+'/cover');
+  const blob=await response.blob();
+  return blob.type.startsWith('image/')&&blob.size<=50000?blob:null;
+}
+
 export async function readCloudLesson(client, path) {
   const s = await authenticated(client);
   if (path.startsWith('r2:')) { if (!/^r2:[a-zA-Z0-9_-]{1,100}$/.test(path)) throw Error('Arquivo inválido.'); const response = await r2Request(s, '/lessons/' + path.slice(3)); return unpackLesson(await response.blob()); }
@@ -47,10 +65,27 @@ export async function readCloudLesson(client, path) {
   const lesson = await unpackLesson(data); unchanged(s); return lesson;
 }
 
+export async function deleteCloudLesson(client, path) {
+  const s = await authenticated(client);
+  if (path.startsWith('r2:')) {
+    if (!/^r2:[a-zA-Z0-9_-]{1,100}$/.test(path)) throw Error('Arquivo inválido.');
+    await r2Request(s, '/lessons/' + path.slice(3), { method: 'DELETE' });
+    return;
+  }
+  if (!path.startsWith(`${s.uid}/lessons/`) || !/^[a-f0-9-]{36}\/lessons\/[a-zA-Z0-9_-]{1,100}\.json(?:\.gz)?$/i.test(path)) throw Error('O arquivo não pertence a esta conta.');
+  const files = client.storage.from(CLOUD_BUCKET);
+  const { error } = await files.remove([path]);
+  if (error) throw cloudError(error);
+  unchanged(s);
+  const result = await client.from('lesson_files').delete().eq('user_id', s.uid).eq('path', path);
+  if (result.error) throw cloudError(result.error);
+  unchanged(s);
+}
+
 async function r2Request(s, path, options = {}) {
   if (!r2ApiUrl || !r2ApiUrl.startsWith('https://')) throw Error('O endereço seguro do R2 ainda não foi configurado.');
   const response = await fetch(r2ApiUrl + path, { ...options, headers: { ...options.headers, Authorization: 'Bearer ' + s.token } });
-  unchanged(s);if(response.status===415&&options.body?.type==='image/gif')throw Error('Para salvar GIFs, publique o Worker atualizado no Cloudflare.');if(!response.ok)throw Error('Não foi possível acessar o R2. Confira a conexão e a configuração da conta.'); return response;
+  unchanged(s);if(response.status===405&&options.method==='DELETE'&&path.startsWith('/lessons/'))throw Error('Atualize o Worker do Cloudflare para habilitar a exclusão de aulas.');if(response.status===415&&options.body?.type==='image/gif')throw Error('Para salvar GIFs, publique o Worker atualizado no Cloudflare.');if(!response.ok)throw Error('Não foi possível acessar o R2. Confira a conexão e a configuração da conta.'); return response;
 }
 export async function putAvatar(client, file) {
   const s = await authenticated(client);

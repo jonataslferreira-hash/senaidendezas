@@ -8,6 +8,18 @@ binding = "FILES"
 bucket_name = "storagelab"
 
 [vars]
+STORAGE_AI_FREE_CONFIRMED = "true"
 SUPABASE_URL = "https://qkpgiwjsqtocvjmqinii.supabase.co"
 SUPABASE_PUBLISHABLE_KEY = "sb_publishable_-CT7iCR3355qijcVioyRkA_-Njn3Q4e"
 ALLOWED_ORIGINS = "https://jonataslferreira-hash.github.io,http://localhost:5173,http://127.0.0.1:5173"
+
+[ai]
+binding = "AI"
+
+[[ratelimits]]
+name = "AI_LIMIT"
+namespace_id = "7101"
+
+[ratelimits.simple]
+limit = 8
+period = 60

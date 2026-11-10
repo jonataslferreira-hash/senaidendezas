@@ -45,7 +45,7 @@ export class PresentationSharing {
       let result,portable='';this.mode='cloud';
       try{const response=await this.request('/presentations',{method:'POST',body:blob,headers:{'Content-Type':blob.type}});result=await response.json();if(!validPublicToken(result.token))throw Error('O servidor retornou um link inválido.');}
       catch(error){if(error.status!==404)throw error;portable=portablePresentation(packed.buffer);result={token:'portable'};this.mode='portable';}
-      this.token=result.token;const local=/^(localhost|127\.0\.0\.1|0\.0\.0\.0)$/.test(location.hostname);let base;try{base=localStorage.getItem('sl-public-url');}catch{}
+      this.token=result.token;const local=/^(localhost|127\.0\.0\.1|0\.0\.0\.0)$/.test(location.hostname);let base;try{if(local)base=localStorage.getItem('sl-public-url');}catch{}
       const url=new URL(base||(local?'https://jonataslferreira-hash.github.io/senaidendezas/':location.origin+location.pathname));url.search='';url.hash='';url.searchParams.set('presentation',result.token);if(portable)url.hash='deck='+portable;this.link=url.href;
       try{localStorage.setItem('sl-public-presentation:'+this.uid+':'+this.lessonId,JSON.stringify({token:this.token,link:this.link,mode:this.mode}));}catch{}
       this.busy=false;this.studio.callbacks.render();

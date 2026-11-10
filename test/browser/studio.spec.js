@@ -1,3 +1,4 @@
+import {createProject} from './project-fixture.js';
 import { test, expect } from '@playwright/test';
 import { readFile } from 'node:fs/promises';
 import { newLesson, newQuestion } from '../../src/lessons.js';
@@ -12,7 +13,7 @@ test('cria, edita, reordena e salva aula; exporta, importa e gerencia a bibliote
   await page.goto('/');
   await expect(page.getByRole('heading', { name: /Sua próxima grande/ })).toBeVisible();
   await page.screenshot({ path: 'test-results/studio-library.png', fullPage: true });
-  await page.getByRole('button', { name: '+ Nova aula', exact: true }).click();
+  await createProject(page);
   await page.getByRole('button', { name: 'Campos', exact: true }).click();
   await page.getByLabel('Título da aula', { exact: true }).fill('O ciclo da água');
   await page.getByLabel('Descrição', { exact: true }).fill('Ciências · uma aula para explorar');
@@ -131,8 +132,8 @@ test('arquivo inválido não substitui aulas e aula sem quiz encerra normalmente
   await page.locator('#import-lesson-file').setInputFiles({ name: 'erro.json', mimeType: 'application/json', buffer: Buffer.from('{"version":99}') });
   await expect(page.locator('#toast')).toContainText('formato');
   await expect(page.locator('.lesson-card')).toHaveCount(1);
-  await page.getByRole('button', { name: '+ Nova aula', exact: true }).click();
-  await page.getByRole('button', { name: '▷ Prévia', exact: true }).click();
+  await createProject(page);
+  await page.getByRole('button', { name: 'Prévia', exact: true }).click();
   await expect(page.getByRole('heading', { name: 'Novo slide', exact: true })).toBeVisible();
   await page.getByRole('button', { name: 'Encerrar aula', exact: true }).click();
   await expect(page.getByRole('heading', { name: 'Aula concluída.', exact: true })).toBeVisible();

@@ -1,0 +1,17 @@
+.slide-style-picker { min-width: 0; }
+.slide-style-picker > button { max-width: 12rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.designer-inspector .slide-style-picker > button { max-width: none; width: 100%; }
+.slide-style-menu {
+  position: fixed; margin: 0; inset: auto; width: min(340px, calc(100vw - 16px));
+  box-sizing: border-box; padding: 10px; border: 1px solid var(--ui-border, #81749d);
+  border-radius: 12px; background: var(--ui-panel, #30283e); color: var(--ui-text, white);
+  box-shadow: 0 12px 36px #0004;
+}
+.slide-style-menu header { display: grid; gap: 5px; padding: 4px 6px 9px; }
+.slide-style-menu header label { display: flex; gap: 6px; align-items: center; }
+.slide-style-options { display: grid; gap: 3px; max-height: min(42vh, 320px); overflow: auto; }
+.slide-style-options > button { display: flex; align-items: center; gap: 8px; text-align: left; color: inherit; }
+.slide-style-options > button[aria-pressed=true] { outline: 1px solid var(--ui-accent, #a98bea); outline-offset: -2px; }
+.slide-style-options i { flex: 0 0 21px; height: 14px; border-radius: 4px; background: linear-gradient(130deg, var(--swatch) 65%, var(--swatch-accent) 65%); border: 1px solid #888; }
+.designer-stage .slide-style-preview { position: absolute; inset: 0; z-index: 5; pointer-events: none; }
+.slide-style-preview > small { position: absolute; right: 4px; top: 4px; background: #241934; color: white; padding: 3px 6px; border-radius: 4px; }

@@ -1,3 +1,14 @@
+import {avatarContent} from './player-avatar.js';
+import {StorageAI} from './storage-ai.js';
+import {cropLessonCover,projectFields} from './lesson-cover.js';
+import {canvasMarkup} from './canvas-view.js';
+import {presentationSlide} from './slide-display.js';
+import {editorShortcut,routeParams} from './editor-route.js';
+import {activityBlocks,normalizeBlocks} from './activity-blocks.js';
+import {ActivityOrder,activityTabs} from './activity-order.js';
+import {ChatAudio} from './chat-audio.js';
+import {gameSettingsMarkup} from './game-settings-ui.js';
+import {recordAudio} from './record-audio.js';
 import {mobileChoice} from './slide-display.js';
 import { AccountPresenter } from './account-presenter.js';
 import { People } from './people.js';
@@ -11,9 +22,10 @@ import brandUrl from './assets/brand.svg';
 import { Showcase, showcaseMarkup, deviceArt } from './showcase.js';
 import { optimizeImage } from './image-optimize.js';
 import { Account } from './auth.js';
+import { studioIcon } from './studio-icons.js';
 import { audioEditor } from './audio-editor.js';
 import { readAudio } from './audio-data.js';
-import { cloudConfigured, saveCloudLesson, listCloudLessons, readCloudLesson } from './cloud-files.js';
+import { cloudConfigured, saveCloudLesson, listCloudLessons, readCloudLesson, readCloudCover, deleteCloudLesson } from './cloud-files.js';
 import { storePages, fillAssetAudio } from './assets.js';
 import { LessonLibrary, newLesson, newSlide, newQuestion, clone, validateLesson, imageURL, difficulties, MAX_LESSON_BYTES } from './lessons.js';
 
@@ -38,10 +50,10 @@ export class Studio {
     this.root = root; this.callbacks = callbacks; this.showcase = new Showcase(root); this.account = new Account(root, callbacks.render);
     this.view = 'library'; this.tab = 'slides'; this.index = 0; this.questionIndex = 0;
     this.dirty = false; this.launching = false; this.dialog = null;
-    this.metaExpanded = false; this.visualMode = false; this.designer = new SlideDesigner(this);
+    this.gameSettingsOpen = false; this.metaExpanded = false; this.visualMode = false; this.designer = new SlideDesigner(this); this.ai=new StorageAI(this); this.cloudCovers=new Map();
     this.importDialog = false; this.importing = null; this.importError = '';
     this.cloudItems = []; this.cloudBusy = false; this.cloudMessage = '';this.cloudLoaded=false;this.cloudRequest=0;
-    root.addEventListener('account-changed', () => { this.cloudRequest++;this.cloudItems=[];this.cloudBusy=false;this.cloudMessage='';this.cloudLoaded=false;this.refreshCloudPanel();if(this.view==='library'&&this.account.user)this.cloudAction('cloud-refresh',{}); });
+    root.addEventListener('account-changed', () => { this.cloudRequest++;this.cloudCovers.clear();this.cloudItems=[];this.cloudBusy=false;this.cloudMessage='';this.cloudLoaded=false;this.refreshCloudPanel();if(this.view==='library'&&this.account.user)this.cloudAction('cloud-refresh',{}); });
     try { this.library = new LessonLibrary(); }
     catch {
       this.library = Object.create(LessonLibrary.prototype);
@@ -50,25 +62,53 @@ export class Studio {
     this.sharing = new PresentationSharing(this);
     this.editorMusic = new EditorMusic(this);
     try{this.cloudLinks=JSON.parse(localStorage.getItem('sl-cloud-links')||'{}');}catch{this.cloudLinks={};}
-    this.remote=new AccountPresenter(this);this.people=new People(this);this.groups=new GroupsPanel(this);this.chat=new LessonChat(this);this.social=new SocialChat(this);
+    this.activityOrder=new ActivityOrder(this);this.remote=new AccountPresenter(this);this.people=new People(this);this.groups=new GroupsPanel(this);this.chat=new LessonChat(this);this.chatAudio=new ChatAudio(this);this.social=new SocialChat(this);
     root.addEventListener('before-account-change',event=>{event.detail.tasks.push((async()=>{
       if(this.groups.live)await this.groups.live.persist();else if(this.draft&&this.dirty){this.library.save(validateLesson(this.draft,{draft:true}));this.dirty=false;}
     })());});
-    root.addEventListener('click',e=>{const button=e.target.closest('[data-slide-audio-open]');if(!button)return;const panel=root.querySelector('.slide-audio-popover'),rect=button.getBoundingClientRect();panel.style.left=Math.max(8,Math.min(rect.left,innerWidth-380))+'px';panel.style.top=rect.bottom+8+'px';panel.togglePopover();button.setAttribute('aria-expanded',String(panel.matches(':popover-open')));});
+    root.addEventListener('toggle',e=>{if(e.target.matches('.game-settings')&&e.target.isConnected)this.gameSettingsOpen=e.target.open;},true);
     this.restoreRoute();
-    if (!new URLSearchParams(location.search).has('presentation') && !new URLSearchParams(location.search).has('collab') && !['preview', 'present'].includes(new URLSearchParams(location.search).get('page'))) this.writeRoute(this.view, this.draft?.id, true);
+    if (!new URLSearchParams(location.search).has('presentation') && !routeParams().has('collab') && !['preview', 'present'].includes(new URLSearchParams(location.search).get('page'))) this.writeRoute(this.view, this.draft?.id, true);
     root.addEventListener('click', e => {
       const target = e.target.closest('[data-studio-action]');
       if (target && !target.disabled) this.action(target.dataset.studioAction, target).catch(err => callbacks.toast(err.message));
     });
+    root.addEventListener('click',async e=>{const b=e.target.closest('[data-record-audio]');if(!b)return;try{const file=await recordAudio();if(file)await this.uploadAudio(file,b.dataset.recordAudio);}catch(error){callbacks.toast(error.message);}});
     root.addEventListener('input', e => this.change(e.target));
     root.addEventListener('change', e => {
       if (this.receivingRemote || !this.root.contains(e.target)) return;
       if (e.target.dataset.audioUpload) this.uploadAudio(e.target.files[0], e.target.dataset.audioUpload).catch(err => callbacks.toast(err.message));
-      else if (e.target.dataset.audioVolume || e.target.dataset.audioLoop) {
-        const audio = this.audioTarget(e.target.dataset.audioVolume || e.target.dataset.audioLoop);
-        if (audio) { if (e.target.dataset.audioVolume) audio.volume = Number(e.target.value); else audio.loop = e.target.checked; this.markDirty(); }
+      else if (e.target.matches('[data-slide-audio-trigger]') && this.groups.canEdit) {
+        const trigger=e.target.value, slide=this.draft.slides[this.index];
+        if(!slide?.audio)return;
+        const target=trigger.startsWith('element:')?this.designer.ensure():slide;
+        if(trigger!=='auto' && (!target.audio.trigger || target.audio.trigger==='auto')){
+          target.audio.loop=false;
+          const loop=this.root.querySelector('[data-audio-loop="slide"]');
+          if(loop)loop.checked=false;
+        }
+        target.audio.trigger=trigger;
+        this.markDirty();
       }
+      else if (e.target.matches('[data-audio-volume],[data-audio-loop],[data-audio-rate],[data-audio-continue]')) {
+        if (!this.groups.canEdit) return;
+        const {audioVolume,audioLoop,audioRate,audioContinue}=e.target.dataset;
+        const audio=this.audioTarget(audioVolume||audioLoop||audioRate||audioContinue);
+        if (!audio) return;
+        if (audioVolume) audio.volume=Number(e.target.value);
+        else if (audioRate) e.target.value=audio.rate=Math.max(.5,Math.min(2,Number(e.target.value)||1));
+        else if (audioContinue) audio.continueAcrossSlides=e.target.checked;
+        else audio.loop=e.target.checked;
+        const preview = e.target.closest('.audio-editor')?.querySelector('[data-audio-preview]');
+        if (preview) {
+          preview.volume = audio.volume;
+          preview.defaultPlaybackRate = audio.rate || 1;
+          preview.playbackRate = preview.defaultPlaybackRate;
+          preview.loop = audio.loop;
+        }
+        this.markDirty();
+      }
+      else if(e.target.matches('[data-lesson-cover-file]'))this.chooseLessonCover(e.target.files[0]).catch(error=>callbacks.toast(error.message));
       else if (e.target.id === 'native-model-files') this.uploadNativeModel(e.target.files).catch(err => callbacks.toast(err.message));
       else if (e.target.id === 'import-slides-file') this.importSlideFile(e.target.files[0]);
       else if (e.target.id === 'import-lesson-file') this.importFile(e.target.files[0]).catch(err => callbacks.toast(err.message));
@@ -80,81 +120,268 @@ export class Studio {
       if (e.key === 'Escape' && this.dialog) { this.dialog = null; callbacks.render(); }
       if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 's' && this.view === 'editor' && this.root.querySelector('.studio-editor')) {
         e.preventDefault();
-        if (this.groups?.live) { this.groups.live.persist().then(() => { callbacks.render(); callbacks.toast('Aula compartilhada salva.'); }).catch(error => callbacks.toast(error.message)); return; }
-        try { this.save(); callbacks.render(); callbacks.toast('Aula salva neste navegador.'); } catch (error) { callbacks.toast(error.message); }
+        this.saveEditor().catch(error=>callbacks.toast(error.message));
       }
     });
   }
   writeRoute(page = this.view, id = this.draft?.id, replace = false) {
-    const url = new URL(location.href); url.searchParams.set('page', page);
+    const url = new URL(location.href);for(const key of ['reload','edit'])url.searchParams.delete(key);url.searchParams.set('page', page);
     if (!['join', 'present'].includes(page)) url.searchParams.delete('s');
-    for (const key of ['lesson', 'tab', 'slide']) url.searchParams.delete(key);
+    for (const key of ['lesson', 'tab', 'slide', 'block']) url.searchParams.delete(key);
     if (['editor', 'preview', 'present'].includes(page) && id) url.searchParams.set('lesson', id);
-    if (page === 'editor') { if (this.tab === 'quiz') url.searchParams.set('tab', 'quiz'); url.searchParams.set('slide', String(this.index + 1)); }
+    if (page === 'editor') { if(this.draft?.activityBlocks&&this.currentBlock())url.searchParams.set('block',this.currentBlock().id);else url.searchParams.delete('block'); if (this.tab === 'quiz') url.searchParams.set('tab', 'quiz'); url.searchParams.set('slide', String(this.index + 1)); }
     url.searchParams.delete('presentation');
     if (this.groups?.live && page === 'editor') url.searchParams.set('collab', this.groups.live.row.id);
     else url.searchParams.delete('collab');
-    if (url.href === location.href && !replace) return;
-    history[replace ? 'replaceState' : 'pushState']({ storageLab: true }, '', url);
+    let editor;if(page==='editor'){const context={tab:this.tab,slide:this.index+1,question:this.questionIndex+1,block:this.currentBlock()?.id||'',collab:this.groups?.live?.row.id||''},alias=editorShortcut(id,context);if(alias){const localSignal=url.searchParams.has('localSignal');url.search='';url.searchParams.set('edit',alias);if(localSignal)url.searchParams.set('localSignal','');editor={alias,id,...context};}}
+    if (url.href === location.href && !replace&&JSON.stringify(history.state?.editor)===JSON.stringify(editor)) return;
+    history[replace ? 'replaceState' : 'pushState']({ storageLab: true,...(editor?{editor}:{}) }, '', url);
   }
   restoreRoute() {
-    const params = new URLSearchParams(location.search), page = params.get('page');
+    const params = routeParams(), page = params.get('page');
     if (['editor', 'preview', 'present'].includes(page) && this.library.lessons.some(l => l.id === params.get('lesson'))) {
       this.open(params.get('lesson'), false); this.tab = params.get('tab') === 'quiz' ? 'quiz' : 'slides';
-      this.index = Math.max(0, Math.min(this.draft.slides.length - 1, (Number(params.get('slide')) || 1) - 1));
-    } else this.view = page === 'join' || (!page && params.has('s')) ? 'join' : 'library';
+      const selected=Math.max(0,Math.min(this.draft.slides.length-1,(Number(params.get('slide'))||1)-1));if(params.get('block'))this.selectBlock(params.get('block'));if(!this.draft.activityBlocks||this.currentBlock()?.items.includes(this.draft.slides[selected]?.id))this.index=selected;const question=Math.max(0,Math.min(this.draft.questions.length-1,(Number(params.get('question'))||1)-1));if(this.tab==='quiz'&&this.currentBlock()?.items.includes(this.draft.questions[question]?.id))this.questionIndex=question;
+    } else this.view = ['shared','storage-ai'].includes(page)?page:page === 'join' || (!page && params.has('s')) ? 'join' : 'library';
   }
-  audioTarget(scope) { return scope === 'quiz' ? this.draft.quizAudio : this.draft.slides[this.index].audio; }
+  selectBlock(id){const block=activityBlocks(this.draft).find(b=>b.id===id);if(!block)return;this.blockId=block.id;this.tab=block.type==='quiz'?'quiz':'slides';const list=this.tab==='quiz'?this.draft.questions:this.draft.slides,key=this.tab==='quiz'?'questionIndex':'index',index=list.findIndex(i=>block.items.includes(i.id));if(index>=0)this[key]=index;}
+  currentBlock(){const blocks=activityBlocks(this.draft);return blocks.find(b=>b.id===this.blockId)||blocks.find(b=>(b.type==='quiz'?'quiz':'slides')===this.tab);}
+  visibleItems(){const quiz=this.tab==='quiz',list=quiz?this.draft.questions:this.draft.slides,block=this.currentBlock();return list.map((item,index)=>({item,index})).filter(({item})=>!this.draft.activityBlocks||block?.items.includes(item.id));}
+  audioOwner(scope) {
+    if(scope.startsWith('quiz'))return this.draft;
+    const slide=this.draft?.slides[this.index];
+    return scope.startsWith('element:')?slide?.elements?.find(e=>e.id===scope.slice(8)):slide;
+  }
+  audioTarget(scope) {
+    const owner=this.audioOwner(scope);
+    if(scope.startsWith('element:')&&!owner?.audio){
+      const slide=this.draft?.slides[this.index];
+      return slide?.audio?.trigger===scope?slide.audio:null;
+    }
+    return owner?.[this.audioField(scope)];
+  }
+  audioField(scope){return scope==='quiz-lobby'?'lobbyAudio':scope==='quiz-question'?'questionAudio':scope==='quiz'?'quizAudio':'audio';}
   linkCloud(id,path){const uid=this.account.user?.id;if(!uid||!path)return;this.cloudLinks[uid]||={};this.cloudLinks[uid][id]={path,savedAt:Date.now()};try{localStorage.setItem('sl-cloud-links',JSON.stringify(this.cloudLinks));}catch{}}
-  cloudFor(lesson){const link=this.cloudLinks[this.account.user?.id]?.[lesson.id];return link?this.cloudItems.find(item=>item.path===link.path):null;}
-  libraryCount(){const used=new Set(this.library.lessons.map(l=>this.cloudFor(l)?.path).filter(Boolean));return this.library.lessons.length+this.cloudItems.filter(c=>!used.has(c.path)).length;}
-  libraryCards(){const used=new Set(),cards=this.library.lessons.map((lesson,index)=>{const cloud=this.cloudFor(lesson);if(cloud)used.add(cloud.path);return this.lessonCard(lesson,index);});this.cloudItems.forEach((item,index)=>{if(!used.has(item.path))cards.push(this.cloudCard(item,index));});return cards.join('');}
-  cloudCard(item,index){return `<article class="lesson-card cloud-lesson-card"><div class="lesson-card-art cloud-card-art"><span class="lesson-category">MINHA AULA</span><span aria-hidden="true">☁</span></div><div class="lesson-card-content"><h3>${esc(item.title)}</h3><p>Aula disponível na sua conta.</p><div class="lesson-card-meta"><small>${(item.bytes/1048576).toFixed(1)} MB</small><span class="storage-state cloud">☁ Na nuvem</span></div><div class="lesson-card-primary">${button('cloud-open','Abrir aula ↗','card-edit',`data-cloud-index="${index}" ${this.cloudBusy?'disabled':''}`)}</div></div></article>`;}
-  storageBadge(lesson){const cloud=this.cloudFor(lesson);if(!this.cloudLoaded&&this.account.user)return '<span class="storage-state">Consultando nuvem…</span>';if(!cloud)return '<span class="storage-state device">▣ Neste dispositivo</span>';const savedAt=this.cloudLinks[this.account.user?.id]?.[lesson.id]?.savedAt||new Date(cloud.updatedAt).getTime();return `<span class="storage-state cloud">☁ ${lesson.updatedAt>savedAt?'Nuvem · alterações locais':'Na nuvem'}</span>`;}
+  cloudFor(lesson){const link=this.cloudLinks[this.account.user?.id]?.[lesson.id];return this.cloudItems.find(item=>item.path===link?.path||item.path==='r2:'+lesson.id||item.id===lesson.id);}
+  cloudLessonIds(item){
+    const linked=Object.entries(this.cloudLinks[this.account.user?.id]||{})
+      .filter(([,link])=>link.path===item.path).map(([id])=>id);
+    return [item.id,item.path?.startsWith('r2:')?item.path.slice(3):null,...linked].filter(Boolean);
+  }
+  unmatchedShared(){
+    const listedIds=new Set([
+      ...this.library.lessons.map(lesson=>lesson.id),
+      ...this.cloudItems.flatMap(item=>this.cloudLessonIds(item))
+    ]);
+    return this.groups.documents.filter(row=>!listedIds.has(this.groups.lessonIds.get(row.id)));
+  }
+  libraryCount(){const used=new Set(this.library.lessons.map(l=>this.cloudFor(l)?.path).filter(Boolean));return this.library.lessons.length+this.cloudItems.filter(c=>!used.has(c.path)).length+this.unmatchedShared().length;}
+  libraryCards(){const used=new Set(),cards=this.library.lessons.map((lesson,index)=>{const cloud=this.cloudFor(lesson);if(cloud)used.add(cloud.path);return this.lessonCard(lesson,index);});this.cloudItems.forEach((item,index)=>{if(!used.has(item.path))cards.push(this.cloudCard(item,index));});for(const row of this.unmatchedShared()){
+    const lesson=this.groups.sharedLessons.get(row.id)?.lesson,cover=lesson?.thumbnail;
+    cards.push(`<article class="lesson-card shared-lesson-card"><div class="lesson-card-art ideas-art">${cover?`<img class="lesson-cover-image" decoding="async" src="${esc(cover)}" alt="">`:lesson?.slides?.length?`<div class="slide-cover-mini" inert aria-hidden="true">${canvasMarkup(presentationSlide(lesson.slides[0]))}</div>`:`<div class="shared-card-symbol">${studioIcon('collaborate')}</div>`}${this.coverStorageIcon(true,true,false)}</div><div class="lesson-card-content"><h3>${esc(lesson?.title||row.title||'Aula compartilhada')}</h3><p>${esc(lesson?.description||'Aula da equipe')}</p><div class="lesson-card-meta"><span>${lesson?.slides?.length||0} slides</span><span class="storage-state cloud">Compartilhada</span></div><div class="lesson-card-primary"><button type="button" class="studio-btn card-edit" data-group-action="open" data-doc="${esc(row.id)}">Editar aula ↗</button><button type="button" class="studio-btn card-present" data-group-action="present" data-doc="${esc(row.id)}">▷ Apresentar</button></div></div></article>`);
+  }return cards.join('');}
+  cloudCard(item,index){
+    const attrs=`data-cloud-index="${index}" ${this.cloudBusy?'disabled':''}`;
+    const shared=this.cloudLessonIds(item).some(id=>this.groups.isShared(id));
+    return `<article class="lesson-card cloud-lesson-card"><div class="lesson-card-art cloud-card-art" data-cloud-cover="${index}"><div class="cloud-cover-placeholder" aria-hidden="true">${studioIcon('cloud')}</div>${this.coverStorageIcon(true,shared,Boolean(item.generatedByAI))}</div><div class="lesson-card-content"><h3>${esc(item.title)}</h3><p>Aula disponível na sua conta.</p><div class="lesson-card-meta"><small>${(item.bytes/1048576).toFixed(1)} MB</small><span class="storage-state cloud">${shared?'Compartilhada':'Na nuvem'}</span></div><div class="lesson-card-primary">${button('cloud-open','Editar aula ↗','card-edit',attrs)}${button('cloud-present','▷ Apresentar','card-present',attrs)}${this.cloudMenu(item,true,index)}</div></div></article>`;
+  }
+  coverStorageIcon(cloud, shared = false, generated = false) {
+    const name=[shared?'Compartilhada':'',cloud||shared?'Na nuvem':'Neste dispositivo',generated?'Gerada por IA':''].filter(Boolean).join(' · ');
+    return `<span class="cover-storage ${shared?'cover-shared':''} ${generated?'cover-generated':''}" role="img" aria-label="${name}" title="${name}">${shared?studioIcon('collaborate'):''}${studioIcon(cloud||shared?'cloud':'monitor')}${generated?studioIcon('robot'):''}</span>`;
+  }
+  watchCloudCovers(){
+    this.coverObserver?.disconnect();
+    const targets=this.root.querySelectorAll('[data-cloud-cover]');
+    if(!targets.length)return;
+    this.coverObserver=new IntersectionObserver(entries=>{
+      for(const {target,isIntersecting} of entries){
+        if(!isIntersecting)continue;
+        this.coverObserver?.unobserve(target);
+        const item=this.cloudItems[Number(target.dataset.cloudCover)],uid=this.account.user?.id;
+        if(!item||!uid)continue;
+        const key=uid+':'+item.path+':'+item.updatedAt;
+        let task=this.cloudCovers.get(key);
+        if(!task){
+          task=(this.coverQueue||Promise.resolve()).then(async()=>{
+            if(this.account.user?.id!==uid)return null;
+            try{return await readCloudCover(this.account.client,item.path);}catch{
+              if(!item.bytes||item.bytes>5*1024*1024||this.account.user?.id!==uid)return null;
+              const lesson=validateLesson(await readCloudLesson(this.account.client,item.path),{draft:true});
+              const {thumbnailFor}=await import('./cover-render.js');
+              const cover=await thumbnailFor(lesson);
+              return cover?(await fetch(cover)).blob():null;
+            }
+          }).catch(()=>null);
+          this.coverQueue=task;
+          if(this.cloudCovers.size>=48)this.cloudCovers.delete(this.cloudCovers.keys().next().value);
+          this.cloudCovers.set(key,task);
+        }
+        task.then(blob=>{
+          if(!blob||!target.isConnected||this.account.user?.id!==uid)return;
+          const image=new Image(),url=URL.createObjectURL(blob);
+          image.className='lesson-cover-image';image.alt='';
+          image.onload=image.onerror=()=>URL.revokeObjectURL(url);
+          image.src=url;target.querySelector('.cloud-cover-placeholder')?.replaceWith(image);
+        });
+      }
+    },{rootMargin:'80px'});
+    for(const node of targets)this.coverObserver.observe(node);
+  }
+  cloudMenu(item, menu = true, index = 0) {
+    const remove = button('cloud-delete-dialog', 'Excluir da nuvem', 'danger-text', `data-cloud-path="${esc(item.path)}"`);
+    return menu ? `<details class="lesson-menu"><summary aria-label="Mais opções: ${esc(item.title)}">···</summary><div>${button('cloud-cover','Trocar capa','',`data-cloud-index="${index}"`)}${remove}</div></details>` : remove;
+  }
+  storageBadge(lesson){
+    if(this.groups.isShared(lesson.id))return '<span class="storage-state cloud">Compartilhada</span>';
+    const cloud=this.cloudFor(lesson);
+    if(!this.cloudLoaded&&this.account.user)return '<span class="storage-state">Consultando nuvem…</span>';
+    if(!cloud)return '<span class="storage-state device">▣ Neste dispositivo</span>';
+    const savedAt=this.cloudLinks[this.account.user?.id]?.[lesson.id]?.savedAt||new Date(cloud.updatedAt).getTime();
+    const localChanges=lesson.updatedAt>savedAt;
+    return `<span class="storage-state cloud ${localChanges?'local-dirty':''}" title="${localChanges?'Há edições neste dispositivo que ainda não chegaram à nuvem.':'Cópia disponível na nuvem.'}">${localChanges?'Alterações locais':'Na nuvem'}</span>`;
+  }
   cloudMarkup(){if(!this.account.user)return '';return `<p class="cloud-status" role="status">${esc(this.cloudBusy||!this.cloudLoaded?'Consultando aulas na nuvem…':/^\d+ aulas? nesta conta\.$|^Nenhuma aula salva na nuvem ainda\.$/.test(this.cloudMessage)?'':this.cloudMessage)}</p>`;}
-  refreshCloudPanel(){const slot=this.root.querySelector('[data-cloud-library]');if(slot)slot.innerHTML=this.cloudMarkup();const grid=this.root.querySelector('[data-library-grid]');const count=this.root.querySelector('[data-library-count]');if(count)count.textContent=this.libraryCount();const refresh=this.root.querySelector('[data-studio-action=cloud-refresh]');if(refresh){refresh.disabled=this.cloudBusy;refresh.textContent=this.cloudBusy?'Consultando…':'Atualizar aulas';}if(grid){const create=grid.querySelector('.create-import-card')?.outerHTML||'';grid.innerHTML=this.libraryCards()+create;}}
+  refreshCloudPanel(){const slot=this.root.querySelector('[data-cloud-library]');if(slot)slot.innerHTML=this.cloudMarkup();const grid=this.root.querySelector('[data-library-grid]');const count=this.root.querySelector('[data-library-count]');if(count)count.textContent=this.libraryCount();const refresh=this.root.querySelector('[data-studio-action=cloud-refresh]');if(refresh){refresh.disabled=this.cloudBusy;refresh.setAttribute('aria-busy',String(this.cloudBusy));}if(grid){const create=grid.querySelector('.create-import-card')?.outerHTML||'';grid.innerHTML=this.libraryCards()+create;fillAssetImages(grid);this.watchCloudCovers();}}
+  hasCloudCopy(lesson=this.draft) {
+    return Boolean(lesson && (this.cloudLinks[this.account.user?.id]?.[lesson.id]||this.cloudFor(lesson)));
+  }
+  async saveLocalEditor() {
+    if(!this.groups.live){this.save();return;}
+    const live=this.groups.live;
+    await live.persist();
+    if(!live.current()||this.groups.live!==live)throw Error('A aula compartilhada mudou. Tente novamente.');
+    const {lesson,ids}=await archiveImportedPages(this.draft);
+    try{if(!live.current()||this.groups.live!==live)throw Error('A aula compartilhada mudou. Tente novamente.');this.library.save(lesson);}catch(error){await removePageAssets(ids).catch(()=>{});throw error;}
+  }
+  async saveEditor() {
+    if(!this.groups.canEdit||!this.needsSave())return;
+    if(this.hasCloudCopy())return this.cloudAction('cloud-save',{});
+    await this.saveLocalEditor();
+    this.callbacks.toast(this.groups.live?'Aula salva no grupo e no dispositivo.':'Aula salva neste dispositivo.');
+    this.callbacks.render();
+  }
+  editorSaveControls() {
+    const linked=this.hasCloudCopy(), canEdit=this.groups.canEdit, disabled=!canEdit||this.cloudBusy?'disabled':'';
+    const needsSave=this.needsSave();
+    const label=this.cloudBusy?'Salvando…':needsSave?'Salvar':'Salvo';
+    return `<div class="editor-save-controls">${button('save',studioIcon(linked?'cloud':'download')+label,'quiet '+(needsSave?'':'is-saved'),
+      `aria-label="Salvar aula" title="${linked?'Salvar no dispositivo e na nuvem':'Salvar no dispositivo'}" ${disabled||(!needsSave?'disabled':'')}`)}
+      ${cloudConfigured&&!linked?button('cloud-save',studioIcon('cloud'),'quiet editor-icon',
+      `aria-label="Salvar na nuvem" title="Salvar na nuvem" ${disabled}`):''}</div>`;
+  }
+  needsSave() {
+    if(this.dirty)return true;
+    const link=this.cloudLinks[this.account.user?.id]?.[this.draft?.id];
+    return Boolean(link&&this.draft.updatedAt>link.savedAt);
+  }
+  paintSaveButton() {
+    const button=this.root.querySelector('.editor-save-controls [data-studio-action=save]');
+    if(!button)return;
+    const needsSave=this.needsSave();
+    button.classList.toggle('is-saved',!needsSave);
+    button.disabled=!this.groups.canEdit||this.cloudBusy||!needsSave;
+    const label=this.cloudBusy?'Salvando…':needsSave?'Salvar':'Salvo';
+    const cloud=String(this.hasCloudCopy());
+    if(button.textContent!==label||button.dataset.cloud!==cloud){button.dataset.cloud=cloud;button.innerHTML=studioIcon(cloud==='true'?'cloud':'download')+label;}
+  }
   async cloudAction(action, target) {
     if (this.cloudBusy) return;
+    if (action==='cloud-delete-dialog') {
+      const item=this.cloudItems.find(file=>file.path===target.dataset.cloudPath);
+      if(item){this.dialog={type:'cloud-delete',item,uid:this.account.user?.id};this.callbacks.render();}
+      return;
+    }
     if (!this.account.user) { this.account.show('login'); return; }
     const uid = this.account.user.id,request=++this.cloudRequest,current=()=>this.cloudRequest===request&&this.account.user?.id===uid; this.cloudBusy = true; this.cloudMessage = ''; this.refreshCloudPanel();
-    const saveButton = this.root.querySelector('[data-studio-action="cloud-save"]');
-    if (saveButton) { saveButton.disabled = true; saveButton.textContent = 'Comprimindo e enviando…'; }
+    const saveButtons=this.root.querySelectorAll('.editor-save-controls button');
+    if(action!=='cloud-refresh')for(const button of saveButtons)button.disabled=true;
     try {
       if (action === 'cloud-save') {
-        this.save(); const lesson = validateLesson(await hydrateLesson(this.draft, true), { draft: true });
+        await this.saveLocalEditor();
+        if(!current())return;
+        const lesson = validateLesson(await hydrateLesson(this.draft, true), { draft: true });
+        if(!current())return;
         this.callbacks.toast('Enviando aula e arquivos para sua conta…');
-        const stored = await saveCloudLesson(this.account.client, lesson);
+        const {thumbnailFor}=await import('./cover-render.js');
+        const cover=await thumbnailFor(lesson).catch(()=>'');
+        if(!current())return;
+        const stored = await saveCloudLesson(this.account.client, lesson, cover);
         if(!current())return;this.linkCloud(lesson.id,stored.path);
         try{const items=await listCloudLessons(this.account.client);if(!current())return;this.cloudItems=items;this.cloudLoaded=true;this.cloudMessage=items.length?`${items.length} ${items.length===1?'aula':'aulas'} nesta conta.`:'Aula enviada. Atualize os arquivos para conferir a lista.';}catch{if(!current())return;this.cloudLoaded=true;this.cloudMessage='A aula foi salva, mas a lista não pôde ser atualizada. Clique em Atualizar arquivos.';}
-        this.callbacks.toast(stored.compressed ? 'Aula salva na nuvem. Compressão economizou ' + Math.round((1 - stored.bytes / stored.originalBytes) * 100) + '%.' : 'Aula e arquivos salvos na nuvem.');
+        this.callbacks.toast(stored.coverSynced===false?'Aula salva. A capa da lista na nuvem aguarda a atualização do Worker.':stored.compressed ? 'Aula salva na nuvem. Compressão economizou ' + Math.round((1 - stored.bytes / stored.originalBytes) * 100) + '%.' : 'Aula e arquivos salvos na nuvem.');
       } else if (action === 'cloud-refresh') {
-        const items = await listCloudLessons(this.account.client);
+        const refreshGroups=this.groups.refresh().catch(()=>{});
+        const items = await listCloudLessons(this.account.client).finally(()=>refreshGroups);
         if (current()) { this.cloudLoaded=true;this.cloudItems = items; this.cloudMessage = items.length ? `${items.length} ${items.length===1?'aula':'aulas'} nesta conta.` : 'Nenhuma aula salva na nuvem ainda.'; }
-      } else if (action === 'cloud-open') {
+      } else if (action === 'cloud-delete') {
+        const dialog=this.dialog;
+        if(dialog?.type!=='cloud-delete'||dialog.uid!==uid)return;
+        await deleteCloudLesson(this.account.client,dialog.item.path);
+        if(!current())return;
+        this.cloudItems=this.cloudItems.filter(item=>item.path!==dialog.item.path);
+        for(const [id,link] of Object.entries(this.cloudLinks[uid]||{}))if(link.path===dialog.item.path)delete this.cloudLinks[uid][id];
+        try{localStorage.setItem('sl-cloud-links',JSON.stringify(this.cloudLinks));}catch{}
+        this.dialog=null;
+        this.callbacks.toast('Aula excluída da nuvem.');
+      } else if (['cloud-open','cloud-present','cloud-cover'].includes(action)) {
         const item = this.cloudItems[Number(target.dataset.cloudIndex)]; if (!item) throw Error('Atualize a lista de arquivos.');
+        if(action==='cloud-present')this.requestPresentationFullscreen();
         const input = await readCloudLesson(this.account.client, item.path);
         if (!current()) return;
-        const parsed = validateLesson(input, { draft: true }), archived = await archiveImportedPages(parsed);
-        try { const saved = this.library.import(archived.lesson);this.linkCloud(saved.id,item.path); this.open(saved.id); }
+        const parsed = validateLesson(input, { draft: true });
+        if(action!=='cloud-cover'&&await this.groups.openForLesson(parsed.id)){
+          if(action==='cloud-present'&&current())await this.launch(this.draft,false,false);
+          return;
+        }
+        if(!current())return;
+        const archived = await archiveImportedPages(parsed);
+        if(!current()){await removePageAssets(archived.ids).catch(()=>{});return;}
+        let saved;
+        try { const linked=Object.entries(this.cloudLinks[uid]||{}).find(([,v])=>v.path===item.path)?.[0];const cloudId=item.path.startsWith('r2:')?item.path.slice(3):parsed.id;saved = this.library.save({...archived.lesson,id:linked||cloudId});this.linkCloud(saved.id,item.path); }
         catch (error) { await removePageAssets(archived.ids).catch(() => {}); throw error; }
+        if(action==='cloud-present')await this.launch(saved,false,false);else if(action==='cloud-cover')this.openCoverDialog(saved);else this.open(saved.id);
       }
     } catch (error) { if(current()){this.cloudLoaded=true;this.cloudMessage=error.message||'Não foi possível consultar as aulas. Clique em Atualizar arquivos para tentar novamente.';this.callbacks.toast(this.cloudMessage);} }
-    finally { if(current()){this.cloudBusy = false;if(action==='cloud-refresh'){this.refreshCloudPanel();const save=this.root.querySelector('[data-studio-action=cloud-save]');if(save){save.disabled=false;save.textContent='☁ Salvar na nuvem';}}else this.callbacks.render();} }
+    finally { if(current()){this.cloudBusy = false;if(action==='cloud-refresh'){this.refreshCloudPanel();this.paintSaveButton();const upload=this.root.querySelector('.editor-save-controls [data-studio-action=cloud-save]');if(upload)upload.disabled=!this.groups.canEdit;}else this.callbacks.render();} }
   }
   async uploadAudio(file, scope) {
     if (!file) return;
-    const draft = this.draft, target = scope === 'quiz' ? draft : draft.slides[this.index], audio = await readAudio(file);
+    if(!this.groups.canEdit)return;
+    if(scope.startsWith('element:'))this.designer.ensure();
+    const draft=this.draft, slide=draft.slides[this.index], target=this.audioOwner(scope);
+    if(!target)return;
+    const audio=await readAudio(file);
     const [assetId] = await storePages([audio.data]);
-    if (this.draft !== draft || (scope !== 'quiz' && !draft.slides.includes(target))) return;
-    target[scope === 'quiz' ? 'quizAudio' : 'audio'] = { ...audio, assetId, data: '' };
+    if(this.draft!==draft||!this.groups.canEdit||(!scope.startsWith('quiz')&&(!draft.slides.includes(slide)||(scope.startsWith('element:')&&!slide.elements.includes(target))))){
+      await removePageAssets([assetId]).catch(()=>{});
+      return;
+    }
+    if(scope.startsWith('element:')&&slide.audio?.trigger===scope)slide.audio=null;
+    target[this.audioField(scope)] = { ...audio, ...(scope.startsWith('element:')?{loop:false}:{}), assetId, data: '', ...(scope==='slide'?{trigger:target.audio?.trigger||'auto'}:{}) };if(scope==='quiz-lobby'||scope==='quiz-question'){draft.gameSettings||={};draft.gameSettings[scope==='quiz-lobby'?'lobby':'questions']='custom';}
     this.markDirty(); this.callbacks.render(); this.callbacks.toast('Áudio adicionado. Use o botão de som ao apresentar.');
   }
+  brandMarkup() {
+    return `<button class="studio-wordmark" data-studio-action="library" aria-label="Storage Lab, biblioteca"><img class="lab-logo" src="${brandUrl}" alt=""><span>storage<span>lab.</span></span></button>`;
+  }
+  navigationMarkup() {
+    return `<nav>${button('library', studioIcon('library')+' Biblioteca de aulas', this.view === 'library' ? 'rail-link active' : 'rail-link','aria-label="Biblioteca de aulas"')}${button('join', studioIcon('join')+' Entrar em uma sala', this.view === 'join' ? 'rail-link active' : 'rail-link','aria-label="Entrar em uma sala"')}${button('shared',studioIcon('collaborate')+' Compartilhados',this.view==='shared'?'rail-link active':'rail-link','aria-label="Compartilhados"')} ${button('storage-ai',studioIcon('sparkle')+' Storage AI',this.view==='storage-ai'?'rail-link active':'rail-link','aria-label="Storage AI"')}<button type="button" class="studio-btn rail-link" data-social-action="open" aria-label="Chat">${studioIcon('chat')} Chat <b data-chat-badge class="chat-badge" ${this.social.badge?'':'hidden'}>${this.social.badge||''}</b></button></nav>`;
+  }
+  railMarkup(closeButton = '') {
+    const brand = this.brandMarkup();
+    return `<aside class="studio-rail">${closeButton ? `<div class="ai-rail-brand">${brand}${closeButton}</div>` : brand}${this.navigationMarkup()}<div class="rail-note"><div class="rail-quick-actions">${button('new','+ Nova aula','quiet')}${button('upload-slides','↑ Importar slides','quiet')}</div></div><div class="rail-bottom">CRIAR. ENSINAR. CONECTAR.</div></aside>`;
+  }
   shell(content) {
-    return `<div class="studio-shell ${this.view === 'editor' ? 'editor-shell' : ''}">${this.view === 'editor' ? '' : `<aside class="studio-rail"><button class="studio-wordmark" data-studio-action="library" aria-label="Storage Lab, biblioteca"><img class="lab-logo" src="${brandUrl}" alt=""><span>storage<span>lab.</span></span></button><div class="rail-label">SEU ESPAÇO DE ENSINO</div><nav>${button('library', '<span>▦</span> Biblioteca de aulas', this.view !== 'join' ? 'rail-link active' : 'rail-link')}${button('join', '<span>↗</span> Entrar em uma sala', this.view === 'join' ? 'rail-link active' : 'rail-link')}<button type="button" class="studio-btn rail-link" data-social-action="open"><span aria-hidden="true">💬</span> Chat <b data-chat-badge class="chat-badge" ${this.social.badge?'':'hidden'}>${this.social.badge||''}</b></button></nav><div class="rail-note"><span class="local-dot"></span><strong>Acesso rápido</strong><div class="rail-quick-actions">${button('new','+ Nova aula','quiet')}${button('upload-slides','↑ Importar slides','quiet')}</div></div><div class="rail-bottom">CRIAR. ENSINAR. CONECTAR.</div></aside>`}<div class="studio-body">${this.view==='editor'?'':`<header class="studio-header"><span class="studio-breadcrumb">Meu espaço <span>/</span> ${this.view === 'editor' ? 'Editor de aula' : this.view === 'join' ? 'Participar' : 'Biblioteca'}</span>${this.view === 'editor' ? this.editorMusic.headerMarkup() : ''}<span data-account-profile>${this.account.profile()}</span></header>`}${content}</div></div>${this.dialogMarkup()}${this.importMarkup()}${this.sharing.markup()}<div data-remote-dialog>${this.remote.dialog()}</div><div data-account-dialog></div><div data-chat-slot>${this.chat.markup()}</div><div data-social-slot>${this.social.markup()}</div>`;
+    const editor = this.view === 'editor';
+    const ai = this.view === 'storage-ai';
+    const header = editor ? '' : ai ? this.ai.navigationMarkup() : `<header class="studio-header"><span data-account-profile>${this.account.profile()}</span></header>`;
+    return `<div class="studio-shell ${editor ? 'editor-shell' : ai ? 'ai-shell' : ''}">${editor || ai ? '' : this.railMarkup()}<div class="studio-body">${header}${content}</div></div>${this.dialogMarkup()}${this.importMarkup()}${this.sharing.markup()}<div data-remote-dialog>${this.remote.dialog()}</div><div data-account-dialog></div><div data-chat-slot>${this.chat.markup()}</div><div data-social-slot>${this.social.markup()}</div>`;
   }
   markup() {
+    if (this.view==='ai-generation') return this.shell(this.ai.generationMarkup());
     if (this.view === 'editor') return this.editor();
-    if (this.view === 'join') return this.shell(`<main class="studio-join"><div><span class="studio-kicker">APRENDER É PARTICIPAR</span><h1>Sua próxima descoberta<br>começa <em>aqui.</em></h1><p>Use o código compartilhado pelo professor ou aponte a câmera para o QR Code da apresentação.</p><div class="join-illustration" aria-hidden="true">✦ <span>↗</span> ◇</div></div>${this.callbacks.joinForm()}</main>`);
+    if (this.view === 'join') return this.shell(`<main class="studio-join"><svg class="join-waves" viewBox="0 0 1000 600" preserveAspectRatio="none" aria-hidden="true"><path d="M-50 360C190 180 295 510 525 340S820 165 1050 315"/><path d="M-50 415C180 235 300 540 520 395S805 215 1050 360"/><path d="M-50 470C185 295 315 605 540 450S840 295 1050 410"/></svg><div class="join-intro"><h1>Sua próxima descoberta<br>começa <em>aqui.</em></h1><p>Use o código compartilhado pelo professor ou aponte a câmera para o QR Code da apresentação.</p><div class="join-illustration join-orbit" aria-hidden="true">${[['🚀','⚡','🦉'],['🤖','🎮','👾'],['🦊','🐸','🪐']].map((icons,i)=>`<div class="join-float" style="--float:${i}">${icons.map((icon,j)=>`<span style="--cycle:${j}">${avatarContent(icon)}</span>`).join('')}</div>`).join('')}</div></div>${this.callbacks.joinForm()}</main>`);
+    if(this.view==='storage-ai')return this.shell(this.ai.createMarkup());
+    if(this.view==='shared')return this.shell(`<main class="studio-library shared-library">${this.groups.markup()}</main>`);
     return this.libraryMarkup();
   }
   libraryMarkup() {
@@ -163,24 +390,29 @@ export class Studio {
       <div data-live-sessions>${this.remote.markup()}</div>${showcaseMarkup()}
 
 
-      <section class="library-section"><div class="library-section-title"><h2>Minha biblioteca <span data-library-count>${this.libraryCount()}</span></h2>${this.account.user?button('cloud-refresh','Atualizar aulas','quiet',this.cloudBusy?'disabled':''):''}</div><div class="lesson-card-grid" data-library-grid>${this.libraryCards()}<div class="new-lesson-card create-import-card"><button class="create-half" data-studio-action="new"><span>+</span><strong>Uma ideia nova?</strong><small>Comece uma aula do zero</small></button><div class="import-half"><span>↥</span><strong>Já tem o conteúdo?</strong><small>Traga seus slides para cá</small><div>${button('upload-slides', 'Importar PDF / PPTX', 'quiet')}${button('import', 'Importar JSON', 'quiet')}</div></div></div></div></section>${this.groups.markup()}<div data-cloud-library>${this.cloudMarkup()}</div><footer class="studio-footer"><span>Feito para conectar quem ensina e quem aprende.</span>${button('restore-demo', 'Adicionar exemplo HDD e SSD', 'link')}</footer><input type="file" id="import-lesson-file" accept=".json,application/json" hidden><input type="file" id="import-slides-file" accept=".pdf,.pptx,application/pdf,application/vnd.openxmlformats-officedocument.presentationml.presentation" hidden></main>`);
+      <section class="library-section"><div class="library-section-title"><h2>Minha biblioteca <span data-library-count>${this.libraryCount()}</span></h2><div class="library-actions"><button type="button" data-studio-action="storage-ai" class="studio-btn storage-ai-primary">${studioIcon('sparkle')} Criar slides com IA</button>${this.account.user?button('cloud-refresh',studioIcon('reload'),'quiet editor-icon',`aria-label="Recarregar aulas" title="Recarregar aulas" ${this.cloudBusy?'disabled':''}`):''}</div></div><div class="lesson-card-grid" data-library-grid>${this.libraryCards()}<div class="new-lesson-card create-import-card"><button class="create-half" data-studio-action="new"><span>+</span><strong>Uma ideia nova?</strong><small>Comece uma aula do zero</small></button><div class="import-half"><span>↥</span><strong>Já tem o conteúdo?</strong><small>Traga seus slides para cá</small><div>${button('upload-slides', 'Importar PDF / PPTX', 'quiet')}${button('import', 'Importar JSON', 'quiet')}</div></div></div></div></section><div data-cloud-library>${this.cloudMarkup()}</div><input type="file" id="import-lesson-file" accept=".json,application/json" hidden><input type="file" id="import-slides-file" accept=".pdf,.pptx,application/pdf,application/vnd.openxmlformats-officedocument.presentationml.presentation" hidden></main>`);
   }
   lessonCard(l, index = 0) {
-    const demo = l.id === 'hdd-ssd-demo';
-    const model = l.slides.some(s => s.kind === 'model');
-    const cover = l.slides.find(s => s.kind === 'document'||s.sourceType==='pptx'&&(s.image||s.assetId));
-    return `<article class="lesson-card" style="--card-index:${Math.min(index, 6)}"><div class="lesson-card-art ${model ? 'hardware-art' : 'ideas-art'}"><span class="lesson-category">${cover ? (cover.sourceType || 'SLIDES').toUpperCase() + ' IMPORTADO' : demo ? 'AULA DEMONSTRATIVA' : 'SUA CRIAÇÃO'}</span>${cover ? assetImage(cover, 'imported-cover') : ''}<div aria-hidden="true" ${cover ? 'hidden' : ''}>${model ? deviceArt() : '<span class="idea-cover-art"><i>T</i><i>✦</i><i>▧</i></span>'}<span>${model ? 'EXPLORE POR DENTRO' : 'UMA IDEIA. MUITAS DESCOBERTAS.'}</span></div><span class="card-art-number">${String(l.slides.length).padStart(2, '0')}</span></div><div class="lesson-card-content"><h3>${esc(l.title || 'Aula sem título')}</h3><p>${esc(l.description || 'Dê forma à sua próxima descoberta.')}</p><div class="lesson-card-meta"><span>▤ ${l.slides.length} slides</span><span>✦ ${l.questions.length} perguntas</span>${this.storageBadge(l)}</div><div class="lesson-card-primary">${button('edit', 'Editar aula ↗', 'card-edit', `data-id="${esc(l.id)}" aria-label="Editar aula: ${esc(l.title)}"`)}${button('present', '▷ Apresentar', 'card-present studio-launch', `data-id="${esc(l.id)}" ${this.launching ? 'disabled' : ''}`)}</div><div class="lesson-card-secondary">${button('preview', demo ? 'Explorar a aula' : 'Prévia', 'link', `data-id="${esc(l.id)}"`)}<details class="lesson-menu"><summary aria-label="Mais opções: ${esc(l.title)}">···</summary><div>${button('rename', 'Renomear', '', `data-id="${esc(l.id)}"`)}${button('duplicate', 'Duplicar', '', `data-id="${esc(l.id)}"`)}${button('export', 'Exportar JSON', '', `data-id="${esc(l.id)}"`)}${button('delete', 'Excluir aula', 'danger-text', `data-id="${esc(l.id)}"`)}</div></details></div></div></article>`;
+    const model=l.id==='hdd-ssd-demo';
+    const cloud = this.cloudFor(l);
+    const firstSlide=l.slides[0];
+    const firstSlideImage=firstSlide&&(firstSlide.image||firstSlide.assetId?firstSlide:firstSlide.elements?.find(e=>e.type==='image'&&(e.image||e.assetId)));
+    const cover=firstSlideImage?{...firstSlideImage,sourceType:firstSlideImage.sourceType||'pdf',imageAlt:firstSlideImage.imageAlt||firstSlide?.title}:null;
+    return `<article class="lesson-card" style="--card-index:${Math.min(index, 6)}"><div class="lesson-card-art ${model ? 'hardware-art' : 'ideas-art'}">${l.thumbnail?`<img class="lesson-cover-image" decoding="async" src="${esc(l.thumbnail)}" alt="">`:cover?assetImage(cover,'imported-cover lesson-cover-image'):model? `<div aria-hidden="true">${deviceArt()}<span>EXPLORE POR DENTRO</span></div>`:`<div class="slide-cover-mini" inert aria-hidden="true">${canvasMarkup(presentationSlide(l.slides[0]))}</div>`}${this.coverStorageIcon(Boolean(cloud),this.groups.isShared(l.id),Boolean(l.generatedByAI))}<span class="card-art-number">${String(l.slides.length).padStart(2, '0')}</span></div><div class="lesson-card-content"><h3>${esc(l.title || 'Aula sem título')}</h3><p>${esc(l.description || 'Dê forma à sua próxima descoberta.')}</p><div class="lesson-card-meta"><span>▤ ${l.slides.length} slides</span><span>✦ ${l.questions.length} perguntas</span>${this.storageBadge(l)}</div><div class="lesson-card-primary">${button('edit', 'Editar aula ↗', 'card-edit', `data-id="${esc(l.id)}" aria-label="Editar aula: ${esc(l.title)}"`)}${button('present', '▷ Apresentar', 'card-present studio-launch', `data-id="${esc(l.id)}" ${this.launching ? 'disabled' : ''}`)}<details class="lesson-menu"><summary aria-label="Mais opções: ${esc(l.title)}">···</summary><div>${button('rename', 'Renomear', '', `data-id="${esc(l.id)}"`)}${button('duplicate', 'Duplicar', '', `data-id="${esc(l.id)}"`)}${button('cover', 'Trocar capa', '', `data-id="${esc(l.id)}"`)}${button('export-pdf','Exportar PDF','',`data-id="${esc(l.id)}"`)}${button('export-pptx','Exportar PPTX','',`data-id="${esc(l.id)}"`)}${cloud?this.cloudMenu(cloud,false):''}${button('delete', cloud?'Excluir do dispositivo':'Excluir aula', 'danger-text', `data-id="${esc(l.id)}"`)}</div></details></div></div></article>`;
   }
   editor() {
     const l = this.draft;
-    return this.shell(`<main class="studio-editor ${this.metaExpanded ? 'expanded-meta' : ''}">${this.groups.editorMarkup()}<div class="editor-heading"><div>${button('library', '← Voltar', 'quiet editor-back') + `<strong class="editor-title">${esc(l.title)}</strong>${this.groups.live?`<span class="editor-group-presence" data-collab-status>${this.groups.statusMarkup()}</span>`:''}`}</div><div class="editor-context">${this.editorMusic.headerMarkup()}<span data-account-profile>${this.account.profile()}</span></div></div><div class="editor-command-row"><div class="editor-tabs" role="tablist" aria-label="Conteúdo da aula"><button role="tab" aria-selected="${this.tab === 'slides'}" data-studio-action="tab-slides">▤ Slides e enquetes <span>${l.slides.length}</span></button><button role="tab" aria-selected="${this.tab === 'quiz'}" data-studio-action="tab-quiz">✦ Quiz <span>${l.questions.length}</span></button></div><div class="editor-top-actions"><details class="editor-more"><summary aria-label="Mais opções da aula">···</summary><div>${button('rename-draft','Renomear','quiet','aria-label="Editar título e descrição"')}${button('export-draft','Baixar JSON','quiet')}</div></details>${this.tab === 'slides' ? button('toggle-visual', this.visualMode ? 'Campos' : 'Editor visual', 'quiet') : ''}${button('save', 'Salvar aula', 'quiet')}${cloudConfigured ? button('cloud-save', '☁ Salvar na nuvem', 'quiet', this.cloudBusy ? 'disabled' : '') : ''}${button('preview-draft', '▷ Prévia', 'quiet')}<button type="button" class="studio-btn quiet" data-group-action="share">Colaborar</button><button type="button" class="studio-btn quiet" data-chat-action="open">Chat</button>${button('share-presentation', 'Compartilhar', 'quiet')}${button('present-draft', 'Apresentar ↗', 'accent studio-launch', this.launching ? 'disabled' : '')}</div></div><div class="editor-workspace ${this.visualMode && this.tab === 'slides' ? 'visual-workspace' : ''}"><aside class="editor-outline"><div class="outline-heading"><span>${this.tab === 'slides' ? 'SEQUÊNCIA DA AULA' : 'DESAFIO FINAL'}</span>${button(this.tab === 'slides' ? 'add-slide' : 'add-question', '+', 'outline-add', `aria-label="${this.tab === 'slides' ? 'Adicionar slide' : 'Adicionar pergunta'}"`)}</div><div class="outline-items">${(this.tab === 'slides' ? l.slides : l.questions).map((item, i) => `<button class="outline-item ${i === (this.tab === 'slides' ? this.index : this.questionIndex) ? 'active' : ''}" data-studio-action="${this.tab === 'slides' ? 'select-slide' : 'select-question'}" data-index="${i}"><span>${String(i + 1).padStart(2, '0')}</span><div><strong ${i === (this.tab === 'slides' ? this.index : this.questionIndex) ? 'data-current-label' : ''}>${esc((this.tab === 'slides' ? item.title : item.text) || 'Sem título')}</strong><small>${this.tab === 'slides' ? kindLabel(item.kind) : esc(item.difficulty) + ' · ' + item.seconds + ' s'}</small></div></button>`).join('')}</div></aside><section class="editor-form-area">${this.tab==='quiz'?audioEditor(l.quizAudio,'quiz'):!this.visualMode&&l.slides[this.index].kind!=='canvas'?audioEditor(l.slides[this.index].audio,'slide'):''}${this.tab === 'slides' ? (this.visualMode ? this.itemToolbar('slide', this.index, l.slides.length) + this.designer.markup(false,false) : this.slideEditor()) + this.slideActivities() : this.quizEditor()}</section><aside class="editor-preview-area"><span class="studio-kicker">UM OLHAR DA TURMA</span><div id="editor-mini-preview">${this.previewMarkup()}</div><p>A prévia completa mostra a apresentação e permite testar o quiz.</p>${button('preview-draft', 'Abrir prévia ↗', 'quiet')}</aside></div></main>`);
+    return this.shell(`<main class="studio-editor ${this.metaExpanded ? 'expanded-meta' : ''}">${this.groups.editorMarkup()}<div class="editor-heading"><div>${button('library', studioIcon('chevron'), 'quiet editor-back editor-icon', 'aria-label="Voltar" title="Voltar"') + `<strong class="editor-title">${esc(l.title)}</strong>${this.groups.live?`<span class="editor-group-presence" data-collab-status>${this.groups.statusMarkup()}</span>`:''}`}</div><div class="editor-context">${this.editorMusic.headerMarkup()}<span data-account-profile>${this.account.profile()}</span></div></div><div class="editor-command-row"><div class="editor-tabs" role="tablist" aria-label="Conteúdo da aula">${activityTabs(l,this.tab,this.currentBlock()?.id,this.groups.canEdit)}</div><div class="editor-top-actions"><details class="editor-more"><summary aria-label="Mais opções da aula">···</summary><div>${button('rename-draft','Renomear','quiet','aria-label="Editar título e descrição"')}${button('export-draft','Baixar JSON','quiet')}</div></details>${this.tab === 'slides'&&this.currentBlock()?.type!=='poll' ? button('toggle-visual', this.visualMode ? 'Campos' : 'Editor visual', 'quiet') : ''}<details class="editor-more editor-download"><summary aria-label="Baixar apresentação" title="Baixar apresentação">${studioIcon('download')}</summary><div>${button('export-pdf','Baixar PDF','quiet')}${button('export-pptx','Baixar PPTX','quiet')}</div></details>${this.editorSaveControls()}${this.tab==='slides'&&this.visualMode&&this.currentBlock()?.type!=='poll'?`<button type="button" class="studio-btn editor-icon ai-tool" data-storage-ai="toggle" aria-label="Storage AI" title="Storage AI" aria-pressed="${Boolean(this.ai.open)}" ${this.groups.canEdit?'':'disabled'}>${studioIcon('sparkle')}</button>`:''}<button type="button" class="studio-btn quiet editor-icon" data-group-action="share" aria-label="Colaborar" title="Colaborar">${studioIcon('collaborate')}</button><button type="button" class="studio-btn quiet editor-icon" data-chat-action="open" aria-label="Chat" title="Chat">${studioIcon('chat')}</button>${button('share-presentation',studioIcon('share'),'quiet editor-icon','aria-label="Compartilhar" title="Compartilhar"')}${button('present-draft', 'Apresentar ↗', 'accent studio-launch', this.launching ? 'disabled' : '')}</div></div><div class="editor-workspace ${this.visualMode && this.tab === 'slides' ? 'visual-workspace' : ''}"><aside class="editor-outline"><div class="outline-heading"><span>${this.currentBlock()?.type==='poll'?'ENQUETES':this.tab === 'slides' ? 'SEQUÊNCIA DA AULA' : 'PERGUNTAS'}</span></div><div class="outline-actions">${this.itemActions(this.tab==='slides'?'slide':'question',this.tab==='slides'?this.index:this.questionIndex,this.tab==='slides'?l.slides.length:l.questions.length)}${button(this.tab === 'slides' ? 'add-slide' : 'add-question', '+', 'outline-add', `aria-label="${this.tab === 'slides' ? 'Adicionar slide' : 'Adicionar pergunta'}"`)}</div><div class="outline-items">${this.visibleItems().map(({item,index:i}) => `<button class="outline-item ${i === (this.tab === 'slides' ? this.index : this.questionIndex) ? 'active' : ''}" data-studio-action="${this.tab === 'slides' ? 'select-slide' : 'select-question'}" data-index="${i}"><span>${String(i + 1).padStart(2, '0')}</span><div><strong ${i === (this.tab === 'slides' ? this.index : this.questionIndex) ? 'data-current-label' : ''}>${esc((this.tab === 'slides' ? item.title : item.text) || 'Sem título')}</strong><small>${this.tab === 'slides' ? kindLabel(item.kind) : esc(item.difficulty) + ' · ' + item.seconds + ' s'}</small></div>${this.tab==='slides'&&this.groups.live?`<span class="collaborator-avatars outline-presence" data-slide-presence="${esc(item.id)}"></span>`:''}</button>`).join('')}</div></aside><section class="editor-form-area">${this.tab==='quiz'?gameSettingsMarkup(l,this.gameSettingsOpen):!this.visualMode&&l.slides[this.index].kind!=='canvas'?audioEditor(l.slides[this.index].audio,'slide'):''}${this.tab === 'slides' ? this.currentBlock()?.type==='poll'?this.pollBlockEditor():(this.visualMode ? this.itemToolbar('slide', this.index, l.slides.length) + this.designer.markup(false,false) : this.slideEditor()) + this.slideActivities() : this.quizEditor()}</section><aside class="editor-preview-area"><span class="studio-kicker">UM OLHAR DA TURMA</span><div id="editor-mini-preview">${this.previewMarkup()}</div></aside></div></main>`);
   }
   slideActivities() {
     const s = this.draft.slides[this.index], poll = s.poll || { text: '', options: ['Concordo', 'Ainda tenho dúvidas'] };
     return `<details class="editor-details slide-activities"><summary>▥ Atividades e passagem deste slide</summary><p>Faça uma enquete ao vivo: a turma vota pelo celular, sem resposta certa e sem pontos.</p><label><input type="checkbox" data-poll-enabled ${s.poll ? 'checked' : ''}> Adicionar enquete a este slide</label>${s.poll ? `<div class="editor-field"><label for="poll-text">Pergunta da enquete</label><input id="poll-text" data-poll-field="text" maxlength="500" value="${esc(poll.text)}"></div><div class="editor-field"><label for="poll-options">Opções (uma por linha, de 2 a 4)</label><textarea id="poll-options" data-poll-field="options" rows="4">${esc(poll.options.join('\n'))}</textarea></div>` : ''}${mobileChoice(s)}<div class="editor-field"><label for="slide-transition">Transição ao entrar neste slide</label><select id="slide-transition" data-scope="slide" data-field="transition">${[['slide', 'Deslizar'], ['fade', 'Dissolver'], ['none', 'Sem animação']].map(([value,label]) => `<option value="${value}" ${(s.transition || 'slide') === value ? 'selected' : ''}>${label}</option>`).join('')}</select><small>Use ↑ e ↓ acima do editor para mudar a ordem. A passagem continua sob seu controle.</small></div></details>`;
   }
+  pollBlockEditor(){const poll=this.draft.slides[this.index].poll;return `${this.itemToolbar('slide',this.index,this.draft.slides.length)}<div class="poll-block-editor"><h2>Enquete</h2><label for="poll-text">Pergunta da enquete</label><input id="poll-text" data-poll-field="text" maxlength="500" value="${esc(poll.text)}"><label for="poll-options">Opções (uma por linha, de 2 a 4)</label><textarea id="poll-options" data-poll-field="options" rows="4">${esc(poll.options.join('\n'))}</textarea></div>`;}
+  itemActions(type,i,total){const position=this.draft.activityBlocks?this.visibleItems().findIndex(v=>v.index===i):i,count=this.draft.activityBlocks?this.visibleItems().length:total;return `${button('move-' + type + '-up', '↑', 'square', `aria-label="Mover ${type === 'slide' ? 'slide' : 'pergunta'} para cima" ${position === 0 ? 'disabled' : ''}`)}${button('move-' + type + '-down', '↓', 'square', `aria-label="Mover ${type === 'slide' ? 'slide' : 'pergunta'} para baixo" ${position >= count - 1 ? 'disabled' : ''}`)}${button('duplicate-' + type, '⧉', 'square', `aria-label="Duplicar ${type === 'slide' ? 'slide' : 'pergunta'}" ${count?'':'disabled'}`)}${button('delete-' + type, '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M3 6h18M9 6V3h6v3M5 6l1 15h12l1-15M10 10v7m4-7v7"/></svg>', 'square danger-text', `aria-label="Excluir ${type === 'slide' ? 'slide' : 'pergunta'}" ${count?'':'disabled'}`)}`;}
   itemToolbar(type, i, total) {
-    return `<div class="item-toolbar"><div class="item-identity"><span class="item-number">${type === 'slide' ? 'SLIDE' : 'PERGUNTA'} ${String(i + 1).padStart(2, '0')}</span><span class="save-state ${this.dirty ? 'unsaved' : ''}" role="status">${this.groups.live ? esc(this.groups.live.status) : this.dirty ? 'Alterações não salvas' : 'Salvo'}</span></div>${type==='slide'&&(this.visualMode||this.draft.slides[i].kind==='canvas')?`<div class="item-tools">${this.designer.toolbarMarkup()}</div>`:''}<div class="item-actions">${button('move-' + type + '-up', '↑', 'square', `aria-label="Mover ${type === 'slide' ? 'slide' : 'pergunta'} para cima" ${i === 0 ? 'disabled' : ''}`)}${button('move-' + type + '-down', '↓', 'square', `aria-label="Mover ${type === 'slide' ? 'slide' : 'pergunta'} para baixo" ${i >= total - 1 ? 'disabled' : ''}`)}${button('duplicate-' + type, '⧉', 'square', `aria-label="Duplicar ${type === 'slide' ? 'slide' : 'pergunta'}"`)}${button('delete-' + type, 'Excluir', 'link danger-text')}</div></div>`;
+    const position=this.draft.activityBlocks?this.visibleItems().findIndex(v=>v.index===i):i,count=this.draft.activityBlocks?this.visibleItems().length:total;
+    return `<div class="item-toolbar"><div class="item-identity"><span class="item-number">${type === 'slide' ? 'SLIDE' : 'PERGUNTA'} ${String(position + 1).padStart(2, '0')}</span><span class="save-state ${this.dirty ? 'unsaved' : ''}" role="status">${this.groups.live ? esc(this.groups.live.status) : this.dirty ? 'Alterações não salvas' : 'Salvo'}</span></div>${type==='slide'&&(this.visualMode||this.draft.slides[i].kind==='canvas')?`<div class="item-tools">${this.designer.toolbarMarkup()}</div>`:''}</div>`;
   }
   slideEditor() {
     const s = this.draft.slides[this.index];
@@ -193,11 +425,12 @@ export class Studio {
       ${field('Destaque', 'callout', s.callout, 'slide', { textarea: true })}${s.comparison ? button('clear-comparison', 'Remover comparação HDD × SSD deste slide', 'link') : ''}<details class="editor-details" ${s.prompt ? 'open' : ''}><summary>↗ Pergunta para discutir com a turma</summary>${field('Pergunta de discussão', 'prompt', s.prompt, 'slide', { textarea: true })}${field('Explicação da discussão', 'answer', s.answer, 'slide', { textarea: true })}</details><details class="editor-details"><summary>▤ Roteiro do apresentador</summary>${field('Notas só para o professor', 'note', s.note, 'slide', { textarea: true, hint: 'As notas não são enviadas aos celulares dos alunos.' })}</details>`;
   }
   quizEditor() {
-    if (!this.draft.questions.length) return `<div class="editor-empty"><span>✦</span><h2>O aprendizado vira desafio.</h2><p>Crie perguntas com alternativas, tempo e dificuldade. O quiz é opcional: você também pode encerrar a aula sem ele.</p>${button('add-question', '+ Criar primeira pergunta', 'accent')}</div>`;
+    if (!this.visibleItems().length) return `<div class="editor-empty"><span>✦</span><h2>O aprendizado vira desafio.</h2><p>Crie perguntas com alternativas, tempo e dificuldade. O quiz é opcional: você também pode encerrar a aula sem ele.</p>${button('add-question', '+ Criar primeira pergunta', 'accent')}</div>`;
     const q = this.draft.questions[this.questionIndex];
     return `${this.itemToolbar('question', this.questionIndex, this.draft.questions.length)}${field('Pergunta', 'text', q.text, 'question', { textarea: true })}<div class="editor-field"><label for="question-option-count">Número de alternativas</label><select id="question-option-count" data-scope="question" data-field="optionCount">${[2, 3, 4].map(n => `<option value="${n}" ${q.options.length === n ? 'selected' : ''}>${n} alternativas</option>`).join('')}</select></div><fieldset class="quiz-options-editor"><legend>Alternativas <small>Marque a resposta correta</small></legend>${q.options.map((option, i) => `<div><input type="radio" name="correct-answer" id="correct-${i}" data-scope="question" data-field="correct" value="${i}" aria-label="Alternativa correta: ${'ABCD'[i]}" ${q.correct === i ? 'checked' : ''}><label for="option-${i}">${'ABCD'[i]}</label><input id="option-${i}" data-scope="question" data-option="${i}" value="${esc(option)}" aria-label="Alternativa ${'ABCD'[i]}" maxlength="500"></div>`).join('')}</fieldset><div class="editor-field-row"><div class="editor-field"><label for="question-difficulty">Dificuldade</label><select id="question-difficulty" data-scope="question" data-field="difficulty">${Object.keys(difficulties).map(d => `<option ${q.difficulty === d ? 'selected' : ''}>${d}</option>`).join('')}</select><small id="difficulty-points">Até ${difficulties[q.difficulty].toLocaleString('pt-BR')} pontos</small></div>${field('Tempo (segundos)', 'seconds', q.seconds, 'question', { type: 'number', attributes: 'min="5" max="300" step="1"', hint: 'Entre 5 e 300 segundos.' })}</div>${field('Explicação da resposta', 'explanation', q.explanation, 'question', { textarea: true, hint: 'Aparece depois que o professor revela a resposta ou o tempo termina.' })}`;
   }
   previewMarkup() {
+    if(this.currentBlock()?.type==='poll'){const p=this.draft.slides[this.index].poll;return `<div class="mini-slide"><span>ENQUETE</span><h3>${esc(p.text)}</h3><div class="mini-answers">${p.options.map((o,i)=>`<p><b>${'ABCD'[i]}</b>${esc(o)}</p>`).join('')}</div></div>`;}
     if (this.tab === 'quiz') {
       const q = this.draft.questions[this.questionIndex];
       return q ? `<div class="mini-slide"><span>✦ QUIZ · ${esc(q.seconds)} s</span><h3>${esc(q.text || 'Sua pergunta')}</h3><div class="mini-answers">${q.options.map((o, i) => `<p><b>${'ABCD'[i]}</b>${esc(o)}</p>`).join('')}</div></div>` : '<div class="mini-slide"><span>✦ SEU QUIZ</span><h3>A próxima descoberta começa com uma pergunta.</h3></div>';
@@ -209,8 +442,32 @@ export class Studio {
     try { if (s.kind === 'image' && (s.image || s.assetId)) media = assetImage(s); } catch { media = '<p>Adicione uma imagem válida.</p>'; }
     return `<div class="mini-slide"><span>${esc(s.tag || 'SUA AULA')}</span><h3>${esc(s.title || 'Título do slide')}</h3>${media}${s.kind === 'model' ? `<div class="mini-model">◇<small>${s.model === 'custom' ? esc(s.customModel?.name || 'Envie seu modelo') : { ssd: 'SSD SATA', hdd: 'HDD', nvme: 'SSD NVMe' }[s.model]}</small></div>` : ''}<p>${esc(s.intro)}</p><ul>${s.points.map(p => `<li>${esc(p)}</li>`).join('')}</ul>${s.prompt ? `<blockquote>${esc(s.prompt)}</blockquote>` : ''}</div>`;
   }
+  openCoverDialog(lesson) {
+    this.dialog={type:'cover',id:lesson.id,form:{thumbnail:lesson.thumbnail||''}};
+  }
+  async chooseLessonCover(file) {
+    const dialog=this.dialog;
+    if(!file||!dialog?.form)return;
+    const thumbnail=await cropLessonCover(file);
+    if(this.dialog!==dialog||!thumbnail)return;
+    dialog.form.thumbnail=thumbnail;
+    this.callbacks.render();
+  }
   dialogMarkup() {
     if (!this.dialog) return '';
+    if(['new','cover'].includes(this.dialog.type)){
+      const creating=this.dialog.type==='new',form=this.dialog.form;
+      return `<div class="modal-backdrop"><section class="studio-dialog project-dialog" role="dialog" aria-modal="true" aria-labelledby="project-title">
+        <h2 id="project-title">${creating?'Nova aula':'Trocar capa'}</h2>
+        ${creating?projectFields(form):'<label class="lesson-cover-input">'+studioIcon('upload')+' Escolher capa<input type="file" data-lesson-cover-file accept="image/png,image/jpeg,image/webp,image/gif" hidden></label>'}
+        ${form.thumbnail?`<img class="lesson-cover-preview" src="${esc(form.thumbnail)}" alt="Prévia da capa">${button('clear-cover','Remover capa','link')}`:''}
+        <div>${button('cancel-dialog','Cancelar','quiet')}${button(creating?'confirm-new':'confirm-cover',creating?'Criar aula':'Salvar capa','accent')}</div>
+      </section></div>`;
+    }
+    if(this.dialog.type==='cloud-delete'){
+      if(this.dialog.uid!==this.account.user?.id)return '';
+      return `<div class="modal-backdrop"><section class="studio-dialog" role="dialog" aria-modal="true" aria-labelledby="studio-dialog-title"><h2 id="studio-dialog-title">Excluir da nuvem?</h2><p>“${esc(this.dialog.item.title)}” será removida da sua conta. Cópias no dispositivo continuam disponíveis.</p><div>${button('cancel-dialog','Cancelar','quiet')}${button('cloud-delete','Excluir da nuvem','danger')}</div></section></div>`;
+    }
     const l = this.dialog.type === 'rename-draft' ? this.draft : this.library.lessons.find(l => l.id === this.dialog.id);
     if (!l) return '';
     const deleting = this.dialog.type === 'delete';
@@ -230,6 +487,7 @@ export class Studio {
       if (poll) { poll[input.dataset.pollField] = input.dataset.pollField === 'options' ? input.value.split('\n').slice(0,4) : input.value; this.markDirty(); }
       return;
     }
+    if(input.dataset.gameSetting){this.draft.gameSettings||={};this.draft.gameSettings[input.dataset.gameSetting]=input.type==='checkbox'?input.checked:input.type==='range'?Number(input.value):input.value;this.markDirty();return;}
     if (!input.dataset.scope) return;
     const scope = input.dataset.scope, key = input.dataset.field;
     const item = scope === 'lesson' ? this.draft : scope === 'slide' ? this.draft.slides[this.index] : this.draft.questions[this.questionIndex];
@@ -253,7 +511,7 @@ export class Studio {
     }
   }
   markDirty() {
-    this.dirty = true; this.groups?.live?.schedule();
+    this.dirty = true; this.paintSaveButton(); this.groups?.live?.schedule();
     const status = document.querySelector('.save-state');
     if (status) { status.textContent = 'Alterações não salvas'; status.classList.add('unsaved'); }
   }
@@ -265,20 +523,25 @@ export class Studio {
   open(id, navigate = true) {
     this.scrollEditorTop = true;
     this.draft = clone(this.library.lessons.find(l => l.id === id));
-    this.index = 0; this.questionIndex = 0; this.tab = 'slides'; this.visualMode = true; this.designer.selected = ''; this.dirty = false; this.view = 'editor';
+    this.blockId=''; this.index = 0; this.questionIndex = 0; this.tab = 'slides'; this.visualMode = true; this.designer.selected = ''; this.dirty = false; this.view = 'editor';
     if (navigate) this.writeRoute();
   }
-  async launch(lesson, preview) {
+  requestPresentationFullscreen() {
+    if(!document.fullscreenElement)document.documentElement.requestFullscreen?.().catch(()=>this.callbacks.toast('Use Tela cheia na barra da apresentação.'));
+  }
+  async launch(lesson, preview, fullscreen = !preview, startIndex, fromEditor = false) {
     if (this.launching) return;
+    if(fullscreen)this.requestPresentationFullscreen();
     this.launching = true; this.callbacks.render();
     try {
       if (this.groups.live) await this.groups.live.persist();
       const validated = validateLesson(await hydrateLesson(lesson));
       this.nativeViewer?.dispose(); this.nativeViewer = null; this.designer.models.mount(null, null);
-      await (preview ? this.callbacks.preview(validated) : this.callbacks.present(validated));
+      await (preview ? this.callbacks.preview(validated) : this.callbacks.present(validated,startIndex,fromEditor));
     }
     finally { this.launching = false; this.callbacks.render(); }
   }
+  async exportVisual(lesson,format){for(const menu of this.root.querySelectorAll('details.editor-more,details.lesson-menu'))menu.open=false;const dialog=document.createElement('dialog');dialog.className='export-dialog';dialog.innerHTML='<h2>Exportando '+format.toUpperCase()+'</h2><p role="status">Preparando os slides…</p><p>Modelos 3D giram no PPTX e ficam em imagem estática no PDF. Simulações viram imagens. No PPTX, os textos continuam editáveis; as fontes precisam estar disponíveis no outro computador. O áudio fica no projeto do site.</p><button type="button">Cancelar</button>';document.body.append(dialog);dialog.showModal();let cancelled=false;dialog.querySelector('button').onclick=()=>{cancelled=true;};dialog.addEventListener('cancel',e=>{e.preventDefault();cancelled=true;});try{const {exportSlides}=await import('./export-slides.js');await exportSlides(lesson,format,(done,total)=>{if(cancelled)throw new DOMException('Cancelado','AbortError');dialog.querySelector('[role=status]').textContent=done+' de '+total+' slides';});this.callbacks.toast('Arquivo '+format.toUpperCase()+' exportado.');}catch(error){if(error.name!=='AbortError')this.callbacks.toast(error.message||'Não foi possível exportar.');}finally{dialog.close();dialog.remove();}}
   async download(lesson) {
     const content = validateLesson(await hydrateLesson(lesson, true), { draft: true });
     const url = URL.createObjectURL(new Blob([JSON.stringify(content, null, 2)], { type: 'application/json' }));
@@ -290,7 +553,7 @@ export class Studio {
     let input;
     try { input = JSON.parse(await file.text()); } catch { throw Error('Não foi possível ler o JSON. Escolha um arquivo exportado pela plataforma.'); }
     const parsed = validateLesson(input, { draft: true });
-    if ([parsed.quizAudio, ...parsed.slides.map(s => s.audio)].some(a => a?.assetId && !a.data)) throw Error('Este JSON não contém todas as músicas. Exporte novamente a aula no navegador original.');
+    if ([parsed.quizAudio,parsed.lobbyAudio,parsed.questionAudio, ...parsed.slides.flatMap(s => [s.audio,...(s.elements||[]).map(e=>e.audio)])].some(a => a?.assetId && !a.data)) throw Error('Este JSON não contém todas as músicas. Exporte novamente a aula no navegador original.');
     if (parsed.slides.some(s => (s.assetId && !s.image) || (s.customModel?.assetId && !s.customModel.data) || s.elements?.some(e => (e.assetId && !e.image) || (e.customModel?.assetId && !e.customModel.data)))) throw Error('Este JSON não contém todas as imagens. Exporte novamente a aula no navegador original.');
     const archived = await archiveImportedPages(parsed);
     let lesson;
@@ -312,16 +575,30 @@ export class Studio {
     if (this.scrollEditorTop && this.view === 'editor') { this.scrollEditorTop = false; window.scrollTo({ top: 0, left: 0, behavior: 'instant' }); }
     this.account.afterRender();
     this.remote.paint();
+    this.ai.mountCreate();
     const cloudVisible=this.view==='library';
     if(cloudVisible&&this.account.user&&!this.cloudBusy&&(!this.cloudLoaded||!this.cloudWasVisible))queueMicrotask(()=>{if(this.view==='library'&&this.account.user&&!this.cloudBusy)this.cloudAction('cloud-refresh',{});});
     this.cloudWasVisible=cloudVisible;
     this.editorMusic.mountPanel();
     if(this.groups.live&&!this.groups.canEdit)for(const node of this.root.querySelectorAll('.designer-toolbar,.designer-workspace,.editor-field,.quiz-options-editor,.slide-activities'))node.inert=true;
-    this.groups.afterRender();
+    this.groups.afterRender();this.groups.live?.trackPosition();
     this.sharing.mount();
     this.showcase.mount();
     fillAssetAudio(this.root);
+    for (const preview of this.root.querySelectorAll('[data-audio-preview]')) {
+      const track = this.audioTarget(preview.dataset.audioPreview);
+      if (!track) continue;
+      preview.volume = track.volume;
+      preview.defaultPlaybackRate = track.rate || 1;
+      preview.playbackRate = preview.defaultPlaybackRate;
+      preview.loop = track.loop;
+    }
     fillAssetImages(this.root);
+    this.watchCloudCovers();
+    if(this.dialog?.type==='new'){
+      this.root.querySelector('#rename-lesson').value=this.dialog.form.title;
+      this.root.querySelector('#rename-description').value=this.dialog.form.description;
+    }
     if (this.view === 'editor' && this.tab === 'slides') this.designer.afterRender(); else this.designer.models.mount(null, null);
     const slot = this.root.querySelector('.native-model-preview');
     if (slot) {
@@ -344,7 +621,7 @@ export class Studio {
   importMarkup() {
     if (!this.importDialog) return '';
     const job = this.importing;
-    return `<div class="modal-backdrop"><section class="studio-dialog import-dialog" role="dialog" aria-modal="true" aria-labelledby="import-title"><span class="studio-kicker">SUAS AULAS TAMBÉM CABEM AQUI</span><h2 id="import-title">Traga seus slides.</h2><p>Importe um PDF ou PowerPoint (.pptx). Cada página vira um slide para apresentar em tela cheia e acompanhar pelo celular.</p>${job ? `<div class="import-status"><strong>${esc(job.name)}</strong><p id="import-read-status" role="status">Abrindo o arquivo…</p><progress id="import-progress" max="1" aria-label="Progresso da importação"></progress></div>` : `${button('choose-slides', '↑ Escolher PDF ou PPTX', 'accent import-choose')}<p class="import-limits">Até 25 MB e 80 páginas. O arquivo é processado neste navegador.</p><p class="import-hint">PPTX: textos e objetos entram no editor. Fontes ausentes, recursos avançados e animações não suportadas aparecem no relatório de compatibilidade de cada slide. PDF mantém páginas estáticas.</p>`}
+    return `<div class="modal-backdrop"><section class="studio-dialog import-dialog" role="dialog" aria-modal="true" aria-labelledby="import-title"><span class="studio-kicker">SUAS AULAS TAMBÉM CABEM AQUI</span><h2 id="import-title">Traga seus slides.</h2><p>Importe um PDF ou PowerPoint (.pptx). Cada página vira um slide para apresentar em tela cheia e acompanhar pelo celular.</p>${job ? `<div class="import-status"><strong>${esc(job.name)}</strong><p id="import-read-status" role="status">Abrindo o arquivo…</p><progress id="import-progress" max="1" aria-label="Progresso da importação"></progress></div>` : `${button('choose-slides', '↑ Escolher PDF ou PPTX', 'accent import-choose')}<p class="import-limits">Até 25 MB e 80 páginas. O arquivo é processado neste navegador.</p><p class="import-hint">PPTX: textos e objetos entram no editor; os efeitos de animação compatíveis e o primeiro áudio incorporado de até 8 MB por slide são preservados. Fontes, gráficos e efeitos avançados podem variar; confira as observações de compatibilidade em cada slide. PDF mantém páginas estáticas.</p>`}
       ${this.importError ? `<p class="studio-warning" role="alert">${esc(this.importError)}</p>` : ''}<div>${button('cancel-import', job ? 'Cancelar importação' : 'Fechar', 'quiet')}</div></section></div>`;
   }
   async importSlideFile(file) {
@@ -385,11 +662,15 @@ export class Studio {
     if (action.startsWith('cloud-')) { await this.cloudAction(action, target); return; }
     const id = target.dataset.id;
     const lookup = () => this.library.lessons.find(l => l.id === id);
-    if (['library', 'join'].includes(action)) {
+    if (['library', 'join','shared','storage-ai'].includes(action)) {
       if (this.groups.live) await this.groups.stop();
       if (this.dirty) this.save();
-      this.view = action; this.writeRoute(); this.callbacks.render(); return;
+      this.view = action; this.writeRoute(); this.callbacks.render();
+      if(action==='shared'&&this.account.user){await this.groups.refresh();if(this.view==='shared')this.callbacks.render();}
+      return;
     }
+    if(action==='add-activity'){this.activityOrder.open();return;}
+    if(action==='export-pdf'||action==='export-pptx'){await this.exportVisual(id?lookup():this.draft,action.slice(7));return;}
     if (action === 'share-presentation') { await this.sharePresentation(); return; }
     if (action === 'upload-slides') { this.importDialog = true; this.importError = ''; }
     else if (action === 'choose-slides') { document.querySelector('#import-slides-file').click(); return; }
@@ -397,14 +678,47 @@ export class Studio {
       if (this.importing) this.importing.controller.abort();
       else this.importDialog = false;
     }
-    else if (action === 'new') { const l = this.library.save(newLesson()); this.open(l.id); this.visualMode = true; }
+    else if(action==='new')this.dialog={type:'new',form:{title:'',description:'',thumbnail:''}};
+    else if(action==='confirm-new'){
+      const form=this.dialog?.form,title=form?.title.trim();
+      if(!title){this.root.querySelector('#rename-lesson').reportValidity();return;}
+      const l=this.library.save({...newLesson(),title,description:form.description,thumbnail:form.thumbnail});
+      this.dialog=null;this.open(l.id);
+    }
+    else if(action==='cover')this.openCoverDialog(lookup());
+    else if(action==='clear-cover')this.dialog.form.thumbnail='';
+    else if(action==='confirm-cover'){
+      const lesson=this.library.lessons.find(l=>l.id===this.dialog?.id);
+      if(!lesson)return;
+      const saved=this.library.save({...lesson,thumbnail:this.dialog.form.thumbnail});
+      this.dialog=null;
+      this.callbacks.render();
+      if(this.hasCloudCopy(saved)&&this.account.user){
+        const uid=this.account.user.id,{thumbnailFor}=await import('./cover-render.js');
+        const cloud=this.cloudFor(saved),link=this.cloudLinks[uid]?.[saved.id];
+        const path=cloud?.path||link?.path;
+        if(!path)return;
+        const content=validateLesson(await readCloudLesson(this.account.client,path),{draft:true});
+        if(saved.thumbnail)content.thumbnail=saved.thumbnail;else delete content.thumbnail;
+        const cover=await thumbnailFor(content).catch(()=>'');
+        if(this.account.user?.id!==uid)return;
+        const result=await saveCloudLesson(this.account.client,content,cover);
+        if(this.account.user?.id!==uid)return;
+        if(!link||lesson.updatedAt<=link.savedAt)this.linkCloud(saved.id,result.path);
+        await this.cloudAction('cloud-refresh',{});
+        this.callbacks.toast(result.coverSynced===false?'Capa salva. A miniatura na nuvem aguarda a atualização do Worker.':'Capa atualizada na nuvem.');
+      }
+      return;
+    }
     else if (action === 'rename-draft') this.dialog = { type: 'rename-draft', id: this.draft.id };
-    else if (action === 'remove-audio') { const scope = target.dataset.audioScope; if (scope === 'quiz') this.draft.quizAudio = null; else this.draft.slides[this.index].audio = null; this.markDirty(); }
+    else if (action === 'remove-audio') { const scope = target.dataset.audioScope; const owner=this.audioOwner(scope);if(owner)owner[this.audioField(scope)]=null;
+      const slide=this.draft.slides[this.index];if(scope.startsWith('element:')&&slide.audio?.trigger===scope)slide.audio=null;
+      this.markDirty(); }
     else if (action === 'toggle-visual') { this.visualMode = !this.visualMode; this.designer.interacting = ''; }
     else if (action === 'upload-native-model') { this.root.querySelector('#native-model-files').click(); return; }
     else if (action === 'restore-demo') { const l = this.library.restoreDemo(); this.open(l.id); }
-    else if (action === 'edit') this.open(id);
-    else if (action === 'save') { if (this.groups.live) { await this.groups.live.persist(); this.callbacks.toast('Aula compartilhada salva.'); } else { this.save(); this.callbacks.toast('Aula salva neste navegador.'); } }
+    else if (action === 'edit') {if(await this.groups.openForLesson(id))return;this.open(id);}
+    else if (action === 'save') { await this.saveEditor(); return; }
     else if (action === 'duplicate') { this.library.duplicate(id); this.callbacks.toast('Cópia adicionada à biblioteca.'); }
     else if (action === 'rename' || action === 'delete') this.dialog = { type: action, id };
     else if (action === 'cancel-dialog') this.dialog = null;
@@ -425,9 +739,17 @@ export class Studio {
     else if (action === 'import') { document.querySelector('#import-lesson-file').click(); return; }
     else if (action === 'export') { await this.download(lookup()); return; }
     else if (action === 'export-draft') { await this.download(this.draft); return; }
-    else if (['preview', 'present'].includes(action)) { await this.launch(lookup(), action === 'preview'); return; }
-    else if (['preview-draft', 'present-draft'].includes(action)) { this.save(); await this.launch(this.draft, action === 'preview-draft'); return; }
-    else if (action.startsWith('tab-')) { this.tab = action.slice(4); this.writeRoute(); }
+    else if (['preview', 'present'].includes(action)) {
+      const shared=this.groups.documents.find(row=>this.groups.lessonIds.get(row.id)===id);
+      if(shared){
+        if(action==='present')this.requestPresentationFullscreen();
+        await this.groups.open(shared.id);
+        await this.launch(this.draft,action==='preview',false);
+      }else await this.launch(lookup(),action==='preview');
+      return;
+    }
+    else if (['preview-draft', 'present-draft'].includes(action)) { this.save(); await this.launch(this.draft, action === 'preview-draft', action === 'present-draft', this.tab==='slides'&&this.currentBlock()?.type!=='poll'?this.index:undefined, action==='present-draft'); return; }
+    else if (action.startsWith('tab-')) { this.selectBlock(target.dataset.block||activityBlocks(this.draft).find(b=>(b.type==='quiz'?'quiz':'slides')===action.slice(4))?.id); this.writeRoute(); }
     else if (action === 'select-slide') { this.index = Number(target.dataset.index); this.writeRoute(this.view, this.draft.id, true); }
     else if (action === 'select-question') this.questionIndex = Number(target.dataset.index);
     else if (action === 'clear-comparison') { this.draft.slides[this.index].comparison = false; this.markDirty(); }
@@ -437,17 +759,19 @@ export class Studio {
       if (action.startsWith('add-') || action.startsWith('duplicate-')) {
         if (list.length >= (isSlide ? 80 : 50)) throw Error('Você chegou ao limite de ' + (isSlide ? '80 slides.' : '50 perguntas.'));
         let item = action.startsWith('add-') ? (isSlide ? newSlide() : newQuestion()) : { ...clone(list[i]), id: crypto.randomUUID() };
+        if(isSlide&&this.currentBlock()?.type==='poll')item.poll||={text:'Qual é a sua opinião?',options:['Concordo','Ainda tenho dúvidas']};
         if (isSlide && this.groups.live) item = canvasFromSlide(item);
         const next = action.startsWith('add-') ? list.length : i + 1;
-        list.splice(next, 0, item); this[indexKey] = next;
+        list.splice(next, 0, item); this[indexKey] = next;if(this.draft.activityBlocks){const block=this.currentBlock();if(block)block.items.push(item.id);}
       } else if (action.startsWith('delete-')) {
-        if (isSlide && list.length === 1) throw Error('Mantenha pelo menos um slide na aula.');
+        if (isSlide && (list.length === 1||this.draft.activityBlocks&&this.visibleItems().length===1)) throw Error('Mantenha pelo menos um slide na aula.');
         list.splice(i, 1); this[indexKey] = Math.max(0, Math.min(i, list.length - 1));
       } else if (action.startsWith('move-')) {
-        const next = i + (action.endsWith('up') ? -1 : 1);
+        const visible=this.visibleItems().map(v=>v.index),at=visible.indexOf(i),next=visible[at+(action.endsWith('up')?-1:1)]??-1;
         if (next < 0 || next >= list.length) return;
         [list[i], list[next]] = [list[next], list[i]]; this[indexKey] = next;
       } else return;
+      if(this.draft.activityBlocks){this.draft.activityBlocks=normalizeBlocks(this.draft.activityBlocks,this.draft);const visible=this.visibleItems();if(visible.length&&!visible.some(({index})=>index===this[indexKey]))this[indexKey]=visible[0].index;}
       this.markDirty();
     }
     if (this.view === 'editor') this.writeRoute(this.view, this.draft.id, true);

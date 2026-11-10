@@ -1,3 +1,4 @@
+import {createProject} from './project-fixture.js';
 import { test, expect } from '@playwright/test';
 import { readFile } from 'node:fs/promises';
 import { objFixture, glbFixture } from '../model-fixtures.js';
@@ -7,7 +8,7 @@ test('modelos OBJ e GLB enviados funcionam no editor, na sala e no JSON portáti
   const phoneContext = await browser.newContext({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true }), phone = await phoneContext.newPage();
   const errors = []; for (const page of [host, phone]) page.on('pageerror', e => errors.push(e.message));
   await host.goto('/?localSignal');
-  await host.getByRole('button', { name: '+ Nova aula', exact: true }).click();
+  await createProject(host);
   await host.getByRole('button', { name: 'Campos', exact: true }).click();
   await host.getByLabel('Título da aula', { exact: true }).fill('Meus modelos 3D');
   await host.getByLabel('Formato do slide', { exact: true }).selectOption('model');
@@ -41,7 +42,7 @@ test('modelos OBJ e GLB enviados funcionam no editor, na sala e no JSON portáti
 });
 test('editor visual cria texto, move e redimensiona, desfaz, adiciona imagem e 3D e apresenta o layout salvo', async ({ page }) => {
   await page.setViewportSize({ width: 1600, height: 1000 }); await page.goto('/');
-  await page.getByRole('button', { name: '+ Nova aula', exact: true }).click();
+  await createProject(page);
   await expect(page.locator('.slide-designer')).toBeVisible();
   await page.getByLabel('Título da aula', { exact: true }).fill('Ciência nas suas mãos');
   await page.locator('.canvas-object[data-type="text"]').first().locator('.canvas-text').dblclick();
@@ -56,16 +57,18 @@ test('editor visual cria texto, move e redimensiona, desfaz, adiciona imagem e 3
   await page.getByRole('button', { name: 'Desfazer', exact: true }).click();
   expect((await selected.boundingBox()).width).toBeCloseTo(moved.width, 0);
   await page.getByRole('button', { name: 'Refazer', exact: true }).click();
-  await page.getByLabel('Tema do slide', { exact: true }).selectOption('sage');
+  await page.locator('.designer-toolbar [data-style-picker="theme"]').click();
+  await page.locator('.slide-style-menu:popover-open [data-style-value="sage"]').click();
   await expect(page.locator('.slide-canvas')).toHaveCSS('background-color', 'rgb(21, 59, 55)');
   await page.locator('#designer-image-file').setInputFiles({ name: 'imagem.png', mimeType: 'image/png', buffer: image });
   await page.getByLabel('Descrição da imagem', { exact: true }).fill('Uma imagem ilustrativa');
   await page.locator('#designer-model-files').setInputFiles({ name: 'piramide.obj', mimeType: 'text/plain', buffer: Buffer.from(objFixture) });
   await expect(page.locator('.canvas-model-slot .hardware-view')).toHaveAttribute('data-custom-loaded', 'true', { timeout: 30000 });
-  await page.getByLabel('Layout do slide', { exact: true }).selectOption('split');
+  await page.locator('.designer-toolbar [data-style-picker="layout"]').click();
+  await page.locator('.slide-style-menu:popover-open [data-style-value="split"]').click();
   await page.getByRole('button', { name: 'Salvar aula', exact: true }).click();
   await page.screenshot({ path: 'test-results/visual-editor-desktop.png', fullPage: true });
-  await page.getByRole('button', { name: '▷ Prévia', exact: true }).click();
+  await page.getByRole('button', { name: 'Prévia', exact: true }).click();
   await expect(page.locator('.canvas-text').first()).toContainText('Ciência em movimento');
   await expect(page.locator('.canvas-model-slot .hardware-view')).toHaveAttribute('data-custom-loaded', 'true', { timeout: 30000 });
   await page.getByRole('button', { name: 'Apresentar em tela cheia', exact: true }).click();
@@ -80,7 +83,7 @@ test('editor visual cria texto, move e redimensiona, desfaz, adiciona imagem e 3
 });
 test('editor no celular aceita toque e arraste, campos acessíveis e desfazer sem ultrapassar a tela', async ({ browser }) => {
   const context = await browser.newContext({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true }), page = await context.newPage();
-  await page.goto('/'); await page.getByRole('button', { name: '+ Nova aula', exact: true }).click();
+  await page.goto('/'); await createProject(page);
   await page.locator('.designer-layer-list button').first().click();
   await page.getByLabel('Texto do elemento', { exact: true }).fill('Uma ideia pelo celular');
   const node = page.locator('.canvas-object[data-selected="true"]'), box = await node.boundingBox();

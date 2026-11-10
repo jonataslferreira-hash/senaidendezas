@@ -9,10 +9,10 @@ test('biblioteca inicia sozinha e mantem navegacao do editor',async({page})=>{
 test('digitacao alinhada segura o texto por 4,5 segundos e apaga antes de trocar fonte',async({page})=>{
   await page.emulateMedia({reducedMotion:'no-preference'});await page.clock.install({time:new Date('2026-11-02T12:00:00Z')});await page.goto('/');
   const text=page.locator('.living-title'),current=page.locator('.living-title-current');await expect(current).toBeAttached();await page.clock.pauseAt(new Date('2026-11-02T12:01:00Z'));
-  const font=await text.getAttribute('data-font');for(let i=0;i<15&&await current.textContent()!=='ganhar vida.';i++)await page.clock.runFor(60);
-  await expect(current).toHaveText('ganhar vida.');
+  const font=await text.getAttribute('data-font');for(let i=0;i<15&&await current.textContent()!=='ganhar vida';i++)await page.clock.runFor(60);
+  await expect(current).toHaveText('ganhar vida');
   expect(Math.abs(await current.evaluate(el=>el.getBoundingClientRect().left-el.closest('h2').getBoundingClientRect().left))).toBeLessThan(2);
-  await page.clock.runFor(4300);await expect(current).toHaveText('ganhar vida.');await expect(text).toHaveAttribute('data-font',font);
+  await page.clock.runFor(4300);await expect(current).toHaveText('ganhar vida');await expect(text).toHaveAttribute('data-font',font);
   await page.clock.runFor(240);const deleting=await current.textContent();expect(deleting.length).toBeLessThan(12);expect(deleting.length).toBeGreaterThan(0);
   await page.clock.runFor(500);expect(await text.getAttribute('data-font')).not.toBe(font);expect((await current.textContent()).length).toBeGreaterThan(0);
   await page.clock.resume();await page.setViewportSize({width:390,height:844});expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
@@ -29,5 +29,5 @@ test('flutuacao visivel, transicao sobreposta e conta animada',async({page})=>{
   await page.getByRole('button',{name:'Fechar conta',exact:true}).click();await expect(page.locator('.account-dialog')).toHaveCount(0);
 });
 test('movimento reduzido preserva digitacao e ciclo sem flutuacao',async({page})=>{
-  await page.emulateMedia({reducedMotion:'reduce'});await page.goto('/');await expect(page.locator('.demo-board')).toHaveCSS('animation-name','none');await expect(page.locator('.living-title-current')).toHaveText('ganhar vida.',{timeout:1800});await expect(page.locator('[data-showcase]')).toHaveAttribute('data-step','1',{timeout:6000});
+  await page.emulateMedia({reducedMotion:'reduce'});await page.goto('/');await expect(page.locator('.demo-board')).toHaveCSS('animation-name','none');await expect(page.locator('.living-title-current')).toHaveText('ganhar vida',{timeout:1800});await expect(page.locator('[data-showcase]')).toHaveAttribute('data-step','1',{timeout:6000});
 });

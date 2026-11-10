@@ -17,7 +17,7 @@ html[data-theme][data-ui-style] #app :is(.studio-shell,.account-dialog,.studio-d
 html[data-theme][data-ui-style] #app :is(.studio-shell,.account-dialog,.studio-dialog,.group-dialog,.lesson-chat) :is(button,summary):is(.danger-text,[data-account-action=logout],[data-social-action=decline]){--control-ink:#a82e45}
 html[data-theme][data-ui-style] #app :is(.studio-shell,.account-dialog,.studio-dialog,.group-dialog,.lesson-chat,.music-panel,.slide-audio-popover) :is(button,summary):focus-visible{outline:2px solid var(--ui-accent);outline-offset:3px}
 
-html[data-appearance=dark] #app :is(.danger-text,[data-account-action=logout],[data-social-action=decline]){--control-ink:#ffb1c0}
+html[data-theme][data-ui-style][data-appearance=dark] #app :is(.studio-shell,.account-dialog,.studio-dialog,.group-dialog,.lesson-chat) :is(button,summary):is(.danger-text,[data-account-action=logout],[data-social-action=decline]){--control-ink:#ffb1c0}
 .spotify-editor-player>button{background:var(--control-surface);color:var(--ui-ink);border:1px solid var(--control-border);border-radius:var(--control-radius);box-shadow:var(--control-shadow)}
 
 /* Glass is translucent material, with separate reflected edges and depth. */

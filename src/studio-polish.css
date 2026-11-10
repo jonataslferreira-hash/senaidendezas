@@ -1,0 +1,196 @@
+#app .studio-header { justify-content: flex-end; }
+#app .studio-rail nav { margin-top: 24px; }
+#app .rail-link svg { flex: none; }
+#app .cloud-card-menu { justify-content: flex-end; }
+#app .studio-library { padding-bottom: 24px; }
+
+#app .lesson-chat {
+  top: 12px;
+  bottom: 12px;
+  width: min(444px, calc(100vw - 24px));
+  padding: 16px 18px;
+  gap: 8px;
+}
+#app .chat-panel-header {
+  display: grid;
+  grid-template-columns: 36px minmax(0, 1fr) 36px;
+  align-items: center;
+  gap: 8px;
+  min-height: 40px;
+}
+#app .chat-panel-header h2 {
+  grid-column: 2;
+  grid-row: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 9px;
+  margin: 0;
+  min-width: 0;
+  font-size: 18px;
+}
+#app .chat-panel-header h2 > span:not(.person-avatar) {
+  font: inherit;
+  color: inherit;
+  letter-spacing: normal;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+#app .chat-panel-header .person-avatar { font-size: 14px; letter-spacing: normal; }
+#app .chat-panel-header > button:last-child { grid-column: 3; grid-row: 1; justify-self: end; }
+#app .chat-back, #app .chat-contact-open {
+  display: inline-grid;
+  place-items: center;
+  width: 36px;
+  min-width: 36px;
+  height: 36px;
+  min-height: 36px;
+  padding: 0;
+}
+#app .chat-panel-header .chat-back { grid-column: 1; grid-row: 1; }
+#app .social-contact-list article { align-items: center; }
+#app .social-contact-list small { overflow-wrap: anywhere; }
+#app .chat-invites { overflow: auto; max-height: 35%; }
+#app :is(.chat-invites,[data-chat-part=result],.chat-typing):empty { display: none; }
+#app .chat-document-choice > label { display: block; font-size: 12px; margin-bottom: 4px; }
+#app .chat-document-choice > p { font-size: 12px; margin-top: 6px; }
+#app .chat-messages {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  scrollbar-gutter: stable;
+  padding-inline-end: 4px;
+}
+#app .chat-messages > article { flex: none; }
+#app .chat-messages > article:first-child { margin-top: auto; }
+#app .chat-typing { min-height: 0; padding: 0; }
+#app .chat-composer {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 38px;
+  gap: 5px 8px;
+  align-items: stretch;
+  flex: none;
+}
+#app .chat-composer textarea { resize: none; min-height: 78px; }
+#app .chat-compose-actions { display: grid; grid-template-rows: 1fr 1fr; gap: 5px; }
+#app .chat-compose-actions > button {
+  display: grid;
+  place-items: center;
+  min-height: 36px;
+  padding: 0;
+}
+#app .chat-message[data-sender-style] > div :is(strong, time) { color: inherit; }
+#app .chat-message time { font-size: 10px; }
+html[data-appearance=dark] #app .chat-message[data-sender-style=glass] > div {
+  background: linear-gradient(135deg, hsl(var(--sender-hue) 35% 29% / .86), hsl(var(--sender-hue) 20% 23% / .92));
+  color: #faf7ff;
+}
+html[data-appearance=dark] #app .lesson-chat .chat-message[data-sender-style=aero] > div {
+  background: linear-gradient(hsl(var(--sender-hue) 32% 37%), hsl(var(--sender-hue) 35% 24%));
+  border-color: hsl(var(--sender-hue) 38% 48%);
+  box-shadow: inset 0 1px 0 #fff3;
+  color: #fff7fc;
+}
+
+#app .designer-selected-heading { margin: 0; padding: 0; border: 0; }
+#app .inspector-hint { margin: 0 0 9px; font-size: 12px; color: var(--ui-muted); }
+#app .inspector-background { margin-bottom: 10px; }
+#app .designer-selected-heading + .inspector-audio { margin: 10px 0; }
+#app .inspector-background summary,
+#app .inspector-audio summary {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  list-style: none;
+  cursor: pointer;
+  padding: 8px 10px;
+  font-size: 12px;
+}
+#app .inspector-background summary::-webkit-details-marker,
+#app .inspector-audio summary::-webkit-details-marker { display: none; }
+#app .inspector-background summary::after,
+#app .inspector-audio summary::after { content: '+'; margin-left: auto; }
+#app :is(.inspector-background,.inspector-audio)[open] summary::after { content: '−'; }
+#app .designer-inspector .background-swatch {
+  display: inline-block;
+  flex: none;
+  width: 22px;
+  height: 17px;
+  border: 1px solid var(--ui-muted);
+  border-radius: 4px;
+}
+#app .designer-inspector .inspector-audio audio { width: 100%; margin-top: 8px; }
+#app .designer-inspector .inspector-audio input[type=checkbox] { width: auto; }
+#app .editor-top-actions,
+#app .editor-save-controls { display: flex; align-items: center; gap: 4px; }
+#app .editor-top-actions { flex-wrap: wrap; }
+#app .editor-icon { display: inline-grid; place-items: center; padding: 0; width: 34px; min-height: 34px; }
+#app .editor-save-controls button { gap: 5px; }
+#app .editor-command-row .editor-tabs {
+  align-items: center;
+  gap: 4px;
+  padding: 3px;
+  min-height: 0;
+}
+#app .editor-command-row .editor-tabs :is(.block-tab,.block-more,.add-activity) {
+  min-height: 30px;
+  height: auto;
+  padding-block: 3px;
+  font-size: 12px;
+  line-height: 1.15;
+  color: var(--ui-ink);
+}
+#app .editor-tabs .block-count {
+  font-size: 11px;
+  opacity: 1;
+  padding: 1px 4px;
+  border-radius: 4px;
+  background: var(--ui-panel);
+  color: var(--ui-ink);
+}
+#app .editor-outline .outline-heading {
+  text-align: center;
+  margin: 0;
+  padding: 5px 4px 4px;
+}
+#app .editor-outline .outline-heading span {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--ui-ink);
+  letter-spacing: .05em;
+}
+#app .editor-outline .outline-actions { padding-block: 2px 6px; }
+#app .snap-guide { display: none; position: absolute; z-index: 60; pointer-events: none; background: #67e8f9; box-shadow: 0 0 0 1px #0e445e; }
+#app .slide-canvas[data-guide-x] .guide-x { display: block; left: var(--guide-x); inset-block: 0; width: 1px; }
+#app .slide-canvas[data-guide-y] .guide-y { display: block; top: var(--guide-y); inset-inline: 0; height: 1px; }
+
+#app .designer-layer-list { padding-block: 4px; }
+#app [data-play-slide-audio] { cursor: pointer; }
+#app [data-play-slide-audio]:focus-visible { outline: 2px solid var(--ui-accent); outline-offset: -3px; }
+
+@media (min-width: 1000px) {
+  html[data-theme][data-ui-style] #app .item-toolbar:has(.item-tools) {
+    grid-template-columns: minmax(75px, 100px) minmax(0, 1fr);
+  }
+  #app .editor-shell .editor-workspace:has(.slide-designer) {
+    grid-template-columns: clamp(172px, 15vw, 216px) minmax(0, 1fr);
+  }
+  html[data-theme][data-ui-style] #app .editor-shell .designer-stage-wrap { display: flex; flex-direction: column; gap: 5px; padding: 8px 14px 4px; }
+  #app .editor-shell .designer-stage {
+    width: min(100%, 1200px, max(1px, calc((100cqh - 44px) * var(--slide-aspect, 1.777778))));
+  }
+  #app .editor-shell .designer-layer-list { margin-top: auto; margin-bottom: 0; flex: none; }
+}
+@media (max-width: 900px) {
+  #app .studio-rail nav { margin-top: 0; }
+}
+@media (max-width: 600px) {
+  #app .lesson-chat { inset: 8px; width: calc(100vw - 16px); padding: 12px; }
+  #app .chat-composer textarea { font-size: 16px; }
+}
+
+/* Center the outline title and the object tools within their own lanes. */
+#app .editor-outline .outline-heading { width:100%; display:flex; align-items:center; justify-content:center; text-align:center; }
+#app .editor-outline .outline-heading span { text-align:center; }
+#app .editor-shell .designer-toolbar { justify-content:center; }

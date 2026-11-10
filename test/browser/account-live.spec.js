@@ -16,8 +16,8 @@ test('a mesma conta encontra e controla a apresentação; outra conta não receb
  }finally{for(const ctx of contexts)await ctx.close();}
 });
 
-test('entrada preenche o nome e a foto da conta, preservando a escolha de outro nome e avatar',async({page})=>{
+test('entrada usa o nome e a foto da conta sem pedir avatar de novo',async({page})=>{
  const users=await mockAccounts(page);users[0].user_metadata.avatar_path='r2:avatar';const photo='data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jRZkAAAAASUVORK5CYII=';
  await page.addInitScript(({photo})=>{const k='sb-qkpgiwjsqtocvjmqinii-auth-token',s=JSON.parse(localStorage.getItem(k));s.user.user_metadata.avatar_path='r2:avatar';localStorage.setItem(k,JSON.stringify(s));localStorage.setItem('sl-account-sessions-v1',JSON.stringify([{...s,avatar_thumbnail:photo}]));},{photo});await page.route('https://storage-lab-files.lagujf.workers.dev/profile/avatar',r=>r.fulfill({status:404}));
- await page.goto('/?page=join');await expect(page.getByLabel('Como podemos chamar você?',{exact:true})).toHaveValue('Ana');await expect(page.getByRole('button',{name:'Usar minha foto de perfil'})).toHaveAttribute('aria-pressed','true');await page.getByLabel('Como podemos chamar você?',{exact:true}).fill('Meu apelido');await page.getByRole('button',{name:'Avatar 🤖',exact:true}).click();await expect(page.getByLabel('Como podemos chamar você?',{exact:true})).toHaveValue('Meu apelido');await page.getByRole('button',{name:'Usar minha foto de perfil'}).click();await expect(page.getByRole('button',{name:'Usar minha foto de perfil'})).toHaveAttribute('aria-pressed','true');
+ await page.goto('/?page=join');await expect(page.getByLabel('Como podemos chamar você?',{exact:true})).toHaveValue('Ana');await expect(page.locator('.avatar-picker')).toHaveCount(0);await expect.poll(()=>page.evaluate(()=>JSON.parse(localStorage.getItem('sl-account-sessions-v1')||'[]')[0]?.avatar_thumbnail)).toBe(photo);
 });

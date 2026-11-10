@@ -1,8 +1,12 @@
+import {validateCustomFonts} from './custom-fonts.js';
+import {normalizeBlocks} from './activity-blocks.js';
+import {validateGameSettings} from './game-settings.js';
 import { slides, defaultQuestions } from './content.js';
 import { compactLesson } from './assets.js';
 import { validateCustomModel } from './model-files.js';
-import { colorValue, normalizeElements } from './canvas-data.js';
+import { canvasThemes, colorValue, normalizeElements, normalizeBackground } from './canvas-data.js';
 import { validateAudio } from './audio-data.js';
+import { openLayouts } from './open-slide-layouts.js';
 
 export const LIBRARY_KEY = 'storage-lab-lessons-v1';
 export const MAX_LESSON_BYTES = 48 * 1024 * 1024;
@@ -36,10 +40,10 @@ export function newQuestion() {
   return { id: uid(), text: 'Nova pergunta', options: ['Alternativa A', 'Alternativa B', 'Alternativa C', 'Alternativa D'], correct: 0, difficulty: 'Fácil', base: 1000, seconds: 20, explanation: '' };
 }
 export function newLesson() {
-  return { version: 1, id: uid(), title: 'Minha nova aula', description: '', updatedAt: Date.now(), slides: [newSlide()], questions: [] };
+  return { version: 1, id: uid(), title: 'Minha nova aula', description: '',gameSettings:validateGameSettings(),activityOrder:['slides','quiz'],lobbyAudio:null,questionAudio:null,quizAudio:null, updatedAt: Date.now(), slides: [newSlide()], questions: [] };
 }
 export function demoLesson() {
-  return { version: 1, id: 'hdd-ssd-demo', title: 'HDD e SSD: por dentro dos seus dados', description: 'Professor por um dia · Senai · Grupo 4 · 10–12 minutos', updatedAt: 0,
+  return { version: 1, id: 'hdd-ssd-demo', title: 'HDD e SSD: por dentro dos seus dados', description: 'Professor por um dia · Senai · Grupo 4 · 10–12 minutos', updatedAt: 0,gameSettings:validateGameSettings(),activityOrder:['slides','quiz'],lobbyAudio:null,questionAudio:null,quizAudio:null,
     slides: slides.map((slide, i) => ({ ...clone(slide), id: 'hardware-' + i, kind: 'model', mobileFocus:'auto', image: '', imageAlt: '' })),
     questions: defaultQuestions.map((q, i) => ({ ...clone(q), id: 'hardware-question-' + i })) };
 }
@@ -51,7 +55,9 @@ export function validateLesson(input, { draft = false } = {}) {
   if (!Array.isArray(input.questions) || input.questions.length > 50) throw Error('O quiz pode ter até 50 perguntas.');
   const title = text(input.title, 140);
   if (!draft && !title.trim()) throw Error('Dê um título para a aula.');
-  const result = { version: 1, id: text(input.id, 100) || uid(), title, description: text(input.description, 500), updatedAt: Number(input.updatedAt) || 0, quizAudio: validateAudio(input.quizAudio) };
+  const result = { version: 1, id: text(input.id, 100) || uid(), title, description: text(input.description, 500), updatedAt: Number(input.updatedAt) || 0, gameSettings:validateGameSettings(input.gameSettings), activityOrder:Array.isArray(input.activityOrder)&&input.activityOrder[0]==='quiz'?['quiz','slides']:['slides','quiz'], lobbyAudio:validateAudio(input.lobbyAudio),questionAudio:validateAudio(input.questionAudio), quizAudio: validateAudio(input.quizAudio) };
+  if(typeof input.thumbnail==='string'&&input.thumbnail.length<65000&&/^data:image\/(webp|png|jpeg);base64,[A-Za-z0-9+/=]+$/.test(input.thumbnail))result.thumbnail=input.thumbnail;
+  if(input.generatedByAI===true)result.generatedByAI=true;
   result.slides = input.slides.map((s, i) => {
     if (!s || !['text', 'image', 'model', 'document', 'canvas'].includes(s.kind)) throw Error('Tipo inválido no slide ' + (i + 1) + '.');
     const title = text(s.title, 200);
@@ -68,7 +74,7 @@ export function validateLesson(input, { draft = false } = {}) {
     const elements = s.kind === 'canvas' ? normalizeElements(s.elements, draft, imageURL) : [];
     return { id: text(s.id, 100) || uid(), kind: s.kind, title, mobileFocus: s.mobileFocus==='text'||s.mobileFocus==='auto'||/^element:[a-zA-Z0-9_-]{1,100}$/.test(s.mobileFocus||'')?s.mobileFocus:'auto', audio: validateAudio(s.audio), tag: text(s.tag, 160), intro: text(s.intro), points: Array.isArray(s.points) ? s.points.slice(0, 12).map(p => text(p, 1000)) : [],
       importWarnings:Array.isArray(s.importWarnings)?s.importWarnings.slice(0,40).map(w=>text(w,240)):[],animations:Array.isArray(s.animations)?s.animations.slice(0,100).filter(a=>a&&typeof a.id==='string'&&['appear','fadeIn','fadeOut','floatIn','flyIn','flyOut','splitIn','wipeIn','zoomIn'].includes(a.effect)).map(a=>({id:text(a.id,100),group:Math.max(0,Math.min(100,Math.floor(Number(a.group)||0))),effect:a.effect,duration:Math.max(1,Math.min(30000,Number(a.duration)||500)),delay:Math.max(0,Math.min(120000,Number(a.delay)||0)),direction:text(a.direction,30),orientation:text(a.orientation,30)})):[],poll: validatePoll(s.poll, draft), transition: ['slide', 'fade', 'none'].includes(s.transition) ? s.transition : 'slide',
-      callout: text(s.callout, 1000), note: text(s.note), prompt: text(s.prompt, 1000), answer: text(s.answer, 3000), comparison: Boolean(s.comparison), model: ['ssd', 'hdd', 'nvme', 'custom'].includes(s.model) ? s.model : 'ssd', customModel, image, imageAlt: text(s.imageAlt, 500), elements, visualTheme: ['midnight','paper','sage','ocean'].includes(s.visualTheme)?s.visualTheme:'', background: colorValue(s.background, '#171324'),
+      callout: text(s.callout, 1000), note: text(s.note), prompt: text(s.prompt, 1000), answer: text(s.answer, 3000), comparison: Boolean(s.comparison), model: ['ssd', 'hdd', 'nvme', 'custom'].includes(s.model) ? s.model : 'ssd', customModel, image, imageAlt: text(s.imageAlt, 500), elements, visualTheme: typeof s.visualTheme==='string'&&Object.hasOwn(canvasThemes,s.visualTheme)?s.visualTheme:'', background: colorValue(s.background, '#171324'), backgroundFill:normalizeBackground(s.backgroundFill), layout:['title','split','spotlight'].includes(s.layout)||openLayouts.has(s.layout)?s.layout:'',
       ...(assetId ? { assetId } : {}), sourceType: ['pdf', 'pptx'].includes(s.sourceType) ? s.sourceType : '', pageWidth: Math.max(1, Math.min(8000, Number(s.pageWidth) || 1600)), pageHeight: Math.max(1, Math.min(8000, Number(s.pageHeight) || 900)) };
   });
   result.questions = input.questions.map((q, i) => {
@@ -81,6 +87,8 @@ export function validateLesson(input, { draft = false } = {}) {
     if (!draft && (!questionText.trim() || options.some(o => !o.trim()))) throw Error('Preencha a pergunta ' + (i + 1) + ' e todas as alternativas.');
     return { id: text(q.id, 100) || uid(), text: questionText, options, correct: q.correct, difficulty: q.difficulty, base: difficulties[q.difficulty], seconds, explanation: text(q.explanation, 3000) };
   });
+  if(input.customFonts?.length)result.customFonts=validateCustomFonts(input.customFonts);
+  if(input.activityBlocks!=null)result.activityBlocks=normalizeBlocks(input.activityBlocks,result);
   if (JSON.stringify(result).length > MAX_LESSON_BYTES) throw Error('A aula excede o limite de 48 MB.');
   return result;
 }

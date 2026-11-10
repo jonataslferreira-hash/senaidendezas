@@ -7,7 +7,7 @@ const isText = (value,key) => textFields.has(key) && typeof value === 'string' &
 function shared(value, key = '') {
   if(isText(value,key))return new Y.Text(value);
   if(Array.isArray(value)) {
-    if(['slides','questions','elements'].includes(key) || value.length && value.every(item=>item && typeof item==='object' && typeof item.id==='string')) {
+    if(['slides','questions','elements'].includes(key) || key!=='animations' && value.length && value.every(item=>item && typeof item==='object' && typeof item.id==='string')) {
       const map=new Y.Map(),items=new Y.Map(),order=new Y.Array();map.set('$list',true);map.set('items',items);map.set('order',order);
       for(const item of value)items.set(item.id,shared(item));order.insert(0,value.map(item=>item.id));return map;
     }

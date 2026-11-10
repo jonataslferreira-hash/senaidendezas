@@ -30,7 +30,7 @@ async function pdfPages(bytes, { signal, progress }) {
   pdf.GlobalWorkerOptions.workerSrc = workerURL;
   const base = new URL('pdfjs-assets/', document.baseURI).href;
   const loading = pdf.getDocument({ data: bytes, isEvalSupported: false, useSystemFonts: true,
-    cMapUrl: base + 'cmaps/', cMapPacked: true, standardFontDataUrl: base + 'standard_fonts/', wasmUrl: base + 'wasm/' });
+    cMapUrl: base + 'cmaps/', cMapPacked: true, standardFontDataUrl: base + 'standard_fonts/', wasmUrl: base + 'wasm/', iccUrl: base + 'iccs/' });
   const abort = () => { loading.destroy().catch(() => {}); };
   signal?.addEventListener('abort', abort, { once: true });
   let doc;

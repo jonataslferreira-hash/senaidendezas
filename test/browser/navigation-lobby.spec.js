@@ -1,3 +1,4 @@
+import {createProject} from './project-fixture.js';
 import { test, expect } from '@playwright/test';
 import { readFile } from 'node:fs/promises';
 import { wavFixture } from '../audio-fixture.js';
@@ -5,23 +6,23 @@ import { wavFixture } from '../audio-fixture.js';
 test('Voltar, Avançar e recarregar preservam a página da aula e abrem o visual por padrão', async ({ page }) => {
   await page.goto('/');
   await page.locator('.lesson-card').first().locator('[data-studio-action="edit"]').click();
-  await expect(page).toHaveURL(/page=editor/); await expect(page.locator('.slide-designer')).toBeVisible();
+  await expect(page).toHaveURL(/edit=/); await expect(page.locator('.slide-designer')).toBeVisible();
   await page.getByLabel('Título da aula', { exact: true }).fill('Uma aula com endereço');
   await page.goBack(); await expect(page.locator('.studio-library')).toBeVisible(); await expect(page).toHaveURL(/page=library/);
   await page.goForward(); await expect(page.getByLabel('Título da aula', { exact: true })).toHaveValue('Uma aula com endereço');
-  await page.getByRole('tab', { name: /Quiz/ }).click(); await expect(page).toHaveURL(/tab=quiz/);
+  await page.getByRole('tab', { name: /Quiz/ }).click(); await expect(page.getByRole('tab',{name:/Quiz/})).toHaveAttribute('aria-selected','true');
   await page.goBack(); await expect(page.locator('.slide-designer')).toBeVisible();
   await page.reload(); await expect(page.locator('.slide-designer')).toBeVisible();
   await page.getByRole('button', { name: 'Campos', exact: true }).click(); await expect(page.getByLabel('Título do slide', { exact: true })).toBeVisible();
   await page.getByRole('button', { name: 'Editor visual', exact: true }).click();
-  await page.getByRole('button', { name: '▷ Prévia', exact: true }).click(); await expect(page).toHaveURL(/page=preview/);
+  await page.getByRole('button', { name: 'Prévia', exact: true }).click(); await expect(page).toHaveURL(/page=preview/);
   await page.goBack(); await expect(page.locator('.slide-designer')).toBeVisible();
   await page.goForward(); await expect(page.getByText('Prévia · sem transmissão', { exact: true })).toBeVisible();
 });
 test('upload de música para slide e quiz toca, pausa, persiste e exporta com a aula', async ({ page }) => {
   const errors = []; page.on('pageerror', e => errors.push(e.message));
   await page.clock.install();
-  await page.goto('/'); await page.getByRole('button', { name: '+ Nova aula', exact: true }).click();
+  await page.goto('/'); await createProject(page);
   await page.locator('[data-audio-upload="slide"]').setInputFiles({ name: 'narracao.wav', mimeType: 'audio/wav', buffer: wavFixture() });
   await expect(page.locator('.audio-name')).toHaveText('narracao.wav');
   await page.getByRole('tab', { name: /Quiz/ }).click();
@@ -33,7 +34,7 @@ test('upload de música para slide e quiz toca, pausa, persiste e exporta com a 
   const json = JSON.parse(await readFile(await (await download).path(), 'utf8'));
   expect(json.quizAudio.data).toMatch(/^data:audio\/wav;base64,/); expect(json.quizAudio.volume).toBe(.2); expect(json.slides[0].audio.assetId).toBeUndefined();
   await page.reload(); await expect(page.locator('.audio-name')).toHaveText('festa.wav');
-  await page.getByRole('button', { name: '▷ Prévia', exact: true }).click();
+  await page.getByRole('button', { name: 'Prévia', exact: true }).click();
   await page.locator('[data-action="sound"]').click();
   await expect.poll(() => page.locator('audio[data-soundtrack]').evaluate(a => a.paused)).toBe(false);
   await page.getByRole('button', { name: 'Iniciar quiz', exact: true }).click();

@@ -1,0 +1,16 @@
+export async function recordAudio({title='Gravar áudio',confirm='Usar gravação'}={}){
+ if(!navigator.mediaDevices?.getUserMedia||!window.MediaRecorder)throw Error('Este navegador não oferece gravação. Abra o site por HTTPS e permita o microfone.');
+ const stream=await navigator.mediaDevices.getUserMedia({audio:{echoCancellation:true,noiseSuppression:true}}).catch(()=>{throw Error('Não foi possível abrir o microfone. Permita o acesso nas configurações do navegador.');});
+ return new Promise((resolve,reject)=>{
+  const dialog=document.createElement('dialog');dialog.className='record-dialog';dialog.innerHTML='<header><h2></h2><button type="button" data-cancel aria-label="Cancelar gravação">×</button></header><div class="record-indicator">● <span>Gravando</span></div><output>0:00</output><audio controls hidden></audio><p>Gravação de até 2 minutos. Você pode ouvir antes de usar.</p><div class="record-actions"><button type="button" data-stop>Parar gravação</button><button type="button" data-use disabled></button><button type="button" data-cancel>Cancelar</button></div>';
+  dialog.querySelector('h2').textContent=title;dialog.querySelector('[data-use]').textContent=confirm;
+  const mime=['audio/webm;codecs=opus','audio/ogg;codecs=opus','audio/mp4'].find(t=>MediaRecorder.isTypeSupported(t));
+  let recorder,url,timer,done=false,file;const chunks=[];
+  const finish=value=>{if(done)return;done=true;clearInterval(timer);if(recorder?.state==='recording')recorder.stop();stream.getTracks().forEach(t=>t.stop());if(url)URL.revokeObjectURL(url);dialog.close();dialog.remove();resolve(value);};
+  try{recorder=new MediaRecorder(stream,mime?{mimeType:mime,audioBitsPerSecond:48000}:{audioBitsPerSecond:48000});}catch(error){stream.getTracks().forEach(t=>t.stop());reject(Error('Não foi possível iniciar a gravação.'));return;}
+  recorder.ondataavailable=e=>{if(e.data.size)chunks.push(e.data);if(chunks.reduce((n,c)=>n+c.size,0)>7*1024*1024&&recorder.state==='recording')recorder.stop();};
+  recorder.onstop=()=>{clearInterval(timer);stream.getTracks().forEach(t=>t.stop());if(done)return;const type=recorder.mimeType.split(';')[0],extension=type.includes('mp4')?'m4a':type.includes('ogg')?'ogg':'webm';file=new File(chunks,'Gravação-'+Date.now()+'.'+extension,{type});file.recordedSeconds=Math.min(120,(Date.now()-started)/1000);url=URL.createObjectURL(file);const audio=dialog.querySelector('audio');audio.src=url;audio.hidden=false;dialog.querySelector('[data-use]').disabled=!file.size;dialog.querySelector('[data-stop]').disabled=true;dialog.querySelector('.record-indicator').textContent='Gravação pronta';};
+  recorder.onerror=()=>finish(null);dialog.addEventListener('cancel',e=>{e.preventDefault();finish(null);});dialog.addEventListener('click',e=>{if(e.target.closest('[data-cancel]'))finish(null);if(e.target.closest('[data-stop]')&&recorder.state==='recording')recorder.stop();if(e.target.closest('[data-use]')&&file)finish(file);});
+  document.body.append(dialog);dialog.showModal();const started=Date.now();recorder.start(500);timer=setInterval(()=>{const seconds=Math.floor((Date.now()-started)/1000);dialog.querySelector('output').textContent=Math.floor(seconds/60)+':'+String(seconds%60).padStart(2,'0');if(seconds>=120&&recorder.state==='recording')recorder.stop();},250);
+ });
+}

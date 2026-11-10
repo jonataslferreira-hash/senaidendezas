@@ -3,10 +3,13 @@ export class PptxAnimations{
  mount(root,slide,key,step=0){
   key+=':'+step;
   if(key!==this.key){this.key=key;this.started=performance.now();}
-  if(!slide?.animations?.length||prefersReducedMotion())return;
+  if(!slide?.animations?.length)return;
+  const reduced=prefersReducedMotion();
+  const objects=new Map([...root.querySelectorAll('.canvas-presenting [data-object-id]')].map(node=>[node.dataset.objectId,node]));
   const elapsed=performance.now()-this.started;
-  for(const effect of slide.animations){const target=[...root.querySelectorAll('.canvas-presenting [data-object-id]')].find(n=>n.dataset.objectId===effect.id);if(!target)continue;
+  for(const effect of slide.animations){const target=objects.get(effect.id);if(!target)continue;
    if((effect.group||0)>step){if(!effect.effect.endsWith('Out')&&!slide.animations.some(a=>a.id===effect.id&&(a.group||0)<=step))target.style.opacity='0';continue;}
+   if(reduced){target.style.opacity=effect.effect.endsWith('Out')?'0':'1';continue;}
    let from={opacity:0},to={opacity:1};
    if(effect.effect==='fadeOut'){from={opacity:1};to={opacity:0};}
    if(['floatIn','flyIn','flyOut'].includes(effect.effect)){const offsets={left:'-100% 0',right:'100% 0',up:'0 -100%',down:'0 100%',top:'0 -100%',bottom:'0 100%'};from={opacity:0,translate:effect.effect==='floatIn'?'0 25%':offsets[effect.direction]||'0 100%'};to={opacity:1,translate:'0 0'};if(effect.effect==='flyOut')[from,to]=[to,from];}

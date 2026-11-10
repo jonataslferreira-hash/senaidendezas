@@ -72,7 +72,7 @@ test('slide de imagem do editor ocupa a tela inteira; texto pode ser mostrado, e
   lesson.slides.push({ ...lesson.slides[0], id: 'text-slide', kind: 'text', title: 'Os três estados da água', points: ['Sólido', 'Líquido', 'Gasoso'], image: '' });
   await page.locator('#import-lesson-file').setInputFiles({ name: 'aula.json', mimeType: 'application/json', buffer: Buffer.from(JSON.stringify(lesson)) });
   await expect(page.getByLabel('Título da aula', { exact: true })).toHaveValue(lesson.title);
-  await page.getByRole('button', { name: '▷ Prévia', exact: true }).click();
+  await page.getByRole('button', { name: 'Prévia', exact: true }).click();
   await page.getByRole('button', { name: 'Apresentar em tela cheia', exact: true }).click();
   const box = await page.locator('.lesson-image img').boundingBox();
   expect(box.x).toBe(0); expect(box.y).toBe(0); expect(box.width).toBe(1440); expect(box.height).toBe(1000);

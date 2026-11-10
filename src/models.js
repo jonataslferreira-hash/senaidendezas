@@ -21,7 +21,7 @@ export class HardwareViewer {
     this.detail = this.el.querySelector('.part-detail');
     if (!defer) this.initialize();
   }
-  initialize() {
+  initialize(defaultModel = true) {
     if (this.initialized || this.disposed) return;
     this.initialized = true;
     try {
@@ -56,8 +56,8 @@ export class HardwareViewer {
       this.ray.setFromCamera(new THREE.Vector2((e.clientX - rect.left) / rect.width * 2 - 1, -(e.clientY - rect.top) / rect.height * 2 + 1), this.camera);
       const hit = this.ray.intersectObjects(this.group.children, true).find(hit => hit.object.userData.part || hit.object.userData.customPart);
       if (hit?.object.userData.customPart) {
-        this.detail.querySelector('strong').textContent = hit.object.userData.customPart;
-        this.detail.querySelector('p').textContent = 'Peça do modelo enviado. Arraste para girar e use o zoom para explorar.';
+        this.detail.querySelector('strong').textContent = this.displayTitle || hit.object.userData.customPart;
+        this.detail.querySelector('p').textContent = this.displayDescription || 'Peça do modelo enviado. Arraste para girar e use o zoom para explorar.';
       } else if (hit) this.select(hit.object.userData.part);
     });
     this.observer = new ResizeObserver(() => this.resize()); this.observer.observe(this.el);
@@ -88,7 +88,7 @@ export class HardwareViewer {
       }
       if (moving || cameraMoved) this.invalidate(false);
     };
-    this.setModel('ssd', true);
+    if (defaultModel) this.setModel('ssd', true);
   }
   invalidate(dirty = true) {
     if (dirty) this.dirty = true;
@@ -96,10 +96,20 @@ export class HardwareViewer {
     this.frameTimer = setTimeout(() => { this.frameTimer = null; this.frameId = requestAnimationFrame(this.drawFrame); }, 33);
   }
   select(part) {
+    this.selectedPart=part;
     const [title, text] = details[part] || details.casing;
-    this.detail.querySelector('strong').textContent = title;
-    this.detail.querySelector('p').textContent = text;
+    this.detail.querySelector('strong').textContent = this.displayTitle || title;
+    this.detail.querySelector('p').textContent = this.displayDescription || text;
     requestAnimationFrame(() => this.resize());
+  }
+  setPresentation({modelLabel='',modelDescription='',modelDetailsHidden=false}={}) {
+    this.displayTitle=modelLabel.trim();this.displayDescription=modelDescription.trim();
+    this.detail.hidden=Boolean(modelDetailsHidden);
+    if(this.type==='custom'){
+      if(this.el.dataset.customLoaded!=='error')this.detail.querySelector('strong').textContent=this.displayTitle||this.customSource?.name||'Modelo 3D';
+      this.detail.querySelector('p').textContent=this.displayDescription;
+      this.resize();
+    }else this.select(this.selectedPart);
   }
   resize() {
     if (!this.renderer) return;
@@ -112,6 +122,7 @@ export class HardwareViewer {
   setModel(type, exploded) {
     this.initialize();
     if (!this.renderer) return;
+    this.customSource = null;
     this.scene.environment = null;
     this.dirty = true;
     if (this.type !== type) {
@@ -177,16 +188,24 @@ export class HardwareViewer {
     for (const part of this.group.children) part.userData.targetY = (part.userData.baseY || 0) + (exploded ? part.userData.lift || 0 : 0);
     this.invalidate();
   }
-  async setCustomModel(model) {
-    this.initialize();
+  async setCustomModel(model, label = '') {
+    this.initialize(false);
     if (!this.renderer || !model) return;
+    this.customSource = model;
+    const title = label.trim() || 'Modelo 3D';
+    const heading = this.detail.querySelector('strong');
     const key = model.assetId || model.name + ':' + model.data?.length;
-    if (this.customKey === key) return;
+    if (this.customKey === key) {
+      if (this.customLabel !== title && this.el.dataset.customLoaded !== 'error') heading.textContent = title;
+      this.customLabel = title;
+      return;
+    }
+    this.customLabel = title;
     this.customKey = key; const version = this.loadVersion = (this.loadVersion || 0) + 1;
     this.el.dataset.customLoaded = 'loading';
     this.renderer.domElement.setAttribute('aria-label', 'Modelo 3D enviado. Arraste para girar e toque nas peças.');
     this.type = 'custom';
-    this.detail.querySelector('strong').textContent = 'Carregando ' + model.name;
+    heading.textContent = title;
     this.detail.querySelector('p').textContent = 'Preparando o modelo 3D…';
     try {
       const { loadCustomObject, disposeObject } = await import('./model-loader.js');
@@ -200,7 +219,7 @@ export class HardwareViewer {
       }
       this.scene.environment = this.environment.texture;
       disposeObject(this.group); this.group.clear(); this.group.add(object);
-      this.detail.querySelector('strong').textContent = model.name;
+      heading.textContent = this.customLabel;
       this.detail.querySelector('p').textContent = 'Modelo enviado · arraste para girar, aproxime com dois dedos e toque nas peças.';
       this.reset(); this.dirty = true; this.resize();
       this.el.dataset.customLoaded = 'true';

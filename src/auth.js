@@ -130,7 +130,9 @@ export class Account {
     // Disable in place so passwords remain in the field only while this request runs.
     for (const input of form.querySelectorAll('input,button')) input.disabled = true;
     try {
-      const redirect = new URL(location.pathname, location.origin), invite = new URLSearchParams(location.search).get('invite');
+      const redirect = new URL(location.href);
+      const invite = redirect.searchParams.get('invite');
+      redirect.search=''; redirect.hash='';
       if (/^[a-f0-9-]{36}$/i.test(invite || '')) redirect.searchParams.set('invite', invite);
       const redirectTo = redirect.href;
       let result;

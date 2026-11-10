@@ -1,0 +1,39 @@
+const paths = {
+  sidebar: 'M3 5h18v14H3zM9 5v14',
+  animate: 'M8 5l12 7-12 7zM3 8v8',
+  duplicate:'M8 8h12v12H8zM4 16V4h12',
+  forward:'M4 20h8v-8H4zM15 12V3m-4 4 4-4 4 4',
+  backward:'M4 4h8v8H4zM15 12v9m-4-4 4 4 4-4',
+  lock:'M5 10h14v11H5zm3 0V7a4 4 0 0 1 8 0v3',
+  unlock:'M5 10h14v11H5zm3 0V7a4 4 0 0 1 8 0',
+  upload:'M12 16V3m-5 5 5-5 5 5M4 15v6h16v-6',
+  reload:'M20 4v5h-5m5 0a8 8 0 1 0 .4 6',
+  monitor:'M3 4h18v13H3zM8 21h8m-4-4v4',
+  sparkle:'M5 5q6 4 7 4t7-4q-4 6-4 7t4 7q-6-4-7-4t-7 4q4-6 4-7T5 5Z',
+  robot:'M12 3v3m-5 0h10a4 4 0 0 1 4 4v7a3 3 0 0 1-3 3H6a3 3 0 0 1-3-3v-7a4 4 0 0 1 4-4Zm-1 6h.1m9 0h.1M8 14h8m-6 3h4',
+  trash:'M3 6h18M9 6V3h6v3M5 6l1 15h12l1-15M10 10v7m4-7v7',
+  volume:'M11 5l-6 4H2v6h3l6 4zm4 3a6 6 0 0 1 0 8m3-11a10 10 0 0 1 0 14',
+  speed:'M4 18a9 9 0 1 1 16 0zM12 14l4-5',
+  spotify:'M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0ZM7 10q5-2 10 1M8 13q4-1 8 1m-7 2q3-1 6 0',
+  camera:'M3 7h4l2-3h6l2 3h4v13H3zM15 13a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z',
+  qr:'M3 3h6v6H3zm12 0h6v6h-6zM3 15h6v6H3zm12 0h3v3h3v3h-6zm-3-3h2m4 0h3',
+  image:'M3 4h18v16H3zm1 13 5-5 4 4 3-3 4 4M9 8h.1',
+  crop:'M6 2v16h16M2 6h16v16',
+  library: 'M3 5h4v14H3zM10 5h4v14h-4zM17 6l3-1 2 13-3 1z',
+  join: 'M13 4h7v16h-7M3 12h12m-4-4 4 4-4 4',
+  chat: 'M4 4h16a1 1 0 0 1 1 1v11a1 1 0 0 1-1 1h-9l-6 4v-4H4a1 1 0 0 1-1-1V5a1 1 0 0 1 1-1Z',
+  chevron: 'm15 5-7 7 7 7',
+  cloud: 'M7 18h11a4 4 0 1 0-.8-7.9A6 6 0 0 0 5.6 11 3.6 3.6 0 0 0 7 18Z',
+  download: 'M12 3v12m-5-5 5 5 5-5M4 16v4h16v-4',
+  preview: 'M2 12s4-7 10-7 10 7 10 7-4 7-10 7S2 12 2 12Zm13 0a3 3 0 1 0-6 0 3 3 0 0 0 6 0Z',
+  collaborate: 'M16 20H3v-2a4 4 0 0 1 4-4h5a4 4 0 0 1 4 4zm-3-12a3.5 3.5 0 1 0-7 0 3.5 3.5 0 0 0 7 0Zm6 1v6m-3-3h6',
+  share: 'M12 15V2m-4 4 4-4 4 4M7 9H4v12h16V9h-3',
+  next: 'm9 5 7 7-7 7',
+  back: 'M20 12H4m7-7-7 7 7 7',
+  mic: 'M9 5a3 3 0 0 1 6 0v7a3 3 0 0 1-6 0zM5 11v1a7 7 0 0 0 14 0v-1m-7 8v3m-4 0h8',
+  send: 'm22 2-7 20-4-9-9-4zm0 0L11 13'
+};
+
+export function studioIcon(name) {
+  return `<svg width="18" height="18" viewBox="0 0 24 24" fill="${name==='sparkle'?'currentColor':'none'}" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="${paths[name]}"/></svg>`;
+}

@@ -1,3 +1,4 @@
+import durations from './editor-track-durations.json' with {type:'json'};
 const wiiPlay = new URL('./assets/covers/wii-play.jpg', import.meta.url).href;
 const wiiParty = new URL('./assets/covers/wii-party.jpg', import.meta.url).href;
 const wiiU = new URL('./assets/covers/wii-u.jpg', import.meta.url).href;
@@ -10,3 +11,5 @@ export const editorTracks = [
 ];
 export function musicCover(track){return track.cover||'data:image/svg+xml,'+encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" width="160" height="160"><rect width="160" height="160" rx="24" fill="${track.color}"/><circle cx="111" cy="40" r="49" fill="#ffffff22"/><circle cx="44" cy="126" r="57" fill="#ffffff22"/><text x="80" y="98" text-anchor="middle" fill="#fff" font-family="Georgia" font-size="66">♫</text></svg>`);}
 export function spotifyTrackId(value){try{const u=new URL(value);if(u.protocol!=='https:'||u.hostname!=='open.spotify.com')return null;return /^\/(?:intl-[a-z]{2}\/)?track\/([a-zA-Z0-9]{22})\/?$/.exec(u.pathname)?.[1]||null;}catch{return null;}}
+
+for(const track of editorTracks)track.duration=durations[track.id]||NaN;

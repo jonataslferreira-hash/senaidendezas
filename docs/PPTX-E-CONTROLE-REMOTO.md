@@ -21,9 +21,14 @@ pela sala. O controle Próximo executa o próximo grupo antes de trocar o slide.
 
 **Esta implementação não é uma reprodução completa do PowerPoint.** Há limites
 de fontes disponíveis, formatação mista, listas, efeitos, mídia e renderização.
-O relatório de compatibilidade aparece no próprio slide. Vídeo, áudio original,
-avanço automático e animações não suportadas não são apresentados como preservados.
-Salvar/exportar a aula usa o formato JSON do site, não um round-trip de PPTX.
+O relatório de compatibilidade aparece no próprio slide. O importador pode
+recuperar o primeiro áudio embutido compatível por slide, de até 8 MB. Vídeos,
+avanço automático e efeitos fora da lista acima podem se perder.
+
+No editor, o botão de download ao lado de **Campos** exporta PDF ou PPTX.
+Modelos 3D viram GIFs em loop no PPTX, com movimento no modo de apresentação
+dos leitores que reproduzem GIF. No PDF, os modelos aparecem como imagens.
+Para transferir a aula editável completa entre navegadores, use **Baixar JSON**.
 
 Antes de adoção institucional, é necessário validar um conjunto representativo
 de apresentações do Senai e decidir se os recursos restantes exigem integração

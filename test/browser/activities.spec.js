@@ -1,3 +1,4 @@
+import {createProject} from './project-fixture.js';
 import { test, expect } from '@playwright/test';
 
 test('aparência persiste e enquete do editor abre, recebe voto e volta ao slide na prévia', async ({ page }) => {
@@ -7,14 +8,14 @@ test('aparência persiste e enquete do editor abre, recebe voto e volta ao slide
   await page.reload(); await expect(page.locator('html')).toHaveAttribute('data-appearance', 'dark');
   await page.screenshot({ path: 'test-results/library-dark.png', fullPage: true, animations: 'disabled' });
   await page.evaluate(async()=>{const {applyAppearance}=await import('/src/appearance.js');applyAppearance('light');});
-  await page.getByRole('button', { name: 'Começar uma aula' }).click();
+  await createProject(page);
   await page.getByText('Atividades e passagem deste slide', { exact: false }).click();
   await page.getByLabel('Adicionar enquete a este slide').check();
   await page.getByLabel('Pergunta da enquete', { exact: true }).fill('Querem explorar mais?');
   await page.getByLabel('Opções (uma por linha, de 2 a 4)').fill('Sim!\nPodemos seguir');
   await page.getByLabel('Transição ao entrar neste slide').selectOption('fade');
   await page.getByRole('button', { name: 'Salvar aula', exact: true }).click();
-  await page.getByRole('button', { name: '▷ Prévia', exact: true }).click();
+  await page.getByRole('button', { name: 'Prévia', exact: true }).click();
   await page.getByRole('button', { name: 'Abrir enquete', exact: false }).click();
   await expect(page.getByRole('heading', { name: 'Querem explorar mais?' })).toBeVisible();
   await page.locator('[data-poll-vote="0"]').click();

@@ -46,7 +46,7 @@ test('PDF importa no build do GitHub Pages; arquivos inválidos, excesso de pág
   page.on('pageerror', e => errors.push(e.message));
   await page.goto('http://127.0.0.1:4173/senaidendezas/');
   await upload(page, 'no-github-pages.pdf', pdfFixture());
-  await page.getByRole('button', { name: '▷ Prévia', exact: true }).click();
+  await page.getByRole('button', { name: 'Prévia', exact: true }).click();
   await expect(page.locator('.document-stage img')).toHaveJSProperty('naturalWidth', 1920);
   await page.getByRole('button', { name: 'Sair', exact: true }).click();
   await page.locator('.editor-heading [data-studio-action="library"]').click();

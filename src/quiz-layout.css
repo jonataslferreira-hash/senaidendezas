@@ -1,0 +1,84 @@
+/* One viewport per game scene; lists may open inside an overlay. */
+#app.quiz-party:has(>main),#app.quiz-party:has(>main.game-question){height:100dvh;min-height:0;display:grid;grid-template-rows:64px minmax(0,1fr);overflow:hidden}
+#app.quiz-party>.header{height:64px;min-height:0;width:100%;margin:0;padding:10px 24px;box-sizing:border-box;max-width:none}
+#app.quiz-party>main{min-height:0;height:100%;width:100%;box-sizing:border-box;overflow:hidden}
+#app .quiz-lobby{display:flex;flex-direction:column;padding:12px 4% 16px;gap:10px;background:transparent}
+#app .lobby-top{min-height:30px;flex:none;justify-content:flex-end}#app .lobby-label:empty{display:none}
+#app .lobby-heading{margin:0 auto;flex:none;text-align:center}#app .lobby-heading h1{font-size:clamp(26px,5vh,46px);line-height:1.05;letter-spacing:-1px;margin:4px 0}#app .lobby-heading h1 br{display:none}#app .lobby-heading h1 em{margin-left:.15em}#app .lobby-heading p:empty{display:none}#app .lobby-heading .lobby-eyebrow{display:none}
+#app .lobby-stage{flex:1;min-height:0;display:flex;flex-direction:column;width:100%;padding:12px 18px;box-sizing:border-box;background:var(--ui-panel);border-color:var(--ui-line)}
+#app .lobby-stage-title{flex:none;padding:0 0 10px;gap:10px}#app .lobby-stage-title>span{color:var(--ui-ink)!important;font-size:12px}
+#app .lobby-players{min-height:0;flex:1;overflow:auto;align-content:center;align-items:center;padding:12px 0;gap:12px;display:flex}
+#app .lobby-player{width:100px;flex:none}#app .lobby-character{height:90px}#app .lobby-player>strong{color:var(--ui-ink);font-size:13px}#app .lobby-player>small{color:var(--ui-muted);font-size:10px}
+#app .lobby-footer{flex:none;margin:0;padding:4px 0;gap:10px;align-items:center}#app .lobby-footer>div:first-child>strong{display:none}#app .lobby-footer p{margin:0;color:var(--ui-muted);font-size:12px}#app .lobby-actions button{min-height:40px;padding:10px 16px}#app .lobby-waiting{color:var(--ui-ink)}
+#app.quiz-party>.game-question{display:flex;flex-direction:column;flex:none;height:100%;min-height:0;padding:8px 4% 12px;gap:8px}
+#app .game-question-top{min-height:30px;flex:none}#app .game-question .question-card{flex:1;min-height:0;padding:16px 20px;gap:10px;overflow:hidden}
+#app .game-question .question-card h1{flex:0 1 auto;max-height:30%;min-height:0;overflow:hidden;font-size:clamp(22px,4.5vh,48px);line-height:1.12;margin:0}
+#app .game-question .answer-options{flex:1;min-height:0;grid-auto-rows:minmax(0,1fr)}#app .game-question .answer-option{overflow:hidden;min-height:0;padding:12px 16px}
+#app .game-question .option-copy{max-height:100%;min-width:0;overflow:hidden;display:block;line-height:1.2}
+#app .game-question .answer-explanation{flex:0 1 auto;min-height:24px;max-height:24%;margin:0;padding:8px 12px;background:var(--ui-soft)!important;color:var(--ui-ink)!important;border:1px solid var(--ui-line);overflow:hidden}
+#app .game-question .answer-explanation :is(strong,p){color:var(--ui-ink)!important}#app .game-question .answer-explanation p{max-height:calc(100% - 22px);overflow:hidden;font-size:13px;line-height:1.25;margin:4px 0 0}
+#app .game-question .answer-status{flex:none;min-height:0;padding:0;margin:0;font-size:12px;line-height:1.2}
+#app .game-question .question-footer{flex:none;min-height:34px;padding-top:5px}#app .game-question .question-footer button{min-height:34px;padding:7px 14px}
+#app .game-results{display:flex;flex-direction:column;min-height:0;height:100%;padding:12px 4%;gap:8px;max-width:1400px}
+#app .results-heading{flex:none}#app .results-heading h1{font-size:clamp(24px,4.4vh,40px);line-height:1.1;margin:3px 0}#app .results-heading>span{font-size:9px}#app .results-heading p{display:none}
+#app :is(.round-towers,.final-podium){flex:1;min-height:0;margin:0;gap:12px;width:100%;overflow:hidden;container-type:size;align-items:end}
+#app .round-towers{display:grid;grid-template-columns:repeat(auto-fit,minmax(0,1fr));justify-content:center}
+#app .round-towers article{max-width:none;min-width:0;min-height:0;text-align:center;display:flex;flex-direction:column;justify-content:end;align-items:center;align-self:end;height:100%;gap:4px}
+#app .round-towers article>strong{margin:0;font-size:clamp(11px,1.3vw,17px);max-width:100%;white-space:nowrap;text-overflow:ellipsis;overflow:hidden}
+#app .round-towers small{font-size:11px;margin:0;min-height:15px;max-width:100%;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:var(--ui-muted)}
+#app .round-tower{flex:none;box-sizing:border-box;width:min(100%,150px);height:calc(12cqh + var(--tower-ratio)*26cqh);min-height:36px;padding:8px 4px;animation:compact-tower-grow 1.6s cubic-bezier(.18,.8,.25,1) both;animation-delay:var(--tower-delay);color:#241c37}
+#app .round-tower>b{font-size:clamp(22px,4vh,34px)}#app .round-tower>span{font-size:14px}
+@keyframes compact-tower-grow{from{height:calc(12cqh + var(--tower-previous)*26cqh)}to{height:calc(12cqh + var(--tower-ratio)*26cqh)}}
+#app .game-results-actions{flex:none;margin:0;gap:8px;min-height:38px;align-items:center}#app .game-results-actions button{min-height:36px;padding:7px 12px;font-size:12px}#app .game-results-actions>p{font-size:12px;margin:0;color:var(--ui-muted)}
+#app .result-standings{position:relative;flex:none;min-height:30px;padding:6px 12px;box-sizing:border-box;width:min(850px,100%);margin:0 auto;border-radius:12px;z-index:5}
+#app .result-standings>summary{font-size:12px;cursor:pointer;min-height:18px;color:var(--ui-ink)}#app .standings-list{position:absolute;bottom:100%;left:0;right:0;background:var(--ui-panel);border:1px solid var(--ui-line);border-radius:14px;padding:8px;max-height:40dvh;overflow:auto;box-shadow:0 -10px 40px #0003}
+#app .standings-list>div{display:flex;gap:10px;align-items:center;padding:8px;border-bottom:1px solid var(--ui-line);font-size:12px}#app .standings-list strong{flex:1}#app .standings-list img{width:30px;height:30px}
+#app .final-podium{display:flex;justify-content:center;align-items:end}
+#app .final-contestant{display:flex;flex-direction:column;align-items:center;justify-content:end;min-height:0;height:100%;max-width:220px;min-width:0;animation:contestant-reveal .8s cubic-bezier(.18,.85,.2,1) both;animation-delay:var(--reveal-delay)}
+#app .final-contestant>strong{font-size:clamp(12px,1.7vw,20px);margin:4px 0;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}#app .final-contestant>span{font-size:clamp(12px,1.4vw,17px)}#app .final-contestant>small{font-size:11px;line-height:1.2;margin:4px 0 8px;color:var(--ui-muted)}
+#app .final-tower{height:22cqh;min-height:44px;width:100%;box-sizing:border-box;padding:12px 4px;font-size:clamp(28px,5vh,48px)}#app .place-1 .final-tower{height:30cqh}#app .place-3 .final-tower{height:16cqh}
+/* Articulated upper arms, elbows, hips, knees and ankles. */
+#app .game-character{position:relative;width:76px;height:106px;margin:0 auto;flex:none;scale:1;transform:none;animation:none;--character-scale:.72;filter:drop-shadow(0 5px 3px #0002)}
+#app .character-rig{position:absolute;width:92px;height:145px;left:50%;bottom:0;margin-left:-46px;transform-origin:50% 100%;scale:var(--character-scale);animation:body-groove 2.1s ease-in-out infinite}
+#app .character-head{animation:head-groove 2.1s ease-in-out infinite;transform-origin:50% 100%}
+#app .character-body{transform-origin:50% 100%;animation:torso-groove 2.1s ease-in-out infinite}
+#app .character-arm{height:28px;width:15px;top:62px;transform-origin:50% 7px;animation:arm-swing 2.1s ease-in-out infinite}
+#app .character-arm.left{left:13px}#app .character-arm.right{right:11px;animation-delay:-1.05s}
+#app .forearm{position:absolute;left:1px;top:21px;width:13px;height:25px;border-radius:10px;background:var(--player-color,#b390e2);transform-origin:50% 4px;animation:elbow-swing 2.1s ease-in-out infinite}
+#app .hand{position:absolute;bottom:-4px;left:1px;width:12px;height:12px;background:#e9c4ac;border-radius:50%}
+#app .character-leg{height:22px;transform-origin:50% 3px;animation:knee-step 2.1s ease-in-out infinite}
+#app .character-leg.right{animation-delay:-1.05s}#app .character-leg:after{content:none}
+#app .shin{position:absolute;top:16px;width:15px;height:22px;background:#3d405c;border-radius:6px;transform-origin:50% 3px;animation:ankle-step 2.1s ease-in-out infinite}
+#app .shoe{position:absolute;bottom:-5px;left:-2px;width:23px;height:11px;border-radius:8px 10px 4px 4px;background:#e4e2ef;border-bottom:3px solid #9895b3}
+#app .dance-1 .character-rig{animation-name:body-bounce;animation-duration:1.6s}#app .dance-1 .character-arm{animation-duration:1.6s}#app .dance-2 .character-rig{animation-name:body-sway;animation-duration:2.6s}#app .dance-2 .forearm{animation-direction:reverse}#app .dance-3 .character-rig{animation-name:body-jump;animation-duration:2.2s}#app .dance-3 .character-arm.left{animation-direction:reverse}
+#app .round-towers .game-character{animation:tower-hop 1.6s ease-in-out both;animation-delay:var(--tower-delay)}
+@keyframes body-groove{0%,100%{transform:translate(-3px,0) rotate(-4deg)}25%{transform:translate(2px,-4px) rotate(2deg)}50%{transform:translate(4px,1px) rotate(5deg)}75%{transform:translate(-1px,-5px) rotate(-1deg)}}
+@keyframes head-groove{0%,100%{transform:rotate(5deg) translateY(1px)}50%{transform:rotate(-6deg) translateY(-2px)}}
+@keyframes torso-groove{0%,100%{transform:rotate(-3deg) scaleY(.98)}50%{transform:rotate(3deg) scaleY(1.02)}}
+@keyframes arm-swing{0%,100%{transform:rotate(18deg)}25%{transform:rotate(-22deg)}50%{transform:rotate(-58deg)}75%{transform:rotate(-18deg)}}
+@keyframes elbow-swing{0%,100%{transform:rotate(-8deg)}50%{transform:rotate(-62deg)}}
+@keyframes knee-step{0%,100%{transform:rotate(-10deg)}25%{transform:rotate(8deg)}50%{transform:rotate(16deg)}75%{transform:rotate(-5deg)}}
+@keyframes ankle-step{0%,100%{transform:rotate(8deg)}50%{transform:rotate(-24deg)}}
+@keyframes body-bounce{0%,100%{transform:translateY(0) rotate(-2deg)}20%{transform:translateY(3px) scaleY(.96)}45%{transform:translateY(-12px) rotate(4deg)}70%{transform:translateY(2px) scaleY(.98)}}
+@keyframes body-sway{0%,100%{transform:translate(-8px,0) rotate(-8deg)}30%{transform:translate(-3px,-5px) rotate(-2deg)}60%{transform:translate(8px,0) rotate(8deg)}80%{transform:translate(3px,-4px) rotate(2deg)}}
+@keyframes body-jump{0%,100%{transform:translateY(0)}18%{transform:translateY(4px) scaleY(.94)}36%{transform:translate(3px,-17px) rotate(5deg)}52%{transform:translateY(1px)}70%{transform:translate(-3px,-8px) rotate(-4deg)}85%{transform:translateY(2px)}}
+@keyframes tower-hop{0%,100%{transform:translateY(0)}20%{transform:translateY(-8px)}40%{transform:translateY(1px)}60%{transform:translateY(-12px)}80%{transform:translateY(0)}}
+.camera-photo video{display:block;width:100%;aspect-ratio:1;object-fit:cover;transform:scaleX(-1);border-radius:18px;background:#111}.camera-photo>button{width:100%;margin-top:12px}
+@media(min-width:1000px){html[data-theme][data-ui-style] #app .designer-stage-wrap{display:flex;flex-direction:column;padding:8px 10px;gap:4px}#app .designer-stage{width:min(100%,1400px,max(1px,calc((100cqh - 46px)*var(--slide-aspect,1.777778))));margin-block:auto;flex:none}#app .designer-layer-list{margin-top:auto;flex:none;min-height:28px;max-height:30px;padding:0;background:transparent}#app .designer-layer-list button{min-height:26px;padding:4px 7px;font-size:10px}#app .outline-heading>span{color:var(--ui-ink);font-weight:650}}
+@media(max-width:800px){#app.quiz-party:has(>main),#app.quiz-party:has(>main.game-question){grid-template-rows:56px minmax(0,1fr)}#app.quiz-party>.header{height:56px;padding:8px 12px;flex-wrap:nowrap;gap:10px}#app.quiz-party .header .brand{font-size:19px}#app.quiz-party .header .lab-logo{width:30px;height:30px}#app.quiz-party .header-right{margin-left:auto;flex-wrap:nowrap;gap:8px}#app.quiz-party[data-role=student] .header :is(.live-participants,.my-room-avatar,[data-room-controller],[data-action=sound]){display:none}#app.quiz-party .connection{font-size:10px;white-space:nowrap}
+#app.quiz-party>.game-question{padding:6px 10px 10px;gap:6px}#app .game-question .question-card{padding:10px;gap:8px}#app .game-question .question-footer{min-height:32px}#app[data-role=student] .game-question .question-footer{display:none}#app[data-role=student] .game-question .option-copy{display:none}#app[data-role=student] .game-question .answer-options{min-height:0}#app[data-role=student] .game-question .answer-option{padding:8px;position:relative;overflow:hidden}#app[data-role=student] .game-question .answer-letter{font-size:clamp(48px,17vw,100px);line-height:1;width:auto;height:auto}#app[data-role=student] .game-question .correct-mark{position:absolute;top:8px;right:10px}#app[data-role=student] .answer-explanation p{display:none}#app[data-role=student] .answer-explanation{max-height:none;flex:none;min-height:24px;font-size:14px}#app[data-role=student] .game-question .answer-explanation strong{font-size:14px}#app .game-question-top .quiz-count{font-size:10px}
+#app .game-results{padding:10px;gap:6px}#app .round-towers.many{grid-template-columns:repeat(3,minmax(0,1fr));grid-template-rows:repeat(2,minmax(0,1fr));gap:8px}#app .round-towers .game-character{height:80px;--character-scale:.52}#app .round-towers.many .game-character{height:62px;--character-scale:.4}#app .round-towers.many .round-tower{height:calc(5cqh + var(--tower-ratio)*8cqh);min-height:28px}#app .round-tower{width:100%;font-size:12px}#app .round-tower>b{font-size:22px}#app .round-towers small{font-size:9px}#app .final-contestant{max-width:31%}#app .final-contestant .game-character{height:86px;--character-scale:.58}#app .final-contestant>small{font-size:9px;min-height:22px}#app .final-tower{box-shadow:inset 0 3px 0 #fff7,3px 0 0 #0002}#app .game-results-actions button{font-size:11px;min-height:34px;padding:7px 9px}
+#app .quiz-lobby{padding:8px 12px 12px;gap:8px}#app .lobby-top{min-height:26px}#app .lobby-code{padding:4px 12px;font-size:9px}#app .lobby-code strong{font-size:18px;margin-top:0}#app .lobby-heading h1{font-size:27px}#app .lobby-stage{padding:10px}#app .lobby-stage-title>span{font-size:10px}#app .lobby-footer{flex-wrap:wrap}#app .lobby-footer p{font-size:11px}#app .lobby-actions{width:100%;justify-content:space-between}#app .lobby-waiting{font-size:11px}#app .lobby-player{width:82px}#app .lobby-character{height:76px}}
+@media(max-height:620px){#app .game-character{height:76px;--character-scale:.5}#app .final-contestant .game-character{height:70px;--character-scale:.46}#app .results-heading h1{font-size:26px}#app .lobby-heading h1{font-size:26px}#app .lobby-character{height:65px}#app .lobby-player{width:80px}#app .lobby-stage-title{padding-bottom:6px}}
+@media(prefers-reduced-motion:reduce){:root:not([data-motion=normal]) #app :is(.character-rig,.character-head,.character-body,.character-arm,.forearm,.character-leg,.shin,.game-character,.round-tower){animation:none!important}}
+
+#app .poll-stage{display:flex;flex-direction:column;padding:14px 4%;gap:12px;max-width:1100px}#app .poll-stage h1{font-size:clamp(24px,4vh,42px);margin:0}#app .poll-stage>p{margin:0;flex:none}#app .poll-options{flex:1;min-height:0;margin:0;grid-auto-rows:minmax(0,1fr)}#app .poll-option{min-height:0;padding:12px}#app .poll-actions{flex:none;margin:0}
+
+/* Fill the question viewport even when older scene rules use automatic margins. */
+#app.quiz-party{--game-header:64px}
+#app.quiz-party:has(>main),#app.quiz-party:has(>main.game-question){grid-template-rows:var(--game-header) minmax(0,1fr)}
+#app.quiz-party:has(>main.game-question)>.game-question{height:100%;margin:0 auto;align-self:stretch;flex:none}
+#app.quiz-party:has(>main)>.header{height:var(--game-header);min-height:0;max-height:var(--game-header);padding-block:8px}
+@media(max-width:800px){#app.quiz-party{--game-header:56px}}
+
+#app .poll-block-editor{padding:20px;max-width:700px}#app .poll-block-editor label{display:block;margin:18px 0 8px;color:var(--ui-ink)}#app .poll-block-editor :is(input,textarea){width:100%;box-sizing:border-box;padding:12px;color:var(--ui-ink);background:var(--ui-panel);border:1px solid var(--ui-line);border-radius:10px}

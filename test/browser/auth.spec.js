@@ -1,3 +1,4 @@
+import {createProject} from './project-fixture.js';
 import { test, expect } from '@playwright/test';
 const user = { id: '11111111-1111-4111-8111-111111111111', aud: 'authenticated', role: 'authenticated', email: 'professor@example.com', app_metadata: { provider: 'email', providers: ['email'] }, user_metadata: {}, created_at: '2026-01-01T00:00:00Z' };
 const token = () => [Buffer.from(JSON.stringify({ alg: 'HS256', typ: 'JWT' })).toString('base64url'), Buffer.from(JSON.stringify({ sub: user.id, exp: Math.floor(Date.now() / 1000) + 3600, aud: 'authenticated' })).toString('base64url'), 'test'].join('.');
@@ -57,7 +58,7 @@ test('link de recuperação abre nova senha no celular e mantém o editor utiliz
   expect(requests.find(r => r.path.endsWith('/user') && r.body?.password)?.body.password).toBe('novasenha123');
   await page.screenshot({ path: 'test-results/account-mobile.png', fullPage: true });
   await page.getByRole('button', { name: 'Fechar conta', exact: true }).click();
-  await page.getByRole('button', { name: '+ Nova aula', exact: true }).click(); await expect(page.locator('.slide-designer')).toBeVisible();
+  await createProject(page); await expect(page.locator('.slide-designer')).toBeVisible();
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
   await context.close();
 });

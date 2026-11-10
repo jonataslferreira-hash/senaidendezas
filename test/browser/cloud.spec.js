@@ -29,7 +29,7 @@ test('conta salva aula e mídias no Storage, lista arquivos e abre uma cópia po
   const lesson = newLesson(); lesson.title = 'Minha aula na nuvem'; lesson.quizAudio = { name: 'festa.wav', data: 'data:audio/wav;base64,' + wavFixture().toString('base64'), volume: .2, loop: true };
   lesson.slides[0] = { ...lesson.slides[0], kind: 'image', image: 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAusB9Wl6Xb8AAAAASUVORK5CYII=', imageAlt: 'Exemplo' };
   await page.locator('#import-lesson-file').setInputFiles({ name: 'aula.json', mimeType: 'application/json', buffer: Buffer.from(JSON.stringify(lesson)) });
-  await page.getByRole('button', { name: '☁ Salvar na nuvem', exact: true }).click(); await expect(page.locator('#toast')).toContainText(/salv[ao]s? na nuvem/i);
+  await page.getByRole('button', { name: 'Salvar na nuvem', exact: true }).click(); await expect(page.locator('#toast')).toContainText(/salv[ao]s? na nuvem/i);
   expect((await unpackLesson(new Blob([cloudFile]))).quizAudio.data).toMatch(/^data:audio/); expect((await unpackLesson(new Blob([cloudFile]))).slides[0].image).toMatch(/^data:image/);
   await page.locator('.editor-heading [data-studio-action="library"]').click();
   await page.getByRole('button', { name: 'Atualizar arquivos', exact: true }).click(); await expect(page.locator('.cloud-file-list')).toContainText(lesson.title);

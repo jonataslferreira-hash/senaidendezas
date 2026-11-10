@@ -9,7 +9,7 @@ test('duas contas editam o mesmo texto ao vivo, salvam versões concorrentes e r
   const lesson=validateLesson(newLesson());lesson.slides[0].title='AB';lesson.slides=lesson.slides.map(canvasFromSlide);const doc=new Y.Doc();writeLesson(doc,lesson);
   let row={id,group_id:group,revision,version:1,title:lesson.title,updated_at:new Date().toISOString()};
   const files=new Map([[`/groups/${group}/${revision}`,Buffer.from(JSON.stringify({format:'sl-yjs-v1',state:encode(Y.encodeStateAsUpdate(doc))}))]]);
-  const sockets=new Set();let delayed=false;let secondRole="editor";const pending=[];
+  const sockets=new Set();let delayed=false;let dropBroadcast=false;let secondRole="editor";const pending=[],comments=[];
   const deliver=(source,event,payload)=>{for(const peer of sockets)if(peer!==source&&peer.topic===source.topic)peer.ws.send(JSON.stringify([null,null,peer.topic,event,payload]));};
   async function makeUser(n,name){
     const uid=`11111111-1111-4111-8111-${String(n).padStart(12,'0')}`,email=name.toLowerCase()+'@example.com';
@@ -37,9 +37,18 @@ test('duas contas editam o mesmo texto ao vivo, salvam versões concorrentes e r
       const request=route.request(),url=new URL(request.url());
       if(url.pathname.endsWith('/user'))return route.fulfill({json:user});
       if(url.pathname.endsWith('/sl_group_documents'))return route.fulfill({json:url.searchParams.has('id')?row:[row]});
-      if(url.pathname.endsWith('/sl_broadcast_document')){const args=request.postDataJSON(),topic='realtime:sl-doc-v2:'+id;const send=()=>{for(const peer of sockets)if(peer.topic===topic)peer.ws.send(JSON.stringify([null,null,topic,'broadcast',{type:'broadcast',event:args.p_event,payload:args.p_data?{data:args.p_data,client:args.p_client}:{}}]));};if(delayed)pending.push(send);else send();return route.fulfill({json:null});}
+      if(url.pathname.endsWith('/sl_broadcast_document')){const args=request.postDataJSON(),topic='realtime:sl-doc-v2:'+id;const send=()=>{for(const peer of sockets)if(peer.topic===topic)peer.ws.send(JSON.stringify([null,null,topic,'broadcast',{type:'broadcast',event:args.p_event,payload:args.p_data?{data:args.p_data,client:args.p_client}:{}}]));};if(!dropBroadcast){if(delayed)pending.push(send);else send();}return route.fulfill({json:null});}
       if(url.pathname.endsWith('/sl_set_collaborator_role')){expect(n).toBe(1);secondRole=request.postDataJSON().p_role;return route.fulfill({json:null});}
       if(url.pathname.endsWith('/sl_collaborators'))return route.fulfill({json:[{user_id:'11111111-1111-4111-8111-000000000001',display_name:'Ana',role:'owner'},{user_id:'11111111-1111-4111-8111-000000000002',display_name:'Bruno',role:secondRole}]});
+      if(url.pathname.endsWith('/sl_chat_messages'))return route.fulfill({json:comments});
+      if(url.pathname.endsWith('/sl_send_chat_message')){
+        const input=request.postDataJSON();
+        expect(input.p_document_id).toBe(id);
+        expect(n===1||secondRole==='commenter').toBe(true);
+        const message={id:crypto.randomUUID(),document_id:id,author_id:uid,author_name:name,body:input.p_body,created_at:new Date().toISOString()};
+        comments.push(message);
+        return route.fulfill({json:message});
+      }
       if(url.pathname.endsWith('/sl_groups'))return route.fulfill({json:[{id:group,name:'Grupo',owner_id:'11111111-1111-4111-8111-000000000001'}]});
       if(url.pathname.endsWith('/sl_publish_group_doc')){
         const args=request.postDataJSON();if(args.p_expected_version!==row.version)return route.fulfill({status:409,json:{code:'40001',message:'Versão mudou'}});
@@ -76,5 +85,15 @@ test('duas contas editam o mesmo texto ao vivo, salvam versões concorrentes e r
     await bruno.page.getByRole('button',{name:'Campos',exact:true}).click();await expect(bruno.page.getByLabel('Texto do elemento',{exact:true})).toHaveValue(/A[xy]{2}B/);
     await ana.page.screenshot({path:'test-results/collaboration-editor.png',fullPage:true,animations:'disabled'});
     await ana.page.getByRole('button',{name:'Colaborar',exact:true}).click();await ana.page.getByLabel('Permissão de Bruno').selectOption('commenter');await expect.poll(()=>secondRole).toBe('commenter');await bruno.page.reload();await expect(bruno.page.locator('.designer-workspace')).toHaveJSProperty('inert',true);await expect(ana.page.getByLabel('Permissão de Bruno')).toHaveValue('commenter');
+    await ana.page.getByRole('button',{name:'Fechar colaboração'}).click();
+    dropBroadcast=true;
+    await ana.page.getByLabel('Texto do elemento',{exact:true}).fill('Edição depois da permissão de comentário');
+    await ana.page.getByRole('button',{name:'Salvar aula',exact:true}).click();
+    await expect(bruno.page.locator('.designer-stage')).toContainText('Edição depois da permissão de comentário',{timeout:14000});
+    for(const {page} of [ana,bruno])await page.getByRole('button',{name:'Chat',exact:true}).click();
+    await bruno.page.getByLabel('Mensagem',{exact:true}).fill('Consigo comentar e acompanhar a edição.');
+    await bruno.page.getByRole('button',{name:'Enviar mensagem',exact:true}).click();
+    await expect(ana.page.getByRole('log')).toContainText('Consigo comentar e acompanhar a edição.',{timeout:12000});
+
   }finally{await ana.context.close();await bruno.context.close();doc.destroy();}
 });

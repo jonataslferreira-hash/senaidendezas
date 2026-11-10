@@ -15,12 +15,13 @@ test('chat entrega mensagens entre duas contas, escapa HTML e recupera históric
       const req=route.request(),path=new URL(req.url()).pathname;
       if(path.endsWith('/user'))return route.fulfill({json:person});
       if(path.endsWith('/sl_group_documents'))return route.fulfill({json:[{id:documentId,group_id:groupId,title:'Aula em equipe'}]});
+      if(path.endsWith('/sl_document_role'))return route.fulfill({json:n===1?'owner':'commenter'});
       if(path.endsWith('/sl_groups'))return route.fulfill({json:[{id:groupId,name:'Equipe'}]});
       if(path.endsWith('/sl_chat_messages'))return route.fulfill({json:[...rows].reverse()});
       if(path.endsWith('/sl_send_chat_message')){
         const body=req.postDataJSON();expect(body.p_document_id).toBe(documentId);
         const row={id:crypto.randomUUID(),document_id:documentId,author_id:uid,author_name:name,body:body.p_body,slide_id:body.p_slide_id,created_at:new Date().toISOString()};rows.push(row);
-        for(const s of sockets)if(s.topic.endsWith('sl-chat:'+documentId))s.ws.send(JSON.stringify([s.joinRef,null,s.topic,'postgres_changes',{ids:[1],data:{schema:'public',table:'sl_chat_messages',commit_timestamp:row.created_at,columns:Object.keys(row).map(name=>({name,type:'text'})),type:'INSERT',record:row,old_record:{},errors:null}}]));
+        for(const s of sockets)if(name==='Ana'&&s.topic.endsWith('sl-chat:'+documentId))s.ws.send(JSON.stringify([s.joinRef,null,s.topic,'postgres_changes',{ids:[1],data:{schema:'public',table:'sl_chat_messages',commit_timestamp:row.created_at,columns:Object.keys(row).map(name=>({name,type:'text'})),type:'INSERT',record:row,old_record:{},errors:null}}]));
         return route.fulfill({json:row});
       }
       return route.fulfill({json:[]});
