@@ -1,4 +1,3 @@
-# Lets Cloudflare Builds find the file API instead of auto-detecting vite.config.js.
 name = "storage-lab-files"
 account_id = "4cdb64404c75086e5ac536d88abd30e6"
 main = "cloudflare/r2-worker.js"
@@ -7,3 +6,20 @@ compatibility_date = "2026-11-01"
 [[r2_buckets]]
 binding = "FILES"
 bucket_name = "storagelab"
+
+[vars]
+STORAGE_AI_FREE_CONFIRMED = "true"
+SUPABASE_URL = "https://qkpgiwjsqtocvjmqinii.supabase.co"
+SUPABASE_PUBLISHABLE_KEY = "sb_publishable_-CT7iCR3355qijcVioyRkA_-Njn3Q4e"
+ALLOWED_ORIGINS = "https://jonataslferreira-hash.github.io,http://localhost:5173,http://127.0.0.1:5173"
+
+[ai]
+binding = "AI"
+
+[[ratelimits]]
+name = "AI_LIMIT"
+namespace_id = "7101"
+
+[ratelimits.simple]
+limit = 8
+period = 60
