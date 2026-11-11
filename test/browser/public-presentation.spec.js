@@ -39,10 +39,10 @@ test('dono cria link público sem notas, recupera o link ao reabrir e pode desat
   });
   await page.goto('/');await createProject(page);await page.getByRole('button',{name:'Campos',exact:true}).click();
   await page.getByText('Roteiro do apresentador',{exact:false}).click();await page.getByLabel('Notas só para o professor',{exact:true}).fill('Nota particular que não deve ser publicada.');
-  await page.getByRole('button',{name:'Compartilhar',exact:true}).click();await page.getByRole('button',{name:'Criar link de apresentação',exact:true}).click();
+  await page.locator('.editor-sharing > summary').click();await page.getByRole('button',{name:'Compartilhar',exact:true}).click();await page.getByRole('button',{name:'Criar link de apresentação',exact:true}).click();
   await expect(page.locator('#presentation-link')).toHaveValue('https://jonataslferreira-hash.github.io/senaidendezas/?presentation='+token);
   expect(snapshot.slides[0].note).toBe('');expect(snapshot.slides[0].kind).toBe('canvas');
-  await page.getByRole('button',{name:'Fechar compartilhamento',exact:true}).click();await page.getByRole('button',{name:'Compartilhar',exact:true}).click();
+  await page.getByRole('button',{name:'Fechar compartilhamento',exact:true}).click();await page.locator('.editor-sharing > summary').click();await page.getByRole('button',{name:'Compartilhar',exact:true}).click();
   await expect(page.locator('#presentation-link')).toBeVisible();await page.getByRole('button',{name:'Desativar link',exact:true}).click();await expect.poll(()=>removed).toBe(true);
 });
 
@@ -52,7 +52,7 @@ test('Worker antigo cria alternativa portátil e informa que a cópia não é re
   await page.addInitScript(({user,jwt})=>localStorage.setItem('sb-qkpgiwjsqtocvjmqinii-auth-token',JSON.stringify({user,access_token:jwt,refresh_token:'test',expires_at:Math.floor(Date.now()/1000)+3600})),{user,jwt});
   await page.route('https://qkpgiwjsqtocvjmqinii.supabase.co/**',route=>route.fulfill({json:route.request().url().endsWith('/user')?user:[]}));
   await page.route('https://storage-lab-files.lagujf.workers.dev/presentations',route=>route.fulfill({status:404,json:{error:'not_found'}}));
-  await page.goto('/');await createProject(page);await page.getByRole('button',{name:'Compartilhar',exact:true}).click();await page.getByRole('button',{name:'Criar link de apresentação',exact:true}).click();
+  await page.goto('/');await createProject(page);await page.locator('.editor-sharing > summary').click();await page.getByRole('button',{name:'Compartilhar',exact:true}).click();await page.getByRole('button',{name:'Criar link de apresentação',exact:true}).click();
   await expect(page.locator('#presentation-link')).toHaveValue(/presentation=portable#deck=/);await expect(page.locator('.publish-portable-note')).toContainText('não revoga');
   const link=await page.locator('#presentation-link').inputValue(),parsed=new URL(link);await page.goto('/'+parsed.search+parsed.hash);await expect(page.locator('#app')).toHaveAttribute('data-read-only','true');
 });

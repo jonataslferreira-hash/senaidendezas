@@ -83,6 +83,7 @@ export class EditorMusic {
     try{const image=new Image();image.crossOrigin='anonymous';image.src=musicCover(track);await image.decode();const canvas=document.createElement('canvas');canvas.width=canvas.height=1;const ctx=canvas.getContext('2d'),side=Math.min(image.naturalWidth,image.naturalHeight);ctx.drawImage(image,(image.naturalWidth-side)/2,(image.naturalHeight-side)/2,side,side,0,0,1,1);const data=ctx.getImageData(0,0,1,1).data;track.color='#'+[...data].slice(0,3).map(n=>n.toString(16).padStart(2,'0')).join('');if(this.track===track)this.studio.root.querySelector('.editor-music')?.style.setProperty('--record-color',track.color);}catch{/* Retain the palette if an external cover blocks sampling. */}
   }
   async playFile(selection=this.selection){
+    if(!this.wantsPlay||selection!==this.selection)return;
     this.playing=true;this.updateProgress();
     try{await this.audio.play();if(selection===this.selection&&!this.wantsPlay){this.audio.pause();this.playing=false;this.updateProgress();}}
     catch{
@@ -137,9 +138,9 @@ export class EditorMusic {
     if(name==='toggle'){
       if(this.track.kind==='spotify'){
         const track=this.track,selection=this.selection;
-        if(this.playing||(!this.spotifyReady&&this.spotifyShouldPlay)){
+        if(this.spotifyShouldPlay||this.playing){
           this.spotifyShouldPlay=false;
-          this.spotifyPausePending=Boolean(this.spotifyController);
+          this.spotifyPausePending=true;
           this.spotifyController?.pause();this.playing=false;this.updateProgress();return;
         }
         this.spotifyShouldPlay=true;

@@ -84,7 +84,10 @@ export function normalizeElements(elements, draft, validateImage) {
       imageZoom: imageZoomValue(e.imageZoom), imageX: number(e.imageX, 0), imageY: number(e.imageY, 0),
       ...(e.type === 'image' ? {
         imageFit: ['cover', 'fill'].includes(e.imageFit) ? e.imageFit : 'contain',
-        imageBackground: colorValue(e.imageBackground, 'transparent')
+        imageBackground: colorValue(e.imageBackground, 'transparent'),
+        imageSource: String(e.imageSource || '').slice(0, 600),
+        imageLicense: String(e.imageLicense || '').slice(0, 300),
+        imageCredit: String(e.imageCredit || '').slice(0, 120)
       } : {}),
       ...(assetId ? { assetId } : {}), model: ['ssd', 'hdd', 'nvme', 'custom'].includes(e.model) ? e.model : 'ssd', customModel, modelLabel: typeof e.modelLabel === 'string' ? e.modelLabel.slice(0, 120) : '', modelDescription:typeof e.modelDescription==='string'?e.modelDescription.slice(0,500):'', modelDetailsHidden:Boolean(e.modelDetailsHidden), ...(e.type==='shape'?shapeFields(e):{}), ...(e.audio?{audio:validateAudio(e.audio)}:{}), locked: Boolean(e.locked) };
   });

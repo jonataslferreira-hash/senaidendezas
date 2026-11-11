@@ -11,6 +11,7 @@ import {slideStylePicker,localLayouts} from './slide-style-picker.js';
 import { canvasMarkup, CanvasModels, esc } from './canvas-view.js';
 import { importModelFiles } from './model-files.js';
 import { storePages, fillAssetImages, fillAssetAudio } from './assets.js';
+import { searchImageChoices, importImageChoice } from './storage-ai-image-search.js';
 const copy = value => JSON.parse(JSON.stringify(value));
 const btn = (action, text, extra = '') => `<button type="button" data-designer-action="${action}" ${extra}>${text}</button>`;
 function snapAxis(position,size,pixels,bypass,targets=[]) {
@@ -50,7 +51,7 @@ export class SlideDesigner {
         this.clearStylePreview();
         this.styleTimer=setTimeout(()=>{
           if(option.isConnected&&option.closest(':popover-open'))this.previewStyle(option);
-        },2000);
+        },1000);
       });
       root.addEventListener(leave,event=>{
         const option=event.target.closest('[data-style-value]');
@@ -58,6 +59,8 @@ export class SlideDesigner {
       });
     }
     root.addEventListener('click', event => {
+      const timeline=event.target.closest('.designer-timeline > summary');
+      if(timeline)this.timelineOpen=!timeline.parentElement.open;
       const summary = event.target.closest('.element-animation > summary');
       if (summary) this.animationOpen = summary.parentElement.open ? null : this.selected;
       else if (!event.target.closest('.element-animation')) {
@@ -69,6 +72,7 @@ export class SlideDesigner {
     root.addEventListener('click', e => { const b = e.target.closest('[data-designer-action]'); if (b) this.action(b.dataset.designerAction, b, e).catch(error => studio.callbacks.toast(error.message)); });
     this.cropPointers=new Map();
     root.addEventListener('wheel',e=>this.cropWheel(e),{passive:false});
+    root.addEventListener('wheel',e=>{const strip=e.target.closest('.designer-layer-list');if(!strip||Math.abs(e.deltaY)<Math.abs(e.deltaX))return;strip.scrollLeft+=e.deltaY;e.preventDefault();},{passive:false});
     root.addEventListener('pointerdown', e => this.down(e));
     root.addEventListener('pointermove', e => this.move(e));
     root.addEventListener('pointerup', e => this.up(e));
@@ -193,7 +197,7 @@ export class SlideDesigner {
     const slide=this.display();
     return `<div class="designer-toolbar" role="toolbar" aria-label="Ferramentas do slide">
       ${btn('undo', '↶', `aria-label="Desfazer" ${h.undo.length ? '' : 'disabled'}`)}${btn('redo', '↷', `aria-label="Refazer" ${h.redo.length ? '' : 'disabled'}`)}
-      <span></span>${btn('add-text', 'T Texto')}${btn('image', '▧ Imagem')}${btn('shape', '▰ Forma')}${btn('model', '◇ Modelo 3D')}${btn('simulation','⚗ Simulação')}
+      <span></span>${btn('add-text', 'T Texto')}${btn('image', '▧ Imagem')}${btn('shape', '▰ Forma')}<details class="designer-insert-more"><summary>Inserir mais</summary><div>${btn('model', '◇ Modelo 3D')}${btn('simulation','⚗ Simulação')}${btn('browse-images',studioIcon('search')+' Buscar imagens')}</div></details>
       ${slideStylePicker('theme',slide)}${slideStylePicker('layout',slide)}
       <input type="file" id="designer-image-file" accept="image/png,image/jpeg,image/webp,image/gif" hidden><input type="file" id="designer-model-files" accept=".glb,.gltf,.obj,.mtl,.bin,.png,.jpg,.jpeg,.webp,.gif,.ktx2" multiple hidden>
     </div>`;
@@ -201,18 +205,40 @@ export class SlideDesigner {
   markup(fieldsOnly = false, showTools = true) {
     const slide = this.display();
     if(this.selected!==null&&!slide.elements.some(e => e.id === this.selected)) this.selected = (slide.elements.find(e=>!e.locked)||slide.elements[0])?.id || '';
-    return `<div class="slide-designer">${slide.importWarnings?.length?`<details class="pptx-compatibility"><summary>Compatibilidade do PPTX · ${slide.importWarnings.length} observações</summary><ul>${slide.importWarnings.map(w=>'<li>'+esc(w)+'</li>').join('')}</ul></details>`:''}${showTools?this.toolbarMarkup():''}<div class="designer-workspace ${fieldsOnly ? 'fields-only' : ''}">${fieldsOnly ? '' : `<div class="designer-stage-wrap"><div class="designer-stage" style="--slide-aspect:${slide.sourceType&&slide.pageWidth&&slide.pageHeight?slide.pageWidth/slide.pageHeight:16/9}">${canvasMarkup(slide, { editing: true, selected: this.selected, interacting: this.interacting })}</div><div class="designer-layer-list" aria-label="Camadas do slide">${slide.elements.map((e, i) => btn('select', (i + 1) + ' · ' + esc(e.type === 'text' ? e.text.slice(0, 25) || 'Texto' : e.type === 'model' ? 'Modelo 3D' : e.type === 'shape' ? 'Forma' : 'Imagem'), `data-id="${e.id}" aria-pressed="${e.id === this.selected}"`)).join('')}</div></div>`}
-      <aside class="designer-inspector">${this.inspector()}</aside></div></div>`;
+    const unavailable=[...new Set((slide.importWarnings||[]).map(w=>/^Fonte indisponível neste dispositivo: (.+)\.$/.exec(w)?.[1]).filter(Boolean))];
+    return `<div class="slide-designer">${slide.importWarnings?.length?`<details class="pptx-compatibility"><summary>Compatibilidade do PPTX · ${slide.importWarnings.length} observações</summary><ul>${slide.importWarnings.map(w=>'<li>'+esc(w)+'</li>').join('')}</ul>${unavailable.map(font=>`<div class="pptx-font-replace"><span>“${esc(font)}” não existe aqui. Trocar por:</span><select data-missing-font="${esc(font)}">${['Arial','Verdana','Georgia','Trebuchet MS','Times New Roman'].map(name=>`<option value="${name}">${name}</option>`).join('')}</select>${btn('replace-font','Aplicar fonte',`data-source-font="${esc(font)}"`)}</div>`).join('')}</details>`:''}${showTools?this.toolbarMarkup():''}<div class="designer-workspace ${fieldsOnly ? 'fields-only' : ''}">${fieldsOnly ? '' : `<div class="designer-stage-wrap"><div class="designer-stage" style="--slide-aspect:${slide.sourceType&&slide.pageWidth&&slide.pageHeight?slide.pageWidth/slide.pageHeight:16/9}">${canvasMarkup(slide, { editing: true, selected: this.selected, interacting: this.interacting })}</div><div class="designer-layer-list" aria-label="Camadas do slide">${slide.elements.map((e, i) => btn('select', (i + 1) + ' · ' + esc(e.type === 'text' ? e.text.slice(0, 25) || 'Texto' : e.type === 'model' ? 'Modelo 3D' : e.type === 'shape' ? 'Forma' : 'Imagem'), `data-id="${e.id}" aria-pressed="${e.id === this.selected}"`)).join('')}</div></div>`}
+      <aside class="designer-inspector">${this.inspector()}${this.studio.ai.open?'':this.studio.slideActivities()}</aside></div></div>`;
   }
   backgroundControls(slide) {
     const fill=slide.backgroundFill, mode=fill?.mode||(slide.visualTheme?'theme':'solid');
     const modes=[...(slide.visualTheme?[['theme','Do tema']]:[]),['solid','Cor sólida'],['gradient','Gradiente']];
     return `<details class="inspector-background" ${this.backgroundOpen?'open':''}>
-      <summary><span class="background-swatch" data-visual-theme="${slide.visualTheme||''}" data-custom-background="${Boolean(fill)}" style="background:${slideBackground(slide)}"></span> Fundo do slide</summary>
+      <summary><span class="background-swatch" data-visual-theme="${slide.visualTheme||''}" data-custom-background="${Boolean(fill)}" style="background:${slideBackground(slide)}"></span><span class="setting-label">Fundo</span></summary>
       <label>Preenchimento<select data-background-mode>${modes.map(([value,label])=>`<option value="${value}" ${value===mode?'selected':''}>${label}</option>`).join('')}</select></label>
       <label>${mode==='gradient'?'Cor inicial':'Cor de base'}<input type="color" id="designer-background" value="${slide.background}"></label>
       ${mode==='gradient'?`<label>Cor final<input type="color" data-background-end value="${fill.end}"></label><label>Ângulo do gradiente<input type="range" data-background-angle min="0" max="360" value="${fill.angle}"></label>`:''}
     </details>`;
+  }
+  animationOrder(slide) {
+    const ordered=this.orderedAnimations(slide);
+    return `<details class="designer-timeline" ${this.timelineOpen?'open':''}><summary>${studioIcon('animate')} Animações <span>${ordered.length}</span></summary>
+      ${ordered.length?`<ol>${ordered.map(({effect,index},position)=>{
+        const object=slide.elements.find(element=>element.id===effect.id);
+        const name=object?.type==='text'?object.text.slice(0,44):object?.imageAlt||({image:'Imagem',shape:'Forma',model:'Modelo 3D'})[object?.type]||'Elemento';
+        return `<li><div><strong>${esc(name)}</strong><small>${effect.group?'Clique '+effect.group:'Ao entrar'} · ${effect.duration} ms</small></div><div class="timeline-actions">
+          ${btn('animation-up','↑',`data-effect-index="${index}" aria-label="Mover animação para cima" ${position===0?'disabled':''}`)}
+          ${btn('animation-down','↓',`data-effect-index="${index}" aria-label="Mover animação para baixo" ${position===ordered.length-1?'disabled':''}`)}</div></li>`;
+      }).join('')}</ol>`:'<p>Adicione uma animação a um elemento para organizar a ordem aqui.</p>'}</details>`;
+  }
+  orderedAnimations(slide) {
+    return (slide.animations||[]).map((effect,index)=>({effect,index}))
+      .sort((a,b)=>a.effect.group-b.effect.group||a.effect.delay-b.effect.delay||a.index-b.index);
+  }
+  settingsMarkup(s) {
+    const active=this.settingTab||'';
+    const background=this.backgroundControls(s).replace(/^<details[^>]*>[\s\S]*?<\/summary>/,'').replace(/<\/details>$/,'');
+    const panels={background,theme:slideStylePicker('theme',s,{inspector:true}),audio:audioEditor(s.audio,'slide',s.elements,{expanded:true})};
+    return `<div class="slide-settings-tabs">${[['background','Fundo',`<span class="background-swatch" style="background:${slideBackground(s)}"></span>`],['theme','Tema',studioIcon('palette')],['audio','Áudio','♫']].map(([id,label,icon])=>btn('setting-'+id,icon+'<span>'+label+'</span>',`aria-pressed="${active===id}"`)).join('')}</div>${active?`<div class="slide-setting-panel">${panels[active]}</div>`:''}`;
   }
   inspector() {
     const s = this.display(), e = s.elements.find(e => e.id === this.selected);
@@ -223,7 +249,7 @@ export class SlideDesigner {
     }
     const number = (label, key, value, min, max) => `<label>${label}<input type="number" data-element-field="${key}" value="${value}" min="${min}" max="${max}" step="0.5"></label>`;
     if(this.studio.ai.open)return this.studio.ai.inspector(s);
-    return `${!e ? this.backgroundControls(s)+slideStylePicker('theme',s,{inspector:true})+audioEditor(s.audio,'slide',s.elements) : `<div class="designer-selected-heading"><strong>${{ text: 'Caixa de texto', image: 'Imagem', model: 'Modelo 3D', shape: 'Forma',simulation:'Simulação' }[e.type]}</strong>${btn('delete', studioIcon('trash')+' Excluir', 'class="danger-text inspector-delete" aria-label="Excluir elemento"')}</div><div class="designer-arrange" aria-label="Organizar elemento">${[
+    return `${!e ? `${this.settingsMarkup(s)}${this.animationOrder(s)}` : `<div class="designer-selected-heading"><strong>${{ text: 'Caixa de texto', image: 'Imagem', model: 'Modelo 3D', shape: 'Forma',simulation:'Simulação' }[e.type]}</strong>${btn('delete', studioIcon('trash')+' Excluir', 'class="danger-text inspector-delete" aria-label="Excluir elemento"')}</div><div class="designer-arrange" aria-label="Organizar elemento">${[
   ['duplicate', 'duplicate', 'Duplicar elemento'],
   ['forward', 'forward', 'Trazer à frente'],
   ['animation'],
@@ -234,6 +260,7 @@ export class SlideDesigner {
       ${e.type === 'image' ? `<div class="designer-image-actions" role="group" aria-label="Ações da imagem">${[
         ['replace-image','image','Trocar imagem'],
         ['image-reset','reload','Restaurar enquadramento'],
+        ['search-image','search','Pesquisar imagem livre'],
         ['crop-image','crop',this.imageEditing===e.id?'Concluir enquadramento':'Enquadrar imagem']
       ].map(([action,icon,label])=>btn(action,studioIcon(icon),`aria-label="${label}" title="${label}" ${action==='crop-image'?`aria-pressed="${this.imageEditing===e.id}"`:''}`)).join('')}</div>
       <label>Ajuste na moldura<select data-element-field="imageFit"><option value="contain">Mostrar inteira</option><option value="cover" ${e.imageFit==='cover'?'selected':''}>Preencher</option><option value="fill" ${e.imageFit==='fill'?'selected':''}>Esticar livremente</option></select></label>
@@ -241,7 +268,7 @@ export class SlideDesigner {
       <div class="designer-position-grid">${number('Deslocamento X (%)','imageX',e.imageX||0,'','')}${number('Deslocamento Y (%)','imageY',e.imageY||0,'','')}</div>
       ${btn('image-background','Fundo transparente',`class="designer-image-background" aria-pressed="${!e.imageBackground||e.imageBackground==='transparent'}"`)}
       ${e.imageBackground&&e.imageBackground!=='transparent'?`<label>Cor do fundo da imagem<input type="color" data-element-field="imageBackground" value="${esc(e.imageBackground)}"></label>`:''}
-      <label>Descrição da imagem<input data-element-field="imageAlt" value="${esc(e.imageAlt)}"></label>` : ''}
+      <label>Descrição da imagem<input data-element-field="imageAlt" value="${esc(e.imageAlt)}"></label>${e.imageSource||e.imageLicense?`<p class="designer-image-credit"><strong>Créditos</strong> ${esc([e.imageCredit,e.imageLicense].filter(Boolean).join(' · '))}${e.imageSource?`<a href="${esc(e.imageSource)}" target="_blank" rel="noopener noreferrer">Ver origem</a>`:''}</p>`:''}` : ''}
       ${e.type === 'model' ? `<label>Modelo<select data-element-field="model" aria-label="Modelo do elemento">${[['ssd', 'SSD SATA'], ['hdd', 'HDD'], ['nvme', 'SSD NVMe'], ['custom', e.customModel?.name || 'Meu modelo enviado']].map(([v, label]) => `<option value="${v}" ${e.model === v ? 'selected' : ''}>${esc(label)}</option>`).join('')}</select></label><label>Nome do modelo<input data-element-field="modelLabel" maxlength="120" value="${esc(e.modelLabel||'')}" placeholder="${esc(e.model==='custom'?e.customModel?.name||'Modelo 3D':'Nome da peça selecionada')}"></label><label>Descrição do modelo<textarea data-element-field="modelDescription" maxlength="500" placeholder="Descrição ao explorar o modelo">${esc(e.modelDescription||'')}</textarea></label><label class="model-details-toggle"><input type="checkbox" data-element-field="modelDetailsHidden" ${e.modelDetailsHidden?'checked':''}> Mostrar somente o modelo 3D</label>${btn('replace-model', '↑ Enviar GLB / GLTF / OBJ')}${btn('interact', this.interacting === e.id ? 'Voltar à edição' : 'Explorar o modelo')}` : ''}
       ${e.type==='simulation'?`<label>Experiência<select data-element-field="simulation" aria-label="Tipo de simulação">${Object.entries(simulationNames).map(([id,name])=>`<option value="${id}" ${e.simulation===id?'selected':''}>${name}</option>`).join('')}</select></label>${btn('interact',this.interacting===e.id?'Voltar à edição':'Experimentar simulação')}`:''}${e.type === 'shape' ? `<label>Cor da forma<input type="color" data-element-field="background" value="${e.background}"></label>
       <label>Cor da borda<input type="color" data-element-field="borderColor" value="${e.borderColor||'#ffffff'}"></label>
@@ -261,7 +288,7 @@ export class SlideDesigner {
   refreshSelection() {
     const ids=this.selectionIds();
     for (const node of this.studio.root.querySelectorAll('.canvas-editing [data-object-id]')) { node.dataset.selected = String(ids.includes(node.dataset.objectId)); node.dataset.interacting = String(node.dataset.objectId === this.interacting);node.dataset.cropping=String(node.dataset.objectId===this.imageEditing); }
-    const inspector = this.studio.root.querySelector('.designer-inspector'); if (inspector && !this.studio.ai.refreshInspectorScope()) { inspector.innerHTML = this.inspector(); inspector.classList.remove('selection-arrive'); void inspector.offsetWidth; inspector.classList.add('selection-arrive'); }
+    const inspector = this.studio.root.querySelector('.designer-inspector'); if (inspector && !this.studio.ai.refreshInspectorScope()) { inspector.innerHTML = this.inspector()+(this.studio.ai.open?'':this.studio.slideActivities()); inspector.classList.remove('selection-arrive'); void inspector.offsetWidth; inspector.classList.add('selection-arrive'); }
     fillAssetAudio(this.studio.root);
     for (const button of this.studio.root.querySelectorAll('[data-designer-action="select"]')) button.setAttribute('aria-pressed', String(ids.includes(button.dataset.id)));
   }
@@ -297,6 +324,7 @@ export class SlideDesigner {
       const minimum = el.type === 'image' ? .1 : 5;
       el.w = Math.max(minimum, Math.min(1000, w + dx));
       el.h = Math.max(minimum, Math.min(1000, h + dy));
+      if(el.type==='text'){el.x=d.initial.x-(el.w-w)/2;el.y=d.initial.y-(el.h-h)/2;}
     }
     else {
       const others=this.display().elements.filter(item=>!d.moving.some(member=>member.id===item.id));
@@ -427,6 +455,27 @@ export class SlideDesigner {
   async action(action, button, event) {
     if(!this.studio.groups.canEdit)return;
     const e = this.display().elements.find(e => e.id === this.selected);
+    if(action==='replace-font'){
+      const font=button.dataset.sourceFont;
+      const replacement=button.parentElement.querySelector('select').value;
+      this.mutate(slide=>{for(const item of slide.elements)if(item.type==='text'&&item.fontFamily===font)item.fontFamily=replacement;slide.importWarnings=slide.importWarnings.filter(w=>w!==`Fonte indisponível neste dispositivo: ${font}.`);});
+      return;
+    }
+    if(action==='animation-up'||action==='animation-down'){
+      const ordered=this.orderedAnimations(this.display());
+      const position=ordered.findIndex(entry=>entry.index===Number(button.dataset.effectIndex));
+      const next=position+(action==='animation-up'?-1:1);
+      if(position<0||!ordered[next])return;
+      const first=ordered[position].effect,second=ordered[next].effect;
+      ordered[position].effect={...second,group:first.group,delay:first.delay};
+      ordered[next].effect={...first,group:second.group,delay:second.delay};
+      this.timelineOpen=true;
+      this.mutate(slide=>{slide.animations=ordered.map(entry=>entry.effect);});
+      return;
+    }
+    if(action.startsWith('setting-')){const tab=action.slice(8);this.settingTab=this.settingTab===tab?'':tab;this.refreshSelection();return;}
+    if(action==='browse-images'){this.openImageSearch(null);return;}
+    if(action==='search-image'){this.openImageSearch(e?.type==='image'?e.id:null);return;}
     if(action==='simulation'){this.mutate(s=>{const e=newElement('simulation',{x:53,y:12,w:42,h:76});s.elements.push(e);this.selected=e.id;});return;}
     if(action==='crop-image'){this.ensure();this.imageEditing=this.imageEditing===e.id?'':e.id;this.refreshSelection();return;}
     if(action==='image-background'){
@@ -467,6 +516,16 @@ export class SlideDesigner {
       else if (action === 'lock') current.locked = !current.locked;
       else if (action === 'forward' || action === 'backward') { const index = s.elements.indexOf(current), next = Math.max(0, Math.min(s.elements.length - 1, index + (action === 'forward' ? 1 : -1))); s.elements.splice(index, 1); s.elements.splice(next, 0, current); }
     });
+  }
+  openImageSearch(targetId){
+    document.querySelector('#storage-image-search')?.remove();
+    const dialog=document.createElement('dialog');dialog.id='storage-image-search';dialog.className='storage-image-search';
+    const accent=getComputedStyle(this.studio.root.querySelector('.designer-inspector')||this.studio.root).getPropertyValue('--studio-accent').trim();
+    if(accent)dialog.style.setProperty('--search-accent',accent);
+    dialog.innerHTML=`<form method="dialog" class="image-search-head"><strong>Pesquisar imagens livres</strong><button aria-label="Fechar">×</button></form><form class="image-search-form"><input name="query" type="search" placeholder="Pesquise o assunto da imagem" required autofocus><button type="submit">Pesquisar</button></form><p class="image-search-status" role="status"></p><div class="image-search-results"></div><button type="button" class="image-search-more" hidden>Carregar mais imagens</button>`;
+    document.body.append(dialog);dialog.showModal();dialog.addEventListener('close',()=>dialog.remove());
+    const form=dialog.querySelector('.image-search-form'),results=dialog.querySelector('.image-search-results');const status=dialog.querySelector('.image-search-status');const more=dialog.querySelector('.image-search-more'),seen=new Set();let searchPage=0,searchTerm='',loading=false,ended=false;more.addEventListener('click',()=>form.requestSubmit());results.addEventListener('scroll',()=>{if(!loading&&!ended&&results.scrollTop+results.clientHeight>=results.scrollHeight-150){form.requestSubmit();}});
+    form.addEventListener('submit',async event=>{event.preventDefault();if(loading)return;const term=new FormData(form).get('query');if(term!==searchTerm){searchTerm=term;searchPage=0;ended=false;seen.clear();results.replaceChildren();}if(ended)return;loading=true;more.disabled=true;status.textContent='Buscando imagens…';try{const choices=await searchImageChoices(term,++searchPage);status.textContent='';if(!choices.length){ended=true;more.hidden=true;if(!results.childElementCount)status.textContent='Nenhuma imagem livre encontrada. Tente outras palavras.';return;}more.hidden=false;for(const choice of choices){if(seen.has(choice.source))continue;seen.add(choice.source);const button=document.createElement('button');button.type='button';button.className='image-search-choice';const img=document.createElement('img');img.src=choice.thumbnail;img.alt=choice.title;img.loading='lazy';img.onerror=()=>button.remove();const title=document.createElement('span');title.className='image-search-title';title.textContent=choice.title;const credit=document.createElement('span');credit.className='image-search-credit';credit.textContent=[choice.catalog,choice.license,choice.author].filter(Boolean).join(' · ');button.append(img,title,credit);if(choice.source){button.title='Abrir a origem: '+choice.source;}button.addEventListener('click',async()=>{button.disabled=true;try{const image=await importImageChoice(choice);const [assetId]=await storePages([image.data]);this.mutate(slide=>{let item=slide.elements.find(value=>value.id===targetId&&value.type==='image');if(!item){item=newElement('image');slide.elements.push(item);}item.assetId=assetId;item.image='';item.imageAlt=image.alt;item.imageSource=image.source;item.imageLicense=[image.license,image.author].filter(Boolean).join(' · ');item.imageCredit=image.catalog||'';this.selected=item.id;});dialog.close();}catch(error){this.studio.callbacks.toast(error.message);button.disabled=false;}});results.append(button);}}catch(error){status.textContent='A busca falhou. Clique em Pesquisar para tentar novamente.';searchPage=Math.max(0,searchPage-1);}finally{loading=false;more.disabled=false;}});
   }
   cropDown(event,node){
     event.preventDefault();this.selected=node.dataset.objectId;this.ensure();

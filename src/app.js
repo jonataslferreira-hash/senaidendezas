@@ -205,6 +205,9 @@ function shareDialog() {
   return `<div class="modal-backdrop"><section class="share-modal" role="dialog" aria-modal="true" aria-labelledby="share-title"><button class="icon-btn close-modal" data-action="close-share" aria-label="Fechar convite">${icon('close')}</button><span class="eyebrow purple-text">A AULA FICA MELHOR JUNTO</span><h2 id="share-title">Conecte a turma<span>.</span></h2><p>Aponte a câmera. Escolha um avatar. Entre na aula.</p><div class="qr-wrap"><img id="room-qr" width="230" height="230" alt="QR Code para entrar nesta sala"></div><span class="eyebrow">OU ENTRE COM O CÓDIGO</span><div class="big-code">${esc(state.code.slice(0, 3))}<span> </span>${esc(state.code.slice(3))}</div><div class="share-link"><input readonly aria-label="Link de convite" value="${esc(url)}"><button class="icon-btn" data-action="copy-link" aria-label="Copiar link">${icon('copy')}</button></div>${import.meta.env.DEV&&/^(localhost|127\.0\.0\.1)$/.test(location.hostname)&&!routeParams().has('localSignal')?`<details><summary>Configurar endereço público</summary><label for="public-url">URL publicada no GitHub Pages</label><input id="public-url" type="url" placeholder="https://usuario.github.io/senaidendezas/"><button class="btn secondary small" data-action="save-url">Salvar endereço</button></details>`:''}</section></div>`;
 }
 function render() {
+  const previousOutline=app.querySelector('.editor-outline');
+  const outlineScroll=previousOutline?.scrollTop;
+  const outlineLesson=previousOutline?.closest('[data-outline-lesson]')?.dataset.outlineLesson;
   studio.editorMusic.setEditing(!state && studio.view === 'editor');
   const form = document.querySelector('#join-form');
   const draftName = form?.querySelector('#player-name')?.value;
@@ -253,6 +256,10 @@ function render() {
   syncPresentationMode();
   if (editDraft) for (const el of app.querySelectorAll('.header, .classroom, .document-classroom, .presentation-toolbar, .pinned-room-qr')) el.inert = true;
   if (!state && !sharedLoading && !(busy && host)) studio.afterRender();
+  const nextOutline=app.querySelector('.editor-outline');
+  if(nextOutline&&outlineScroll!=null&&outlineLesson===nextOutline.closest('[data-outline-lesson]')?.dataset.outlineLesson){
+    nextOutline.scrollTop=outlineScroll;
+  }
   if (!state && joinNameTouched && draftName!==undefined && document.querySelector('#player-name')) document.querySelector('#player-name').value = draftName;
   const slot = document.querySelector('#viewer-slot');
   if (slot) { slot.append(viewer.el); if (localModel === 'custom' && slides[state.slide]?.customModel) viewer.setCustomModel(slides[state.slide].customModel); else viewer.setModel(localModel, localExploded); requestAnimationFrame(() => viewer.resize()); }

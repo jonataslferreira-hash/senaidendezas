@@ -38,7 +38,7 @@ async function modelGif(viewer) {
 }
 export async function exportSlides(input,format,onProgress=()=>{}){
  const lesson=await hydrateLesson(input,true),host=document.createElement('div'),models=new CanvasModels(),simulations=new Simulations();host.className='export-canvas-host';host.setAttribute('aria-hidden','true');host.style.cssText='position:fixed;left:-20000px;top:0;pointer-events:none;z-index:-1;';document.body.append(host);
- const pdf=format==='pdf'?await import('pdf-lib'):null,pptx=format==='pptx'?await import('@office-kit/pptx'):null,deck=pdf?await pdf.PDFDocument.create():pptx.createPresentation(),first=presentationSlide(lesson.slides[0]),ratio=first.pageWidth/first.pageHeight||16/9,deckW=pptx?.inches(13.333333),deckH=deckW/ratio;
+ const pngOnly=format==='png',pdf=format==='pdf'?await import('pdf-lib'):null,pptx=format==='pptx'?await import('@office-kit/pptx'):null,deck=pdf?await pdf.PDFDocument.create():pptx?.createPresentation(),first=presentationSlide(lesson.slides[0]),ratio=first.pageWidth/first.pageHeight||16/9,deckW=pptx?.inches(13.333333),deckH=deckW/ratio;
  if(pptx)pptx.setSlideSize(deck,{width:deckW,height:Math.round(deckH)});
  try{for(const [index,original]of lesson.slides.entries()){
   onProgress(index,lesson.slides.length);const slide=presentationSlide(original),aspect=slide.pageWidth/slide.pageHeight||16/9,w=Math.min(1280,1280*aspect),h=w/aspect;host.style.width=w+'px';host.style.height=h+'px';
@@ -61,6 +61,13 @@ export async function exportSlides(input,format,onProgress=()=>{}){
    }
   }
   const fontEmbedCSS=await slideFontCSS(slide,lesson.customFonts),target=host.querySelector('.slide-canvas')||host,options={fontEmbedCSS,pixelRatio:1,width:w,height:h,preferredFontFormat:'woff2',style:{width:w+'px',height:h+'px',transform:'none'}};
+  if(pngOnly){
+   const name=(slide.title||'Slide').replace(/[^\p{L}\p{N}_ -]/gu,'').slice(0,80)||'Slide';
+   const png=await toPng(target,options);
+   onProgress(1,1);
+   save(bytes(png),name+'.png','image/png');
+   return;
+  }
   if(pdf){const png=await toPng(target,options),embedded=await deck.embedPng(png),page=deck.addPage([w*.75,h*.75]);page.drawImage(embedded,{x:0,y:0,width:w*.75,height:h*.75});}
   else{
    const out=pptx.addBlankSlide(deck);pptx.setSlideBackground(out,slide.background||'#ffffff');const scale=Math.min(deckW/w,deckH/h),dx=(deckW-w*scale)/2,dy=(deckH-h*scale)/2,map=new Map();

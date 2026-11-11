@@ -42,6 +42,8 @@ test('modelos próprios são validados, persistidos por referência e transporta
 });
 
 test('pedidos de imagem viram consultas curtas e pesquisáveis', () => {
-  assert.equal(normalizeImageQuery('Coloque uma imagem de vários sistemas operacionais nessa página'), 'vários sistemas operacionais');
+  // Os catálogos são em inglês: o pedido em português é traduzido antes da busca.
+  assert.equal(normalizeImageQuery('Coloque uma imagem de vários sistemas operacionais nessa página'), 'vários operating systems');
+  assert.match(normalizeImageQuery('troque a imagem pela área de trabalho do windows'), /desktop.*windows/);
   assert.equal(normalizeImageQuery('troque esta foto por um SSD gamer com fundo transparente'), 'SSD gamer');
 });

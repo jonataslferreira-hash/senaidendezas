@@ -2,7 +2,11 @@ import durations from './editor-track-durations.json' with {type:'json'};
 const wiiPlay = new URL('./assets/covers/wii-play.jpg', import.meta.url).href;
 const wiiParty = new URL('./assets/covers/wii-party.jpg', import.meta.url).href;
 const wiiU = new URL('./assets/covers/wii-u.jpg', import.meta.url).href;
+const cameraCover='https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcSPrHqvdRD-G3oWomMAOZWIO2KeV0OJl-wqDRjDq2em5eJ6mZ-z81F3x4EM&s=10';
 export const editorTracks = [
+  {id:'3ds-pop',title:'Slideshow (Pop)',artist:'Nintendo 3DS Camera',cover:cameraCover,color:'#79b7db',url:'https://jetta.vgmtreasurechest.com/soundtracks/nintendo-3ds-background-music/gpirprzbpl/19.%20Nintendo%203DS%20Camera%20-%20Slideshow%20%28Pop%29.mp3'},
+  {id:'3ds-funk',title:'Slideshow (Funk)',artist:'Nintendo 3DS Camera',cover:cameraCover,color:'#79b7db',url:'https://jetta.vgmtreasurechest.com/soundtracks/nintendo-3ds-background-music/umxqoljipx/20.%20Nintendo%203DS%20Camera%20-%20Slideshow%20%28Funk%29.mp3'},
+  {id:'wiiu-eshop',title:'Nintendo eShop - Main Theme',artist:'Wii U',cover:wiiU,color:'#e8a65d',url:'https://lambda.vgmtreasurechest.com/soundtracks/nintendo-wii-u-system-menu-soundtrack-wii-u-gamerip-2012/wanplksi/15.%20Nintendo%20eShop%20-%20Main%20Theme.mp3'},
   {id:'wii-play',title:'Title (Wii Play)',artist:'Wii Play',cover:wiiPlay,color:'#93beb9',url:'https://nu.vgmtreasurechest.com/soundtracks/wii-music-collection/kxgoydxa/17.%20Title%20%28Wii%20Play%29.mp3'},
   {id:'rankings',title:'Rankings',artist:'Wii Party',cover:wiiParty,color:'#d8a78c',url:'https://lambda.vgmtreasurechest.com/soundtracks/wii-party/mapbjtqw/004%20-%20Rankings.mp3'},
   {id:'mii-tv',title:'Mii Maker — Editing a Mii (TV)',artist:'Wii U',cover:wiiU,color:'#a59acb',url:'https://lambda.vgmtreasurechest.com/soundtracks/wii-u-system-audio-background-music/obpsvapz/50.%20Mii%20Maker%20-%20Editing%20a%20Mii%20%28TV%29.mp3'},

@@ -114,7 +114,7 @@ html[data-appearance=dark] #app .ai-brand { --ai-blue: #78a9ff; --ai-purple: #c1
   overscroll-behavior: contain;
 }
 #app .ai-shell .storage-ai-page .ai-composer :is(.ai-add-wrap, .ai-count-wrap, .ai-send-button) { grid-row: 1; align-self: end; }
-#app .ai-shell .storage-ai-page .ai-add-wrap { grid-column: 1; position: static; }
+#app .ai-shell .storage-ai-page .ai-add-wrap { grid-column: 1; position: relative; }
 #app .ai-shell .storage-ai-page .ai-add-button { width: 34px; height: 34px; }
 #app .ai-shell .storage-ai-page .ai-count-wrap { grid-column: 3; }
 #app .ai-shell .storage-ai-page .ai-send-button { grid-column: 5; }
@@ -136,7 +136,7 @@ html[data-theme][data-ui-style] #app .ai-shell .ai-instant-button[aria-pressed=t
 .ai-lesson-preview-stage { aspect-ratio:16 / 9; width:100%; }
 .ai-lesson-preview-stage .canvas-frame { width:100%; height:100%; }
 .ai-lesson-preview > div:last-child { display:flex; flex-wrap:wrap; gap:8px; }
-#app .ai-shell .storage-ai-page .ai-attachment-menu { left: 8px; right: auto; }
+#app .ai-shell .storage-ai-page .ai-attachment-menu { left: 0; right: auto; bottom: calc(100% + 10px); }
 #app .ai-shell .storage-ai-page .ai-composer [data-ai-photo-count] { grid-column: 1 / -1; grid-row: 2; }
 #app .ai-shell .ai-send-button {
   --control-surface: linear-gradient(135deg, #2863cd, #7539b5);
@@ -147,6 +147,28 @@ html[data-theme][data-ui-style] #app .ai-shell .ai-instant-button[aria-pressed=t
   background: var(--control-surface);
 }
 #app .ai-shell .ai-create-log .storage-ai-message.user { background: linear-gradient(120deg, #355bc0, #7241af); }
+#app .ai-shell .ai-create-log .ai-retry-button {
+  margin: 0 0 14px auto;
+  padding: 9px 16px;
+  border-radius: 12px;
+  border: 1px solid #7f6ad866;
+  background: #6b52c526;
+  color: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+#app .ai-shell .ai-create-log .ai-retry-button:hover { background: #6b52c540; }
+#app .ai-shell .ai-composer-hint .ai-quota-hint { color: #ffd08a; font-weight: 600; }
+#app .ai-lesson-preview .ai-palette-row { display:flex; align-items:center; gap:10px; margin:10px 0; flex-wrap:wrap; }
+#app .ai-lesson-preview .ai-palette-row>span { font-size:12px; font-weight:700; opacity:.85; }
+#app .ai-lesson-preview .ai-palette-list { display:flex; gap:6px; flex-wrap:wrap; }
+#app .ai-lesson-preview .ai-palette-chip {
+  display:flex; width:38px; height:24px; padding:0; overflow:hidden; cursor:pointer;
+  border:2px solid transparent; border-radius:8px; background:none; box-shadow:0 2px 8px #0006;
+}
+#app .ai-lesson-preview .ai-palette-chip i { display:block; flex:1; }
+#app .ai-lesson-preview .ai-palette-chip:hover { transform:translateY(-2px); }
+#app .ai-lesson-preview .ai-palette-chip.is-active { border-color:#fff; box-shadow:0 0 0 2px #7f9cff99; }
 
 #app .storage-ai-page .ai-welcome {
   width: min(620px, 100%);

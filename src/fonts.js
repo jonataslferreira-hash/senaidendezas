@@ -9,9 +9,89 @@ export function loadFont(family){
  const promise=fontCatalog().then(async list=>{if(!list.some(f=>f.family===family))return;await new Promise((resolve,reject)=>{const link=document.createElement('link');link.rel='stylesheet';link.href='https://fonts.googleapis.com/css2?family='+encodeURIComponent(family)+'&display=swap';link.onload=resolve;link.onerror=()=>reject(Error('A fonte não carregou. Confira a conexão.'));document.head.append(link);});await document.fonts.load(`24px "${family.replace(/["\\]/g,'')}"`);});
  loaded.set(family,promise);promise.catch(()=>loaded.delete(family));return promise;
 }
-export function loadSlideFonts(slide,customFonts=[]){return Promise.allSettled([...new Set((slide?.elements||[]).filter(e=>e.type==='text').map(e=>e.fontFamily))].map(f=>{const custom=customFonts.find(c=>c.family===f);return custom?loadCustomFont(custom):loadFont(f);}));}
+const importedWebFonts=new Map();
+export function fontAvailable(family,context){
+ const safe=family.replace(/["\\]/g,''),sample='mmmmmmmmWWlli0123';
+ if(!document.fonts.check(`12px "${safe}"`))return false;
+ return ['monospace','serif','sans-serif'].some(base=>{
+  context.font='72px '+base;
+  const fallback=context.measureText(sample).width;
+  context.font=`72px "${safe}",${base}`;
+  return Math.abs(context.measureText(sample).width-fallback)>.1;
+ });
+}
+export function loadPptxFont(family){
+ if(!/^[\p{L}\p{N} ._-]{1,100}$/u.test(family)||navigator.onLine===false)return Promise.resolve('');
+ if(importedWebFonts.has(family))return importedWebFonts.get(family);
+ const task=(async()=>{
+  const signal=AbortSignal.timeout(6000);
+  for(const variants of [':ital,wght@0,400;0,700;1,400;1,700',':wght@400;700','']){
+   const url=new URL('https://fonts.googleapis.com/css2');
+   url.searchParams.set('family',family+variants);
+   const response=await fetch(url,{signal});
+   if(!response.ok)continue;
+   const css=await response.text();
+   const blocks=[...css.matchAll(/@font-face\s*\{([^{}]+)\}/g)].map(match=>match[1]).filter(block=>{
+    const name=/font-family:\s*['"]([^'"]+)['"]/.exec(block)?.[1];
+    return name?.toLowerCase()===family.toLowerCase();
+   });
+   if(!blocks.length)continue;
+   const files=new Map();
+   const rules=await Promise.all(blocks.map(async block=>{
+    const source=/url\(\s*['"]?(https:\/\/fonts\.gstatic\.com\/[\w./%-]+)['"]?\s*\)/.exec(block)?.[1];
+    if(!source)return '';
+    if(!files.has(source))files.set(source,(async()=>{
+     const response=await fetch(source,{signal});
+     if(!response.ok)throw Error('Fonte indisponível');
+     const blob=await response.blob();
+     if(blob.size>1_000_000)throw Error('Fonte muito grande');
+     return new Promise((resolve,reject)=>{
+      const reader=new FileReader();
+      reader.onload=()=>resolve(reader.result);
+      reader.onerror=reject;
+      reader.readAsDataURL(blob);
+     });
+    })());
+    return '@font-face{'+block.replace(source,await files.get(source))+'}';
+   }));
+   const inline=rules.filter(Boolean).join('\n');
+   if(!inline)continue;
+   const style=document.createElement('style');
+   style.textContent=inline;
+   document.head.append(style);
+   try{
+    if((await document.fonts.load(`24px "${family}"`)).length)return inline;
+   }catch{}
+   style.remove();
+  }
+  return '';
+ })().catch(()=>'');
+ importedWebFonts.set(family,task);
+ task.then(css=>{if(!css)importedWebFonts.delete(family);});
+ return task;
+}
+export function loadSlideFonts(slide,customFonts=[]){
+ const families=new Set((slide?.elements||[]).filter(element=>element.type==='text').map(element=>element.fontFamily));
+ const pptx=slide?.sourceType==='pptx';
+ const measure=pptx?document.createElement('canvas').getContext('2d'):null;
+ return Promise.allSettled([...families].map(family=>{
+  const custom=customFonts.find(font=>font.family===family);
+  if(custom)return loadCustomFont(custom);
+  if(pptx)return family&&!fontAvailable(family,measure)?loadPptxFont(family):Promise.resolve();
+  return loadFont(family);
+ }));
+}
 const embeddedFonts=new Map();
-export async function slideFontCSS(slide,customFonts=[]){const fonts=[...new Set((slide.elements||[]).filter(e=>e.type==='text').map(e=>e.fontFamily))].filter(f=>f&&!system.includes(f)),catalog=fonts.length?await fontCatalog():[];const customCSS=await Promise.all(customFonts.filter(f=>fonts.includes(f.family)).map(async f=>`@font-face{font-family:"${f.family}";src:url(${await customFontData(f)});}`));return customCSS.join('\n')+(await Promise.all(fonts.filter(f=>catalog.some(c=>c.family===f)).map(f=>{if(!embeddedFonts.has(f))embeddedFonts.set(f,(async()=>{const response=await fetch('https://fonts.googleapis.com/css2?family='+encodeURIComponent(f)+'&display=swap',{signal:AbortSignal.timeout(15000)});if(!response.ok)throw Error('Não foi possível incorporar a fonte '+f);let css=await response.text();for(const url of [...new Set([...css.matchAll(/url\((https:[^)]+)\)/g)].map(m=>m[1]))]){const response=await fetch(url,{signal:AbortSignal.timeout(15000)});if(!response.ok)throw Error('A fonte '+f+' não pôde ser incorporada.');const bytes=new Uint8Array(await response.arrayBuffer());let binary='';for(let i=0;i<bytes.length;i+=8192)binary+=String.fromCharCode(...bytes.subarray(i,i+8192));css=css.split(url).join('data:font/woff2;base64,'+btoa(binary));}return css;})());return embeddedFonts.get(f);}))).join('\n');}
+async function pptxFontCSS(slide,customFonts){
+ const families=new Set(slide.elements.filter(element=>element.type==='text').map(element=>element.fontFamily));
+ const rules=await Promise.all([...families].map(async family=>{
+  const font=customFonts.find(font=>font.family===family);
+  if(font)return `@font-face{font-family:"${font.family}";src:url(${await customFontData(font)});}`;
+  return importedWebFonts.get(family)||'';
+ }));
+ return rules.filter(Boolean).join('\n');
+}
+export async function slideFontCSS(slide,customFonts=[]){if(slide.sourceType==='pptx')return pptxFontCSS(slide,customFonts);const fonts=[...new Set((slide.elements||[]).filter(e=>e.type==='text').map(e=>e.fontFamily))].filter(f=>f&&!system.includes(f)),catalog=fonts.length?await fontCatalog():[];const customCSS=await Promise.all(customFonts.filter(f=>fonts.includes(f.family)).map(async f=>`@font-face{font-family:"${f.family}";src:url(${await customFontData(f)});}`));return customCSS.join('\n')+(await Promise.all(fonts.filter(f=>catalog.some(c=>c.family===f)).map(f=>{if(!embeddedFonts.has(f))embeddedFonts.set(f,(async()=>{const response=await fetch('https://fonts.googleapis.com/css2?family='+encodeURIComponent(f)+'&display=swap',{signal:AbortSignal.timeout(15000)});if(!response.ok)throw Error('Não foi possível incorporar a fonte '+f);let css=await response.text();for(const url of [...new Set([...css.matchAll(/url\((https:[^)]+)\)/g)].map(m=>m[1]))]){const response=await fetch(url,{signal:AbortSignal.timeout(15000)});if(!response.ok)throw Error('A fonte '+f+' não pôde ser incorporada.');const bytes=new Uint8Array(await response.arrayBuffer());let binary='';for(let i=0;i<bytes.length;i+=8192)binary+=String.fromCharCode(...bytes.subarray(i,i+8192));css=css.split(url).join('data:font/woff2;base64,'+btoa(binary));}return css;})());return embeddedFonts.get(f);}))).join('\n');}
 export function fontButton(element,customFonts=[]){return `<button type="button" class="font-choose" data-font-action="open" style="font-family:'${esc(element.fontFamily||'Arial')}',sans-serif">${esc(customFonts.find(f=>f.family===element.fontFamily)?.name||element.fontFamily||'Arial')} ▾</button>`;}
 export function recommendFonts(slide,element){const text=(slide.title+' '+(slide.elements||[]).map(e=>e.text||'').join(' ')).toLowerCase();if(/hdd|ssd|tecnolog|comput|armazen|circuit|program/.test(text))return ['Inter','Space Grotesk','IBM Plex Sans','Manrope','Roboto'];if(/história|literatura|poema|conto|filosof/.test(text))return ['Lora','Merriweather','Libre Baskerville','Source Serif 4','Literata'];if(/criança|infantil|brinc|jogo/.test(text))return ['Nunito','Quicksand','Baloo 2','Fredoka','Rubik'];return element?.role==='title'?['Outfit','Montserrat','DM Sans','Poppins','Sora']:['Atkinson Hyperlegible','Source Sans 3','Noto Sans','Open Sans','Roboto'];}
 export class FontPicker{

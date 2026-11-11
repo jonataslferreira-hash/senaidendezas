@@ -1,4 +1,5 @@
 const paths = {
+  palette:'M12 3a9 9 0 1 0 0 18h1a2 2 0 0 0 1.5-3.3A1 1 0 0 1 15.3 16H18a3 3 0 0 0 3-3c0-6-4-10-9-10ZM7 11h.1M10 7h.1M15 7h.1M17 11h.1',
   sidebar: 'M3 5h18v14H3zM9 5v14',
   animate: 'M8 5l12 7-12 7zM3 8v8',
   duplicate:'M8 8h12v12H8zM4 16V4h12',
@@ -18,6 +19,7 @@ const paths = {
   camera:'M3 7h4l2-3h6l2 3h4v13H3zM15 13a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z',
   qr:'M3 3h6v6H3zm12 0h6v6h-6zM3 15h6v6H3zm12 0h3v3h3v3h-6zm-3-3h2m4 0h3',
   image:'M3 4h18v16H3zm1 13 5-5 4 4 3-3 4 4M9 8h.1',
+  search:'M11 3a8 8 0 1 0 0 16 8 8 0 0 0 0-16zm6 14 5 5',
   crop:'M6 2v16h16M2 6h16v16',
   library: 'M3 5h4v14H3zM10 5h4v14h-4zM17 6l3-1 2 13-3 1z',
   join: 'M13 4h7v16h-7M3 12h12m-4-4 4 4-4 4',

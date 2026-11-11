@@ -13,8 +13,5 @@
   </defs>
   <rect x="2" y="2" width="60" height="60" rx="19" fill="url(#tile)"/>
   <rect x="2.5" y="2.5" width="59" height="59" rx="18.5" stroke="white" stroke-opacity=".3"/>
-  <path d="M14 34v11a5 5 0 0 0 5 5h24" stroke="#dfd4ff" stroke-opacity=".64" stroke-width="2" stroke-linecap="round"/>
-  <path d="M31 18h-7a5 5 0 0 0-5 5v17a5 5 0 0 0 5 5h22a5 5 0 0 0 5-5v-6" stroke="url(#light)" stroke-width="2.3" stroke-linecap="round"/>
-  <path d="M40 12c1.7 8.1 4.9 11.3 13 13-8.1 1.7-11.3 4.9-13 13-1.7-8.1-4.9-11.3-13-13 8.1-1.7 11.3-4.9 13-13Z" fill="url(#light)"/>
-  <circle cx="27" cy="37" r="1.6" fill="#e9cfff"/>
+  <path d="M32 10c3 13 9 19 22 22-13 3-19 9-22 22-3-13-9-19-22-22 13-3 19-9 22-22Z" transform="rotate(45 32 32)" fill="url(#light)"/>
 </svg>

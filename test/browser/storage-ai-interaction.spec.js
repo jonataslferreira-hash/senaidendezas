@@ -2,14 +2,70 @@ import {test,expect} from '@playwright/test';
 import {mockAccounts} from './auth-fixture.js';
 import QRCode from 'qrcode';
 import {createProject} from './project-fixture.js';
+import {pptxFixture} from '../document-fixtures.js';
+
+test('storageAI vincula PPTX e reorganiza as páginas no mesmo projeto',async({page})=>{
+  test.setTimeout(120000);
+  await mockAccounts(page);
+  await page.route('**/storage-ai/history',route=>route.fulfill({json:{sessions:[]}}));
+  await page.route('**/lessons/**',route=>route.fulfill({status:route.request().method()==='PUT'?200:404,json:{}}));
+  await page.route('**/storage-ai',route=>{
+    const input=route.request().postDataJSON();
+    expect(input.mode).toBe('revise');
+    const [first,second]=input.context.slides;
+    const title=first.elements.find(element=>element.text==='Professor por um dia');
+    return route.fulfill({json:{slideOrder:[second.id,first.id],edits:[{slideId:first.id,changes:[{id:title.id,text:'Título revisado',x:12}]}]}});
+  });
+  await page.goto('/?page=storage-ai');
+  await expect(page.getByRole('heading',{name:'storageAI'})).toBeVisible();
+  await page.getByRole('button',{name:'Adicionar conteúdo'}).click();
+  await expect(page.getByRole('button',{name:'Importar PPTX'})).toBeVisible();
+  await page.locator('input[name=presentation]').setInputFiles({name:'vinculada.pptx',mimeType:'application/vnd.openxmlformats-officedocument.presentationml.presentation',buffer:await pptxFixture()});
+  const linked=page.getByText('Apresentação vinculada. Diga o que quer editar.');
+  const fontDialog=page.locator('.pptx-font-dialog');
+  await expect(linked.or(fontDialog)).toBeVisible({timeout:60000});
+  if(await fontDialog.isVisible())await fontDialog.getByRole('button',{name:'Aplicar em todos os slides'}).click();
+  await expect(linked).toBeVisible();
+  const readLesson=()=>page.evaluate(()=>JSON.parse(localStorage.getItem('storage-lab-lessons-v1')).find(lesson=>lesson.title==='vinculada'));
+  const before=await readLesson();
+  await page.getByLabel('Mensagem para Storage AI').fill('Mova a página 2 para o início e revise o título da primeira.');
+  await page.getByRole('button',{name:'Enviar mensagem'}).click();
+  await expect(page.getByText(/Reordenei as páginas/)).toBeVisible();
+  const after=await readLesson();
+  expect(after.id).toBe(before.id);
+  expect(after.slides.map(slide=>slide.id)).toEqual(before.slides.map(slide=>slide.id).reverse());
+  expect(after.slides[1].elements).toContainEqual(expect.objectContaining({text:'Título revisado',x:12}));
+  await page.getByRole('button',{name:'Nova conversa',exact:true}).click();
+  await page.getByRole('button',{name:'Adicionar conteúdo'}).click();
+  await page.getByRole('button',{name:'Adicionar da biblioteca'}).click();
+  const picker=page.locator('.ai-presentation-picker');
+  await picker.getByLabel('Apresentação').selectOption({label:'vinculada'});
+  await picker.getByRole('button',{name:'Adicionar',exact:true}).click();
+  await expect(page.getByText('Apresentação vinculada. Diga o que quer editar.')).toBeVisible();
+});
 
 test('prévia pede aprovação e salva as atividades nas quantidades escolhidas',async({page})=>{
   await mockAccounts(page);
+  await page.route('https://pt.wikipedia.org/w/api.php?**',route=>route.fulfill({json:{
+    query:{search:[{pageid:123,title:'Sistema Solar',snippet:'O Sistema Solar contém oito planetas.'}]}
+  }}));
+  await page.route('https://commons.wikimedia.org/w/api.php?**',route=>route.fulfill({json:{
+    query:{pages:[{title:'File:Sistema Solar.png',imageinfo:[{
+      width:800,height:600,thumburl:'https://upload.wikimedia.org/solar-system.png',
+      descriptionurl:'https://commons.wikimedia.org/wiki/File:Sistema_Solar.png',
+      extmetadata:{LicenseShortName:{value:'CC0'}}
+    }]}]}
+  }}));
+  const image=await QRCode.toBuffer('Sistema Solar',{width:120});
+  await page.route('https://upload.wikimedia.org/solar-system.png',route=>route.fulfill({
+    contentType:'image/png',body:image
+  }));
+  await page.route('https://api.openverse.org/**',route=>route.fulfill({json:{results:[]}}));
   await page.route('https://storage-lab-files.lagujf.workers.dev/storage-ai/history',route=>route.fulfill({json:{sessions:[]}}));
   await page.route('https://storage-lab-files.lagujf.workers.dev/lessons/**',route=>route.fulfill({json:{ok:true}}));
   await page.route('https://storage-lab-files.lagujf.workers.dev/storage-ai',route=>{
     const input=route.request().postDataJSON();
-    if(input.prompt.includes('perguntas de múltipla escolha novas')){
+    if(input.prompt.startsWith('Crie apenas atividades para esta aula;')){
       expect(input.activities).toEqual({quizzes:1,questions:1,polls:0});
       return route.fulfill({json:{questions:[{text:'Qual é o maior planeta?',options:['A','B','C'],correct:0}]}});
     }
@@ -32,6 +88,7 @@ test('prévia pede aprovação e salva as atividades nas quantidades escolhidas'
   await expect(page.getByRole('navigation',{name:'Histórico de conversas'})).toContainText('Planetas');
   const preview=page.locator('.ai-lesson-preview');
   await expect(preview).toContainText('2 quizzes');
+  await expect(preview.getByRole('img',{name:'Sistema Solar'})).toBeVisible();
   const saved=()=>page.evaluate(()=>JSON.parse(localStorage.getItem('storage-lab-lessons-v1')).find(lesson=>lesson.title==='Proposta de aula'));
   expect(await saved()).toBeUndefined();
   await preview.getByRole('button',{name:'Criar apresentação'}).click();
@@ -39,6 +96,9 @@ test('prévia pede aprovação e salva as atividades nas quantidades escolhidas'
   const lesson=await saved();
   expect(lesson.activityBlocks.filter(block=>block.type==='quiz').map(block=>block.items.length)).toEqual([1,1]);
   expect(lesson.questions.map(question=>question.options.length)).toEqual([3,3]);
+  const references=lesson.slides.find(slide=>slide.title==='Referências');
+  expect(references.note).toContain('https://pt.wikipedia.org/?curid=123');
+  expect(references.note).toContain('https://commons.wikimedia.org/wiki/File:Sistema_Solar.png');
 });
 
 test('Storage AI keeps the page and draft while choosing slide count and sending',async({page})=>{
@@ -293,7 +353,7 @@ test('Storage AI troca somente a imagem selecionada por um PNG transparente', as
   await page.route('https://commons.wikimedia.org/w/api.php?**', route => {
     expect(new URL(route.request().url()).searchParams.get('gsrsearch')).toContain('filemime:png');
     return route.fulfill({json:{query:{pages:['opaca','transparente'].map((name,index)=>({
-      title:'File:'+name+'.png',index,imageinfo:[{thumburl:'https://thumb.wikimedia.org/test/'+name+'.png',
+      title:'File:Solid state drive '+name+'.png',index,imageinfo:[{thumburl:'https://thumb.wikimedia.org/test/'+name+'.png',
         thumbmime:'image/png',descriptionurl:'https://commons.wikimedia.org/wiki/File:'+name+'.png',
         extmetadata:{License:{value:'cc-by-sa-4.0'},Artist:{value:'<b>Autor de teste</b>'},AttributionRequired:{value:'true'}}}]
     }))}}});
@@ -341,7 +401,7 @@ test('Storage AI troca somente a imagem selecionada por um PNG transparente', as
   await expect(page.locator('.ai-reference')).toContainText('original.png');
   await expect(page.getByLabel('Pedido para Storage AI')).toHaveValue('Troque a imagem por um SSD com fundo transparente');
   await page.getByRole('button',{name:'Enviar pedido',exact:true}).click();
-  await expect(object.locator('img')).toHaveAttribute('alt','transparente');
+  await expect(object.locator('img')).toHaveAttribute('alt','Solid state drive transparente');
   await expect(object).toHaveCount(1);
   expect(await object.getAttribute('data-object-id')).toBe(selectedId);
   expect(await object.evaluate(el=>[el.style.left,el.style.top,el.style.width,el.style.height])).toEqual(frame);

@@ -16,6 +16,9 @@ STORAGE_AI_FREE_CONFIRMED = "true"
 SUPABASE_URL = "https://qkpgiwjsqtocvjmqinii.supabase.co"
 SUPABASE_PUBLISHABLE_KEY = "sb_publishable_-CT7iCR3355qijcVioyRkA_-Njn3Q4e"
 ALLOWED_ORIGINS = "https://jonataslferreira-hash.github.io,http://localhost:5173,http://127.0.0.1:5173"
+# Modelos gratuitos do OpenRouter, na ordem de tentativa. Variantes :free não
+# exigem créditos comprados.
+OPENROUTER_MODEL = "openrouter/free,google/gemma-4-31b-it:free,nvidia/nemotron-3.5-lightning:free"
 
 [ai]
 binding = "AI"

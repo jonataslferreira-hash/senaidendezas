@@ -13,7 +13,7 @@ test('estilo do perfil também alcança controles do player, ações do slide, m
   await page.screenshot({path:'test-results/workspace-style-'+style+'.png',animations:'disabled'});
   if(style==='glass'||style==='aero'){await page.getByRole('button',{name:'Ana',exact:true}).click();await page.getByLabel('Aparência do site',{exact:true}).selectOption('dark');await page.getByRole('button',{name:'Fechar conta',exact:true}).click();await page.screenshot({path:'test-results/workspace-style-'+style+'-dark.png',animations:'disabled'});await page.getByRole('button',{name:'Ana',exact:true}).click();await page.getByLabel('Aparência do site',{exact:true}).selectOption('light');await page.getByRole('button',{name:'Fechar conta',exact:true}).click();}
   const background=await page.locator('[data-music-action=next]').evaluate(e=>getComputedStyle(e).backgroundImage);expect(background.includes('linear-gradient')).toBe(style==='aero'||style==='glass');
-  await page.getByRole('button',{name:'Colaborar',exact:true}).click();await expect(page.getByRole('button',{name:'Fechar colaboração',exact:true})).toHaveCSS('border-radius','50%');await page.getByRole('button',{name:'Fechar colaboração',exact:true}).click();
+  await page.locator('.editor-sharing > summary').click();await page.getByRole('button',{name:'Colaborar',exact:true}).click();await expect(page.getByRole('button',{name:'Fechar colaboração',exact:true})).toHaveCSS('border-radius','50%');await page.getByRole('button',{name:'Fechar colaboração',exact:true}).click();
  }
 });
 test('perfil tem cores e estilos; adicionar e trocar contas preserva sessões e preferências',async({page})=>{

@@ -51,5 +51,8 @@ test('Worker exige login e associação ao grupo para arquivos, protege revisão
 test('recorte mantém centro, permite ampliar além de 4× e arrastar livremente; links Spotify são validados',()=>{
   for(const [w,h] of [[400,200],[200,400],[50,50]])for(const zoom of [1,2,4,20,1000]){const crop=cropRectangle(w,h,zoom);assert.ok(crop.x>=0&&crop.y>=0&&crop.x+crop.side<=w&&crop.y+crop.side<=h);assert.equal(crop.x+crop.side/2,w/2);assert.equal(crop.y+crop.side/2,h/2);}
   assert.ok(cropRectangle(400,200,20).side<cropRectangle(400,200,4).side);assert.ok(cropRectangle(400,200,2,-.5,-.5).x<0);
-  assert.equal(editorTracks.length,5);assert.equal(spotifyTrackId('https://open.spotify.com/track/0123456789012345678901?si=abc'),'0123456789012345678901');assert.equal(spotifyTrackId('https://evil.example/track/0123456789012345678901'),null);
+  assert.equal(spotifyTrackId('https://open.spotify.com/track/0123456789012345678901?si=abc'),'0123456789012345678901');assert.equal(spotifyTrackId('https://evil.example/track/0123456789012345678901'),null);
+});
+test('a playlist contém as três novas faixas e mantém as originais',()=>{
+  assert.deepEqual(new Set(editorTracks.map(track=>track.id)),new Set(['3ds-pop','3ds-funk','wiiu-eshop','wii-play','rankings','mii-tv','mii-menu','mii-gamepad']));
 });

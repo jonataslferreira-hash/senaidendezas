@@ -84,7 +84,7 @@ test('duas contas editam o mesmo texto ao vivo, salvam versões concorrentes e r
     await bruno.page.reload();await expect(bruno.page.locator('.slide-designer')).toBeVisible();
     await bruno.page.getByRole('button',{name:'Campos',exact:true}).click();await expect(bruno.page.getByLabel('Texto do elemento',{exact:true})).toHaveValue(/A[xy]{2}B/);
     await ana.page.screenshot({path:'test-results/collaboration-editor.png',fullPage:true,animations:'disabled'});
-    await ana.page.getByRole('button',{name:'Colaborar',exact:true}).click();await ana.page.getByLabel('Permissão de Bruno').selectOption('commenter');await expect.poll(()=>secondRole).toBe('commenter');await bruno.page.reload();await expect(bruno.page.locator('.designer-workspace')).toHaveJSProperty('inert',true);await expect(ana.page.getByLabel('Permissão de Bruno')).toHaveValue('commenter');
+    await ana.page.locator('.editor-sharing > summary').click();await ana.page.getByRole('button',{name:'Colaborar',exact:true}).click();await ana.page.getByLabel('Permissão de Bruno').selectOption('commenter');await expect.poll(()=>secondRole).toBe('commenter');await bruno.page.reload();await expect(bruno.page.locator('.designer-workspace')).toHaveJSProperty('inert',true);await expect(ana.page.getByLabel('Permissão de Bruno')).toHaveValue('commenter');
     await ana.page.getByRole('button',{name:'Fechar colaboração'}).click();
     dropBroadcast=true;
     await ana.page.getByLabel('Texto do elemento',{exact:true}).fill('Edição depois da permissão de comentário');
