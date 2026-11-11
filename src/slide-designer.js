@@ -5,7 +5,7 @@ import {FontPicker,fontButton,loadSlideFonts} from './fonts.js';
 import {presentationSlide} from './slide-display.js';
 import { audioEditor } from './audio-editor.js';
 import { optimizeImage } from './image-optimize.js';
-import { canvasFromSlide, newElement, canvasThemes, applyCanvasTheme, slideBackground, normalizeBackground, imageZoomValue } from './canvas-data.js';
+import { MAX_CANVAS_ELEMENTS, canvasFromSlide, newElement, canvasThemes, applyCanvasTheme, slideBackground, normalizeBackground, imageZoomValue } from './canvas-data.js';
 import {openLayouts, applyOpenLayout} from './open-slide-layouts.js';
 import {slideStylePicker,localLayouts} from './slide-style-picker.js';
 import { canvasMarkup, CanvasModels, esc } from './canvas-view.js';
@@ -417,7 +417,7 @@ export class SlideDesigner {
       if (!['image/png', 'image/jpeg', 'image/webp', 'image/gif'].includes(file.type) || file.size > 1400000) throw Error('Use PNG, JPEG, WebP ou GIF de até 1,4 MB.');
       const data = await new Promise((resolve, reject) => { const reader = new FileReader(); reader.onload = () => resolve(reader.result); reader.onerror = reject; reader.readAsDataURL(file); });
       const [assetId] = await storePages([data]); if (!this.studio.groups.canEdit || sourceSlide !== this.original) return;
-      this.mutate(s => { let e = s.elements.find(e => e.id === targetId && e.type === 'image'); if (!e) { if(targetId)return; if(s.elements.length>=40)throw Error('Use até 40 elementos no slide.'); e = newElement('image', { imageAlt: file.name }); s.elements.push(e); } e.assetId = assetId; e.image = ''; this.selected = e.id; }); this.replaceId = null;
+      this.mutate(s => { let e = s.elements.find(e => e.id === targetId && e.type === 'image'); if (!e) { if(targetId)return; if(s.elements.length>=MAX_CANVAS_ELEMENTS)throw Error(`Use até ${MAX_CANVAS_ELEMENTS} elementos no slide.`); e = newElement('image', { imageAlt: file.name }); s.elements.push(e); } e.assetId = assetId; e.image = ''; this.selected = e.id; }); this.replaceId = null;
     }
     if (t.id === 'designer-model-files') {
       const sourceSlide = this.original, targetId = this.replaceId, model = await importModelFiles(t.files); if (!model || sourceSlide !== this.original) return;
@@ -441,7 +441,7 @@ export class SlideDesigner {
     }
     if (action === 'select') { this.selectObject(button.dataset.id,event?.shiftKey); return; }
     if (action === 'image' || action === 'replace-image') { this.replaceId = action.startsWith('replace') ? e?.id : null; this.studio.root.querySelector('#designer-image-file').click(); return; }
-    if (action === 'model') { this.mutate(s => { if (s.elements.length >= 40) throw Error('Use até 40 elementos no slide.'); if (s.elements.filter(item => item.type === 'model').length >= 2) throw Error('Use até dois modelos por slide.'); const model = newElement('model'); s.elements.push(model); this.selected = model.id; }); return; }
+    if (action === 'model') { this.mutate(s => { if (s.elements.length >= MAX_CANVAS_ELEMENTS) throw Error(`Use até ${MAX_CANVAS_ELEMENTS} elementos no slide.`); if (s.elements.filter(item => item.type === 'model').length >= 2) throw Error('Use até dois modelos por slide.'); const model = newElement('model'); s.elements.push(model); this.selected = model.id; }); return; }
     if (action === 'replace-model') { this.replaceId = e?.id; this.studio.root.querySelector('#designer-model-files').click(); return; }
     if (action === 'interact') { this.interacting = this.interacting === e.id ? '' : e.id; this.refreshSelection(); return; }
     if (action === 'undo' || action === 'redo') {
@@ -453,7 +453,7 @@ export class SlideDesigner {
     const shape=action==='shape'?await pickShape():null;
     if(action==='shape'&&(!shape||!this.studio.groups.canEdit||this.original!==original))return;
     this.mutate(s => {
-      if (s.elements.length >= 40 && ['add-text', 'shape', 'duplicate'].includes(action)) throw Error('Use até 40 elementos no slide.');
+      if (s.elements.length >= MAX_CANVAS_ELEMENTS && ['add-text', 'shape', 'duplicate'].includes(action)) throw Error(`Use até ${MAX_CANVAS_ELEMENTS} elementos no slide.`);
       let current = s.elements.find(e => e.id === this.selected);
       if (action === 'add-text' || action === 'shape') { current = newElement(action === 'shape' ? 'shape' : 'text',shape||{}); s.elements.push(current); this.selected = current.id; }
       else if (!current) return;

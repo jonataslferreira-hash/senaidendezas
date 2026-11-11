@@ -7,6 +7,10 @@ compatibility_date = "2026-11-01"
 binding = "FILES"
 bucket_name = "storagelab"
 
+[[previews.r2_buckets]]
+binding = "FILES"
+bucket_name = "storagelab"
+
 [vars]
 STORAGE_AI_FREE_CONFIRMED = "true"
 SUPABASE_URL = "https://qkpgiwjsqtocvjmqinii.supabase.co"

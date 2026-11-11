@@ -19,6 +19,7 @@ export const canvasThemes = {
   ...openSlideThemes,
   ...studioSlideThemes
 };
+export const MAX_CANVAS_ELEMENTS = 120;
 export function layoutPanelColor(background, accent) {
   return '#'+[1,3,5].map(offset=>{
     const base=parseInt(background.slice(offset,offset+2),16);
@@ -65,7 +66,7 @@ export function newElement(type, overrides = {}) {
     text: 'Escreva sua ideia', role: '', fontSize: 36,fontFamily:'Arial',italic:false,rotation:0,verticalAlign:'start',textPadding:[0,0,0,0], color: '#f1eaff', bold: false, align: 'left', background: '#b7a0e8', image: '', imageAlt: '', imageZoom:1,imageX:0,imageY:0, model: 'ssd', modelLabel: '', modelDescription: '', modelDetailsHidden:false, customModel: null, locked: false, ...overrides };
 }
 export function normalizeElements(elements, draft, validateImage) {
-  if (!Array.isArray(elements) || elements.length > 40) throw Error('Um slide livre pode ter até 40 elementos.');
+  if (!Array.isArray(elements) || elements.length > MAX_CANVAS_ELEMENTS) throw Error(`Um slide livre pode ter até ${MAX_CANVAS_ELEMENTS} elementos.`);
   if (elements.filter(e => e.type === 'model').length > 2) throw Error('Use até dois modelos 3D por slide para manter a aula fluida.');
   const ids = new Set();
   return elements.map(e => {

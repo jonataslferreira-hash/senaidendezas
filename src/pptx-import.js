@@ -1,7 +1,7 @@
 import * as pptx from '@office-kit/pptx';
 import {renderSlideToSvg} from '@office-kit/pptx-preview';
 import {newSlide} from './lessons.js';
-import {newElement} from './canvas-data.js';
+import {MAX_CANVAS_ELEMENTS,newElement} from './canvas-data.js';
 import {MAX_AUDIO_BYTES} from './audio-data.js';
 export const pptxEffects=['appear','fadeIn','fadeOut','floatIn','flyIn','flyOut','splitIn','wipeIn','zoomIn'];
 function fontAvailable(family,ctx){
@@ -46,7 +46,7 @@ export async function editablePptx(bytes,{signal,progress}){
   const warnings=new Set(),svg=renderSlideToSvg(pres,source,{textLayout:'svg',resolveFamily:family=>family||'Arial',measureText:(text,spec)=>{measure.font=`${spec.italic?'italic ':''}${spec.bold?'bold ':''}${spec.sizePx}px "${spec.family.replace(/["\\]/g,'')}"`;const m=measure.measureText(text);return{widthPx:m.width,ascentPx:m.fontBoundingBoxAscent||spec.sizePx*.8,descentPx:m.fontBoundingBoxDescent||spec.sizePx*.2};}}),doc=cleanPptxSvg(svg),root=doc.documentElement;
   const view=root.getAttribute('viewBox').split(/\s+/).map(Number),width=view[2],height=view[3],elements=[];
   const preview=await raster(new XMLSerializer().serializeToString(root),320,180);
-  const shapes=pptx.getSlideShapes(source);if(shapes.length>39)throw Error(`O slide ${index+1} tem mais de 39 objetos. Divida-o antes de importar para o editor.`);
+  const shapes=pptx.getSlideShapes(source);
   const mediaShapes=shapes.map(shape=>({shape,media:pptx.getShapeMedia(shape)})).filter(entry=>entry.media?.kind==='audio');
   let slideAudio=null;
   if(mediaShapes.length){
@@ -81,7 +81,7 @@ export async function editablePptx(bytes,{signal,progress}){
    group.remove();await wait();
   }
   // Remaining artwork belongs to the master/layout and stays as a background layer.
-  if(elements.length>39)throw Error(`O slide ${index+1} precisa de mais de 40 camadas no editor. Divida o slide antes de importar.`);
+  if(elements.length>MAX_CANVAS_ELEMENTS)throw Error(`O slide ${index+1} excede o limite de ${MAX_CANVAS_ELEMENTS} elementos editáveis.`);
   elements.unshift(newElement('image',{x:0,y:0,w:100,h:100,image:await raster(serialize(root),width,height),imageAlt:'Fundo e elementos do modelo',locked:true}));
   const animations=[];let start=0,end=0,group=0;
   for(const a of pptx.getSlideAnimations(source)){

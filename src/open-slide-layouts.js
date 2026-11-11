@@ -1,5 +1,5 @@
 import catalog from './open-layout-catalog.json' with {type:'json'};
-import {canvasThemes, newElement, layoutPanelColor} from './canvas-data.js';
+import {MAX_CANVAS_ELEMENTS,canvasThemes, newElement, layoutPanelColor} from './canvas-data.js';
 
 export const openLayouts = new Map(catalog.map(layout => ['opf-'+layout.id, layout]));
 const decorPrefix = 'opf-decor-';
@@ -74,7 +74,7 @@ export function applyOpenLayout(slide, key) {
   const decorations = [];
   const panelColor = layoutPanelColor(slide.background || theme.background, theme.accent);
   const shape = (x,y,w,h,background,shapeType='rectangle') => {
-    if(elements.length+decorations.length>=40) return;
+    if(elements.length+decorations.length>=MAX_CANVAS_ELEMENTS) return;
     const id = decorPrefix+(background===panelColor?'panel-':'')+crypto.randomUUID();
     decorations.push(newElement('shape',{id,x,y,w,h,background,shapeType,cornerRadius:0}));
   };

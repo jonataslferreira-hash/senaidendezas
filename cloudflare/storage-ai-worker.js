@@ -97,4 +97,3 @@ export async function handleStorageAI(request,env,user,headers) {
 import {AI_PHOTO_LIMIT,AI_PHOTOS_PER_SHEET,AI_SLIDE_LIMIT,aiLayouts,aiThemes} from '../src/storage-ai-options.js';
 import {openSlideThemes} from '../src/open-slide-themes.js';
 import openLayoutCatalog from '../src/open-layout-catalog.json' with {type:'json'};
-
