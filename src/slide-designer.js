@@ -197,7 +197,7 @@ export class SlideDesigner {
     const slide=this.display();
     return `<div class="designer-toolbar" role="toolbar" aria-label="Ferramentas do slide">
       ${btn('undo', '↶', `aria-label="Desfazer" ${h.undo.length ? '' : 'disabled'}`)}${btn('redo', '↷', `aria-label="Refazer" ${h.redo.length ? '' : 'disabled'}`)}
-      <span></span>${btn('add-text', 'T Texto')}${btn('image', '▧ Imagem')}${btn('shape', '▰ Forma')}<details class="designer-insert-more"><summary>Inserir mais</summary><div>${btn('model', '◇ Modelo 3D')}${btn('simulation','⚗ Simulação')}${btn('browse-images',studioIcon('search')+' Buscar imagens')}</div></details>
+      <span></span>${btn('add-text', 'T Texto')}${btn('image', '▧ Imagem')}${btn('shape', '▰ Forma')}<details class="designer-insert-more"><summary>Inserir mais</summary><div>${btn('icon', '⊞ Ícones de objetos')}${btn('model', '◇ Modelo 3D')}${btn('simulation','⚗ Simulação')}${btn('browse-images',studioIcon('search')+' Buscar imagens')}</div></details>
       ${slideStylePicker('theme',slide)}${slideStylePicker('layout',slide)}
       <input type="file" id="designer-image-file" accept="image/png,image/jpeg,image/webp,image/gif" hidden><input type="file" id="designer-model-files" accept=".glb,.gltf,.obj,.mtl,.bin,.png,.jpg,.jpeg,.webp,.gif,.ktx2" multiple hidden>
     </div>`;
@@ -272,7 +272,7 @@ export class SlideDesigner {
       ${e.type === 'model' ? `<label>Modelo<select data-element-field="model" aria-label="Modelo do elemento">${[['ssd', 'SSD SATA'], ['hdd', 'HDD'], ['nvme', 'SSD NVMe'], ['custom', e.customModel?.name || 'Meu modelo enviado']].map(([v, label]) => `<option value="${v}" ${e.model === v ? 'selected' : ''}>${esc(label)}</option>`).join('')}</select></label><label>Nome do modelo<input data-element-field="modelLabel" maxlength="120" value="${esc(e.modelLabel||'')}" placeholder="${esc(e.model==='custom'?e.customModel?.name||'Modelo 3D':'Nome da peça selecionada')}"></label><label>Descrição do modelo<textarea data-element-field="modelDescription" maxlength="500" placeholder="Descrição ao explorar o modelo">${esc(e.modelDescription||'')}</textarea></label><label class="model-details-toggle"><input type="checkbox" data-element-field="modelDetailsHidden" ${e.modelDetailsHidden?'checked':''}> Mostrar somente o modelo 3D</label>${btn('replace-model', '↑ Enviar GLB / GLTF / OBJ')}${btn('interact', this.interacting === e.id ? 'Voltar à edição' : 'Explorar o modelo')}` : ''}
       ${e.type==='simulation'?`<label>Experiência<select data-element-field="simulation" aria-label="Tipo de simulação">${Object.entries(simulationNames).map(([id,name])=>`<option value="${id}" ${e.simulation===id?'selected':''}>${name}</option>`).join('')}</select></label>${btn('interact',this.interacting===e.id?'Voltar à edição':'Experimentar simulação')}`:''}${e.type === 'shape' ? `<label>Cor da forma<input type="color" data-element-field="background" value="${e.background}"></label>
       <label>Cor da borda<input type="color" data-element-field="borderColor" value="${e.borderColor||'#ffffff'}"></label>
-      <div class="designer-type-settings">${number('Largura da borda','borderWidth',e.borderWidth||0,0,40)}${e.shapeType!=='ellipse'?number('Curvatura','cornerRadius',e.cornerRadius??5,0,100):''}</div>` : ''}
+      <div class="designer-type-settings">${number('Largura da borda','borderWidth',e.borderWidth||0,0,40)}${!['ellipse','icon'].includes(e.shapeType)?number('Curvatura','cornerRadius',e.cornerRadius??5,0,100):''}</div>` : ''}
       <div class="designer-position-grid">${number('Posição X (%)', 'x', e.x, -1000, 1000)}${number('Posição Y (%)', 'y', e.y, -1000, 1000)}${number('Largura (%)', 'w', e.w, e.type==='image'?.1:5, 1000)}${number('Altura (%)', 'h', e.h, e.type==='image'?.1:5, 1000)}</div>
 
       <small>As posições são relativas ao slide e ficam iguais no computador e no celular.</small>`}
@@ -498,13 +498,14 @@ export class SlideDesigner {
       const h = this.history(), from = action === 'undo' ? h.undo : h.redo, to = action === 'undo' ? h.redo : h.undo;
       if (!from.length) return; to.push(copy(this.original)); this.studio.draft.slides[this.studio.index] = from.pop(); this.studio.markDirty(); this.studio.callbacks.render(); return;
     }
-    const original=action==='shape'?this.original:null;
-    const shape=action==='shape'?await pickShape():null;
-    if(action==='shape'&&(!shape||!this.studio.groups.canEdit||this.original!==original))return;
+    const insertShape=action==='shape'||action==='icon';
+    const original=insertShape?this.original:null;
+    const shape=insertShape?await pickShape():null;
+    if(insertShape&&(!shape||!this.studio.groups.canEdit||this.original!==original))return;
     this.mutate(s => {
-      if (s.elements.length >= MAX_CANVAS_ELEMENTS && ['add-text', 'shape', 'duplicate'].includes(action)) throw Error(`Use até ${MAX_CANVAS_ELEMENTS} elementos no slide.`);
+      if (s.elements.length >= MAX_CANVAS_ELEMENTS && ['add-text', 'shape', 'icon', 'duplicate'].includes(action)) throw Error(`Use até ${MAX_CANVAS_ELEMENTS} elementos no slide.`);
       let current = s.elements.find(e => e.id === this.selected);
-      if (action === 'add-text' || action === 'shape') { current = newElement(action === 'shape' ? 'shape' : 'text',shape||{}); s.elements.push(current); this.selected = current.id; }
+      if (action === 'add-text' || insertShape) { current = newElement(insertShape ? 'shape' : 'text',shape||{}); s.elements.push(current); this.selected = current.id; }
       else if (!current) return;
       else if (action === 'delete') {
         s.elements=s.elements.filter(e=>e.id!==current.id);

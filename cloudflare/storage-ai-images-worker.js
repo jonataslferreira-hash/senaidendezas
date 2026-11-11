@@ -20,6 +20,16 @@ const clip = (value, max) => clean(value).slice(0, max);
 const untagged = value => clean(value).replace(/[?&]utm_[^=]+=[^&]*/g, '').replace(/[?&]$/, '');
 const tokens = value => clean(value).toLowerCase().normalize('NFD').replace(/\p{M}/gu, '').match(/[\p{L}\p{N}]+/gu) || [];
 
+// Documentos e digitalizações aparecem no Commons quando se busca "ícone" ou
+// "sistema operacional": são PDFs, DJVUs e TIFFs de páginas escaneadas. Eles
+// nunca servem como foto de slide.
+const DOCUMENT_MIME = /^(?:application\/|image\/(?:vnd\.djvu|tiff|x-tiff|x-ms-bmp))/i;
+const DOCUMENT_FILE = /\.(?:pdf|djvu|djv|tiff?|bmp|docx?|pptx?|xlsx?|odt|ods|odp|epub|txt|zip|gz|ogg|ogv|webm|mp4)$/i;
+function isDocument(item) {
+  return DOCUMENT_MIME.test(clean(item?.kind)) || DOCUMENT_FILE.test(clean(item?.file || item?.title));
+}
+
+
 async function fetchJSON(url, timeout = UPSTREAM_TIMEOUT) {
   const response = await fetch(url, { headers: { Accept: 'application/json', 'User-Agent': USER_AGENT }, signal: AbortSignal.timeout(timeout) });
   if (!response.ok) throw Error('upstream_' + response.status);
@@ -75,7 +85,7 @@ async function commonsSearch(query, limit) {
     const meta = info.extmetadata || {};
     const file = page.title?.replace(/^File:/, '') || '';
     const description = plainText(meta.ImageDescription?.value);
-    items.push({
+    const candidate = {
       id: 'commons:' + page.pageid,
       title: clip(file.replace(/_/g, ' '), 200),
       file: clip(file, 200),
@@ -90,7 +100,8 @@ async function commonsSearch(query, limit) {
       width: Number(info.width) || 0,
       height: Number(info.height) || 0,
       kind: clip(info.mime, 40)
-    });
+    };
+    if (!isDocument(candidate)) items.push(candidate);
   }
   return items;
 }
@@ -213,7 +224,7 @@ const AMBIGUOUS_TOKENS = new Set([
 
 const normalizeTitle = value => tokens(value).join(' ');
 
-function scoreItem(item, queryTokens, { transparent = false } = {}) {
+function scoreItem(item, queryTokens, { transparent = false, wantsIcon = false } = {}) {
   const label = (item.title || '') + ' ' + (item.file || '');
   const titleTokens = new Set(tokens(label));
   const haystack = new Set(tokens(label + ' ' + (item.description || '')));
@@ -230,6 +241,14 @@ function scoreItem(item, queryTokens, { transparent = false } = {}) {
   if (base.length > 1 && matched === base.length) score += 0.6;
   // Pedido de fundo transparente: PNG, WebP e SVG têm chance de ter alfa.
   if (transparent && /svg|png|webp/i.test(item.kind || '')) score += 0.45;
+  // Ícone, logo ou símbolo: vetor/PNG recortado é melhor que uma foto.
+  if (wantsIcon && /svg|png/i.test(item.kind || '')) score += 0.5;
+  // Formato de slide (paisagem) rende mais que uma foto em pé ou panorâmica.
+  if (item.width && item.height) {
+    const ratio = item.width / item.height;
+    if (ratio >= 1.2 && ratio <= 2.1) score += 0.18;
+    else if (ratio < 0.75 || ratio > 3) score -= 0.12;
+  }
   if (item.license) score += 0.05;
   if (item.width && item.height) score += 0.05;
   return score;
@@ -272,6 +291,7 @@ async function searchImages(query, page, limit, { transparent = false } = {}) {
   const key = encodeURIComponent(term.toLowerCase()) + '-' + page + '-' + limit + (transparent ? '-png' : '');
   return cached(key, async () => {
     const queryTokens = tokens(term).filter(token => token.length > 1 && !STOP_WORDS.has(token));
+    const wantsIcon = queryTokens.some(token => ['logo', 'logotipo', 'logomarca', 'icon', 'icone', 'simbolo', 'symbol'].includes(token));
     // Uma segunda busca sem preposições encontra o artigo do assunto quando o
     // pedido vem em português ("area de trabalho do windows" -> "windows").
     const meaningful = tokens(term).filter(token => token.length > 3 && !GENERIC_TOKENS.has(token) && !STOP_WORDS.has(token));
@@ -299,7 +319,8 @@ async function searchImages(query, page, limit, { transparent = false } = {}) {
       ...(openverse.status === 'fulfilled' ? openverse.value : [])
     ];
     const ranked = all
-      .map(item => ({ ...item, score: scoreItem(item, queryTokens, { transparent }) }))
+      .filter(item => !isDocument(item) && item.thumbnail && item.url)
+      .map(item => ({ ...item, score: scoreItem(item, queryTokens, { transparent, wantsIcon }) }))
       .sort((a, b) => b.score - a.score || (b.width * b.height) - (a.width * a.height));
     const unique = dedupe(ranked);
     const start = (page - 1) * limit;

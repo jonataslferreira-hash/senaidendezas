@@ -6,6 +6,8 @@ import { compactLesson } from '../src/assets.js';
 import { validateCustomModel } from '../src/model-files.js';
 import { Room } from '../src/room.js';
 import { normalizeImageQuery } from '../src/storage-ai-image-search.js';
+import { composeAISlide, requestedFont, requestedPalette } from '../src/storage-ai-layouts.js';
+import { shapeFields, shapeIcons } from '../src/shapes.js';
 test('slide livre preserva elementos e limita posições, cores e recursos', () => {
   const lesson = newLesson();
   const canvas = canvasFromSlide(lesson.slides[0]);
@@ -42,8 +44,35 @@ test('modelos próprios são validados, persistidos por referência e transporta
 });
 
 test('pedidos de imagem viram consultas curtas e pesquisáveis', () => {
-  // Os catálogos são em inglês: o pedido em português é traduzido antes da busca.
   assert.equal(normalizeImageQuery('Coloque uma imagem de vários sistemas operacionais nessa página'), 'vários operating systems');
   assert.match(normalizeImageQuery('troque a imagem pela área de trabalho do windows'), /desktop.*windows/);
   assert.equal(normalizeImageQuery('troque esta foto por um SSD gamer com fundo transparente'), 'SSD gamer');
+});
+
+test('cores e fonte pedidas no texto são aplicadas ao slide', () => {
+  assert.equal(requestedPalette('quero azul, verde pastel e rosa pastel'), 'pastel');
+  assert.equal(requestedPalette('use azul e verde'), 'pastel');
+  assert.equal(requestedPalette('quero rosa'), 'rose');
+  assert.equal(requestedPalette('fundo escuro com roxo'), 'midnight');
+  assert.equal(requestedPalette('sem preferência de cor'), '');
+  assert.equal(requestedFont('coloca a fonte do windows 11'), 'Segoe UI');
+  assert.equal(requestedFont('fonte georgia'), 'Georgia');
+  assert.equal(requestedFont('pode escolher'), '');
+  const design=composeAISlide({spec:{theme:'pastel',font:'Segoe UI'},index:1,title:'IA no Windows',
+    body:'• Copilot integrado ao sistema\n• Automação de tarefas',images:[],model:null,previous:null});
+  assert.equal(design.theme,'pastel');
+  const title=design.elements.find(element=>element.role==='title');
+  assert.equal(title.fontFamily,'Segoe UI');
+  // As três cores pastel aparecem nas formas de apoio.
+  const tinted=design.elements.filter(element=>element.type==='shape'&&element.id.startsWith('ai-decor-tint-'));
+  assert.ok(tinted.length>=2);
+  assert.ok(tinted.some(element=>element.background!==tinted[0].background));
+});
+
+test('ícones de objetos são formas editáveis', () => {
+  assert.ok(Object.keys(shapeIcons).length>=20);
+  const fields=shapeFields({shapeType:'icon',iconName:'robot'});
+  assert.equal(fields.shapeType,'icon');
+  assert.equal(fields.iconName,'robot');
+  assert.equal(shapeFields({shapeType:'icon',iconName:'inexistente'}).iconName,'monitor');
 });

@@ -16,9 +16,22 @@ export const canvasThemes = {
   citrus: { name: 'Cítrico', background: '#fff5db', color: '#382d24', accent: '#ae4c26' },
   lagoon: { name: 'Lagoa', background: '#092f3c', color: '#e9fffb', accent: '#83e2cc' },
   rose: { name: 'Rosa antigo', background: '#fff0ee', color: '#392732', accent: '#a23f67' },
+  // Combinação pedida com frequência: azul com verde e rosa pastel. As cores
+  // extras (tints) alimentam as formas de apoio, então as três aparecem no
+  // slide sem prejudicar a leitura do título e do corpo.
+  pastel: { name: 'Azul, verde e rosa pastel', background: '#f7fbff', end: '#fdf2f7', color: '#243244', accent: '#2a66c9',
+    tints: ['#a8d5ff', '#a9e5c6', '#ffc3da'], heading: 'Segoe UI', body: 'Segoe UI' },
   ...openSlideThemes,
   ...studioSlideThemes
 };
+// Mistura duas cores hexadecimais. O editor só aceita #rrggbb, então toda
+// transparência visual é feita calculando a cor final.
+export function mixHex(from, to, ratio) {
+  const parse = hex => [1, 3, 5].map(i => parseInt(String(hex).slice(i, i + 2), 16));
+  const [a, b, c] = parse(from), [d, e, f] = parse(to);
+  return '#' + [a + (d - a) * ratio, b + (e - b) * ratio, c + (f - c) * ratio]
+    .map(value => Math.round(Math.max(0, Math.min(255, value))).toString(16).padStart(2, '0')).join('');
+}
 export const MAX_CANVAS_ELEMENTS = 120;
 export function layoutPanelColor(background, accent) {
   return '#'+[1,3,5].map(offset=>{
@@ -33,6 +46,7 @@ export function applyCanvasTheme(slide, key) {
   slide.visualTheme = key;
   slide.background = theme.background;
   slide.backgroundFill = theme.end ? { mode: 'gradient', end: theme.end, angle: 135 } : undefined;
+  let decorTint = 0;
   for (const element of slide.elements) {
     if (element.locked) continue;
     if (element.type === 'text') {
@@ -41,8 +55,19 @@ export function applyCanvasTheme(slide, key) {
       const font = title ? theme.heading : theme.body;
       if (font) element.fontFamily = font;
     }
-    if (element.type === 'shape') element.background = element.id.startsWith('opf-decor-panel-')
-      ? layoutPanelColor(theme.background, theme.accent) : theme.accent;
+    if (element.type === 'shape') {
+      const tints = Array.isArray(theme.tints) && theme.tints.length ? theme.tints : [theme.accent];
+      // As formas de apoio da IA guardam a cor da paleta: as grandes ficam
+      // pastel (misturadas ao fundo) e as linhas finas usam o destaque.
+      if (element.id.startsWith('ai-decor-tint-')) {
+        const tint = tints[decorTint++ % tints.length];
+        const light = parseInt(theme.background.slice(1, 3), 16) > 150;
+        element.background = mixHex(theme.background, tint, light ? .55 : .24);
+      } else if (element.id.startsWith('ai-decor-accent-')) {
+        element.background = theme.accent;
+      } else element.background = element.id.startsWith('opf-decor-panel-')
+        ? layoutPanelColor(theme.background, theme.accent) : theme.accent;
+    }
   }
   return true;
 }

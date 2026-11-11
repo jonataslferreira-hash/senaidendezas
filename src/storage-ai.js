@@ -7,9 +7,9 @@ import {studioIcon} from './studio-icons.js';
 import {prefersReducedMotion} from './motion-preference.js';
 import {canvasMarkup,CanvasModels,esc} from './canvas-view.js';
 import {createSlideModel,createSlideSound} from './storage-ai-media.js';
-import {AI_PHOTO_LIMIT,AI_SLIDE_LIMIT,aiPalettes} from './storage-ai-options.js';
+import {AI_PHOTO_LIMIT,AI_SLIDE_LIMIT,aiPalettes,aiThemes} from './storage-ai-options.js';
 import {canAttachPhoto,prepareSlidePhotos} from './storage-ai-photos.js';
-import {composeAISlide,planSlidePhotos} from './storage-ai-layouts.js';
+import {composeAISlide,planSlidePhotos,requestedPalette,requestedFont} from './storage-ai-layouts.js';
 import {applyOpenLayout,openLayouts} from './open-slide-layouts.js';
 import {presentationSlide} from './slide-display.js';
 import {findSlideImage,imageSourceNote,normalizeImageQuery} from './storage-ai-image-search.js';
@@ -110,9 +110,16 @@ function typeRipple(input){
   animation.onfinish=()=>wave.remove();
 }
 
-async function buildLesson(result,count,photos,onSlide,activities={},imageDefault=true) {
+async function buildLesson(result,count,photos,onSlide,activities={},imageDefault=true,request={}) {
   const specs=result.slides;
   if(!Array.isArray(specs)||specs.length!==count)throw Error('A resposta veio incompleta. Tente gerar novamente.');
+  const prompt=typeof request?.prompt==='string'?request.prompt:'';
+  // Cor e fonte pedidas no texto têm prioridade sobre a escolha do modelo.
+  const requestedTheme=requestedPalette(prompt);
+  const font=requestedFont(prompt);
+  const sharedTheme=requestedTheme||(/mesm[oa]\s+(?:tema|cor|paleta)|tema\s+(?:único|unico)|padr[aã]o\s+de\s+cor/i.test(prompt)
+    ?specs.find(spec=>aiThemes.includes(spec?.theme))?.theme:null);
+  const styledSpec=spec=>({...spec,...(sharedTheme?{theme:sharedTheme}:{}),...(font?{font}:{})});
   const lesson=newLesson();
   lesson.title=text(result.title,140)||'Aula criada com Storage AI';
   lesson.description=text(result.description,500);lesson.generatedByAI=true;
@@ -124,7 +131,7 @@ async function buildLesson(result,count,photos,onSlide,activities={},imageDefaul
     const wantsOnlineImage=query&&!placements[index].length;
     const images=Array.from({length:wantsOnlineImage?1:placements[index].length},()=>({data:'',alt:''}));
     const model=spec?.model3D||['hdd','ssd','nvme'].includes(spec?.model)?{}:null;
-    const planned=composeAISlide({spec,index,title:text(spec?.title,130),body:text(spec?.body,430),images,model,previous:plannedPrevious});
+    const planned=composeAISlide({spec:styledSpec(spec),index,title:text(spec?.title,130),body:text(spec?.body,430),images,model,previous:plannedPrevious});
     plannedPrevious=planned;
     const frame=planned.elements.find(element=>element.type==='image');
     return wantsOnlineImage&&frame?[[index,query,frame.w/frame.h*16/9]]:[];
@@ -133,6 +140,12 @@ async function buildLesson(result,count,photos,onSlide,activities={},imageDefaul
   for(let index=0;index<searches.length;index+=4){
     await Promise.all(searches.slice(index,index+4).map(async([i,query,aspectRatio])=>{
       let image=await findSlideImage(query,{aspectRatio});
+      if(!image){
+        // O título do slide costuma ser o termo que a pessoa digitaria no
+        // Google. Vale tentar por ele antes de desistir.
+        const titleQuery=normalizeImageQuery(cleanSlideText(spec?.title,120));
+        if(titleQuery&&titleQuery!==query)image=await findSlideImage(titleQuery,{aspectRatio});
+      }
       if(!image){
         const fallback=normalizeImageQuery(text(result.title,100));
         if(fallback&&fallback!==query)image=await findSlideImage(fallback,{aspectRatio});
@@ -145,7 +158,7 @@ async function buildLesson(result,count,photos,onSlide,activities={},imageDefaul
   // como um slide de abertura de verdade, e não já no primeiro conteúdo.
   const coverQuery=normalizeImageQuery(cleanSlideText(result.title,120));
   const coverImage=imageDefault?await findSlideImage(coverQuery,{aspectRatio:16/9}):null;
-  const coverDesign=composeAISlide({spec:{layout:'cover',theme:specs[0]?.theme},index:0,title:lesson.title,
+  const coverDesign=composeAISlide({spec:{layout:'cover',theme:sharedTheme||specs[0]?.theme,font},index:0,title:lesson.title,
     body:cleanSlideText(lesson.description,160),images:coverImage?[coverImage]:[],model:null,previous:null});
   const cover={...newSlide(),kind:'canvas',title:lesson.title,background:coverDesign.background,
     backgroundFill:coverDesign.backgroundFill,visualTheme:coverDesign.theme,elements:coverDesign.elements,transition:'slide'};
@@ -163,7 +176,7 @@ async function buildLesson(result,count,photos,onSlide,activities={},imageDefaul
     const images=placements[i].map(index=>({index,data:photos[index]}));
     const webImage=foundImages.get(i);
     if(webImage)images.push(webImage);
-    const design=composeAISlide({spec,index:i+1,title,body,images,model,previous});
+    const design=composeAISlide({spec:styledSpec(spec),index:i+1,title,body,images,model,previous});
     previous=design;
     const {elements,background,backgroundFill,theme}=design;
     const slide={...newSlide(),kind:'canvas',title,background,backgroundFill,visualTheme:theme,elements,
@@ -178,8 +191,8 @@ async function buildLesson(result,count,photos,onSlide,activities={},imageDefaul
   }
   const sources=[...new Set([...(coverImage?[coverImage]:[]),...foundImages.values()].filter(Boolean).map(image=>imageSourceNote(image)).concat((Array.isArray(result.sources)?result.sources:[]).map(source=>typeof source==='string'?source:source.url||'')).filter(Boolean))];
   const referenceBody=sources.length?sources.join('\n\n'):'Não foram retornadas fontes de pesquisa verificáveis nesta geração. Confira o conteúdo antes de apresentar.';
-  const refDesign=composeAISlide({spec:{layout:'statement'},index:count+1,title:'Referências',body:referenceBody,images:[],model:null,previous});
-  const references={...newSlide(),kind:'canvas',title:'Referências',background:refDesign.background,backgroundFill:refDesign.backgroundFill,elements:refDesign.elements,note:referenceBody};
+  const refDesign=composeAISlide({spec:{layout:'statement',theme:sharedTheme||specs[0]?.theme,font},index:count+1,title:'Referências',body:referenceBody,images:[],model:null,previous});
+  const references={...newSlide(),kind:'canvas',title:'Referências',background:refDesign.background,backgroundFill:refDesign.backgroundFill,visualTheme:refDesign.theme,elements:refDesign.elements,note:referenceBody};
   lesson.slides.push(references);await onSlide(references,lesson.title);
   if(Array.isArray(result.questions))lesson.questions=result.questions.slice(0,30).map((item,index)=>{
     const options=Array.isArray(item?.options)?item.options.slice(0,4).map(value=>text(value,300)):[];
@@ -919,8 +932,17 @@ export class StorageAI {
     try{
       const portable=await hydrateLesson(lesson,true);
       if(uid!==this.studio.account.user?.id)return false;
-      const uploaded=await saveCloudLesson(this.studio.account.client,portable);
+      // A capa também é a miniatura da biblioteca. Antes ela só existia quando
+      // a aula era editada manualmente, então aulas da IA apareciam em branco.
+      const {thumbnailFor}=await import('./cover-render.js');
+      const cover=await thumbnailFor(portable).catch(()=>'');
       if(uid!==this.studio.account.user?.id)return false;
+      const uploaded=await saveCloudLesson(this.studio.account.client,portable,cover);
+      if(uid!==this.studio.account.user?.id)return false;
+      if(cover&&!lesson.thumbnail){
+        lesson.thumbnail=cover;
+        try{this.studio.library.save(lesson);}catch{/* a nuvem já tem a capa */}
+      }
       this.studio.linkCloud(lesson.id,uploaded.path);
       this.studio.cloudAction('cloud-refresh',{}).catch(()=>{});
       return true;
@@ -1042,12 +1064,13 @@ export class StorageAI {
           // Yield to the browser so each assembled slide can be painted.
           if(!document.hidden)await new Promise(resolve=>setTimeout(resolve,34));
         }
-      },activities,imageDefault);
+      },activities,imageDefault,{prompt:brief});
       const title=cleanChatTitle(result.chatTitle);
       if(title)session.title=chatTitle(title);
       const imageNotice=missingImages===1?'Um slide ficou sem imagem: não havia foto relevante no catálogo livre.':
         missingImages>1?`${missingImages} slides ficaram sem imagem: preferi não usar fotos fora do assunto.`:'';
-      const draft={lesson,brief,photosFiles,activityNotice:[activityNotice,imageNotice].filter(Boolean).join(' '),reviewQuestion:text(result.reviewQuestion,350)};
+      const draft={lesson,brief,photosFiles,activityNotice:[activityNotice,imageNotice].filter(Boolean).join(' '),reviewQuestion:text(result.reviewQuestion,350),
+        palette:requestedPalette(brief)||lesson.slides.find(slide=>!slide.poll&&slide.visualTheme)?.visualTheme};
       if(session.instant){await this.commitPreview(job,session,draft);return;}
       this.previews.set(session.id,draft);
       while(this.previews.size>3)this.previews.delete(this.previews.keys().next().value);
@@ -1080,6 +1103,16 @@ export class StorageAI {
       await removePageAssets(archived.ids).catch(()=>{});
       throw error;
     }
+    // Miniatura da biblioteca: gerada a partir da capa recém-criada. Sem isso,
+    // as aulas da IA apareciam sem capa na biblioteca e na nuvem.
+    try{
+      const {thumbnailFor}=await import('./cover-render.js');
+      const cover=await thumbnailFor(saved);
+      if(cover&&cover!==saved.thumbnail){
+        saved.thumbnail=cover;
+        this.studio.library.save(saved);
+      }
+    }catch{/* a aula continua válida sem miniatura */}
     this.previews.delete(session.id);
     if(!session.title||session.title==='Nova conversa')session.title=chatTitle(cleanChatTitle(saved.title));
     const cloudSaved=await this.syncLesson(saved,job.uid);

@@ -1,5 +1,59 @@
-import {canvasThemes,newElement} from './canvas-data.js';
+import {canvasThemes,newElement,mixHex} from './canvas-data.js';
 import {aiLayouts,aiThemes} from './storage-ai-options.js';
+
+// Cores e fontes pedidas no texto precisam chegar ao slide. Sem isso, o modelo
+// escolhe um tema qualquer e a apresentação sai fora do combinado.
+const plainWords=value=>String(value||'').toLowerCase().normalize('NFD').replace(/\p{M}/gu,'');
+const mentions=(text,...names)=>names.some(name=>new RegExp('(?<![\\p{L}\\p{N}])'+name+'(?![\\p{L}\\p{N}])','u').test(text));
+
+export function requestedPalette(prompt){
+  const text=plainWords(prompt);
+  if(!text)return '';
+  // Um tema citado pelo nome tem prioridade ("usa a paleta ocean").
+  for(const id of aiThemes){
+    const theme=canvasThemes[id];
+    if(mentions(text,id)||theme?.name&&mentions(text,plainWords(theme.name)))return id;
+  }
+  const blue=mentions(text,'azul','azuis','blue');
+  const green=mentions(text,'verde','verdes','green');
+  const pink=mentions(text,'rosa','rosas','pink','rose');
+  const pastel=mentions(text,'pastel','pastelizado','suave','suaves','claro','clara');
+  const dark=mentions(text,'preto','preta','escuro','escura','dark','noite','noturno','noturna');
+  const purple=mentions(text,'roxo','roxa','roxos','lilas','purple','violeta');
+  // Fundo escuro combinado com uma cor: usa a versão escura daquela família.
+  if(dark&&purple)return 'midnight';
+  if(dark&&blue)return 'cosmos';
+  if(dark&&green)return 'sage';
+  if(dark&&pink)return 'ember';
+  if(dark)return 'midnight';
+  // Duas ou três cores pedidas: a paleta pastel mostra todas nas formas.
+  const colorCount=[blue,green,pink].filter(Boolean).length;
+  if(colorCount>=2||pastel&&colorCount>=1)return 'pastel';
+  if(blue)return pastel?'pastel':'ocean';
+  if(green)return pastel?'pastel':'sage';
+  if(pink)return pastel?'pastel':'rose';
+  if(purple)return 'iris';
+  if(mentions(text,'laranja','orange','amarelo','amarela','yellow','dourado','dourada'))return 'citrus';
+  if(mentions(text,'vermelho','vermelha','red','vinho','bordo'))return 'ember';
+  if(mentions(text,'bege','areia','creme','beige','sand'))return 'sand';
+  if(mentions(text,'branco','branca','white','limpo','limpa'))return 'paper';
+  return '';
+}
+
+export function requestedFont(prompt){
+  const text=plainWords(prompt);
+  if(!text)return '';
+  if(/windows\s*11|segoe|fonte do windows|fonte padrao do windows/i.test(text))return 'Segoe UI';
+  if(mentions(text,'calibri'))return 'Calibri';
+  if(mentions(text,'arial'))return 'Arial';
+  if(mentions(text,'georgia'))return 'Georgia';
+  if(mentions(text,'times','serifada','serif'))return 'Times New Roman';
+  if(mentions(text,'verdana'))return 'Verdana';
+  if(mentions(text,'trebuchet'))return 'Trebuchet MS';
+  if(mentions(text,'comic'))return 'Comic Sans MS';
+  if(mentions(text,'tahoma'))return 'Tahoma';
+  return '';
+}
 
 export function planSlidePhotos(specs,total){
   const assigned=new Set();
@@ -32,7 +86,6 @@ const gradientEnds={
   paper:'#eee7f9',iris:'#e8d7f6',glacier:'#d0ebf2',sand:'#f6dfb5',
   cosmos:'#453a87',citrus:'#ffd19f',lagoon:'#1e6572',rose:'#f9c9d3'
 };
-const lightThemes=new Set(['paper','iris','glacier','sand','citrus','rose']);
 const layoutsByMedia={
   none:['statement','editorial','cover'],
   single:['split','feature','cover'],
@@ -88,13 +141,34 @@ function tiles(area,count){
   });
 }
 
+// Contraste calculado (WCAG) para nunca deixar texto da cor do fundo nem da
+// forma decorativa que está atrás dele.
+function channel(value){value/=255;return value<=.03928?value/12.92:Math.pow((value+.055)/1.055,2.4);}
+function luminance(hex){
+  const [r,g,b]=[1,3,5].map(i=>parseInt(hex.slice(i,i+2),16));
+  return .2126*channel(r)+.7152*channel(g)+.0722*channel(b);
+}
+function contrast(a,b){
+  const one=luminance(a),two=luminance(b);
+  return (Math.max(one,two)+.05)/(Math.min(one,two)+.05);
+}
+function readable(color,background,bold){
+  const fallback=contrast(color||background,background)>=(bold?3.1:4.5)?color:null;
+  if(fallback)return fallback;
+  return luminance(background)>.42?'#1a2432':'#ffffff';
+}
+
 export function composeAISlide({spec,index,title,body,images,model,previous}){
+  const safeSpec=spec&&typeof spec==='object'?spec:{};
   const fallbackTheme=aiThemes[index%aiThemes.length];
-  const palette=aiThemes.includes(spec.theme)?spec.theme:(previous?.theme||fallbackTheme);
-  const theme=canvasThemes[palette], end=theme.end||gradientEnds[palette];
-  const isLight=theme.end?parseInt(theme.background.slice(1,3),16)>150:lightThemes.has(palette);
+  const wanted=aiThemes.includes(safeSpec.theme)?safeSpec.theme:previous?.theme;
+  const palette=aiThemes.includes(wanted)?wanted:fallbackTheme;
+  const theme=canvasThemes[palette]||canvasThemes[fallbackTheme];
+  const end=theme.end||gradientEnds[palette]||theme.background;
+  const isLight=parseInt(theme.background.slice(1,3),16)>150;
+  const font=typeof safeSpec.font==='string'&&safeSpec.font.trim()?safeSpec.font.trim().slice(0,80):'';
   const mediaCount=images.length+Number(Boolean(model));
-  const proposed=spec?.composition;
+  const proposed=safeSpec.composition;
   const frame=value=>{
     if(!value||typeof value!=='object')return null;
     const box=['x','y','w','h'].map(key=>Number(value[key]));
@@ -106,64 +180,75 @@ export function composeAISlide({spec,index,title,body,images,model,previous}){
   const customComposition=customFrames.title&&customFrames.body&&(!mediaCount||customFrames.visual)&&
     !overlaps(customFrames.title,customFrames.body)&&!overlaps(customFrames.title,customFrames.visual)&&!overlaps(customFrames.body,customFrames.visual);
   const allowed=mediaCount>=5?['gallery','feature']:layoutsByMedia[mediaCount===0?'none':mediaCount===1?'single':'multiple'];
-  const preferred=aiLayouts.includes(spec.layout)?spec.layout:layoutOrder[index%layoutOrder.length];
+  const preferred=aiLayouts.includes(safeSpec.layout)?safeSpec.layout:layoutOrder[index%layoutOrder.length];
   const layout=allowed.includes(preferred)&&preferred!==previous?.layout
     ?preferred:allowed.find(name=>name!==previous?.layout)||allowed[0];
   const mirrored=!customComposition&&layout==='split'&&index%2===0;
   let {title:titleFrame,body:bodyFrame,visual,align='left'}=mediaCount?mediaLayouts[layout]:textLayouts[layout];
-  if(customComposition){titleFrame=customFrames.title;bodyFrame=customFrames.body;if(mediaCount)visual=customFrames.visual;align=spec.composition.align==='center'?'center':spec.composition.align==='right'?'right':'left';}
+  if(customComposition){titleFrame=customFrames.title;bodyFrame=customFrames.body;if(mediaCount)visual=customFrames.visual;align=proposed.align==='center'?'center':proposed.align==='right'?'right':'left';}
   if(mirrored){
     titleFrame=[48,...titleFrame.slice(1)];bodyFrame=[48,...bodyFrame.slice(1)];visual=[6,visual[1],36,visual[3]];
   }
   const elements=[];
-  const shape=(frame,background,cornerRadius=0)=>newElement('shape',{...rect(frame),background,cornerRadius});
-  const ellipse=(frame,background,extra={})=>newElement('shape',{...rect(frame),shapeType:'ellipse',background,...extra});
-  const mix=(from,to,ratio)=>{const parse=hex=>[1,3,5].map(i=>parseInt(hex.slice(i,i+2),16));const [a,b,c]=parse(from),[d,e,f]=parse(to);
-    return '#'+[a+(d-a)*ratio,b+(e-b)*ratio,c+(f-c)*ratio].map(value=>Math.round(value).toString(16).padStart(2,'0')).join('');};
-  const soft=mix(theme.background,theme.accent,isLight?.1:.17);
-  const veil=mix(theme.background,isLight?'#000000':'#ffffff',isLight?.045:.07);
+  let decor=0;
+  const decorId=kind=>`ai-decor-${kind}-${index}-${decor++}`;
+  const shape=(frame,background,cornerRadius=0,kind='accent')=>newElement('shape',{id:decorId(kind),...rect(frame),background,cornerRadius});
+  const ellipse=(frame,background,kind='tint')=>newElement('shape',{id:decorId(kind),...rect(frame),shapeType:'ellipse',background});
+  const veil=mixHex(theme.background,isLight?'#000000':'#ffffff',isLight?.045:.07);
+  const tints=Array.isArray(theme.tints)&&theme.tints.length?theme.tints:[theme.accent];
+  const tintAt=step=>tints[(index+step)%tints.length];
+  const tintStrong=step=>isLight?mixHex(theme.background,tintAt(step),.62):tintAt(step);
+  const titleColor=readable(theme.accent,theme.background,true);
+  const bodyColor=readable(theme.color,theme.background,false);
   const titleText=fitContent(String(title||''),titleFrame,true);
   const bodyText=fitContent(String(body||''),bodyFrame,false);
   const bodyAlign=align==='center'&&bodyText.includes('•')?'left':align;
-  // Formas de apoio: ficam nas margens, atrás do texto, e dão o acabamento de
-  // modelo pronto (círculos suaves recortados pela borda, linhas finas, losangos).
-  const blobIndex=index%4;
-  if(blobIndex===0){
-    elements.push(ellipse([-13,54,44,80],soft));
-    elements.push(shape([86,6,11,.45],theme.accent,10));
-    elements.push(ellipse([91,82,4,7],veil));
-  }else if(blobIndex===1){
-    elements.push(ellipse([69,-20,46,82],soft));
-    elements.push(ellipse([2,76,10,18],soft));
-    elements.push(ellipse([3.6,78.6,6.8,12.8],theme.background));
-    elements.push(shape([6,10,7,.6],theme.accent,10));
-  }else if(blobIndex===2){
-    elements.push(ellipse([85,28,28,50],soft));
-    elements.push(shape([5,91.5,24,.4],theme.accent,10));
-    elements.push(ellipse([80,88,1.3,2.3],theme.accent));
-    elements.push(ellipse([83,88,1.3,2.3],theme.accent));
-    elements.push(ellipse([86,88,1.3,2.3],theme.accent));
-  }else{
-    elements.push(ellipse([-16,-26,54,70],soft));
-    elements.push(newElement('shape',{x:89,y:7,w:6,h:6,shapeType:'diamond',background:theme.accent}));
-    elements.push(shape([7,92,86,.45],theme.accent,10));
+
+  // Formas de apoio: só entram em espaços livres. Antes, o círculo pastel podia
+  // cair atrás do título e deixar o texto ilegível.
+  const protectedFrames=[titleFrame,bodyFrame,visual].filter(Boolean);
+  const taken=[];
+  const free=(box,pad=1.7)=>![...protectedFrames,...taken].some(([x,y,w,h])=>
+    box[0]<x+w+pad&&box[0]+box[2]>x-pad&&box[1]<y+h+pad&&box[1]+box[3]>y-pad);
+  const blobColors=step=>mixHex(theme.background,tintAt(step),isLight?.58:.26);
+  const blobCandidates=[
+    [-26,-36,62,82],[-28,46,62,90],[68,-34,58,80],[70,42,54,86],
+    [-24,70,56,66],[46,-42,64,70],[4,-44,58,66]
+  ];
+  const blob=blobCandidates.find(box=>free(box));
+  if(blob){elements.push(ellipse(blob,blobColors(0)));taken.push(blob);}
+  const spotCandidates=[[0,78,11,19],[85,74,11,18],[-4,-10,14,26],[86,-8,14,24]];
+  const spot=spotCandidates.find(box=>free(box));
+  if(spot){elements.push(ellipse(spot,blobColors(1)));taken.push(spot);}
+  const lineCandidates=[[7,93.4,17,.55],[92.4,20,.5,18],[7,12,12,.5],[49,10.5,10,.6]];
+  const line=lineCandidates.find(box=>free(box));
+  if(line){elements.push(shape(line,theme.accent,10,'accent'));taken.push(line);}
+  const dotSpots=[[8,88.5],[84,88.5],[86,7],[4,9]];
+  const dot=dotSpots.find(([x,y])=>free([x,y,9,5.5]));
+  if(dot){
+    for(let i=0;i<3;i++)elements.push(ellipse([dot[0]+i*2.6,dot[1],1.35,2.35],tintStrong(i+2)));
+    taken.push([dot[0],dot[1],9,5.5]);
   }
-  if(layout==='editorial')elements.push(shape([49,15,.35,67],theme.accent));
-  if(layout==='statement'){
-    elements.push(shape([46,12,8,.75],theme.accent,10));
-  }
-  if(layout==='cover')elements.push(shape([mediaCount?7:44,17,12,1],theme.accent,10));
-  if(layout==='feature')elements.push(shape([7,27.8,16,.8],theme.accent,10));
-  if(layout==='split')elements.push(shape([mirrored?48:7,8,7,.7],theme.accent,10));
-  if(layout==='gallery')elements.push(shape([7,40.5,86,.4],theme.accent));
+  const diamondSpot=[[88,7,5,5],[6,88,5,5],[88,86,5,5],[5,7,5,5]].find(box=>free(box,1));
+  if(diamondSpot){elements.push(newElement('shape',{id:decorId('accent'),...rect(diamondSpot),shapeType:'diamond',background:theme.accent}));taken.push(diamondSpot);}
+
+  if(layout==='editorial'&&!customComposition)elements.push(shape([49.1,15,.3,67],theme.accent,0,'accent'));
+  if(layout==='statement')elements.push(shape([46,12,8,.75],theme.accent,10,'accent'));
+  if(layout==='cover')elements.push(shape([mediaCount?7:44,17,12,1],theme.accent,10,'accent'));
+  if(layout==='feature')elements.push(shape([7,27.8,16,.8],theme.accent,10,'accent'));
+  if(layout==='split')elements.push(shape([mirrored?48:7,8,7,.7],theme.accent,10,'accent'));
+  if(layout==='gallery')elements.push(shape([7,41,86,.4],theme.accent,0,'accent'));
   if(layout==='statement'||layout==='cover'){
-    elements.push(newElement('text',{x:layout==='cover'?(mediaCount?7:44):14,y:9,w:8,h:7,text:'✦',fontSize:layout==='cover'?34:30,color:theme.accent,align:'left',bold:true}));
+    const symbolX=align==='center'?titleFrame[0]+titleFrame[2]/2-4:titleFrame[0];
+    const symbolY=Math.max(3,titleFrame[1]-11);
+    elements.push(newElement('text',{id:decorId('accent'),x:symbolX,y:symbolY,w:8,h:7,text:'✦',fontFamily:font||theme.heading||'Georgia',
+      fontSize:layout==='cover'?34:30,color:mixHex(theme.background,titleColor,.78),align:'left',bold:true}));
   }
   elements.push(
-    newElement('text',{...rect(titleFrame),role:'title',text:titleText,align,bold:true,color:theme.accent,
-      fontFamily:theme.heading||(['cover','editorial'].includes(layout)?'Georgia':'Arial'),
+    newElement('text',{...rect(titleFrame),role:'title',text:titleText,align,bold:true,color:titleColor,
+      fontFamily:font||theme.heading||(['cover','editorial'].includes(layout)?'Georgia':'Arial'),
       fontSize:fitFont(titleText,titleFrame,layout==='cover'?73:59,true),verticalAlign:layout==='editorial'?'center':'start'}),
-    newElement('text',{...rect(bodyFrame),text:bodyText,align:bodyAlign,color:theme.color,fontFamily:theme.body||'Arial',fontSize:fitFont(bodyText,bodyFrame,layout==='gallery'?28:34,false),
+    newElement('text',{...rect(bodyFrame),text:bodyText,align:bodyAlign,color:bodyColor,fontFamily:font||theme.body||'Arial',fontSize:fitFont(bodyText,bodyFrame,layout==='gallery'?28:34,false),
       verticalAlign:layout==='editorial'?'center':'start'})
   );
   if(visual){

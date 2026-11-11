@@ -727,6 +727,11 @@ html[data-motion=reduced] #app .storage-ai-page :is(*,::before,::after) { animat
 #app .shape-dialog[open] { animation:ai-menu-in .22s ease-out both; }
 #app .shape-dialog .shape-options button { transition:transform .18s,background .18s,border-color .18s; }
 #app .shape-dialog .shape-options button { display:flex; align-items:center; gap:10px; text-align:left; }
+#app .shape-dialog .shape-section-label { margin:16px 0 2px; font-size:12px; font-weight:700; letter-spacing:.04em; text-transform:uppercase; color:color-mix(in srgb,var(--ui-ink) 62%,transparent); }
+#app .shape-dialog .shape-options.shape-icons { grid-template-columns:repeat(3,minmax(0,1fr)); }
+#app .shape-dialog .shape-options.shape-icons button { flex-direction:column; gap:6px; min-height:78px; padding:10px 6px; font-size:11px; text-align:center; }
+#app .shape-dialog .shape-options.shape-icons .shape-option-preview { width:34px; height:34px; }
+#app .shape-dialog .shape-options.shape-icons .shape-option-preview svg { width:30px; height:30px; }
 #app .shape-dialog .shape-option-preview { display:grid; place-items:center; width:24px; height:24px; color:var(--ui-accent); flex:none; }
 #app .shape-dialog .shape-option-preview :is(svg,.canvas-shape) { width:18px; height:18px; }
 #app .shape-dialog .shape-option-preview polygon { fill:currentColor; stroke:none; }

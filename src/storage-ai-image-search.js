@@ -196,10 +196,16 @@ function choiceFromWorker(item){
     license:clean(item.license),
     licenseUrl:clean(item.licenseUrl),
     catalog:clean(item.catalog)||'Catálogo livre',
+    kind:clean(item.kind),
     width:Number(item.width)||0,
     height:Number(item.height)||0
   };
 }
+
+// PDFs, DJVUs e TIFFs de páginas escaneadas não são fotos de slide.
+const documentFile=/\.(?:pdf|djvu|djv|tiff?|bmp|docx?|pptx?|xlsx?|odt|ods|odp|epub|txt|zip|gz|ogg|ogv|webm|mp4)$/i;
+const isDocumentChoice=choice=>/^(?:application\/|image\/(?:vnd\.djvu|tiff|x-tiff|x-ms-bmp))/i.test(choice.kind||'')||
+  documentFile.test(choice.file||'')||documentFile.test(choice.title||'');
 
 // Palavras que só dizem "marca" ou "assunto genérico" não bastam para aceitar
 // uma imagem: no Commons, "windows" devolve fotos de janelas de prédios e
@@ -265,6 +271,7 @@ export async function findSlideImage(query, { transparent = false, aspectRatio =
     }
   }
   const usable=()=>candidates
+    .filter(choice=>!isDocumentChoice(choice))
     .filter(choice=>!logo||isLogoTitle(choice.title+' '+(choice.file||'')))
     .map(choice=>({choice,relevance:relevanceOf(choice,strong,phrases)}))
     .filter(item=>item.relevance>=minimum)
@@ -292,6 +299,7 @@ export async function findSlideImage(query, { transparent = false, aspectRatio =
         const {query:results}=await response.json();
         for(const page of results?.pages||[]){
           const info=page.imageinfo?.[0];
+          if(!info||documentFile.test(page.title||'')||/^(?:application\/|image\/(?:vnd\.djvu|tiff|x-tiff|x-ms-bmp))/i.test(info.mime||''))continue;
           if(!/^https:\/\/(?:upload|thumb)\.wikimedia\.org\//.test(info?.thumburl||''))continue;
           const credit=imageCredit(info);
           if(!credit||transparent&&info.thumbmime&&!['image/png','image/webp'].includes(info.thumbmime))continue;
@@ -342,21 +350,32 @@ export function imageSourceNote(image){
 export async function searchImageChoices(query,page=1){
   const term=normalizeImageQuery(query);
   if(!term)return [];
-  const worker=await workerJson('/storage-ai/images?q='+encodeURIComponent(term)+'&page='+String(page)+'&limit=24');
-  if(worker?.items?.length){
-    const choices=worker.items.map(choiceFromWorker).filter(choice=>choice.thumbnail&&choice.url&&choice.source);
-    if(choices.length)return choices;
-  }
   const words=searchWords;
   const logo=isLogoQuery(term);
   const subjects=words(term).filter(word=>word.length>2&&!['logo','logotipo','logomarca','icone','png','svg','foto','imagem'].includes(word));
-  const relevant=choices=>choices.map((choice,index)=>{
-    const title=words(choice.title);
-    const match=subjects.filter(word=>title.includes(word)).length;
-    const brandAlias=subjects.length===1&&subjects[0]==='chatgpt'&&title.some(word=>/^(?:gpt\d+|openai)$/.test(word));
-    return {choice,index,match:match+(brandAlias ? 0.5 : 0),logo:title.some(word=>['logo','logotipo','icon','icone'].includes(word))};
-  }).filter(item=>!logo||!subjects.length||(item.match>0&&isLogoTitle(item.choice.title)))
-    .sort((a,b)=>b.match-a.match||Number(b.logo)-Number(a.logo)||a.index-b.index).map(item=>item.choice);
+  const strong=strongQueryWords(term);
+  const phrases=strongPhrases.filter(phrase=>(' '+subjectWords(term).join(' ')+' ').includes(' '+phrase+' '));
+  // A galeria também precisa descartar PDFs e digitalizações e colocar na
+  // frente as imagens que realmente citam o assunto pedido. Era o mesmo
+  // problema das fotos automáticas, só que na hora de escolher à mão.
+  const relevant=choices=>choices
+    .filter(choice=>!isDocumentChoice(choice))
+    .map((choice,index)=>{
+      const title=words(choice.title);
+      const match=subjects.filter(word=>title.includes(word)).length;
+      const brandAlias=subjects.length===1&&subjects[0]==='chatgpt'&&title.some(word=>/^(?:gpt\d+|openai)$/.test(word));
+      return {choice,index,match:match+(brandAlias ? 0.5 : 0),relevance:relevanceOf(choice,strong,phrases),
+        logo:title.some(word=>['logo','logotipo','icon','icone'].includes(word))};
+    })
+    .filter(item=>!logo||!subjects.length||(item.match>0&&isLogoTitle(item.choice.title)))
+    .sort((a,b)=>b.relevance-a.relevance||b.match-a.match||Number(b.logo)-Number(a.logo)||a.index-b.index)
+    .map(item=>item.choice);
+  const worker=await workerJson('/storage-ai/images?q='+encodeURIComponent(term)+'&page='+String(page)+'&limit=24');
+  if(worker?.items?.length){
+    const choices=worker.items.map(choiceFromWorker).filter(choice=>choice.thumbnail&&choice.url&&choice.source);
+    const ranked=relevant(choices);
+    if(ranked.length)return ranked;
+  }
   let openChoices=[];
   try {
     const params=new URLSearchParams({q:term,license:'cc0,pdm,by,by-sa',page_size:'40',page:String(page),mature:'false'});
@@ -380,7 +399,8 @@ export async function searchImageChoices(query,page=1){
     const payload=await response.json();
     const commons=(payload.query?.pages||[]).sort((a,b)=>a.index-b.index).flatMap(item=>{
     const info=item.imageinfo?.[0];
-    const credit=info&&imageCredit(info);
+    if(!info||documentFile.test(item.title||'')||/^(?:application\/|image\/(?:vnd\.djvu|tiff|x-tiff|x-ms-bmp))/i.test(info.mime||''))return [];
+    const credit=imageCredit(info);
     if(!credit||!info.thumburl)return [];
     return [{title:item.title.replace(/^File:/,'').replace(/_/g,' '),thumbnail:info.thumburl,url:info.thumburl,...credit,catalog:'Wikimedia Commons'}];
     });
