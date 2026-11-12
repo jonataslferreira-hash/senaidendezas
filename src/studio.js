@@ -1,3 +1,4 @@
+import { createUuid } from './uuid.js';
 import {avatarContent} from './player-avatar.js';
 import {StorageAI} from './storage-ai.js';
 import {cropLessonCover,projectFields} from './lesson-cover.js';
@@ -66,6 +67,7 @@ export class Studio {
     this.sharing = new PresentationSharing(this);
     this.editorMusic = new EditorMusic(this);
     try{this.cloudLinks=JSON.parse(localStorage.getItem('sl-cloud-links')||'{}');}catch{this.cloudLinks={};}
+    this.bindIconHints();
     this.activityOrder=new ActivityOrder(this);this.remote=new AccountPresenter(this);this.people=new People(this);this.groups=new GroupsPanel(this);this.chat=new LessonChat(this);this.chatAudio=new ChatAudio(this);this.social=new SocialChat(this);
     root.addEventListener('before-account-change',event=>{event.detail.tasks.push((async()=>{
       if(this.groups.live)await this.groups.live.persist();else if(this.draft&&this.dirty){this.library.save(validateLesson(this.draft,{draft:true}));this.dirty=false;}
@@ -76,6 +78,10 @@ export class Studio {
     root.addEventListener('click', e => {
       const drawer=this.root.querySelector('#studio-navigation');
       if(drawer?.open&&(e.target===drawer||e.target.closest('#studio-navigation [data-studio-action], #studio-navigation [data-social-action]')))drawer.close();
+      const options = root.querySelector('.mobile-editor-actions[aria-expanded=true]');
+      if (options && !e.target.closest('.mobile-editor-actions, .editor-top-actions details > summary, [data-studio-action=close-mobile-actions]')) {
+        options.setAttribute('aria-expanded', 'false');
+      }
       const menu=e.target.closest('.editor-top-actions details,.designer-toolbar details');
       for(const open of root.querySelectorAll('.editor-top-actions details[open],.designer-toolbar details[open]')){
         if(open!==menu)open.open=false;
@@ -281,7 +287,7 @@ export class Studio {
     const label=this.cloudBusy?'Salvando…':needsSave?'Salvar':'Salvo';
     return `<div class="editor-save-controls">${button('save',studioIcon(linked?'cloud':'download')+label,'quiet '+(needsSave?'':'is-saved'),
       `aria-label="Salvar aula" title="${linked?'Salvar no dispositivo e na nuvem':'Salvar no dispositivo'}" ${disabled||(!needsSave?'disabled':'')}`)}
-      ${cloudConfigured&&!linked?button('cloud-save',studioIcon('cloud'),'quiet editor-icon',
+      ${cloudConfigured&&!linked?button('cloud-save',studioIcon('cloud')+'<span class="mobile-action-label">Enviar à nuvem</span>','quiet editor-icon',
       `aria-label="Salvar na nuvem" title="Salvar na nuvem" ${disabled}`):''}</div>`;
   }
   needsSave() {
@@ -290,14 +296,14 @@ export class Studio {
     return Boolean(link&&this.draft.updatedAt>link.savedAt);
   }
   paintSaveButton() {
-    const button=this.root.querySelector('.editor-save-controls [data-studio-action=save]');
-    if(!button)return;
+    for(const button of this.root.querySelectorAll('.editor-save-controls [data-studio-action=save]')){
     const needsSave=this.needsSave();
     button.classList.toggle('is-saved',!needsSave);
     button.disabled=!this.groups.canEdit||this.cloudBusy||!needsSave;
     const label=this.cloudBusy?'Salvando…':needsSave?'Salvar':'Salvo';
     const cloud=String(this.hasCloudCopy());
     if(button.textContent!==label||button.dataset.cloud!==cloud){button.dataset.cloud=cloud;button.innerHTML=studioIcon(cloud==='true'?'cloud':'download')+label;}
+    }
   }
   async cloudAction(action, target) {
     if (this.cloudBusy) return;
@@ -384,12 +390,14 @@ export class Studio {
   railMarkup(closeButton = '') {
     const brand = this.brandMarkup();
     return `<aside class="studio-rail">${closeButton ? `<div class="ai-rail-brand">${brand}${closeButton}</div>` : brand}
+      ${this.navigationMarkup()}
+      <div class="rail-footer">
       <div class="rail-quick-actions">
         ${button('new', studioIcon('add') + '<span>Nova aula</span>', 'quiet')}
         ${button('upload-slides', studioIcon('upload') + '<span>Importar slides</span>', 'quiet')}
       </div>
-      ${this.navigationMarkup()}
       <div class="rail-profile" data-account-profile>${this.account.profile()}</div>
+      </div>
     </aside>`;
   }
   // Barra superior do celular: logo, perfil e um único botão que abre o menu
@@ -434,14 +442,62 @@ export class Studio {
   }
   editor() {
     const l = this.draft;
-    return this.shell(`<main class="studio-editor ${this.metaExpanded ? 'expanded-meta' : ''}">${this.groups.editorMarkup()}<div class="editor-heading"><div>${button('library', studioIcon('chevron'), 'quiet editor-back editor-icon', 'aria-label="Voltar" title="Voltar"') + `<strong class="editor-title">${esc(l.title)}</strong>${this.groups.live?`<span class="editor-group-presence" data-collab-status>${this.groups.statusMarkup()}</span>`:''}`}</div><div class="editor-context">${this.editorMusic.headerMarkup()}<span data-account-profile>${this.account.profile()}</span></div></div><div class="editor-command-row"><div class="editor-tabs" role="tablist" aria-label="Conteúdo da aula">${activityTabs(l,this.tab,this.currentBlock()?.id,this.groups.canEdit)}</div><div class="editor-top-actions"><details class="editor-more"><summary aria-label="Mais opções da aula">···</summary><div>${button('rename-draft','Renomear','quiet','aria-label="Editar título e descrição"')}${button('export-draft','Baixar JSON','quiet')}</div></details>${this.tab === 'slides'&&this.currentBlock()?.type!=='poll' ? button('toggle-visual', this.visualMode ? 'Campos' : 'Editor visual', 'quiet') : ''}<details class="editor-more editor-download"><summary aria-label="Baixar apresentação" title="Baixar apresentação">${studioIcon('download')}</summary><div>${button('export-pdf','Baixar PDF','quiet')}${button('export-pptx','Baixar PPTX','quiet')}${this.tab==='slides'?button('export-png','Baixar PNG deste slide','quiet'):''}</div></details>${this.editorSaveControls()}${this.tab==='slides'&&this.visualMode&&this.currentBlock()?.type!=='poll'?`<button type="button" class="studio-btn editor-icon ai-tool" data-storage-ai="toggle" aria-label="Storage AI" title="Storage AI" aria-pressed="${Boolean(this.ai.open)}" ${this.groups.canEdit?'':'disabled'}>${studioIcon('sparkle')}</button>`:''}<details class="editor-more editor-sharing"><summary aria-label="Compartilhar e colaborar" title="Compartilhar e colaborar">${studioIcon('share')}</summary><div><button type="button" class="studio-btn quiet" data-group-action="share">${studioIcon('collaborate')} Colaborar</button><button type="button" class="studio-btn quiet" data-chat-action="open">${studioIcon('chat')} Chat</button>${button('share-presentation','Compartilhar','quiet')}</div></details>${button('present-draft', 'Apresentar ↗', 'accent studio-launch', this.launching ? 'disabled' : '')}</div></div><div class="editor-workspace ${this.visualMode && this.tab === 'slides' ? 'visual-workspace' : ''}"><aside class="editor-outline" data-outline-lesson="${esc(l.id)}"><div class="outline-heading"><span>${this.currentBlock()?.type==='poll'?'ENQUETES':this.tab === 'slides' ? 'SEQUÊNCIA DA AULA' : 'PERGUNTAS'}</span></div><div class="outline-actions">${this.itemActions(this.tab==='slides'?'slide':'question',this.tab==='slides'?this.index:this.questionIndex,this.tab==='slides'?l.slides.length:l.questions.length)}${button(this.tab === 'slides' ? 'add-slide' : 'add-question', '+', 'outline-add', `aria-label="${this.tab === 'slides' ? 'Adicionar slide' : 'Adicionar pergunta'}"`)}</div><div class="outline-items">${this.visibleItems().map(({item,index:i}) => `<button class="outline-item ${i === (this.tab === 'slides' ? this.index : this.questionIndex) ? 'active' : ''}" data-studio-action="${this.tab === 'slides' ? 'select-slide' : 'select-question'}" data-index="${i}"><span>${String(i + 1).padStart(2, '0')}</span><div><strong ${i === (this.tab === 'slides' ? this.index : this.questionIndex) ? 'data-current-label' : ''}>${esc((this.tab === 'slides' ? item.title : item.text) || 'Sem título')}</strong><small>${this.tab === 'slides' ? kindLabel(item.kind) : esc(item.difficulty) + ' · ' + item.seconds + ' s'}</small></div>${this.tab==='slides'&&this.groups.live?`<span class="collaborator-avatars outline-presence" data-slide-presence="${esc(item.id)}"></span>`:''}</button>`).join('')}</div></aside><section class="editor-form-area">${this.tab==='quiz'?gameSettingsMarkup(l,this.gameSettingsOpen):!this.visualMode&&l.slides[this.index].kind!=='canvas'?audioEditor(l.slides[this.index].audio,'slide'):''}${this.tab === 'slides' ? this.currentBlock()?.type==='poll'?this.pollBlockEditor():(this.visualMode ? this.itemToolbar('slide', this.index, l.slides.length) + this.designer.markup(false,false) : this.slideEditor()) + (this.visualMode?'':this.slideActivities()) : this.quizEditor()}</section><aside class="editor-preview-area"><span class="studio-kicker">UM OLHAR DA TURMA</span><div id="editor-mini-preview">${this.previewMarkup()}</div></aside></div></main>`);
+    return this.shell(`<main class="studio-editor ${this.metaExpanded ? 'expanded-meta' : ''}">${this.groups.editorMarkup()}<div class="editor-heading"><div>${button('library', studioIcon('chevron'), 'quiet editor-back editor-icon', 'aria-label="Voltar" title="Voltar"') + `<strong class="editor-title">${esc(l.title)}</strong>${this.groups.live?`<span class="editor-group-presence" data-collab-status>${this.groups.statusMarkup()}</span>`:''}`}</div><div class="editor-context">${this.editorMusic.headerMarkup()}<span data-account-profile>${this.account.profile()}</span></div></div><div class="editor-command-row"><button type="button" class="studio-btn mobile-activity-list" data-studio-action="list-activities">${studioIcon('sequence')}<span>Roteiro da aula</span></button><div class="mobile-editor-history">${this.tab==='slides'&&this.visualMode&&this.currentBlock()?.type!=='poll'?this.designer.historyMarkup():''}</div><div class="mobile-primary-actions">${this.editorSaveControls()}${this.tab==='slides'&&this.visualMode&&this.currentBlock()?.type!=='poll'?`<button type="button" class="studio-btn editor-icon ai-tool" data-storage-ai="toggle" aria-label="storageAI" title="storageAI" aria-pressed="${Boolean(this.ai.open)}" ${this.groups.canEdit?'':'disabled'}>${studioIcon('sparkle')}</button>`:''}${button('present-draft','▷','accent studio-launch','aria-label="Apresentar" title="Apresentar" '+(this.launching?'disabled':''))}</div><div class="editor-tabs" role="tablist" aria-label="Conteúdo da aula">${activityTabs(l,this.tab,this.currentBlock()?.id,this.groups.canEdit)}</div><button type="button" class="studio-btn quiet mobile-editor-actions" data-studio-action="mobile-actions" aria-expanded="false" aria-controls="editor-actions" aria-label="Opções da aula" title="Opções da aula">···</button><div class="editor-top-actions" id="editor-actions"><div class="mobile-actions-heading"><strong>Opções da aula</strong><button type="button" class="studio-btn" data-studio-action="close-mobile-actions" aria-label="Fechar opções">×</button></div><details class="editor-more"><summary aria-label="Mais opções da aula">${studioIcon('more')}<span class="mobile-action-label">Projeto</span></summary><div>${button('rename-draft','Renomear','quiet','aria-label="Editar título e descrição"')}${button('export-draft','Baixar JSON','quiet')}</div></details>${this.tab === 'slides'&&this.currentBlock()?.type!=='poll' ? button('toggle-visual', studioIcon('fields') + '<span>' + (this.visualMode ? 'Campos' : 'Editor visual') + '</span>', 'quiet') : ''}<details class="editor-more editor-download"><summary aria-label="Baixar apresentação" title="Baixar apresentação">${studioIcon('download')}<span class="mobile-action-label">Baixar</span></summary><div>${button('export-pdf','Baixar PDF','quiet')}${button('export-pptx','Baixar PPTX','quiet')}${this.tab==='slides'?button('export-png','Baixar PNG deste slide','quiet'):''}</div></details>${this.editorSaveControls()}${this.tab==='slides'&&this.visualMode&&this.currentBlock()?.type!=='poll'?`<button type="button" class="studio-btn editor-icon ai-tool" data-storage-ai="toggle" aria-label="Storage AI" title="Storage AI" aria-pressed="${Boolean(this.ai.open)}" ${this.groups.canEdit?'':'disabled'}>${studioIcon('sparkle')}<span class="mobile-action-label">storageAI</span></button>`:''}<details class="editor-more editor-sharing"><summary aria-label="Compartilhar e colaborar" title="Compartilhar e colaborar">${studioIcon('share')}<span class="mobile-action-label">Compartilhar</span></summary><div><button type="button" class="studio-btn quiet" data-group-action="share">${studioIcon('collaborate')} Colaborar</button><button type="button" class="studio-btn quiet" data-chat-action="open">${studioIcon('chat')} Chat</button>${button('share-presentation','Compartilhar','quiet')}</div></details>${button('present-draft', 'Apresentar ↗', 'accent studio-launch', this.launching ? 'disabled' : '')}</div></div><div class="editor-workspace ${this.visualMode && this.tab === 'slides' ? 'visual-workspace' : ''}"><aside class="editor-outline" data-outline-lesson="${esc(l.id)}"><div class="outline-heading"><span>${this.currentBlock()?.type==='poll'?'ENQUETES':this.tab === 'slides' ? 'SEQUÊNCIA DA AULA' : 'PERGUNTAS'}</span></div><div class="outline-actions">${this.itemActions(this.tab==='slides'?'slide':'question',this.tab==='slides'?this.index:this.questionIndex,this.tab==='slides'?l.slides.length:l.questions.length)}${button(this.tab === 'slides' ? 'add-slide' : 'add-question', '+', 'outline-add', `aria-label="${this.tab === 'slides' ? 'Adicionar slide' : 'Adicionar pergunta'}"`)}</div><div class="outline-items">${this.visibleItems().map(({item,index:i}) => `<button class="outline-item ${i === (this.tab === 'slides' ? this.index : this.questionIndex) ? 'active' : ''}" data-studio-action="${this.tab === 'slides' ? 'select-slide' : 'select-question'}" data-index="${i}">${this.tab==='slides'?this.slideThumbnail(item):''}<span>${String(i + 1).padStart(2, '0')}</span><div><strong ${i === (this.tab === 'slides' ? this.index : this.questionIndex) ? 'data-current-label' : ''}>${esc((this.tab === 'slides' ? item.title : item.text) || 'Sem título')}</strong><small>${this.tab === 'slides' ? kindLabel(item.kind) : esc(item.difficulty) + ' · ' + item.seconds + ' s'}</small></div>${this.tab==='slides'&&this.groups.live?`<span class="collaborator-avatars outline-presence" data-slide-presence="${esc(item.id)}"></span>`:''}</button>`).join('')}</div></aside><section class="editor-form-area">${this.tab==='quiz'?gameSettingsMarkup(l,this.gameSettingsOpen):!this.visualMode&&l.slides[this.index].kind!=='canvas'?audioEditor(l.slides[this.index].audio,'slide'):''}${this.tab === 'slides' ? this.currentBlock()?.type==='poll'?this.pollBlockEditor():(this.visualMode ? this.itemToolbar('slide', this.index, l.slides.length) + this.mobileSlidePreviews() + this.designer.markup(false,false) : this.slideEditor()) + (this.visualMode?'':this.slideActivities()) : this.quizEditor()}</section><aside class="editor-preview-area"><span class="studio-kicker">UM OLHAR DA TURMA</span><div id="editor-mini-preview">${this.previewMarkup()}</div></aside></div></main>`);
   }
   slideActivities() {
     const s = this.draft.slides[this.index], poll = s.poll || { text: '', options: ['Concordo', 'Ainda tenho dúvidas'] };
-    return `<details class="editor-details slide-activities"><summary>▥ Atividades e passagem deste slide</summary>${s.poll ? `<div class="editor-field"><label for="poll-text">Pergunta da enquete</label><input id="poll-text" data-poll-field="text" maxlength="500" value="${esc(poll.text)}"></div><div class="editor-field"><label for="poll-options">Opções (uma por linha, de 2 a 4)</label><textarea id="poll-options" data-poll-field="options" rows="4">${esc(poll.options.join('\n'))}</textarea></div>` : ''}${mobileChoice(s)}<div class="editor-field"><label for="slide-transition">Transição ao entrar neste slide</label><select id="slide-transition" data-scope="slide" data-field="transition">${[['slide', 'Deslizar'], ['fade', 'Dissolver'], ['zoom', 'Aproximar'], ['rise', 'Subir'], ['wipe', 'Revelar'], ['none', 'Sem animação']].map(([value,label]) => `<option value="${value}" ${(s.transition || 'slide') === value ? 'selected' : ''}>${label}</option>`).join('')}</select></div></details>`;
+    return `<details class="editor-details slide-activities"><summary>▥ Atividades e passagem deste slide</summary>${s.poll ? `<div class="editor-field"><label for="poll-text">Pergunta da enquete</label><input id="poll-text" data-poll-field="text" maxlength="500" value="${esc(poll.text)}"></div><div class="editor-field"><label for="poll-options">Opções (uma por linha, de 2 a 4)</label><textarea id="poll-options" data-poll-field="options" rows="4">${esc(poll.options.join('\n'))}</textarea></div>` : ''}${mobileChoice(s)}<div class="editor-field"><label for="slide-transition">Transição ao entrar neste slide</label><select id="slide-transition" data-scope="slide" data-field="transition">${[['slide', 'Deslizar'], ['fade', 'Dissolver'], ['zoom', 'Aproximar'], ['rise', 'Subir'], ['wipe', 'Revelar'], ['iris', 'Círculo'], ['split', 'Cortina'], ['flip', 'Virar página'], ['none', 'Sem animação']].map(([value,label]) => `<option value="${value}" ${(s.transition || 'slide') === value ? 'selected' : ''}>${label}</option>`).join('')}</select></div></details>`;
   }
   pollBlockEditor(){const poll=this.draft.slides[this.index].poll;return `${this.itemToolbar('slide',this.index,this.draft.slides.length)}<div class="poll-block-editor"><h2>Enquete</h2><label for="poll-text">Pergunta da enquete</label><input id="poll-text" data-poll-field="text" maxlength="500" value="${esc(poll.text)}"><label for="poll-options">Opções (uma por linha, de 2 a 4)</label><textarea id="poll-options" data-poll-field="options" rows="4">${esc(poll.options.join('\n'))}</textarea></div>`;}
   itemActions(type,i,total){const position=this.draft.activityBlocks?this.visibleItems().findIndex(v=>v.index===i):i,count=this.draft.activityBlocks?this.visibleItems().length:total;return `${button('move-' + type + '-up', '↑', 'square', `aria-label="Mover ${type === 'slide' ? 'slide' : 'pergunta'} para cima" ${position === 0 ? 'disabled' : ''}`)}${button('move-' + type + '-down', '↓', 'square', `aria-label="Mover ${type === 'slide' ? 'slide' : 'pergunta'} para baixo" ${position >= count - 1 ? 'disabled' : ''}`)}${button('duplicate-' + type, '⧉', 'square', `aria-label="Duplicar ${type === 'slide' ? 'slide' : 'pergunta'}" ${count?'':'disabled'}`)}${button('delete-' + type, '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M3 6h18M9 6V3h6v3M5 6l1 15h12l1-15M10 10v7m4-7v7"/></svg>', 'square danger-text', `aria-label="Excluir ${type === 'slide' ? 'slide' : 'pergunta'}" ${count?'':'disabled'}`)}`;}
+  bindIconHints() {
+    let timer, origin, hint, shown = false;
+    const clear = () => { clearTimeout(timer); hint?.remove(); hint = null; };
+    this.root.addEventListener('pointerdown', event => {
+      clear();
+      shown = false;
+      const control = event.target.closest('.editor-shell :is(button,summary)[aria-label]');
+      if (event.pointerType !== 'touch' || !control?.querySelector('svg')) return;
+      origin = {x:event.clientX,y:event.clientY};
+      timer = setTimeout(() => {
+        if (!control.isConnected) return;
+        const rect = control.getBoundingClientRect();
+        hint = document.createElement('span');
+        hint.className = 'editor-icon-hint';
+        hint.textContent = control.getAttribute('aria-label');
+        hint.style.left = Math.max(82,Math.min(window.innerWidth-82,rect.left+rect.width/2))+'px';
+        hint.style.top = (rect.top>44?rect.top-8:rect.bottom+36)+'px';
+        document.body.append(hint);
+        shown = true;
+      }, 550);
+    });
+    this.root.addEventListener('pointermove', event => {
+      if (origin && Math.hypot(event.clientX-origin.x,event.clientY-origin.y)>10) clear();
+    });
+    for (const type of ['pointerup','pointercancel']) this.root.addEventListener(type, () => {
+      origin = null;
+      clearTimeout(timer);
+      if (hint) { const visible = hint; setTimeout(() => visible.remove(), 800); }
+      if (shown) setTimeout(() => { shown = false; }, 400);
+    });
+    this.root.addEventListener('click', event => {
+      if (!shown) return;
+      shown = false;
+      event.preventDefault();
+      event.stopImmediatePropagation();
+    }, true);
+  }
+  slideThumbnail(item) {
+    const slide=presentationSlide(item);
+    const content=item.kind==='document'?assetImage(item):canvasMarkup(slide).replace(/<button class="canvas-explode"[\s\S]*?<\/button>/g,'');
+    return `<div class="slide-thumbnail" style="aspect-ratio:${slide.pageWidth&&slide.pageHeight?slide.pageWidth/slide.pageHeight:16/9}" inert aria-hidden="true">${content}</div>`;
+  }
+  mobileSlidePreviews() {
+    return `<div class="mobile-slide-previews" aria-label="Páginas do slide">${this.visibleItems().map(({item,index}) =>
+      `<div class="mobile-slide-preview">
+        <button type="button" data-studio-action="select-slide" data-index="${index}" aria-current="${index===this.index?'page':'false'}" aria-label="${esc(item.title || 'Slide '+(index+1))}">${this.slideThumbnail(item)}<span class="mobile-slide-number">${index+1}</span></button>
+      </div>`).join('')}${this.groups.canEdit?button('add-slide','+', 'studio-btn','aria-label="Adicionar slide" title="Adicionar slide"'):''}</div>`;
+  }
   itemToolbar(type, i, total) {
     const position=this.draft.activityBlocks?this.visibleItems().findIndex(v=>v.index===i):i,count=this.draft.activityBlocks?this.visibleItems().length:total;
     return `<div class="item-toolbar"><div class="item-identity"><span class="item-number">${type === 'slide' ? 'SLIDE' : 'PERGUNTA'} ${String(position + 1).padStart(2, '0')}</span><span class="save-state ${this.dirty ? 'unsaved' : ''}" role="status">${this.groups.live ? esc(this.groups.live.status) : this.dirty ? 'Alterações não salvas' : 'Salvo'}</span></div>${type==='slide'&&(this.visualMode||this.draft.slides[i].kind==='canvas')?`<div class="item-tools">${this.designer.toolbarMarkup()}</div>`:''}</div>`;
@@ -689,9 +745,21 @@ export class Studio {
     slide.model = 'custom'; slide.customModel = model; this.markDirty(); this.callbacks.render();
   }
   async action(action, target) {
+    if (action === 'mobile-actions' || action === 'close-mobile-actions') {
+      const toggle = this.root.querySelector('.mobile-editor-actions');
+      const open = action === 'mobile-actions' && toggle.getAttribute('aria-expanded') !== 'true';
+      toggle.setAttribute('aria-expanded', String(open));
+      if (open) {
+        this.designer.closeMobileInspector();
+        this.root.querySelector('.mobile-actions-heading button')?.focus();
+      } else {
+        toggle.focus();
+      }
+      return;
+    }
     if(action==='open-navigation'){const drawer=this.root.querySelector('#studio-navigation');if(drawer&&!drawer.open){drawer.showModal();drawer.querySelector('[data-studio-action="close-navigation"]')?.focus();}return;}
     if(action==='close-navigation'){target.closest('dialog')?.close();return;}
-    if(this.view==='editor'&&this.groups.live&&!this.groups.canEdit&&!['library','select-slide','select-question','tab-slides','tab-quiz','toggle-visual','preview-draft','present-draft','share-presentation','export-draft'].includes(action)){this.callbacks.toast('Sua permissão permite '+(this.groups.role==='commenter'?'comentar':'visualizar')+' esta aula.');return;}
+    if(this.view==='editor'&&this.groups.live&&!this.groups.canEdit&&!['library','select-slide','select-question','tab-slides','tab-quiz','toggle-visual','list-activities','preview-draft','present-draft','share-presentation','export-draft'].includes(action)){this.callbacks.toast('Sua permissão permite '+(this.groups.role==='commenter'?'comentar':'visualizar')+' esta aula.');return;}
     if (this.importing && action !== 'cancel-import') return;
     if (action.startsWith('cloud-')) { await this.cloudAction(action, target); return; }
     const id = target.dataset.id;
@@ -704,6 +772,7 @@ export class Studio {
       if(action==='shared'&&this.account.user){await this.groups.refresh();if(this.view==='shared')this.callbacks.render();}
       return;
     }
+    if(action==='list-activities'){this.activityOrder.list();return;}
     if(action==='add-activity'){this.activityOrder.open();return;}
     if(action==='export-png'){await this.exportVisual({...this.draft,slides:[this.draft.slides[this.index]]},'png');return;}
     if(action==='export-pdf'||action==='export-pptx'){await this.exportVisual(id?lookup():this.draft,action.slice(7));return;}
@@ -786,7 +855,7 @@ export class Studio {
     }
     else if (['preview-draft', 'present-draft'].includes(action)) { this.save(); await this.launch(this.draft, action === 'preview-draft', action === 'present-draft', this.tab==='slides'&&this.currentBlock()?.type!=='poll'?this.index:undefined, action==='present-draft'); return; }
     else if (action.startsWith('tab-')) { this.selectBlock(target.dataset.block||activityBlocks(this.draft).find(b=>(b.type==='quiz'?'quiz':'slides')===action.slice(4))?.id); this.writeRoute(); }
-    else if (action === 'select-slide') { this.index = Number(target.dataset.index); this.writeRoute(this.view, this.draft.id, true); }
+    else if (action === 'select-slide') { this.index = Number(target.dataset.index); this.designer.mobilePanel = ''; this.writeRoute(this.view, this.draft.id, true); }
     else if (action === 'select-question') this.questionIndex = Number(target.dataset.index);
     else if (action === 'clear-comparison') { this.draft.slides[this.index].comparison = false; this.markDirty(); }
     else if (action === 'clear-image') { this.draft.slides[this.index].image = ''; delete this.draft.slides[this.index].assetId; this.markDirty(); }
@@ -794,7 +863,7 @@ export class Studio {
       const isSlide = action.includes('slide'), list = isSlide ? this.draft.slides : this.draft.questions, indexKey = isSlide ? 'index' : 'questionIndex', i = this[indexKey];
       if (action.startsWith('add-') || action.startsWith('duplicate-')) {
         if (list.length >= (isSlide ? 80 : 50)) throw Error('Você chegou ao limite de ' + (isSlide ? '80 slides.' : '50 perguntas.'));
-        let item = action.startsWith('add-') ? (isSlide ? newSlide() : newQuestion()) : { ...clone(list[i]), id: crypto.randomUUID() };
+        let item = action.startsWith('add-') ? (isSlide ? newSlide() : newQuestion()) : { ...clone(list[i]), id: createUuid() };
         if(isSlide&&this.currentBlock()?.type==='poll')item.poll||={text:'Qual é a sua opinião?',options:['Concordo','Ainda tenho dúvidas']};
         if (isSlide && this.groups.live) item = canvasFromSlide(item);
         const next = action.startsWith('add-') ? list.length : i + 1;

@@ -1,3 +1,4 @@
+import { createUuid } from './uuid.js';
 import { pickShape } from './shapes.js';
 import { studioIcon } from './studio-icons.js';
 import {Simulations,simulationNames} from './simulations.js';
@@ -73,7 +74,15 @@ export class SlideDesigner {
     this.cropPointers=new Map();
     root.addEventListener('wheel',e=>this.cropWheel(e),{passive:false});
     root.addEventListener('wheel',e=>{const strip=e.target.closest('.designer-layer-list');if(!strip||Math.abs(e.deltaY)<Math.abs(e.deltaX))return;strip.scrollLeft+=e.deltaY;e.preventDefault();},{passive:false});
-    root.addEventListener('pointerdown', e => this.down(e));
+    root.addEventListener('pointerdown', event => {
+      const grip = event.target.closest('[data-layer-grip]');
+      if (grip) {
+        event.preventDefault();
+        this.dragLayer(event, grip);
+        return;
+      }
+      this.down(event);
+    });
     root.addEventListener('pointermove', e => this.move(e));
     root.addEventListener('pointerup', e => this.up(e));
     root.addEventListener('pointercancel', e => this.up(e));
@@ -98,6 +107,7 @@ export class SlideDesigner {
     this.groupSlide=this.display().id;
     this.selected=group.has(id)?id:[...group].at(-1)||null;
     this.interacting='';
+    this.mobilePanel='';
     this.refreshSelection();
   }
   display() {
@@ -107,7 +117,7 @@ export class SlideDesigner {
     return this.derived.get(this.original.id).slide;
   }
   ensure() {
-    if (this.original.kind !== 'canvas') this.studio.draft.slides[this.studio.index] = this.display();
+    if (this.original.kind !== 'canvas') this.studio.draft.slides[this.studio.index] = copy(this.display());
     return this.original;
   }
   history(id=this.original.id) {
@@ -117,10 +127,13 @@ export class SlideDesigner {
   record(before = copy(this.original)) {
     const h = this.history(before.id); h.undo.push(before); if (h.undo.length > 40) h.undo.shift(); h.redo = [];
   }
-  mutate(fn) {
+  mutate(fn, preserveInspector = false) {
+    const scroll = preserveInspector ? this.studio.root.querySelector("#designer-inspector")?.scrollTop : undefined;
     const before = copy(this.original); this.record(before);
     try { fn(this.ensure()); } catch (error) { this.studio.draft.slides[this.studio.index] = before; this.history().undo.pop(); throw error; }
     this.studio.markDirty(); this.studio.callbacks.render();
+    const inspector = this.studio.root.querySelector("#designer-inspector");
+    if (inspector && scroll !== undefined) inspector.scrollTop = scroll;
   }
   applyStyle(slide, kind, value) {
     if(kind==='theme'){
@@ -192,12 +205,80 @@ export class SlideDesigner {
     this.studio.markDirty();
     this.studio.callbacks.render();
   }
+  dragLayer(event, grip) {
+    if (!this.studio.groups.canEdit || event.button !== 0) return;
+    const list = grip.closest('#designer-layers');
+    const from = grip.dataset.layerGrip;
+    const original = this.original;
+    grip.setPointerCapture(event.pointerId);
+    grip.classList.add('dragging');
+    const ghost = document.createElement('span');
+    ghost.className = 'layer-drag-preview';
+    ghost.textContent = grip.parentElement.querySelector('button').textContent;
+    document.body.append(ghost);
+    let destination;
+    const move = next => {
+      ghost.style.translate = next.clientX + 'px ' + next.clientY + 'px';
+      destination?.classList.remove('layer-drop-target');
+      const bounds = list.getBoundingClientRect();
+      if (next.clientX < bounds.left + 28) list.scrollLeft -= 12;
+      if (next.clientX > bounds.right - 28) list.scrollLeft += 12;
+      destination = document.elementFromPoint(next.clientX, next.clientY)?.closest('[data-layer-row]');
+      if (destination?.closest('#designer-layers') === list && destination.dataset.layerRow !== from) destination.classList.add('layer-drop-target');
+    };
+    const finish = end => {
+      ghost.remove();
+      destination?.classList.remove('layer-drop-target');
+      grip.classList.remove('dragging');
+      grip.removeEventListener('pointermove', move);
+      grip.removeEventListener('pointerup', finish);
+      grip.removeEventListener('pointercancel', finish);
+      if (end.type !== 'pointerup' || this.original !== original || !this.studio.groups.canEdit) return;
+      const to = document.elementFromPoint(end.clientX, end.clientY)?.closest('[data-layer-row]')?.dataset.layerRow;
+      if (!to || from === to) return;
+      this.mutate(slide => {
+        const fromIndex = slide.elements.findIndex(item => item.id === from);
+        const toIndex = slide.elements.findIndex(item => item.id === to);
+        if (fromIndex < 0 || toIndex < 0) return;
+        const [element] = slide.elements.splice(fromIndex, 1);
+        slide.elements.splice(toIndex, 0, element);
+      }, true);
+      const nextList = this.studio.root.querySelector('#designer-layers');
+      if (nextList && list.hasAttribute('data-mobile-open')) {
+        nextList.setAttribute('data-mobile-open', '');
+        nextList.scrollLeft = list.scrollLeft;
+        this.studio.root.querySelector('[data-designer-action="mobile-layers"]')?.setAttribute('aria-expanded', 'true');
+      }
+    };
+    move(event);
+    grip.addEventListener('pointermove', move);
+    grip.addEventListener('pointerup', finish);
+    grip.addEventListener('pointercancel', finish);
+  }
+  historyMarkup() {
+    const history = this.history();
+    return ['undo', 'redo'].map((action, index) => {
+      const label = index ? 'Refazer' : 'Desfazer';
+      return btn(action, studioIcon(action), `aria-label="${label}" title="${label}" ${this.studio.groups.canEdit && history[action].length ? '' : 'disabled'}`);
+    }).join('');
+  }
   toolbarMarkup(){
     const h=this.history();
     const slide=this.display();
-    return `<div class="designer-toolbar" role="toolbar" aria-label="Ferramentas do slide">
-      ${btn('undo', '↶', `aria-label="Desfazer" ${h.undo.length ? '' : 'disabled'}`)}${btn('redo', '↷', `aria-label="Refazer" ${h.redo.length ? '' : 'disabled'}`)}
-      <span></span>${btn('add-text', 'T Texto')}${btn('image', '▧ Imagem')}${btn('shape', '▰ Forma')}<details class="designer-insert-more"><summary>Inserir mais</summary><div>${btn('icon', '⊞ Ícones de objetos')}${btn('model', '◇ Modelo 3D')}${btn('simulation','⚗ Simulação')}${btn('browse-images',studioIcon('search')+' Buscar imagens')}</div></details>
+    return `<div class="designer-toolbar" role="toolbar" aria-label="Ferramentas do slide" data-selection-type="${slide.elements.find(item => item.id === this.selected)?.type || ''}">
+      <div class="mobile-object-tools">
+        ${btn('mobile-object-edit', 'Editar', 'aria-controls="designer-inspector" aria-expanded="false"')}
+        <button type="button" data-font-action="open" class="mobile-object-font">Fonte</button>
+        ${btn('duplicate',studioIcon('duplicate'),'aria-label="Duplicar elemento"')}
+        ${btn('delete',studioIcon('trash'),'aria-label="Excluir elemento"')}
+        ${btn('mobile-clear-selection','Concluir')}
+      </div>
+      <button type="button" class="mobile-inspector-open" data-designer-action="mobile-inspector-open" aria-controls="designer-inspector" aria-expanded="false">${studioIcon('settings')}<span>Ajustes</span></button>
+      ${btn('undo', '↶', `class="desktop-history" aria-label="Desfazer" ${h.undo.length ? '' : 'disabled'}`)}${btn('redo', '↷', `class="desktop-history" aria-label="Refazer" ${h.redo.length ? '' : 'disabled'}`)}
+      <span></span>${btn('add-text', studioIcon('text')+'<span>Texto</span>')}${btn('image', studioIcon('image')+'<span>Imagem</span>')}${btn('shape', studioIcon('shape')+'<span>Forma</span>')}<details class="designer-insert-more"><summary><span class="desktop-insert-label">Inserir mais</span><span class="mobile-action-label">${studioIcon('more')}<span>Mais</span></span></summary><div><div class="mobile-history">
+        ${btn('undo', '↶ Desfazer', h.undo.length ? '' : 'disabled')}${btn('redo', '↷ Refazer', h.redo.length ? '' : 'disabled')}
+        ${btn('mobile-layers','Camadas', 'aria-controls="designer-layers" aria-expanded="false"')}
+      </div>${btn('icon', '⊞ Ícones de objetos')}${btn('model', '◇ Modelo 3D')}${btn('simulation','⚗ Simulação')}${btn('browse-images',studioIcon('search')+' Buscar imagens')}</div></details>
       ${slideStylePicker('theme',slide)}${slideStylePicker('layout',slide)}
       <input type="file" id="designer-image-file" accept="image/png,image/jpeg,image/webp,image/gif" hidden><input type="file" id="designer-model-files" accept=".glb,.gltf,.obj,.mtl,.bin,.png,.jpg,.jpeg,.webp,.gif,.ktx2" multiple hidden>
     </div>`;
@@ -206,8 +287,13 @@ export class SlideDesigner {
     const slide = this.display();
     if(this.selected!==null&&!slide.elements.some(e => e.id === this.selected)) this.selected = (slide.elements.find(e=>!e.locked)||slide.elements[0])?.id || '';
     const unavailable=[...new Set((slide.importWarnings||[]).map(w=>/^Fonte indisponível neste dispositivo: (.+)\.$/.exec(w)?.[1]).filter(Boolean))];
-    return `<div class="slide-designer">${slide.importWarnings?.length?`<details class="pptx-compatibility"><summary>Compatibilidade do PPTX · ${slide.importWarnings.length} observações</summary><ul>${slide.importWarnings.map(w=>'<li>'+esc(w)+'</li>').join('')}</ul>${unavailable.map(font=>`<div class="pptx-font-replace"><span>“${esc(font)}” não existe aqui. Trocar por:</span><select data-missing-font="${esc(font)}">${['Arial','Verdana','Georgia','Trebuchet MS','Times New Roman'].map(name=>`<option value="${name}">${name}</option>`).join('')}</select>${btn('replace-font','Aplicar fonte',`data-source-font="${esc(font)}"`)}</div>`).join('')}</details>`:''}${showTools?this.toolbarMarkup():''}<div class="designer-workspace ${fieldsOnly ? 'fields-only' : ''}">${fieldsOnly ? '' : `<div class="designer-stage-wrap"><div class="designer-stage" style="--slide-aspect:${slide.sourceType&&slide.pageWidth&&slide.pageHeight?slide.pageWidth/slide.pageHeight:16/9}">${canvasMarkup(slide, { editing: true, selected: this.selected, interacting: this.interacting })}</div><div class="designer-layer-list" aria-label="Camadas do slide">${slide.elements.map((e, i) => btn('select', (i + 1) + ' · ' + esc(e.type === 'text' ? e.text.slice(0, 25) || 'Texto' : e.type === 'model' ? 'Modelo 3D' : e.type === 'shape' ? 'Forma' : 'Imagem'), `data-id="${e.id}" aria-pressed="${e.id === this.selected}"`)).join('')}</div></div>`}
-      <aside class="designer-inspector">${this.inspector()}${this.studio.ai.open?'':this.studio.slideActivities()}</aside></div></div>`;
+    return `<div class="slide-designer">${slide.importWarnings?.length?`<details class="pptx-compatibility"><summary>Compatibilidade do PPTX · ${slide.importWarnings.length} observações</summary><ul>${slide.importWarnings.map(w=>'<li>'+esc(w)+'</li>').join('')}</ul>${unavailable.map(font=>`<div class="pptx-font-replace"><span>“${esc(font)}” não existe aqui. Trocar por:</span><select data-missing-font="${esc(font)}">${['Arial','Verdana','Georgia','Trebuchet MS','Times New Roman'].map(name=>`<option value="${name}">${name}</option>`).join('')}</select>${btn('replace-font','Aplicar fonte',`data-source-font="${esc(font)}"`)}</div>`).join('')}</details>`:''}${showTools?this.toolbarMarkup():''}<div class="designer-workspace ${fieldsOnly ? 'fields-only' : ''}">${fieldsOnly ? '' : `<div class="designer-stage-wrap"><div class="designer-stage" style="--slide-aspect:${slide.sourceType&&slide.pageWidth&&slide.pageHeight?slide.pageWidth/slide.pageHeight:16/9}">${canvasMarkup(slide, { editing: true, selected: this.selected, interacting: this.interacting })}</div><div class="designer-layer-list" id="designer-layers" aria-label="Camadas do slide">${slide.elements.map((e, i) => `<span class="designer-layer-row" data-layer-row="${esc(e.id)}">${btn('select', (i + 1) + ' · ' + esc(e.type === 'text' ? e.text.slice(0, 25) || 'Texto' : e.type === 'model' ? 'Modelo 3D' : e.type === 'shape' ? 'Forma' : 'Imagem'), `data-id="${e.id}" aria-pressed="${e.id === this.selected}"`)}${this.studio.groups.canEdit ? `<span class="layer-grip" data-layer-grip="${esc(e.id)}" title="Arraste para mover a camada" aria-hidden="true">&#8942;</span>` : ''}</span>`).join('')}</div></div>`}
+      <aside class="designer-inspector" id="designer-inspector" data-mobile-panel="${this.mobilePanel||''}">${this.inspectorContent()}</aside></div></div>`;
+  }
+  inspectorContent() {
+    const close = btn('mobile-inspector-close','×','class="mobile-inspector-close" aria-label="Fechar painel de edição"');
+    const activities = this.studio.ai.open?'':this.studio.slideActivities();
+    return close+this.inspector()+(activities?'<div class="designer-slide-activities">'+activities+'</div>':'');
   }
   backgroundControls(slide) {
     const fill=slide.backgroundFill, mode=fill?.mode||(slide.visualTheme?'theme':'solid');
@@ -237,7 +323,7 @@ export class SlideDesigner {
   settingsMarkup(s) {
     const active=this.settingTab||'';
     const background=this.backgroundControls(s).replace(/^<details[^>]*>[\s\S]*?<\/summary>/,'').replace(/<\/details>$/,'');
-    const panels={background,theme:slideStylePicker('theme',s,{inspector:true}),audio:audioEditor(s.audio,'slide',s.elements,{expanded:true})};
+    const panels={background,theme:slideStylePicker('theme',s,{inspector:true})+'<div class="mobile-slide-layout">'+slideStylePicker('layout',s,{inspector:true})+'</div>',audio:audioEditor(s.audio,'slide',s.elements,{expanded:true})};
     return `<div class="slide-settings-tabs">${[['background','Fundo',`<span class="background-swatch" style="background:${slideBackground(s)}"></span>`],['theme','Tema',studioIcon('palette')],['audio','Áudio','♫']].map(([id,label,icon])=>btn('setting-'+id,icon+'<span>'+label+'</span>',`aria-pressed="${active===id}"`)).join('')}</div>${active?`<div class="slide-setting-panel">${panels[active]}</div>`:''}`;
   }
   inspector() {
@@ -249,14 +335,15 @@ export class SlideDesigner {
     }
     const number = (label, key, value, min, max) => `<label>${label}<input type="number" data-element-field="${key}" value="${value}" min="${min}" max="${max}" step="0.5"></label>`;
     if(this.studio.ai.open)return this.studio.ai.inspector(s);
-    return `${!e ? `${this.settingsMarkup(s)}${this.animationOrder(s)}` : `<div class="designer-selected-heading"><strong>${{ text: 'Caixa de texto', image: 'Imagem', model: 'Modelo 3D', shape: 'Forma',simulation:'Simulação' }[e.type]}</strong>${btn('delete', studioIcon('trash')+' Excluir', 'class="danger-text inspector-delete" aria-label="Excluir elemento"')}</div><div class="designer-arrange" aria-label="Organizar elemento">${[
+    return `${!e ? `${this.settingsMarkup(s)}${this.animationOrder(s)}` : `<div class="designer-selected-heading"><strong>${{ text: 'Caixa de texto', image: 'Imagem', model: 'Modelo 3D', shape: 'Forma',simulation:'Simulação' }[e.type]}</strong></div><div class="designer-arrange" aria-label="Organizar elemento">${[
   ['duplicate', 'duplicate', 'Duplicar elemento'],
   ['forward', 'forward', 'Trazer à frente'],
   ['animation'],
   ['backward', 'backward', 'Enviar para trás'],
-  ['lock', e.locked ? 'unlock' : 'lock', e.locked ? 'Desbloquear elemento' : 'Fixar elemento']
-].map(([action,icon,label])=>action==='animation'?elementAnimation(s,e,this.animationOpen===e.id):btn(action,studioIcon(icon),'aria-label="'+label+'" title="'+label+'"')).join('')}</div>${audioEditor(e.audio || (s.audio?.trigger==='element:'+e.id?s.audio:null),'element:'+e.id)}
-      ${e.type === 'text' ? `<label>Fonte${fontButton(e,this.studio.draft.customFonts)}</label><label>Texto do elemento<textarea data-element-field="text" aria-label="Texto do elemento">${esc(e.text)}</textarea></label><div class="designer-type-settings">${number('Tamanho', 'fontSize', e.fontSize, 1, 512)}<label>Cor do texto<input type="color" data-element-field="color" value="${e.color}"></label></div><div class="designer-format-row">${btn('bold', '<b>N</b>', `aria-label="Negrito" aria-pressed="${e.bold}"`)}${['left', 'center', 'right'].map((a, i) => btn('align', ['⇤', '↔', '⇥'][i], `data-align="${a}" aria-label="${['Alinhar à esquerda', 'Centralizar texto', 'Alinhar à direita'][i]}"`)).join('')}</div>` : ''}
+  ['lock', e.locked ? 'unlock' : 'lock', e.locked ? 'Desbloquear elemento' : 'Fixar elemento'],
+  ['delete', 'trash', 'Excluir elemento']
+].map(([action,icon,label])=>action==='animation'?elementAnimation(s,e,this.animationOpen===e.id):btn(action,studioIcon(icon),'aria-label="'+label+'" title="'+label+'"'+(action==='lock'?' aria-pressed="'+Boolean(e.locked)+'"':''))).join('')}</div>${audioEditor(e.audio || (s.audio?.trigger==='element:'+e.id?s.audio:null),'element:'+e.id)}
+      ${e.type === 'text' ? `<label>Fonte${fontButton(e,this.studio.draft.customFonts)}</label><label>Texto do elemento<textarea data-element-field="text" aria-label="Texto do elemento">${esc(e.text)}</textarea></label><div class="designer-type-settings">${number('Tamanho', 'fontSize', e.fontSize, 1, 512)}<label>Cor do texto<input type="color" data-element-field="color" value="${e.color}"></label></div><div class="designer-format-row">${btn('bold', '<b>N</b>', `aria-label="Negrito" aria-pressed="${e.bold}"`)}${['left', 'center', 'right'].map((a, i) => btn('align', ['⇤', '↔', '⇥'][i], `data-align="${a}" aria-pressed="${e.align===a}" aria-label="${['Alinhar à esquerda', 'Centralizar texto', 'Alinhar à direita'][i]}"`)).join('')}</div>` : ''}
       ${e.type === 'image' ? `<div class="designer-image-actions" role="group" aria-label="Ações da imagem">${[
         ['replace-image','image','Trocar imagem'],
         ['image-reset','reload','Restaurar enquadramento'],
@@ -266,8 +353,6 @@ export class SlideDesigner {
       <label>Ajuste na moldura<select data-element-field="imageFit"><option value="contain">Mostrar inteira</option><option value="cover" ${e.imageFit==='cover'?'selected':''}>Preencher</option><option value="fill" ${e.imageFit==='fill'?'selected':''}>Esticar livremente</option></select></label>
       <div class="image-crop-controls">${btn('image-minus','−','aria-label="Diminuir zoom da imagem"')}<output>${Math.round((e.imageZoom||1)*1000)/10}%</output>${btn('image-plus','+','aria-label="Aumentar zoom da imagem"')}</div>
       <div class="designer-position-grid">${number('Deslocamento X (%)','imageX',e.imageX||0,'','')}${number('Deslocamento Y (%)','imageY',e.imageY||0,'','')}</div>
-      ${btn('image-background','Fundo transparente',`class="designer-image-background" aria-pressed="${!e.imageBackground||e.imageBackground==='transparent'}"`)}
-      ${e.imageBackground&&e.imageBackground!=='transparent'?`<label>Cor do fundo da imagem<input type="color" data-element-field="imageBackground" value="${esc(e.imageBackground)}"></label>`:''}
       <label>Descrição da imagem<input data-element-field="imageAlt" value="${esc(e.imageAlt)}"></label>${e.imageSource||e.imageLicense?`<p class="designer-image-credit"><strong>Créditos</strong> ${esc([e.imageCredit,e.imageLicense].filter(Boolean).join(' · '))}${e.imageSource?`<a href="${esc(e.imageSource)}" target="_blank" rel="noopener noreferrer">Ver origem</a>`:''}</p>`:''}` : ''}
       ${e.type === 'model' ? `<label>Modelo<select data-element-field="model" aria-label="Modelo do elemento">${[['ssd', 'SSD SATA'], ['hdd', 'HDD'], ['nvme', 'SSD NVMe'], ['custom', e.customModel?.name || 'Meu modelo enviado']].map(([v, label]) => `<option value="${v}" ${e.model === v ? 'selected' : ''}>${esc(label)}</option>`).join('')}</select></label><label>Nome do modelo<input data-element-field="modelLabel" maxlength="120" value="${esc(e.modelLabel||'')}" placeholder="${esc(e.model==='custom'?e.customModel?.name||'Modelo 3D':'Nome da peça selecionada')}"></label><label>Descrição do modelo<textarea data-element-field="modelDescription" maxlength="500" placeholder="Descrição ao explorar o modelo">${esc(e.modelDescription||'')}</textarea></label><label class="model-details-toggle"><input type="checkbox" data-element-field="modelDetailsHidden" ${e.modelDetailsHidden?'checked':''}> Mostrar somente o modelo 3D</label>${btn('replace-model', '↑ Enviar GLB / GLTF / OBJ')}${btn('interact', this.interacting === e.id ? 'Voltar à edição' : 'Explorar o modelo')}` : ''}
       ${e.type==='simulation'?`<label>Experiência<select data-element-field="simulation" aria-label="Tipo de simulação">${Object.entries(simulationNames).map(([id,name])=>`<option value="${id}" ${e.simulation===id?'selected':''}>${name}</option>`).join('')}</select></label>${btn('interact',this.interacting===e.id?'Voltar à edição':'Experimentar simulação')}`:''}${e.type === 'shape' ? `<label>Cor da forma<input type="color" data-element-field="background" value="${e.background}"></label>
@@ -275,7 +360,7 @@ export class SlideDesigner {
       <div class="designer-type-settings">${number('Largura da borda','borderWidth',e.borderWidth||0,0,40)}${!['ellipse','icon'].includes(e.shapeType)?number('Curvatura','cornerRadius',e.cornerRadius??5,0,100):''}</div>` : ''}
       <div class="designer-position-grid">${number('Posição X (%)', 'x', e.x, -1000, 1000)}${number('Posição Y (%)', 'y', e.y, -1000, 1000)}${number('Largura (%)', 'w', e.w, e.type==='image'?.1:5, 1000)}${number('Altura (%)', 'h', e.h, e.type==='image'?.1:5, 1000)}</div>
 
-      <small>As posições são relativas ao slide e ficam iguais no computador e no celular.</small>`}
+      `}
       <details class="designer-notes"><summary>Perguntas e roteiro</summary><label>Pergunta de discussão<textarea data-slide-field="prompt">${esc(s.prompt)}</textarea></label><label>Explicação da discussão<textarea data-slide-field="answer">${esc(s.answer)}</textarea></label><label>Notas do professor<textarea data-slide-field="note">${esc(s.note)}</textarea></label></details>`;
   }
   afterRender() {
@@ -286,16 +371,18 @@ export class SlideDesigner {
   }
   selectedElement() { return this.ensure().elements.find(e => e.id === this.selected); }
   refreshSelection() {
+    const toolbar = this.studio.root.querySelector('.designer-toolbar');
+    if (toolbar) toolbar.dataset.selectionType = this.display().elements.find(item => item.id === this.selected)?.type || '';
     const ids=this.selectionIds();
     for (const node of this.studio.root.querySelectorAll('.canvas-editing [data-object-id]')) { node.dataset.selected = String(ids.includes(node.dataset.objectId)); node.dataset.interacting = String(node.dataset.objectId === this.interacting);node.dataset.cropping=String(node.dataset.objectId===this.imageEditing); }
-    const inspector = this.studio.root.querySelector('.designer-inspector'); if (inspector && !this.studio.ai.refreshInspectorScope()) { inspector.innerHTML = this.inspector()+(this.studio.ai.open?'':this.studio.slideActivities()); inspector.classList.remove('selection-arrive'); void inspector.offsetWidth; inspector.classList.add('selection-arrive'); }
+    const inspector = this.studio.root.querySelector('.designer-inspector'); if (inspector && !this.studio.ai.refreshInspectorScope()) { inspector.dataset.mobilePanel=this.mobilePanel||''; inspector.innerHTML = this.inspectorContent(); inspector.classList.remove('selection-arrive'); void inspector.offsetWidth; inspector.classList.add('selection-arrive'); }
     fillAssetAudio(this.studio.root);
     for (const button of this.studio.root.querySelectorAll('[data-designer-action="select"]')) button.setAttribute('aria-pressed', String(ids.includes(button.dataset.id)));
   }
   down(event) {
     if(!this.studio.groups.canEdit)return;
     const node = event.target.closest('.canvas-editing .canvas-object');
-    if(!node&&event.target.closest('.designer-stage-wrap')&&!event.target.closest('button,input,select,textarea')){this.selected=null;this.interacting='';this.imageEditing='';this.refreshSelection();return;}
+    if(!node&&event.target.closest('.designer-stage-wrap')&&!event.target.closest('button,input,select,textarea')){this.selected=null;this.mobilePanel='';this.interacting='';this.imageEditing='';this.refreshSelection();return;}
     if (!node || event.target.closest('[contenteditable]') || event.target.closest('button')) return;
     if(this.imageEditing===node.dataset.objectId){this.cropDown(event,node);return;}
     this.imageEditing='';
@@ -317,7 +404,8 @@ export class SlideDesigner {
     if(this.cropPointers.has(event.pointerId)){this.cropMove(event);return;}
     if (!this.drag) return;
     const d = this.drag, dx = (event.clientX - d.x) / d.box.width * 100, dy = (event.clientY - d.y) / d.box.height * 100;
-    if (Math.abs(dx) + Math.abs(dy) < .15) return;
+    if (!d.moved && Math.abs(dx) + Math.abs(dy) < .15) return;
+    d.moved = true;
     const el = this.selectedElement();
     if (d.resize) {
       const { w, h } = d.initial;
@@ -438,21 +526,51 @@ export class SlideDesigner {
       return;
     }
     if (t.id === 'designer-image-file') {
-      let file = t.files[0]; if (!file) return;
-      const sourceSlide = this.original, targetId = this.replaceId;
-      file = await optimizeImage(file);
-      if (!this.studio.groups.canEdit || sourceSlide !== this.original) return;
-      if (!['image/png', 'image/jpeg', 'image/webp', 'image/gif'].includes(file.type) || file.size > 1400000) throw Error('Use PNG, JPEG, WebP ou GIF de até 1,4 MB.');
-      const data = await new Promise((resolve, reject) => { const reader = new FileReader(); reader.onload = () => resolve(reader.result); reader.onerror = reject; reader.readAsDataURL(file); });
-      const [assetId] = await storePages([data]); if (!this.studio.groups.canEdit || sourceSlide !== this.original) return;
-      this.mutate(s => { let e = s.elements.find(e => e.id === targetId && e.type === 'image'); if (!e) { if(targetId)return; if(s.elements.length>=MAX_CANVAS_ELEMENTS)throw Error(`Use até ${MAX_CANVAS_ELEMENTS} elementos no slide.`); e = newElement('image', { imageAlt: file.name }); s.elements.push(e); } e.assetId = assetId; e.image = ''; this.selected = e.id; }); this.replaceId = null;
+      await this.uploadImage(t.files[0], this.replaceId, this.original);
+      this.replaceId = null;
     }
     if (t.id === 'designer-model-files') {
       const sourceSlide = this.original, targetId = this.replaceId, model = await importModelFiles(t.files); if (!model || sourceSlide !== this.original) return;
       this.mutate(s => { let e = s.elements.find(e => e.id === targetId && e.type === 'model'); if (!e) { if (s.elements.filter(e => e.type === 'model').length >= 2) throw Error('Use até dois modelos por slide.'); e = newElement('model'); s.elements.push(e); } e.model = 'custom'; e.customModel = model; this.selected = e.id; }); this.replaceId = null;
     }
   }
+  closeMobileInspector() {
+    this.mobilePanel = '';
+    const root = this.studio.root;
+    const inspector = root.querySelector('.designer-inspector');
+    if (inspector) inspector.dataset.mobilePanel = '';
+    for (const trigger of root.querySelectorAll('[aria-controls="designer-inspector"]')) trigger.setAttribute('aria-expanded', 'false');
+  }
   async action(action, button, event) {
+    if (action === 'mobile-inspector-close') {
+      if (this.studio.ai.open) { this.studio.ai.open = false; this.studio.callbacks.render(); return; }
+      const trigger = this.studio.root.querySelector('[aria-controls="designer-inspector"][aria-expanded="true"]');
+      this.closeMobileInspector();
+      trigger?.focus();
+      return;
+    }
+    if (action === 'mobile-layers') {
+      const layers = this.studio.root.querySelector('#designer-layers');
+      if (layers) {
+        const open = layers.toggleAttribute('data-mobile-open');
+        button.setAttribute('aria-expanded', String(open));
+      }
+      return;
+    }
+    if (action === 'mobile-clear-selection') {
+      this.closeMobileInspector();
+      this.selectObject(null);
+      return;
+    }
+    if (action === 'mobile-inspector-open' || action === 'mobile-object-edit') {
+      const isSlide = action === 'mobile-inspector-open';
+      if (isSlide) this.selected = null;
+      this.mobilePanel = isSlide ? 'slide' : 'element';
+      this.refreshSelection();
+      button.setAttribute('aria-expanded', 'true');
+      this.studio.root.querySelector('.mobile-inspector-close')?.focus({preventScroll: true});
+      return;
+    }
     if(!this.studio.groups.canEdit)return;
     const e = this.display().elements.find(e => e.id === this.selected);
     if(action==='replace-font'){
@@ -478,18 +596,12 @@ export class SlideDesigner {
     if(action==='search-image'){this.openImageSearch(e?.type==='image'?e.id:null);return;}
     if(action==='simulation'){this.mutate(s=>{const e=newElement('simulation',{x:53,y:12,w:42,h:76});s.elements.push(e);this.selected=e.id;});return;}
     if(action==='crop-image'){this.ensure();this.imageEditing=this.imageEditing===e.id?'':e.id;this.refreshSelection();return;}
-    if(action==='image-background'){
-      this.mutate(s=>{
-        const image=s.elements.find(item=>item.id===e?.id);
-        if(image?.type==='image')image.imageBackground=!image.imageBackground||image.imageBackground==='transparent'?'#ffffff':'transparent';
-      });
-      return;
-    }
     if(['image-plus','image-minus','image-reset'].includes(action)){
-      this.mutate(s=>{const image=s.elements.find(item=>item.id===e?.id);if(!image)return;if(action==='image-reset'){image.imageZoom=1;image.imageX=image.imageY=0;}else image.imageZoom=imageZoomValue((image.imageZoom||1)*(action==='image-plus'?1.25:.8));});return;
+      this.mutate(s=>{const image=s.elements.find(item=>item.id===e?.id);if(!image)return;if(action==='image-reset'){image.imageZoom=1;image.imageX=image.imageY=0;}else image.imageZoom=imageZoomValue((image.imageZoom||1)*(action==='image-plus'?1.25:.8));}, true);return;
     }
     if (action === 'select') { this.selectObject(button.dataset.id,event?.shiftKey); return; }
-    if (action === 'image' || action === 'replace-image') { this.replaceId = action.startsWith('replace') ? e?.id : null; this.studio.root.querySelector('#designer-image-file').click(); return; }
+    if (action === 'replace-image') { if (e?.type === 'image') this.openImageReplacement(e.id); return; }
+    if (action === 'image') { this.openImageReplacement(); return; }
     if (action === 'model') { this.mutate(s => { if (s.elements.length >= MAX_CANVAS_ELEMENTS) throw Error(`Use até ${MAX_CANVAS_ELEMENTS} elementos no slide.`); if (s.elements.filter(item => item.type === 'model').length >= 2) throw Error('Use até dois modelos por slide.'); const model = newElement('model'); s.elements.push(model); this.selected = model.id; }); return; }
     if (action === 'replace-model') { this.replaceId = e?.id; this.studio.root.querySelector('#designer-model-files').click(); return; }
     if (action === 'interact') { this.interacting = this.interacting === e.id ? '' : e.id; this.refreshSelection(); return; }
@@ -511,22 +623,117 @@ export class SlideDesigner {
         s.elements=s.elements.filter(e=>e.id!==current.id);
         if(s.animations)s.animations=s.animations.filter(a=>a.id!==current.id);
       }
-      else if (action === 'duplicate') { const next = { ...copy(current), id: crypto.randomUUID(), x: current.x + 3, y: current.y + 3 }; s.elements.push(next); this.selected = next.id; }
+      else if (action === 'duplicate') { const next = { ...copy(current), id: createUuid(), x: current.x + 3, y: current.y + 3 }; s.elements.push(next); this.selected = next.id; }
       else if (action === 'bold') current.bold = !current.bold;
       else if (action === 'align') current.align = button.dataset.align;
       else if (action === 'lock') current.locked = !current.locked;
       else if (action === 'forward' || action === 'backward') { const index = s.elements.indexOf(current), next = Math.max(0, Math.min(s.elements.length - 1, index + (action === 'forward' ? 1 : -1))); s.elements.splice(index, 1); s.elements.splice(next, 0, current); }
     });
   }
+  async uploadImage(file, targetId, sourceSlide) {
+      if (!file) return;
+      file = await optimizeImage(file);
+      if (!this.studio.groups.canEdit || sourceSlide !== this.original) return;
+      if (!['image/png', 'image/jpeg', 'image/webp', 'image/gif'].includes(file.type) || file.size > 1400000) throw Error('Use PNG, JPEG, WebP ou GIF de até 1,4 MB.');
+      const data = await new Promise((resolve, reject) => { const reader = new FileReader(); reader.onload = () => resolve(reader.result); reader.onerror = reject; reader.readAsDataURL(file); });
+      const [assetId] = await storePages([data]); if (!this.studio.groups.canEdit || sourceSlide !== this.original) return;
+      this.mutate(s => { let e = s.elements.find(e => e.id === targetId && e.type === 'image'); if (!e) { if(targetId)return; if(s.elements.length>=MAX_CANVAS_ELEMENTS)throw Error(`Use até ${MAX_CANVAS_ELEMENTS} elementos no slide.`); e = newElement('image', { imageAlt: file.name }); s.elements.push(e); } e.assetId = assetId; e.image = ''; e.imageSource = e.imageLicense = e.imageCredit = ''; e.imageBackground = 'transparent'; this.selected = e.id; });
+  }
+  openImageReplacement(targetId, initialUrl) {
+    const original = this.original;
+    const dialog = document.createElement('dialog');
+    dialog.className = 'storage-image-search image-replacement';
+    dialog.innerHTML = `<form method="dialog" class="image-search-head"><strong>${targetId ? 'Trocar imagem' : 'Adicionar imagem'}</strong><button aria-label="Fechar">×</button></form>
+      <button type="button" class="image-drop-zone" data-image-device>${studioIcon('upload')}<strong>Abrir galeria</strong><span>Arraste ou cole uma imagem aqui</span></button><input type="file" accept="image/png,image/jpeg,image/webp,image/gif" hidden>
+      <form class="image-search-form"><input name="url" type="url" aria-label="Link HTTPS da imagem" placeholder="https://…" required><button>Usar link</button></form>
+      <div class="image-import-preview" hidden><img alt="Prévia da imagem"><button type="button">Usar esta imagem</button></div><p role="status"></p>`;
+    const picker = dialog.querySelector('input[type=file]');
+    const status = dialog.querySelector('[role=status]');
+    const importFile = async file => {
+      if (!file) return;
+      try {
+        await this.uploadImage(file, targetId, original);
+        if (dialog.open) dialog.close();
+      } catch (error) { status.textContent = error.message; }
+    };
+    dialog.querySelector('[data-image-device]').onclick = () => picker.click();
+    picker.onchange = () => importFile(picker.files[0]);
+    const linkForm = dialog.querySelector('.image-search-form');
+    dialog.addEventListener('dragover', event => event.preventDefault());
+    dialog.addEventListener('drop', event => {
+      event.preventDefault();
+      const file = [...event.dataTransfer.files].find(item => item.type.startsWith('image/'));
+      if (file) { importFile(file); return; }
+      const html = new DOMParser().parseFromString(event.dataTransfer.getData('text/html'), 'text/html');
+      const url = html.querySelector('img')?.getAttribute('src') || event.dataTransfer.getData('text/uri-list').split(/\r?\n/).find(line => /^https:\/\//i.test(line));
+      if (url) { linkForm.elements.url.value = url; linkForm.requestSubmit(); }
+    });
+    dialog.addEventListener('paste', event => {
+      const file = [...event.clipboardData.files].find(item => item.type.startsWith('image/'));
+      if (file) { event.preventDefault(); importFile(file); return; }
+      const html = new DOMParser().parseFromString(event.clipboardData.getData('text/html'), 'text/html');
+      const url = html.querySelector('img')?.getAttribute('src');
+      if (url?.startsWith('https://')) { event.preventDefault(); linkForm.elements.url.value = url; linkForm.requestSubmit(); }
+    });
+    const preview = dialog.querySelector('.image-import-preview');
+    const previewImage = preview.querySelector('img');
+    const confirm = preview.querySelector('button');
+    const resetPreview = () => { preview.hidden = true; previewImage.removeAttribute('src'); };
+    linkForm.elements.url.addEventListener('input', resetPreview);
+    let pendingUrl;
+    linkForm.onsubmit = async event => {
+      event.preventDefault();
+      resetPreview();
+      try {
+        const enteredUrl = linkForm.elements.url.value.trim();
+        let url = new URL(enteredUrl);
+        if (url.origin === 'https://www.google.com' && url.pathname === '/imgres' && url.searchParams.has('imgurl')) url = new URL(url.searchParams.get('imgurl'));
+        if (url.protocol !== 'https:') { status.textContent = 'Use um link HTTPS para a imagem.'; return; }
+        status.textContent = 'Verificando imagem…';
+        const image = new Image();
+        image.src = url.href;
+        await image.decode();
+        if (!dialog.open || linkForm.elements.url.value.trim() !== enteredUrl) return;
+        pendingUrl = url;
+        previewImage.src = url.href;
+        preview.hidden = false;
+        status.textContent = '';
+      } catch { status.textContent = 'Use o endereço direto da imagem ou envie o arquivo pela galeria.'; }
+    };
+    confirm.onclick = async () => {
+      if (!pendingUrl || preview.hidden) return;
+      confirm.disabled = true;
+      status.textContent = 'Salvando imagem…';
+      try {
+        const response = await fetch(pendingUrl, {credentials:'omit', signal:AbortSignal.timeout(12000)});
+        if (!response.ok || !response.headers.get('Content-Type')?.startsWith('image/')) throw Error();
+        const blob = await response.blob();
+        if (!dialog.open) return;
+        await this.uploadImage(new File([blob], 'Imagem da web', {type:blob.type}), targetId, original);
+        if (dialog.open) dialog.close();
+      } catch {
+        status.textContent = 'Este site bloqueou o download direto ou o formato é incompatível. Copie a imagem ou salve o arquivo e envie pela galeria.';
+      } finally { confirm.disabled = false; }
+    };
+    dialog.addEventListener('close', () => dialog.remove(), {once:true});
+    document.body.append(dialog);
+    dialog.showModal();
+    if (initialUrl) { linkForm.elements.url.value = initialUrl; linkForm.requestSubmit(); }
+  }
   openImageSearch(targetId){
     document.querySelector('#storage-image-search')?.remove();
     const dialog=document.createElement('dialog');dialog.id='storage-image-search';dialog.className='storage-image-search';
     const accent=getComputedStyle(this.studio.root.querySelector('.designer-inspector')||this.studio.root).getPropertyValue('--studio-accent').trim();
     if(accent)dialog.style.setProperty('--search-accent',accent);
-    dialog.innerHTML=`<form method="dialog" class="image-search-head"><strong>Pesquisar imagens livres</strong><button aria-label="Fechar">×</button></form><form class="image-search-form"><input name="query" type="search" placeholder="Pesquise o assunto da imagem" required autofocus><button type="submit">Pesquisar</button></form><p class="image-search-status" role="status"></p><div class="image-search-results"></div><button type="button" class="image-search-more" hidden>Carregar mais imagens</button>`;
+    dialog.innerHTML=`<form method="dialog" class="image-search-head"><strong>Buscar imagens</strong><button aria-label="Fechar">×</button></form>
+      <p class="image-search-intro">Encontre a imagem certa para sua aula <span>Bing Imagens</span></p>
+      <form class="image-search-form"><input name="query" type="search" aria-label="Buscar imagens" placeholder="Ex.: Hello Kitty PNG" required autofocus><button type="submit">Pesquisar</button></form>
+      <p class="image-search-status" role="status">Pesquise pelo assunto, personagem ou objeto.</p><div class="image-search-results"></div>`;
     document.body.append(dialog);dialog.showModal();dialog.addEventListener('close',()=>dialog.remove());
-    const form=dialog.querySelector('.image-search-form'),results=dialog.querySelector('.image-search-results');const status=dialog.querySelector('.image-search-status');const more=dialog.querySelector('.image-search-more'),seen=new Set();let searchPage=0,searchTerm='',loading=false,ended=false;more.addEventListener('click',()=>form.requestSubmit());results.addEventListener('scroll',()=>{if(!loading&&!ended&&results.scrollTop+results.clientHeight>=results.scrollHeight-150){form.requestSubmit();}});
-    form.addEventListener('submit',async event=>{event.preventDefault();if(loading)return;const term=new FormData(form).get('query');if(term!==searchTerm){searchTerm=term;searchPage=0;ended=false;seen.clear();results.replaceChildren();}if(ended)return;loading=true;more.disabled=true;status.textContent='Buscando imagens…';try{const choices=await searchImageChoices(term,++searchPage);status.textContent='';if(!choices.length){ended=true;more.hidden=true;if(!results.childElementCount)status.textContent='Nenhuma imagem livre encontrada. Tente outras palavras.';return;}more.hidden=false;for(const choice of choices){if(seen.has(choice.source))continue;seen.add(choice.source);const button=document.createElement('button');button.type='button';button.className='image-search-choice';const img=document.createElement('img');img.src=choice.thumbnail;img.alt=choice.title;img.loading='lazy';img.onerror=()=>button.remove();const title=document.createElement('span');title.className='image-search-title';title.textContent=choice.title;const credit=document.createElement('span');credit.className='image-search-credit';credit.textContent=[choice.catalog,choice.license,choice.author].filter(Boolean).join(' · ');button.append(img,title,credit);if(choice.source){button.title='Abrir a origem: '+choice.source;}button.addEventListener('click',async()=>{button.disabled=true;try{const image=await importImageChoice(choice);const [assetId]=await storePages([image.data]);this.mutate(slide=>{let item=slide.elements.find(value=>value.id===targetId&&value.type==='image');if(!item){item=newElement('image');slide.elements.push(item);}item.assetId=assetId;item.image='';item.imageAlt=image.alt;item.imageSource=image.source;item.imageLicense=[image.license,image.author].filter(Boolean).join(' · ');item.imageCredit=image.catalog||'';this.selected=item.id;});dialog.close();}catch(error){this.studio.callbacks.toast(error.message);button.disabled=false;}});results.append(button);}}catch(error){status.textContent='A busca falhou. Clique em Pesquisar para tentar novamente.';searchPage=Math.max(0,searchPage-1);}finally{loading=false;more.disabled=false;}});
+    const form=dialog.querySelector('.image-search-form'),results=dialog.querySelector('.image-search-results');const status=dialog.querySelector('.image-search-status');const seen=new Set();let searchPage=0,searchTerm='',loading=false,ended=false;
+    const loadNext=()=>{if(dialog.open&&searchPage&&!loading&&!ended&&form.elements.query.value===searchTerm&&results.scrollHeight-results.scrollTop-results.clientHeight<150)form.requestSubmit();};
+    results.addEventListener('scroll', loadNext);
+    form.addEventListener('submit',async event=>{event.preventDefault();if(loading)return;const term=new FormData(form).get('query');if(term!==searchTerm){searchTerm=term;searchPage=0;ended=false;seen.clear();results.replaceChildren();}if(ended)return;loading=true;status.textContent='Buscando imagens…';try{const choices=await searchImageChoices(term,++searchPage);status.textContent='';if(!choices.length){ended=true;if(!results.childElementCount)status.textContent='Nenhuma imagem encontrada no Bing. Tente outras palavras.';return;}for(const choice of choices){if(seen.has(choice.source))continue;seen.add(choice.source);const button=document.createElement('button');button.type='button';button.className='image-search-choice';const img=document.createElement('img');img.src=choice.thumbnail;img.alt=choice.title;img.loading='lazy';img.onerror=()=>button.remove();const title=document.createElement('span');title.className='image-search-title';title.textContent=choice.title;const credit=document.createElement('span');credit.className='image-search-credit';credit.textContent=[choice.catalog,choice.license,choice.author].filter(Boolean).join(' · ');button.append(img,title,credit);if(choice.source){button.title='Abrir a origem: '+choice.source;}button.addEventListener('click',async()=>{button.disabled=true;try{const image=await importImageChoice(choice);const [assetId]=await storePages([image.data]);this.mutate(slide=>{let item=slide.elements.find(value=>value.id===targetId&&value.type==='image');if(!item){item=newElement('image');slide.elements.push(item);}item.assetId=assetId;item.image='';item.imageAlt=image.alt;item.imageSource=image.source;item.imageLicense=[image.license,image.author].filter(Boolean).join(' · ');item.imageCredit=image.catalog||'';this.selected=item.id;});dialog.close();}catch(error){this.studio.callbacks.toast(error.message);button.disabled=false;}});results.append(button);}requestAnimationFrame(loadNext);}catch(error){status.textContent='A busca falhou. Clique em Pesquisar para tentar novamente.';searchPage=Math.max(0,searchPage-1);}finally{loading=false;}});
   }
   cropDown(event,node){
     event.preventDefault();this.selected=node.dataset.objectId;this.ensure();

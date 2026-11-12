@@ -14,11 +14,6 @@
 #app .shared-refresh{align-self:center;flex:0 0 auto;display:inline-flex;align-items:center;gap:7px}
 #app .shared-refresh span{display:inline-block;font-size:15px;transition:transform .3s ease}
 #app .shared-refresh:hover span{transform:rotate(180deg)}
-#app .shared-stats{display:flex;align-items:center;gap:16px;flex-wrap:wrap;font-size:12px;color:var(--studio-muted,#847590)}
-#app .shared-stats>span{display:inline-flex;align-items:center;gap:6px;padding:7px 13px;border:1px solid var(--studio-line,#e8e0ef);border-radius:999px;background:color-mix(in srgb,var(--studio-panel,#fff) 80%,transparent)}
-#app .shared-stats strong{font-size:14px;color:var(--studio-ink,#322442)}
-#app .shared-live i{width:7px;height:7px;border-radius:50%;background:#54bd8b;box-shadow:0 0 0 4px #54bd8b26;animation:shared-pulse 2s ease-in-out infinite}
-@keyframes shared-pulse{50%{box-shadow:0 0 0 7px #54bd8b0d}}
 #app .shared-message:empty{display:none}
 #app .shared-message{font-size:12px;color:var(--studio-muted,#847590);margin:0}
 #app .shared-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(255px,1fr));gap:clamp(14px,1.8vw,20px)}
@@ -42,10 +37,6 @@
 #app .shared-empty>span svg{width:30px;height:30px}
 #app .shared-empty strong{font-size:17px;letter-spacing:-.4px;color:var(--studio-ink,#322442)}
 #app .shared-empty p{max-width:40ch;font-size:12.5px;line-height:1.65;color:var(--studio-muted,#847590)}
-html[data-appearance=dark] #app .shared-hero{background:radial-gradient(ellipse at 4% 0,color-mix(in srgb,var(--studio-accent,#bda7f4) 22%,transparent),transparent 58%),linear-gradient(155deg,#26242f,#211e2b)}
-html[data-appearance=dark] #app .shared-card{background:#26242f}
-html[data-appearance=dark] #app .shared-card-art{background:radial-gradient(ellipse at 30% 15%,color-mix(in srgb,var(--studio-accent,#bda7f4) 26%,transparent),transparent 62%),linear-gradient(140deg,#2c2938,#241f30)}
-html[data-appearance=dark] #app .shared-card-art i{background:#332e3fdd;color:#d9c6f6}
 @media(max-width:760px){
   #app .shared-page{padding:14px 0 54px}
   #app .shared-hero{flex-wrap:wrap;padding:18px 17px;border-radius:22px}
@@ -60,4 +51,34 @@ html[data-appearance=dark] #app .shared-card-art i{background:#332e3fdd;color:#d
   #app .shared-card-copy strong{font-size:13px}
   #app .shared-card-art{aspect-ratio:4/3}
   #app .shared-card-mark{width:42px;height:42px;border-radius:13px}
+}
+
+/* Cabeçalho curto e cartões em lista, com contraste nos dois modos. */
+#app .shared-page{gap:14px}
+html #app .shared-hero{
+  flex-wrap:nowrap;
+  align-items:center;
+  gap:14px;
+  padding:16px 18px;
+  background:linear-gradient(105deg,color-mix(in srgb,var(--ui-accent) 12%,var(--ui-panel)),var(--ui-panel));
+  border:1px solid var(--ui-line);
+  border-radius:16px;
+}
+#app .shared-hero::after{display:none}
+#app .shared-hero-mark{width:42px;height:42px;border-radius:12px;color:var(--ui-ink);background:var(--ui-soft);box-shadow:none}
+#app .shared-hero-mark svg{width:21px;height:21px}
+#app .shared-hero-copy h1{margin:0;font-size:clamp(18px,3vw,29px);letter-spacing:-.03em;color:var(--ui-ink)}
+#app .shared-hero-copy p{margin:4px 0 0;color:var(--ui-muted)}
+#app .shared-grid{grid-template-columns:repeat(auto-fit,minmax(min(100%,290px),1fr));gap:10px}
+html #app .shared-card{display:grid;grid-template-columns:92px minmax(0,1fr);background:var(--ui-panel);color:var(--ui-ink);border-color:var(--ui-line);min-height:94px}
+html #app .shared-card-art{aspect-ratio:auto;align-self:stretch;background:var(--ui-soft)}
+#app .shared-card-art i{display:none}
+#app .shared-card-mark{width:36px;height:36px;background:transparent;color:var(--ui-ink);box-shadow:none}
+#app .shared-card-copy{padding:12px}
+#app .shared-card-copy small{color:var(--ui-muted)}
+#app .shared-card-open{padding-top:3px}
+@media(max-width:420px){
+  #app .shared-hero{padding:12px;gap:9px}
+  #app .shared-refresh{padding-inline:8px;font-size:11px}
+  #app .shared-hero-mark{width:34px;height:34px}
 }

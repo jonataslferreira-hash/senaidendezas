@@ -1,3 +1,4 @@
+import { createUuid } from './uuid.js';
 import { shapeFields } from './shapes.js';
 import { validateAudio } from './audio-data.js';
 import { validateCustomModel } from './model-files.js';
@@ -87,7 +88,7 @@ export function slideBackground(slide) {
 const number = (v, fallback) => Number.isFinite(Number(v)) ? Number(v) : fallback;
 export const imageZoomValue = value => Math.max(.001, number(value, 1));
 export function newElement(type, overrides = {}) {
-  return { id: crypto.randomUUID(), type, simulation:'projectile', x: 8, y: 15, w: type === 'text' ? 65 : 42, h: type === 'text' ? 18 : 60,
+  return { id: createUuid(), type, simulation:'projectile', x: 8, y: 15, w: type === 'text' ? 65 : 42, h: type === 'text' ? 18 : 60,
     text: 'Escreva sua ideia', role: '', fontSize: 36,fontFamily:'Arial',italic:false,rotation:0,verticalAlign:'start',textPadding:[0,0,0,0], color: '#f1eaff', bold: false, align: 'left', background: '#b7a0e8', image: '', imageAlt: '', imageZoom:1,imageX:0,imageY:0, model: 'ssd', modelLabel: '', modelDescription: '', modelDetailsHidden:false, customModel: null, locked: false, ...overrides };
 }
 export function normalizeElements(elements, draft, validateImage) {
@@ -97,8 +98,8 @@ export function normalizeElements(elements, draft, validateImage) {
   return elements.map(e => {
     if (!e || !['text', 'image', 'model', 'shape','simulation'].includes(e.type)) throw Error('O slide contém um elemento inválido.');
     const w = Math.max(.1, Math.min(1000, number(e.w, 40))), h = Math.max(.1, Math.min(1000, number(e.h, 20)));
-    let id = typeof e.id === 'string' && /^[a-zA-Z0-9_-]{1,100}$/.test(e.id) ? e.id : crypto.randomUUID();
-    if (ids.has(id)) id = crypto.randomUUID(); ids.add(id);
+    let id = typeof e.id === 'string' && /^[a-zA-Z0-9_-]{1,100}$/.test(e.id) ? e.id : createUuid();
+    if (ids.has(id)) id = createUuid(); ids.add(id);
     const assetId = typeof e.assetId === 'string' && /^asset-[a-f0-9-]{36}$/.test(e.assetId) ? e.assetId : '';
     const image = validateImage(e.image), customModel = validateCustomModel(e.customModel, draft);
     if (!draft && e.type === 'image' && !image && !assetId) throw Error('Carregue a imagem do elemento antes de apresentar.');

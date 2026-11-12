@@ -1,3 +1,4 @@
+import { createUuid } from './uuid.js';
 import Peer from 'peerjs';
 import { Room } from './room.js';
 import { compactLesson, hydrateLesson } from './assets.js';
@@ -155,10 +156,10 @@ export class Classroom {
     this.broadcast();
   }
   async updateProfile(name,avatar){await this.request('profile',{name,avatar});this.name=name;this.avatar=avatar;const saved=playerStorage.get('sl-player-'+this.code);playerStorage.set('sl-player-'+this.code,{...saved,name,avatar});const mode={host:false,code:this.code,name,avatar};playerStorage.set('sl-active-player',mode);storage.set('sl-mode',mode);}
-  request(type,payload){if(!this.conn?.open)return Promise.reject(Error('Aguarde a reconexão.'));const request=crypto.randomUUID();return new Promise((resolve,reject)=>{const timeout=setTimeout(()=>{this.pending.delete(request);reject(Error('Não recebemos confirmação.'));},7000);this.pending.set(request,{resolve,reject,timeout});this.conn.send({type,payload,request});});}
+  request(type,payload){if(!this.conn?.open)return Promise.reject(Error('Aguarde a reconexão.'));const request=createUuid();return new Promise((resolve,reject)=>{const timeout=setTimeout(()=>{this.pending.delete(request);reject(Error('Não recebemos confirmação.'));},7000);this.pending.set(request,{resolve,reject,timeout});this.conn.send({type,payload,request});});}
   answer(choice, questionIndex) {
     if (!this.conn?.open) return Promise.reject(Error('Reconectando à sala. Aguarde.'));
-    const request = crypto.randomUUID();
+    const request = createUuid();
     return new Promise((resolve, reject) => {
       const timeout = setTimeout(() => { this.pending.delete(request); reject(Error('Não recebemos confirmação. Verifique a conexão.')); }, 5000);
       this.pending.set(request, { resolve, reject, timeout });

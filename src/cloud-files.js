@@ -1,3 +1,4 @@
+import { createUuid } from './uuid.js';
 import { packLesson, unpackLesson } from './file-codec.js';
 export const r2ApiUrl = (import.meta.env?.VITE_R2_API_URL || '').replace(/\/$/, '');
 export const cloudConfigured = true;
@@ -18,7 +19,7 @@ function cloudError(error) {
   return Error('Não foi possível acessar a nuvem. Confira a conexão, a sessão e o espaço disponível.');
 }
 export async function saveCloudLesson(client, lesson, cover = '') {
-  const s = await authenticated(client), id = /^[a-zA-Z0-9_-]{1,100}$/.test(lesson.id) ? lesson.id : crypto.randomUUID();
+  const s = await authenticated(client), id = /^[a-zA-Z0-9_-]{1,100}$/.test(lesson.id) ? lesson.id : createUuid();
   const packed = await packLesson(lesson); unchanged(s);
   const blob = new Blob([packed.buffer], { type: packed.compressed ? 'application/gzip' : 'application/json' });
   if (blob.size > MAX_CLOUD_BYTES) throw Error('A aula ultrapassa 50 MB. Divida os arquivos antes de enviar.');

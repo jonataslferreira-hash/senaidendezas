@@ -27,10 +27,11 @@ async function workerHeaders(){
 }
 
 async function workerJson(path){
-  const headers=await workerHeaders();
+  const local=import.meta.env.DEV;
+  const headers=local?{}:await workerHeaders();
   if(!headers)return null;
   try{
-    const response=await fetch(r2ApiUrl+path,{headers,signal:AbortSignal.timeout(WORKER_TIMEOUT)});
+    const response=await fetch((local?'':r2ApiUrl)+path,{headers,signal:AbortSignal.timeout(WORKER_TIMEOUT)});
     if(!response.ok)return null;
     return await response.json();
   }catch{return null;}
@@ -174,7 +175,7 @@ const translationPatterns=imageQueryTranslations.map(([portuguese,english])=>({
   pattern:new RegExp('(?<![\\p{L}\\p{N}])'+portuguese.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')+'(?![\\p{L}\\p{N}])','giu')
 }));
 export function expandImageQuery(query){
-  let text=String(query||'');
+  let text=String(query||'').replace(/\b(hello kitty)\s+(?:personagem|character)\b/gi,'$1');
   for(const {pattern,english} of translationPatterns)text=text.replace(pattern,english);
   return text.replace(/\s+/g,' ').trim();
 }
@@ -372,45 +373,15 @@ export async function searchImageChoices(query,page=1){
     .filter(item=>!logo||!subjects.length||(item.match>0&&isLogoTitle(item.choice.title)))
     .sort((a,b)=>b.relevance-a.relevance||b.choice.score-a.choice.score||b.match-a.match||Number(b.logo)-Number(a.logo)||a.index-b.index)
     .map(item=>item.choice);
-  const worker=await workerJson('/storage-ai/images?q='+encodeURIComponent(term)+'&page='+String(page)+'&limit=24');
+  const worker=await workerJson('/storage-ai/images?source=bing&q='+encodeURIComponent(term)+'&page='+String(page)+'&limit=24');
   if(worker?.items?.length){
     const choices=worker.items.map(choiceFromWorker).filter(choice=>choice.thumbnail&&choice.url&&choice.source);
     const ranked=relevant(choices);
-    if(ranked.length)return ranked;
+    return ranked;
   }
-  let openChoices=[];
-  try {
-    const params=new URLSearchParams({q:term,license:'cc0,pdm,by,by-sa',page_size:'40',page:String(page),mature:'false'});
-    const response=await fetch('https://api.openverse.org/v1/images/?'+params,{signal:AbortSignal.timeout(12000)});
-    if(!response.ok)throw Error('A busca de imagens está indisponível agora.');
-    const payload=await response.json();
-    const choices=(payload.results||[]).filter(item=>/^https:\/\//.test(item.thumbnail||'')&&/^https:\/\//.test(item.foreign_landing_url||'')&&(['cc0','pdm'].includes(item.license)||item.creator)).map(item=>({title:(item.title||term).replace(/^File:/i,'').replace(/_/g,' '),thumbnail:item.thumbnail,url:item.url,source:item.foreign_landing_url,author:item.creator||'',license:item.license,licenseUrl:item.license_url||'',catalog:'Openverse'}));
-    openChoices=choices;
-  } catch {
-    // Commons é independente do limite do Openverse.
-  }
-  const params=new URLSearchParams({
-    action:'query',format:'json',formatversion:'2',origin:'*',generator:'search',
-    gsrsearch:term+(logo?'':' filetype:bitmap'),gsrnamespace:'6',gsrlimit:'24',gsroffset:String((page-1)*24),
-    prop:'imageinfo',iiprop:'url|extmetadata',iiurlwidth:'480',
-    iiextmetadatafilter:'License|LicenseShortName|AttributionRequired|Artist|Attribution'
-  });
-  try {
-    const response=await fetch('https://commons.wikimedia.org/w/api.php?'+params,{signal:AbortSignal.timeout(8000)});
-    if(!response.ok)throw Error('A busca de imagens está indisponível agora.');
-    const payload=await response.json();
-    const commons=(payload.query?.pages||[]).sort((a,b)=>a.index-b.index).flatMap(item=>{
-    const info=item.imageinfo?.[0];
-    if(!info||documentFile.test(item.title||'')||/^(?:application\/|image\/(?:vnd\.djvu|tiff|x-tiff|x-ms-bmp))/i.test(info.mime||''))return [];
-    const credit=imageCredit(info);
-    if(!credit||!info.thumburl)return [];
-    return [{title:item.title.replace(/^File:/,'').replace(/_/g,' '),thumbnail:info.thumburl,url:info.thumburl,...credit,catalog:'Wikimedia Commons'}];
-    });
-    return relevant([...new Map([...openChoices,...commons].map(choice=>[choice.source,choice])).values()]);
-  }catch(error){
-    if(openChoices.length)return relevant(openChoices);
-    throw error;
-  }
+  if(worker)return [];
+  throw Error('Não foi possível consultar o Bing. Tente novamente em instantes.');
+
 }
 
 export async function importImageChoice(choice){

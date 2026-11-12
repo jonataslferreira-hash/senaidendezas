@@ -1,3 +1,4 @@
+import { createUuid } from './uuid.js';
 import { r2ApiUrl } from './cloud-files.js';
 import { packLesson, unpackLesson } from './file-codec.js';
 export async function rpc(client,name,args) {
@@ -19,4 +20,4 @@ export async function groupRequest(client,path,options={}){
 }
 export async function getDocument(client,id){const {data,error}=await client.from('sl_group_documents').select('*').eq('id',id).single();if(error||!data)throw Error('Documento indisponível para esta conta.');return data;}
 export async function getSnapshot(client,row){const response=await groupRequest(client,`/groups/${row.group_id}/${row.revision}`);const payload=await unpackLesson(await response.blob());if(payload.format!=='sl-yjs-v1'||typeof payload.state!=='string')throw Error('Documento colaborativo inválido.');return payload;}
-export async function putSnapshot(client,groupId,payload){const packed=await packLesson(payload),revision=crypto.randomUUID();const blob=new Blob([packed.buffer],{type:packed.compressed?'application/gzip':'application/json'});if(blob.size>50*1024*1024)throw Error('A aula compartilhada ultrapassa 50 MB.');await groupRequest(client,`/groups/${groupId}/${revision}`,{method:'PUT',body:blob,headers:{'Content-Type':blob.type}});return revision;}
+export async function putSnapshot(client,groupId,payload){const packed=await packLesson(payload),revision=createUuid();const blob=new Blob([packed.buffer],{type:packed.compressed?'application/gzip':'application/json'});if(blob.size>50*1024*1024)throw Error('A aula compartilhada ultrapassa 50 MB.');await groupRequest(client,`/groups/${groupId}/${revision}`,{method:'PUT',body:blob,headers:{'Content-Type':blob.type}});return revision;}

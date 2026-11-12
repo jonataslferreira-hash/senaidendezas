@@ -1,3 +1,4 @@
+import { createUuid } from './uuid.js';
 const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const commands=new Set(['previous','next-slide','next-stage','quiz','start-quiz','reveal','next-question','back-lesson','finish','poll','close-poll']);
 export function remoteConnectionMessage(state,error,online=true){
@@ -9,7 +10,7 @@ export function remoteConnectionMessage(state,error,online=true){
  return 'A conexão do controle foi interrompida. Tentando reconectar…';
 }
 export class AccountPresenter{
- constructor(studio){this.studio=studio;this.device=crypto.randomUUID();this.sessions=[];this.epoch=0;this.open='';this.status='';studio.root.addEventListener('account-changed',()=>this.connect());studio.root.addEventListener('click',e=>{const b=e.target.closest('[data-remote-action]');if(b)this.action(b).catch(error=>{this.status=error.message;this.paint();});});queueMicrotask(()=>this.connect());}
+ constructor(studio){this.studio=studio;this.device=createUuid();this.sessions=[];this.epoch=0;this.open='';this.status='';studio.root.addEventListener('account-changed',()=>this.connect());studio.root.addEventListener('click',e=>{const b=e.target.closest('[data-remote-action]');if(b)this.action(b).catch(error=>{this.status=error.message;this.paint();});});queueMicrotask(()=>this.connect());}
  async connect(force=false){
   const owner=this.studio.account.user?.id;
   if(!force&&owner&&owner===this.owner&&(this.channel||this.connecting))return;

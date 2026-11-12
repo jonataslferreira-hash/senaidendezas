@@ -205,8 +205,11 @@ function shareDialog() {
   return `<div class="modal-backdrop"><section class="share-modal" role="dialog" aria-modal="true" aria-labelledby="share-title"><button class="icon-btn close-modal" data-action="close-share" aria-label="Fechar convite">${icon('close')}</button><span class="eyebrow purple-text">A AULA FICA MELHOR JUNTO</span><h2 id="share-title">Conecte a turma<span>.</span></h2><p>Aponte a câmera. Escolha um avatar. Entre na aula.</p><div class="qr-wrap"><img id="room-qr" width="230" height="230" alt="QR Code para entrar nesta sala"></div><span class="eyebrow">OU ENTRE COM O CÓDIGO</span><div class="big-code">${esc(state.code.slice(0, 3))}<span> </span>${esc(state.code.slice(3))}</div><div class="share-link"><input readonly aria-label="Link de convite" value="${esc(url)}"><button class="icon-btn" data-action="copy-link" aria-label="Copiar link">${icon('copy')}</button></div>${import.meta.env.DEV&&/^(localhost|127\.0\.0\.1)$/.test(location.hostname)&&!routeParams().has('localSignal')?`<details><summary>Configurar endereço público</summary><label for="public-url">URL publicada no GitHub Pages</label><input id="public-url" type="url" placeholder="https://usuario.github.io/senaidendezas/"><button class="btn secondary small" data-action="save-url">Salvar endereço</button></details>`:''}</section></div>`;
 }
 function render() {
+  const slideMotionKey = state?.phase === 'lesson' ? `${activeLesson.id}:${state.code}:${state.slide}` : '';
+  const outgoingSlide = pageMotion.captureSlide(app, slideMotionKey, slides[state?.slide]?.transition);
   const previousOutline=app.querySelector('.editor-outline');
   const outlineScroll=previousOutline?.scrollTop;
+  const previewsScroll=app.querySelector('.mobile-slide-previews')?.scrollLeft;
   const outlineLesson=previousOutline?.closest('[data-outline-lesson]')?.dataset.outlineLesson;
   studio.editorMusic.setEditing(!state && studio.view === 'editor');
   const form = document.querySelector('#join-form');
@@ -256,6 +259,8 @@ function render() {
   syncPresentationMode();
   if (editDraft) for (const el of app.querySelectorAll('.header, .classroom, .document-classroom, .presentation-toolbar, .pinned-room-qr')) el.inert = true;
   if (!state && !sharedLoading && !(busy && host)) studio.afterRender();
+  const nextPreviews=app.querySelector('.mobile-slide-previews');
+  if(nextPreviews&&previewsScroll!=null&&outlineLesson===app.querySelector('[data-outline-lesson]')?.dataset.outlineLesson)nextPreviews.scrollLeft=previewsScroll;
   const nextOutline=app.querySelector('.editor-outline');
   if(nextOutline&&outlineScroll!=null&&outlineLesson===nextOutline.closest('[data-outline-lesson]')?.dataset.outlineLesson){
     nextOutline.scrollTop=outlineScroll;
@@ -278,6 +283,7 @@ function render() {
     ? `${activeLesson.id}:${state.phase}:${state.slide}:${state.questionIndex}`
     : studio.view==='editor'?`editor:${studio.draft?.id||''}`:studio.view;
   pageMotion.mount(app, {key:motionKey,kind:state?.phase||studio.view,slide:state?.slide||0});
+  pageMotion.showOutgoingSlide(app, outgoingSlide);
   gameLayout.mount(app);
   updateClock();
   const ticking = ['question', 'countdown'].includes(state?.phase);
@@ -643,6 +649,24 @@ import './interface-system.css';
 
 app.addEventListener('pointerdown',e=>{gameAudio.unlock();if(document.fullscreenElement&&(e.clientY<48||e.target.closest('.document-top')))showPresentationControls();});
 
+// Navigate only deliberate taps; model dragging and interactive controls keep
+// their own gestures and never advance the presentation.
+let slideTap=null;
+app.addEventListener('pointerdown',e=>{
+  slideTap=null;
+  if(!document.fullscreenElement||state?.phase!=='lesson'||!host||e.pointerType!=='touch')return;
+  if(!e.target.closest('.document-stage')||e.target.closest('button,a,input,select,textarea,[contenteditable],.canvas-model-slot,.mobile-model-slot,[data-play-slide-audio]'))return;
+  slideTap={id:e.pointerId,x:e.clientX,y:e.clientY};
+});
+app.addEventListener('pointerup',e=>{
+  const tap=slideTap;slideTap=null;
+  if(!tap||tap.id!==e.pointerId||Math.hypot(e.clientX-tap.x,e.clientY-tap.y)>12||!document.fullscreenElement||state?.phase!=='lesson')return;
+  const stage=app.querySelector('.document-stage');if(!stage)return;
+  const rect=stage.getBoundingClientRect();
+  action(e.clientX<rect.left+rect.width/2?'previous':'next-slide');
+});
+app.addEventListener('pointercancel',()=>{slideTap=null;});
+
 import './editor-refinement.css';
 
 import './workspace-controls.css';
@@ -657,3 +681,4 @@ app.addEventListener('profile-updated',()=>{
 app.addEventListener('account-changed',()=>{avatarChanged=false;joinNameTouched=false;joinNameDraft='';selectedAvatar=avatars[0];if(!state&&studio.view==='join')queueMicrotask(render);});
 
 import './account-live.css';
+import './workspace-styles.css';

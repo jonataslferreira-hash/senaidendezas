@@ -1,3 +1,4 @@
+import { createUuid } from './uuid.js';
 import {activityBlocks} from './activity-blocks.js';
 import {isPhotoAvatar} from './player-avatar.js';
 import { avatars, defaultQuestions } from './content.js';
@@ -5,7 +6,7 @@ import { demoLesson, validateLesson } from './lessons.js';
 
 export const questions = defaultQuestions;
 
-export const newToken = () => crypto.randomUUID();
+export const newToken = () => createUuid();
 export class Room {
   constructor(code, saved, now = Date.now, lesson = demoLesson(), startIndex) {
     this.now = now;

@@ -1,4 +1,5 @@
 import { defineConfig } from 'vite';
+import { handleStorageAIImages } from './cloudflare/storage-ai-images-worker.js';
 import { cpSync, mkdirSync, readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
@@ -10,6 +11,14 @@ export default defineConfig({
   plugins: [{
     name: 'local-pdf-assets',
     configureServer(server) {
+      server.middlewares.use('/storage-ai/images', async (req, res) => {
+        try {
+          const result = await handleStorageAIImages(new Request('http://localhost/storage-ai/images' + (req.url || ''), {method: req.method}), {}, null, {});
+          res.statusCode = result.status;
+          result.headers.forEach((value, key) => res.setHeader(key, value));
+          res.end(Buffer.from(await result.arrayBuffer()));
+        } catch { res.statusCode = 502; res.end(JSON.stringify({error:'search_unavailable',items:[]})); }
+      });
       server.middlewares.use('/model-codecs', (req, res, next) => {
         const match = /^\/(draco|basis)\/([a-zA-Z0-9_.-]+)$/.exec((req.url || '').split('?')[0]);
         if (!match) return next();

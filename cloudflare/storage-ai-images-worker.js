@@ -190,9 +190,9 @@ function bingSized(url, width, height) {
   return url + (url.includes('?') ? '&' : '?') + 'w=' + width + '&h=' + height + '&c=7&rs=1&qlt=90';
 }
 
-async function bingSearch(query, limit) {
+async function bingSearch(query, limit, page = 1) {
   const params = new URLSearchParams({
-    q: query, first: '1', count: String(Math.min(35, Math.max(limit, 12))), mmasync: '1', adlt: 'off'
+    q: query, first: String((page - 1) * limit + 1), count: String(Math.min(35, Math.max(limit, 12))), mmasync: '1', adlt: 'moderate'
   });
   const response = await fetch('https://www.bing.com/images/async?' + params, {
     headers: { Accept: 'text/html,application/xhtml+xml', 'User-Agent': BROWSER_USER_AGENT, 'Accept-Language': 'pt-BR,pt;q=0.9,en;q=0.7' },
@@ -363,10 +363,14 @@ async function cached(key, loader) {
   return value;
 }
 
-async function searchImages(query, page, limit, { transparent = false } = {}) {
+async function searchImages(query, page, limit, { transparent = false, bingOnly = false } = {}) {
   const term = clip(query, MAX_QUERY);
-  const key = encodeURIComponent(term.toLowerCase()) + '-' + page + '-' + limit + (transparent ? '-png' : '');
+  const key = 'v3-' + (bingOnly ? 'bing-' : '') + encodeURIComponent(term.toLowerCase()) + '-' + page + '-' + limit + (transparent ? '-png' : '');
   return cached(key, async () => {
+    if (bingOnly) {
+      const items = await bingSearch(term, limit, page);
+      return {query: term, page, items, total: page * limit + (items.length ? 1 : 0)};
+    }
     const queryTokens = tokens(term).filter(token => token.length > 1 && !STOP_WORDS.has(token));
     const wantsIcon = queryTokens.some(token => ['logo', 'logotipo', 'logomarca', 'icon', 'icone', 'simbolo', 'symbol'].includes(token));
     // Uma segunda busca sem preposições encontra o artigo do assunto quando o
@@ -374,7 +378,7 @@ async function searchImages(query, page, limit, { transparent = false } = {}) {
     const meaningful = tokens(term).filter(token => token.length > 3 && !GENERIC_TOKENS.has(token) && !STOP_WORDS.has(token));
     const alternate = meaningful.length >= 2 ? meaningful.join(' ') : '';
     const [bing, commons, wiki, wikiEn, openverse, commonsAlt, wikiAlt, wikiEnAlt] = await Promise.allSettled([
-      bingSearch(term, 30),
+      bingSearch(term, limit, page),
       commonsSearch(term, 30),
       wikipediaSearch(term, 6, 'pt.wikipedia.org'),
       wikipediaSearch(term, 6, 'en.wikipedia.org'),
@@ -402,8 +406,10 @@ async function searchImages(query, page, limit, { transparent = false } = {}) {
       .map(item => ({ ...item, score: scoreItem(item, queryTokens, { transparent, wantsIcon }) }))
       .sort((a, b) => b.score - a.score || (b.width * b.height) - (a.width * a.height));
     const unique = dedupe(ranked);
+    const web = unique.filter(item => item.catalog === 'Bing Imagens');
     const start = (page - 1) * limit;
-    return { query: term, page, items: unique.slice(start, start + limit).map(({ fileTitle, ...item }) => item), total: unique.length };
+    const selected = web.length ? web.slice(0, limit) : unique.slice(start, start + limit);
+    return { query: term, page, items: selected.map(({ fileTitle, ...item }) => item), total: web.length ? page * limit + (web.length >= limit ? 1 : 0) : unique.length };
   });
 }
 
@@ -465,7 +471,7 @@ export async function handleStorageAIImages(request, env, user, headers) {
   const transparent = url.searchParams.get('transparent') === '1';
   if (!query) return json({ error: 'invalid_query', items: [] }, 400);
   try {
-    const result = await searchImages(query, page, limit, { transparent });
+    const result = await searchImages(query, page, limit, { transparent, bingOnly: url.searchParams.get('source') === 'bing' });
     return json(result, 200, { 'Cache-Control': 'private, max-age=300' });
   } catch {
     return json({ error: 'search_unavailable', items: [] }, 502);

@@ -1,3 +1,4 @@
+import { createUuid } from './uuid.js';
 // Imported pages live in IndexedDB; the lightweight library stays in localStorage.
 let database;
 const cache = new Map();
@@ -13,7 +14,7 @@ function openDatabase() {
 }
 export async function storePages(images) {
   const db = await openDatabase();
-  const entries = images.map(image => ({ id: 'asset-' + crypto.randomUUID(), image }));
+  const entries = images.map(image => ({ id: 'asset-' + createUuid(), image }));
   await new Promise((resolve, reject) => {
     const tx = db.transaction('pages', 'readwrite');
     for (const entry of entries) tx.objectStore('pages').put(entry);

@@ -1,10 +1,12 @@
 /* Student screens have their own reading and touch layout. Authored slide colors stay intact. */
 .student-expand{display:block;margin:12px auto;border:1px solid #a88acb55;background:#bda1e51a;border-radius:12px;color:#9872b8;font:inherit;padding:12px 18px;min-height:44px;cursor:pointer}
 
-/* Atalhos junto à marca e perfil no rodapé da navegação. */
-#app .studio-rail .rail-quick-actions{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px;margin:14px 0 0}
+/* Atalhos e perfil no rodapé da navegação. */
+#app .studio-rail .rail-footer{margin-top:auto;padding-top:14px}
+#app .studio-rail .rail-quick-actions{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px;margin:0 0 12px}
 #app .studio-rail .rail-quick-actions .studio-btn{display:flex;flex-direction:column;justify-content:center;align-items:center;gap:5px;min-height:58px;min-width:0;padding:7px 4px;text-align:center;font-size:11px;line-height:1.2}
-#app .studio-rail .rail-profile{margin-top:auto;padding:14px 6px 8px;border-top:1px solid var(--studio-line,#ffffff12)}
+#app .studio-rail .rail-profile{padding:12px 0 8px;border-top:1px solid var(--studio-line,#ffffff12)}
+#app .studio-rail .rail-profile .studio-account-button{width:100%;max-width:none;justify-content:flex-start;box-sizing:border-box}
 .studio-topbar{display:none}
 .studio-topbar .studio-wordmark{min-width:0}
 .studio-topbar [data-account-profile]{margin-left:auto;min-width:0}
@@ -143,4 +145,246 @@ html[data-appearance=light] #app[data-role=student] .callout p{color:#6d5287}
 }
 @media(prefers-reduced-motion:reduce){
   #app :is(.lesson-card,.shared-card,.outline-item){animation:none!important}
+}
+
+/* No celular, o slide ocupa a área central e os ajustes abrem por cima. */
+#app .editor-shell :is(.mobile-editor-actions,.mobile-inspector-open,.mobile-inspector-close){display:none}
+@media(max-width:900px){
+  html body #app .editor-shell .studio-editor:has(.visual-workspace){
+    height:100dvh;
+    min-height:0;
+    overflow:clip;
+    display:flex;
+    flex-direction:column;
+    box-sizing:border-box;
+  }
+  html body #app .editor-shell .editor-command-row{
+    flex:0 0 auto;
+    overflow:visible;
+    justify-content:space-between;
+  }
+  #app .editor-shell .mobile-editor-actions,
+  #app .editor-shell .designer-toolbar .mobile-inspector-open,
+  #app .editor-shell .mobile-inspector-close{display:inline-flex;align-items:center;justify-content:center;min-height:40px}
+  html body #app .editor-shell .editor-top-actions{
+    display:none;
+    position:fixed;
+    inset:108px 10px auto;
+    z-index:39;
+    max-height:calc(100dvh - 180px);
+    overflow:auto;
+    padding:12px;
+    border:1px solid var(--ui-line);
+    border-radius:16px;
+    background:var(--ui-panel);
+    box-shadow:0 12px 35px #0004;
+  }
+  html body #app .editor-shell .mobile-editor-actions[aria-expanded=true]+.editor-top-actions{display:grid;grid-template-columns:minmax(0,1fr)}
+  #app .editor-shell .editor-top-actions :is(details,summary,.studio-btn){width:100%;box-sizing:border-box}
+  #app .editor-shell .editor-top-actions details>div{position:static;min-width:0;box-shadow:none}
+  html body #app .editor-shell .editor-context>[data-editor-music]{display:block}
+  #app .editor-shell .editor-context .editor-music{display:flex;align-items:center;gap:4px;min-width:0}
+  #app .editor-shell .editor-context .editor-music :is(.music-info,.music-record,.music-controls button:not([data-music-play])){display:none}
+  #app .editor-shell .editor-context .editor-music .music-cover-button,
+  #app .editor-shell .editor-context .editor-music [data-music-play]{width:34px;height:36px;min-width:34px;min-height:36px;padding:3px}
+  #app .editor-shell .editor-context .editor-music .music-cover-button img{width:100%;height:100%;object-fit:cover}
+  html body #app .editor-shell .visual-workspace{flex:1;min-height:0}
+  html body #app .editor-shell .visual-workspace .editor-form-area,
+  html body #app .editor-shell .visual-workspace .slide-designer,
+  html body #app .editor-shell .visual-workspace .designer-workspace{flex:1;min-height:0;display:flex;flex-direction:column}
+  html body #app .editor-shell .visual-workspace .designer-stage-wrap{
+    flex:1;
+    display:flex!important;
+    flex-direction:column;
+    justify-content:center;
+    container-type:size!important;
+  }
+  html body #app .editor-shell .designer-stage{
+    flex:none;
+    align-self:center;
+    width:min(100%,calc(max(36px,100cqh - 38px) * var(--slide-aspect,1.777778)));
+  }
+  html body #app .editor-shell .designer-inspector{
+    display:none;
+    position:fixed;
+    inset:auto 8px calc(64px + env(safe-area-inset-bottom)) 8px;
+    z-index:38;
+    margin:0;
+    max-height:min(46dvh,420px);
+    overflow:auto;
+    overscroll-behavior:contain;
+  }
+  html body #app .editor-shell .designer-inspector:is([data-mobile-panel="element"],[data-mobile-panel="slide"],:has(.storage-ai-inspector)){display:block}
+  #app .editor-shell .designer-inspector[data-mobile-panel="element"] :is(.designer-notes,.designer-slide-activities),
+  #app .editor-shell .designer-inspector:has(.storage-ai-inspector) .mobile-inspector-close{display:none}
+  #app .editor-shell .mobile-inspector-close{float:right;width:40px;margin:0 0 6px 8px}
+  html body #app .editor-shell .editor-heading{flex:0 0 auto}
+}
+
+.music-panel-transport{display:none}
+@media(max-width:900px){
+  #app .editor-shell .music-panel-transport{display:flex;gap:8px;margin-block:8px}
+  #app .editor-shell .music-panel-transport button{min-width:44px;min-height:40px;display:grid;place-items:center}
+  html body #app .editor-shell .designer-stage{max-height:none;margin:0}
+}
+
+/* The editor canvas and its tools each have a dedicated row on touch screens. */
+#app .editor-shell :is(.mobile-object-tools,.mobile-action-label,.mobile-actions-heading){display:none}
+@media(max-width:900px){
+  html[data-ui-style] body #app .editor-shell .studio-editor:has(.slide-designer){
+    padding:0;
+    background:var(--ui-base);
+  }
+  html[data-ui-style] body #app .editor-shell .editor-heading{
+    min-height:54px;
+    padding:6px 10px;
+    margin:0;
+    gap:6px!important;
+  }
+  html[data-ui-style] body #app .editor-shell .editor-heading>div:first-child{min-width:0;width:0;gap:7px}
+  html[data-ui-style] body #app .editor-shell .editor-heading .editor-group-presence{display:none}
+  html[data-ui-style] body #app .editor-shell .editor-context,
+  html[data-ui-style] body #app .editor-shell .editor-context .editor-music{flex-wrap:nowrap!important;gap:4px}
+  html[data-ui-style] body #app .editor-shell .editor-context [data-account-profile]{display:flex;flex:none}
+  html[data-ui-style] body #app .editor-shell .editor-context .studio-account-button{padding:4px 6px;min-height:40px}
+  html[data-ui-style] body #app .editor-shell .editor-context .studio-account-button:not(:has(.profile-avatar))>span:last-child{display:block}
+  html[data-ui-style] body #app .editor-shell .editor-command-row{padding:4px 10px}
+  html[data-ui-style] body #app .editor-shell .editor-tabs{
+    flex:0 1 auto;min-width:0;overflow-x:auto;scrollbar-width:none
+  }
+  html[data-ui-style] body #app .editor-shell .mobile-editor-actions{flex:none;min-width:44px;font-size:20px;line-height:1;padding:0 10px}
+  html[data-ui-style] body #app .editor-shell .editor-top-actions{
+    inset:102px 10px auto;
+    max-width:420px;
+    margin-left:auto;
+    max-height:calc(100dvh - 118px);
+    z-index:46;
+    gap:5px;
+    color:var(--ui-ink);
+    overscroll-behavior:contain;
+  }
+  html[data-ui-style] body #app .editor-shell .mobile-editor-actions[aria-expanded=true]+.editor-top-actions{
+    grid-template-columns:repeat(2,minmax(0,1fr));
+    align-items:start;
+    gap:8px;
+  }
+  html[data-ui-style] body #app .editor-shell .mobile-actions-heading{
+    grid-column:1/-1;display:flex;align-items:center;justify-content:space-between;
+    font-size:14px;padding:0 0 4px;
+  }
+  html[data-ui-style] body #app .editor-shell .mobile-actions-heading button{width:38px;padding:0;font-size:22px}
+  html[data-ui-style] body #app .editor-shell .editor-top-actions>details>summary,
+  html[data-ui-style] body #app .editor-shell .editor-top-actions>button{
+    display:flex;justify-content:center;align-items:center;gap:6px;min-height:44px;
+  }
+  #app .editor-shell .editor-top-actions :is(.mobile-action-label){display:inline}
+  html[data-ui-style] body #app .editor-shell .editor-top-actions details[open]{grid-column:1/-1}
+  html[data-ui-style] body #app .editor-shell .editor-top-actions details>div{width:100%;box-sizing:border-box}
+  html[data-ui-style] body #app .editor-shell .editor-top-actions .editor-save-controls{flex-wrap:wrap;min-width:0}
+  html[data-ui-style] body #app .editor-shell .visual-workspace:has(.designer-stage) .editor-outline{
+    order:2;flex:none;padding:5px 10px;gap:5px;border-top:1px solid var(--ui-line);
+  }
+  html[data-ui-style] body #app .editor-shell .editor-outline .outline-actions>button{
+    width:28px;min-width:28px;height:36px;min-height:36px;
+  }
+  html[data-ui-style] body #app .editor-shell .editor-outline .outline-item{min-width:96px;min-height:36px}
+  html[data-ui-style] body #app .editor-shell .visual-workspace .editor-form-area{overflow:clip!important;backdrop-filter:none!important}
+  html[data-ui-style] body #app .editor-shell .visual-workspace .designer-stage-wrap{
+    overflow:clip!important;padding:8px 12px;background:transparent
+  }
+  html[data-ui-style] body #app .editor-shell .visual-workspace .designer-layer-list{
+    flex:none;width:100%;justify-content:safe center;min-height:30px;margin:7px 0 0
+  }
+  html[data-ui-style] body #app .editor-shell .item-toolbar:has(.item-tools){
+    position:relative;inset:auto;order:2;flex:none;z-index:4;
+    margin:0;min-height:60px;padding:6px 8px;
+    background:var(--ui-panel);box-shadow:none;backdrop-filter:none!important;
+  }
+  html[data-ui-style] body #app .editor-shell .studio-editor:has(.designer-stage){padding-bottom:env(safe-area-inset-bottom)}
+  html[data-ui-style] body #app .editor-shell .item-toolbar:has(.item-tools)>.item-tools{
+    width:100%;max-width:none;margin:0;overflow:visible
+  }
+  html[data-ui-style] body #app .editor-shell .designer-toolbar{
+    justify-content:safe center!important;gap:4px
+  }
+  html[data-ui-style] body #app .editor-shell .designer-toolbar button{min-height:44px}
+  html[data-ui-style] body #app .editor-shell .designer-toolbar[data-selection-type]:not([data-selection-type=""])>:not(.mobile-object-tools){display:none}
+  html[data-ui-style] body #app .editor-shell .designer-toolbar[data-selection-type]:not([data-selection-type=""]) .mobile-object-tools{
+    display:flex;justify-content:safe center;align-items:center;gap:6px
+  }
+  html[data-ui-style] body #app .editor-shell .designer-toolbar:not([data-selection-type=text]) .mobile-object-font{display:none}
+  html[data-ui-style] body #app .editor-shell .mobile-object-tools [data-designer-action=delete]{color:var(--ui-danger,#ba4062)}
+  html[data-ui-style] body #app .editor-shell .visual-workspace .designer-inspector{
+    position:static;inset:auto;flex:0 1 auto;
+    margin:0;max-height:38dvh;min-height:0;padding:10px 14px;
+    border:0;border-top:1px solid var(--ui-line);border-radius:0;box-shadow:none;
+    background:var(--ui-panel);overflow:auto;
+  }
+  html[data-ui-style] body #app .editor-shell .designer-inspector::before{display:none}
+  html[data-ui-style] body #app .editor-shell .designer-inspector .mobile-inspector-close{
+    position:sticky;top:0;z-index:3;
+    background:var(--ui-soft);color:var(--ui-ink);border:1px solid var(--ui-line);
+  }
+  html[data-ui-style] body #app .editor-shell .designer-inspector .designer-selected-heading{margin-top:0}
+  html[data-ui-style] body #app .editor-shell .designer-inspector .storage-ai-inspector{min-height:0}
+  html[data-ui-style] body .font-dialog[open]{
+    margin:auto 0 0;width:100%;height:min(520px,72dvh);max-height:72dvh;
+    border-radius:20px 20px 0 0;padding:14px 14px calc(14px + env(safe-area-inset-bottom));
+  }
+  html[data-ui-style] body .font-dialog>header{margin:0}
+  html[data-ui-style] body .font-dialog h2{font-size:19px}
+  html[data-ui-style] body .font-dialog .font-results button{min-height:84px;padding:9px;gap:5px;contain-intrinsic-size:auto 84px}
+  html[data-ui-style] body .font-dialog .font-results strong{font-size:16px}
+  html[data-ui-style] body .font-dialog .font-results span{font-size:12px}
+}
+
+#app :is(.mobile-history,.mobile-slide-layout){display:none}
+@media(max-width:900px){
+  html[data-ui-style] body #app .editor-shell .designer-stage{margin:0!important;border-radius:3px}
+  html[data-ui-style] body #app .editor-shell .designer-layer-list:not([data-mobile-open]){display:none}
+  html[data-ui-style] body #app .editor-shell .designer-toolbar{
+    justify-content:safe center!important;gap:4px;
+  }
+  html[data-ui-style] body #app .editor-shell .designer-toolbar :is(.desktop-history,.desktop-insert-label),
+  html[data-ui-style] body #app .editor-shell .designer-toolbar>.slide-style-picker{display:none}
+  html[data-ui-style] body #app .editor-shell .designer-insert-more summary>.mobile-action-label{display:inline}
+  html[data-ui-style] body #app .editor-shell .designer-insert-more>summary{min-height:44px;display:flex;align-items:center;padding:0 8px}
+  html[data-ui-style] body #app .editor-shell .designer-insert-more[open]>div{z-index:45;bottom:calc(116px + env(safe-area-inset-bottom))}
+  #app .mobile-history{display:flex;gap:4px}
+  #app .mobile-slide-layout{display:block;margin-top:8px}
+  html[data-ui-style] body #app .editor-shell .editor-outline .outline-actions>button{width:30px;min-width:30px}
+}
+
+@media(max-width:900px){
+  html[data-ui-style] body #app .editor-shell .item-tools .designer-toolbar {
+    backdrop-filter:none!important;
+    padding:0!important;
+  }
+  html[data-ui-style] body #app .editor-shell .designer-workspace.fields-only .designer-inspector {
+    display:block;position:static;max-height:none;margin:0;
+  }
+  html[data-ui-style] body #app .editor-shell .fields-only .mobile-inspector-close {display:none}
+}
+@media(max-width:360px){
+  html[data-ui-style] body #app .editor-shell .designer-toolbar button{padding-inline:7px;font-size:11px}
+}
+
+#app .designer-toolbar :is([data-designer-action=add-text],[data-designer-action=image],[data-designer-action=shape]){
+  display:inline-flex;align-items:center;gap:4px;
+}
+@media(max-width:900px){
+  html[data-ui-style] body #app .editor-shell .designer-toolbar[data-selection-type=""]>:is(.mobile-inspector-open,[data-designer-action=add-text],[data-designer-action=image],[data-designer-action=shape],.designer-insert-more){
+    flex:1;min-width:0;
+  }
+  html[data-ui-style] body #app .editor-shell .designer-toolbar[data-selection-type=""]>:is(button,.designer-insert-more)>span,
+  html[data-ui-style] body #app .editor-shell .designer-toolbar .designer-insert-more .mobile-action-label{
+    white-space:nowrap;
+  }
+  html[data-ui-style] body #app .editor-shell .designer-toolbar[data-selection-type=""]>button:not(.desktop-history),
+  html[data-ui-style] body #app .editor-shell .designer-insert-more summary .mobile-action-label{
+    display:flex;flex-direction:column;justify-content:center;align-items:center;gap:3px;
+    font-size:10px;line-height:1.15;
+  }
+  html[data-ui-style] body #app .editor-shell .designer-insert-more>summary{justify-content:center}
+  html[data-ui-style] body #app .editor-shell .designer-toolbar svg{flex:none;width:17px;height:17px}
 }

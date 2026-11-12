@@ -1,3 +1,4 @@
+import { createUuid } from './uuid.js';
 import { Y, encode, decode, writeLesson, readLesson } from './collaboration-core.js';
 import { rpc, getDocument, getSnapshot, putSnapshot, groupRequest } from './collaboration-api.js';
 import { validateLesson } from './lessons.js';
@@ -6,7 +7,7 @@ const listItem = (list,id,index) => list instanceof Y.Map ? list.get('items').ge
 export class LiveDocument {
   constructor(studio,row,doc,onStatus) {
     this.studio=studio;this.client=studio.account.client;this.row=row;this.doc=doc;this.onStatus=onStatus;this.uid=studio.account.user.id;
-    this.clientId=crypto.randomUUID();this.version=0;this.savedVersion=0;this.queue=[];this.people=[];this.status='Conectando ao grupo…';
+    this.clientId=createUuid();this.version=0;this.savedVersion=0;this.queue=[];this.people=[];this.status='Conectando ao grupo…';
     this.update=(update,origin)=>{
       if(this.closed||origin==='snapshot'||!this.studio.groups.canEdit)return;
       this.version++;this.studio.dirty=true;this.status='Alterações por salvar';this.paint();

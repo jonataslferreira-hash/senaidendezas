@@ -1,3 +1,4 @@
+import { createUuid } from './uuid.js';
 import {routeParams} from './editor-route.js';
 import { Y,encode,decode,writeLesson,readLesson } from './collaboration-core.js';
 import { LiveDocument } from './collaboration-live.js';
@@ -53,15 +54,15 @@ export class GroupsPanel {
   markup(){
     const cards=this.documents.map(d=>{
       const lesson=this.sharedLessons.get(d.id)?.lesson,cover=lesson?.thumbnail,slides=lesson?.slides?.filter(slide=>!slide.poll).length||0;
-      return `<button type="button" class="shared-card" data-group-action="open" data-doc="${esc(d.id)}"><span class="shared-card-art">${cover?`<img src="${esc(cover)}" alt="" loading="lazy">`:`<span class="shared-card-mark">${studioIcon('collaborate')}</span>`}<i>${studioIcon('cloud')}</i></span><span class="shared-card-copy"><strong>${esc(d.title)}</strong><small>${slides?slides+' slides · ':''}Edição ao vivo</small><span class="shared-card-open">Abrir aula ${studioIcon('chevron')}</span></span></button>`;
+      return `<button type="button" class="shared-card" data-group-action="open" data-doc="${esc(d.id)}"><span class="shared-card-art">${cover?`<img src="${esc(cover)}" alt="" loading="lazy">`:`<span class="shared-card-mark">${studioIcon('collaborate')}</span>`}</span><span class="shared-card-copy"><strong>${esc(d.title)}</strong><small>${slides?slides+' slides · ':''}Aula compartilhada</small><span class="shared-card-open">Abrir aula ${studioIcon('next')}</span></span></button>`;
     }).join('');
     return `<section class="shared-page">
       <header class="shared-hero">
         <span class="shared-hero-mark">${studioIcon('collaborate')}</span>
-        <div class="shared-hero-copy"><span class="studio-kicker">TRABALHO EM EQUIPE</span><h1>Aulas <em>compartilhadas</em></h1><p>As aulas que chegaram até você ficam aqui. Abra e edite junto com a turma, em tempo real.</p></div>
+        <div class="shared-hero-copy"><h1>Compartilhados</h1><p>${this.documents.length} ${this.documents.length===1?'aula compartilhada':'aulas compartilhadas'}</p></div>
         <button type="button" class="studio-btn quiet shared-refresh" data-group-action="refresh"><span aria-hidden="true">↻</span> Atualizar</button>
       </header>
-      <div class="shared-stats"><span><strong>${this.documents.length}</strong>${this.documents.length===1?'aula compartilhada':'aulas compartilhadas'}</span><span class="shared-live"><i></i>Edição ao vivo</span></div>
+
       <p role="status" data-group-message class="shared-message">${esc(this.message)}</p>
       ${cards?`<div class="shared-grid">${cards}</div>`:`<div class="shared-empty"><span>${studioIcon('collaborate')}</span><strong>Nenhuma aula compartilhada ainda</strong><p>Abra uma aula no editor e convide alguém pelo e-mail. O convite também aparece no Chat.</p></div>`}
     </section>`;
@@ -168,7 +169,7 @@ export class GroupsPanel {
     await groupRequest(this.client,'/collaboration/status');
     this.studio.save();const portable=validateLesson(await hydrateLesson(this.studio.draft,true),{draft:true}),doc=new Y.Doc();
     portable.slides=portable.slides.map(canvasFromSlide);writeLesson(doc,portable);
-    const group=await rpc(this.client,'sl_create_group',{p_name:portable.title}),id=crypto.randomUUID();
+    const group=await rpc(this.client,'sl_create_group',{p_name:portable.title}),id=createUuid();
     const revision=await putSnapshot(this.client,group.id,{format:'sl-yjs-v1',state:encode(Y.encodeStateAsUpdate(doc))});
     const row=await rpc(this.client,'sl_publish_group_doc',{p_group_id:group.id,p_doc_id:id,p_expected_version:0,p_revision:revision,p_title:portable.title});
     this.groups.push(group);await this.enter(row,doc);

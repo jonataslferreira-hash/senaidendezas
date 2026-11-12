@@ -1,3 +1,4 @@
+import { createUuid } from './uuid.js';
 import catalog from './open-layout-catalog.json' with {type:'json'};
 import {MAX_CANVAS_ELEMENTS,canvasThemes, newElement, layoutPanelColor} from './canvas-data.js';
 
@@ -75,7 +76,7 @@ export function applyOpenLayout(slide, key) {
   const panelColor = layoutPanelColor(slide.background || theme.background, theme.accent);
   const shape = (x,y,w,h,background,shapeType='rectangle') => {
     if(elements.length+decorations.length>=MAX_CANVAS_ELEMENTS) return;
-    const id = decorPrefix+(background===panelColor?'panel-':'')+crypto.randomUUID();
+    const id = decorPrefix+(background===panelColor?'panel-':'')+createUuid();
     decorations.push(newElement('shape',{id,x,y,w,h,background,shapeType,cornerRadius:0}));
   };
   if(theme.ornament==='orbit'){

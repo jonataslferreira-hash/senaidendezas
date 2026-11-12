@@ -15,7 +15,7 @@ export function slideStylePicker(kind, slide, {inspector=false}={}) {
   const current = options.find(([id])=>id===selected)?.[1].name;
   return `<div class="slide-style-picker"><button type="button" data-style-picker="${kind}" aria-expanded="false" aria-label="${title}" title="${title}">${esc(inspector?title:current||(theme?'Tema':'Layout'))} ▾</button>
     <div class="slide-style-menu" popover aria-label="${title}">
-      <header><strong>${title}</strong><small>Passe o mouse ou foque por 2 s para ver no slide.</small>
+      <header><strong>${title}</strong><small>Passe o mouse ou foque por 1 s para ver no slide.</small>
       ${inspector?'<label><input type="checkbox" data-style-all> Aplicar a todos os slides</label>':''}</header>
       <div class="slide-style-options">${options.map(([id,option])=>`<button type="button" data-style-kind="${kind}" data-style-value="${id}" aria-pressed="${id===selected}">
         ${theme?`<i aria-hidden="true" style="--swatch:${option.background};--swatch-accent:${option.accent}"></i>`:''}${esc(option.name)}</button>`).join('')}</div>

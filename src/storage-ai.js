@@ -1,3 +1,4 @@
+import { createUuid } from './uuid.js';
 import {MAX_CANVAS_ELEMENTS,canvasFromSlide,newElement,colorValue,applyCanvasTheme,canvasThemes} from './canvas-data.js';
 import {r2ApiUrl,saveCloudLesson,readCloudLesson,listCloudLessons} from './cloud-files.js';
 import {archiveImportedPages,fillAssetImages,hydrateLesson,removePageAssets} from './assets.js';
@@ -180,7 +181,7 @@ async function buildLesson(result,count,photos,onSlide,activities={},imageDefaul
     previous=design;
     const {elements,background,backgroundFill,theme}=design;
     const slide={...newSlide(),kind:'canvas',title,background,backgroundFill,visualTheme:theme,elements,
-      audio:createSlideSound(spec.sound),transition:['slide','fade','zoom','rise','wipe','none'].includes(spec.transition)?spec.transition:'slide'};
+      audio:createSlideSound(spec.sound),transition:['slide','fade','zoom','rise','wipe','iris','split','flip','none'].includes(spec.transition)?spec.transition:'slide'};
     if(webImage)slide.note=imageSourceNote(webImage);
     // Keep the composition's measured text and media frames together. Applying a
     // second template here can squeeze the body into a narrow column and cover it
@@ -210,7 +211,7 @@ async function buildLesson(result,count,photos,onSlide,activities={},imageDefaul
     if(!text(item?.text,500)||options.length<2||options.some(value=>!value))throw Error(`A enquete ${index+1} veio incompleta. Tente novamente.`);
     const slide={...newSlide(),title:text(item.title,130)||`Enquete ${index+1}`,poll:{text:text(item.text,500),options}};
     lesson.slides.push(slide);
-    lesson.activityBlocks.push({id:crypto.randomUUID(),type:'poll',items:[slide.id]});
+    lesson.activityBlocks.push({id:createUuid(),type:'poll',items:[slide.id]});
   }
   if(lesson.questions.length){
     const perQuiz=activities.quizzes?activities.questions:lesson.questions.length;
@@ -224,16 +225,16 @@ async function buildLesson(result,count,photos,onSlide,activities={},imageDefaul
 
 function addActivities(lesson,result){
   let added=0;
-  if(!lesson.activityBlocks)lesson.activityBlocks=[{id:'slides',type:'slides',items:lesson.slides.filter(slide=>!slide.poll).map(slide=>slide.id)},...(lesson.slides.filter(slide=>slide.poll).map(slide=>({id:crypto.randomUUID(),type:'poll',items:[slide.id]}))),...(lesson.questions.length?[{id:'quiz',type:'quiz',items:lesson.questions.map(question=>question.id)}]:[])];
+  if(!lesson.activityBlocks)lesson.activityBlocks=[{id:'slides',type:'slides',items:lesson.slides.filter(slide=>!slide.poll).map(slide=>slide.id)},...(lesson.slides.filter(slide=>slide.poll).map(slide=>({id:createUuid(),type:'poll',items:[slide.id]}))),...(lesson.questions.length?[{id:'quiz',type:'quiz',items:lesson.questions.map(question=>question.id)}]:[])];
   for(const [index,item] of (Array.isArray(result.polls)?result.polls:[]).slice(0,8).entries()){
     const options=Array.isArray(item?.options)?item.options.slice(0,4).map(value=>text(value,200)):[];
     if(!text(item?.text,500)||options.length<2||options.some(value=>!value))throw Error(`A enquete ${index+1} veio incompleta.`);
     const slide={...newSlide(),title:text(item.title,130)||`Enquete ${index+1}`,poll:{text:text(item.text,500),options}};
-    lesson.slides.push(slide);lesson.activityBlocks.push({id:crypto.randomUUID(),type:'poll',items:[slide.id]});added++;
+    lesson.slides.push(slide);lesson.activityBlocks.push({id:createUuid(),type:'poll',items:[slide.id]});added++;
   }
   const questions=(Array.isArray(result.questions)?result.questions:[]).slice(0,20);
   if(questions.length){
-    const block={id:crypto.randomUUID(),type:'quiz',items:[]};
+    const block={id:createUuid(),type:'quiz',items:[]};
     for(const [index,item] of questions.entries()){
       const options=Array.isArray(item?.options)?item.options.slice(0,4).map(value=>text(value,300)):[];
       if(!text(item?.text,600)||options.length<2||options.some(value=>!value)||!Number.isInteger(item.correct)||item.correct<0||item.correct>=options.length)throw Error(`A pergunta ${index+1} veio incompleta.`);
@@ -328,7 +329,7 @@ async function applyEdit(slide,result,target,photos=[]) {
     if(/^#[0-9a-f]{6}$/i.test(result.background||'')&&result.background!==slide.background){
       slide.background=result.background;slide.backgroundFill={mode:'solid'};count++;
     }
-    if(['slide','fade','zoom','rise','wipe','none'].includes(result.transition)&&slide.transition!==result.transition){
+    if(['slide','fade','zoom','rise','wipe','iris','split','flip','none'].includes(result.transition)&&slide.transition!==result.transition){
       slide.transition=result.transition;count++;
     }
     const audio=createSlideSound(result.sound);
@@ -737,7 +738,7 @@ export class StorageAI {
     },350);
   }
   newSession(persist=true){
-    const session={id:crypto.randomUUID(),title:'Nova conversa',updatedAt:Date.now(),messages:[{role:'assistant',text:'Oi! Me conte o tema da aula, o público e o que você quer criar. Também posso ajudar a revisar um slide no editor.'}]};
+    const session={id:createUuid(),title:'Nova conversa',updatedAt:Date.now(),messages:[{role:'assistant',text:'Oi! Me conte o tema da aula, o público e o que você quer criar. Também posso ajudar a revisar um slide no editor.'}]};
     this.sessions.unshift(session);this.activeChatId=session.id;this.messages=session.messages;this.draftPrompt='';
     if(persist)this.saveSessions();
   }
@@ -750,10 +751,17 @@ export class StorageAI {
   newChat(){if(this.busy)return;this.saveSessions();this.newSession();this.clearAttachments();this.renderCreate();}
   startFresh(){
     if(this.busy)return;
-    const active=this.sessions.find(s=>s.id===this.activeChatId);
-    const talked=active?.messages?.some(message=>message.role==='user');
-    if(!active||talked)this.newSession(false);
-    this.draftPrompt='';this.clearAttachments();
+    const isEmpty = session => !linkedLessonId(session) && !session.messages.some(message => message.role === 'user');
+    const empty = this.sessions.find(session => session.id === this.activeChatId && isEmpty(session))
+      || this.sessions.find(isEmpty);
+    if (empty && empty.id === this.activeChatId) return;
+    if (empty) {
+      this.activeChatId = empty.id;
+      this.messages = empty.messages;
+      this.saveSessions();
+    } else this.newSession();
+    this.draftPrompt = '';
+    this.clearAttachments();
   }
   switchChat(id){if(this.busy)return;const session=this.sessions.find(s=>s.id===id);if(!session)return;this.activeChatId=id;this.messages=session.messages;this.draftPrompt='';this.clearAttachments();this.saveSessions();this.renderCreate();}
   clearAttachments(){

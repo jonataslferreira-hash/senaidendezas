@@ -9,3 +9,5 @@ dist/
 .firebase/
 
 .wrangler/
+
+iniciar.bat

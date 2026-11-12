@@ -1,4 +1,12 @@
 const paths = {
+  sequence: 'M8 6h12M8 12h12M8 18h12M4 6h.01M4 12h.01M4 18h.01',
+  fields: 'M4 5h16v14H4zM8 9h8m-8 5h5',
+  undo: 'm8 5-5 5 5 5m-5-5h11a5 5 0 0 1 0 10h-2',
+  redo: 'm16 5 5 5-5 5m5-5H10a5 5 0 0 0 0 10h2',
+  settings:'M4 6h16M4 12h16M4 18h16M8 4v4m8 2v4m-6 2v4',
+  text:'M5 6V4h14v2M12 4v16m-4 0h8',
+  shape:'M3 4h10v10H3zM11 16a5 5 0 1 0 5-5',
+  more:'M5 12h.1m6.9 0h.1m6.9 0h.1',
   add:'M12 5v14M5 12h14',
   palette:'M12 3a9 9 0 1 0 0 18h1a2 2 0 0 0 1.5-3.3A1 1 0 0 1 15.3 16H18a3 3 0 0 0 3-3c0-6-4-10-9-10ZM7 11h.1M10 7h.1M15 7h.1M17 11h.1',
   sidebar: 'M3 5h18v14H3zM9 5v14',
