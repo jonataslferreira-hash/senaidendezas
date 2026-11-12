@@ -13,6 +13,7 @@ const MAX_LIMIT = 48;
 const MAX_QUERY = 160;
 const MAX_PROXY_BYTES = 8 * 1024 * 1024;
 const USER_AGENT = 'StorageLab/1.0 (open educational slide tool)';
+const BROWSER_USER_AGENT = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36';
 
 const clean = value => String(value ?? '').trim();
 const clip = (value, max) => clean(value).slice(0, max);
@@ -167,6 +168,70 @@ async function openverseSearch(query, limit) {
   return items;
 }
 
+// A busca do Bing não exige chave e devolve resultados muito próximos aos do
+// Google Imagens. O Worker lê a página assíncrona, aproveita as miniaturas do
+// CDN do Bing (leves e redimensionáveis) e guarda a página de origem. Assim a
+// busca por "Hello Kitty personagem" traz a personagem, não resultados com
+// palavras parecidas.
+function decodeEntities(value) {
+  return String(value ?? '')
+    .replace(/&quot;/g, '"')
+    .replace(/&#0*39;|&#x0*27;/gi, "'")
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&#x([0-9a-f]+);/gi, (_, hex) => String.fromCodePoint(parseInt(hex, 16)))
+    .replace(/&#(\d+);/g, (_, number) => String.fromCodePoint(Number(number)))
+    .replace(/&amp;/g, '&')
+    .replace(/&nbsp;/g, ' ');
+}
+
+function bingSized(url, width, height) {
+  if (!url) return '';
+  return url + (url.includes('?') ? '&' : '?') + 'w=' + width + '&h=' + height + '&c=7&rs=1&qlt=90';
+}
+
+async function bingSearch(query, limit) {
+  const params = new URLSearchParams({
+    q: query, first: '1', count: String(Math.min(35, Math.max(limit, 12))), mmasync: '1', adlt: 'off'
+  });
+  const response = await fetch('https://www.bing.com/images/async?' + params, {
+    headers: { Accept: 'text/html,application/xhtml+xml', 'User-Agent': BROWSER_USER_AGENT, 'Accept-Language': 'pt-BR,pt;q=0.9,en;q=0.7' },
+    signal: AbortSignal.timeout(UPSTREAM_TIMEOUT)
+  });
+  if (!response.ok) throw Error('bing_' + response.status);
+  const html = await response.text();
+  const items = [];
+  const pattern = /class="iusc"[^>]*\sm="([^"]*)"/g;
+  let match;
+  while ((match = pattern.exec(html)) && items.length < limit) {
+    let meta;
+    try { meta = JSON.parse(decodeEntities(match[1])); } catch { continue; }
+    const original = clean(meta.murl);
+    const thumbnail = clean(meta.turl);
+    if (!thumbnail || !/^https:\/\//.test(thumbnail)) continue;
+    if (isDocument({ file: original, title: meta.t })) continue;
+    const page = clean(meta.purl);
+    const title = plainText(meta.t || meta.desc || query);
+    items.push({
+      id: 'bing:' + clip(meta.md5 || meta.cid || thumbnail, 80),
+      title: clip(title || query, 200),
+      file: clip(title || query, 200),
+      description: clip(plainText(meta.desc || ''), 300),
+      thumbnail: bingSized(thumbnail, 480, 360),
+      url: bingSized(thumbnail, 900, 700),
+      source: /^https:\/\//.test(page) ? clip(page, 600) : '',
+      catalog: 'Bing Imagens',
+      author: '',
+      license: '',
+      licenseUrl: '',
+      width: 0,
+      height: 0,
+      kind: 'image'
+    });
+  }
+  return items;
+}
+
 // Resolve a licença dos arquivos usados nas páginas da Wikipédia em uma única
 // consulta ao Commons, para não repetir a busca arquivo por arquivo.
 // A Wikipédia devolve o nome do arquivo com underscore e o Commons devolve
@@ -222,13 +287,21 @@ const AMBIGUOUS_TOKENS = new Set([
   'desktop', 'interface', 'update', 'store', 'photos', 'camera'
 ]);
 
+// Palavras de "papel" descrevem o tipo de imagem, não o assunto. Em "Hello
+// Kitty personagem", o assunto é Hello Kitty; "personagem" não deve fazer
+// vencer uma imagem chamada "Hello Kitty traficante".
+const ROLE_TOKENS = new Set([
+  'personagem', 'personagens', 'character', 'characters', 'boneco', 'boneca', 'toy', 'brinquedo',
+  'desenho', 'cartoon', 'anime', 'manga', 'mascote', 'mascot', 'fundo', 'background', 'transparente',
+  'transparent', 'png', 'render', 'wallpaper', 'papel', 'parede', 'hd', '4k'
+]);
 const normalizeTitle = value => tokens(value).join(' ');
 
 function scoreItem(item, queryTokens, { transparent = false, wantsIcon = false } = {}) {
   const label = (item.title || '') + ' ' + (item.file || '');
   const titleTokens = new Set(tokens(label));
   const haystack = new Set(tokens(label + ' ' + (item.description || '')));
-  const significant = queryTokens.filter(token => !GENERIC_TOKENS.has(token) && !AMBIGUOUS_TOKENS.has(token));
+  const significant = queryTokens.filter(token => !GENERIC_TOKENS.has(token) && !AMBIGUOUS_TOKENS.has(token) && !ROLE_TOKENS.has(token));
   const base = significant.length ? significant : queryTokens;
   let matched = 0;
   for (const token of base) if (titleTokens.has(token)) matched++;
@@ -239,6 +312,10 @@ function scoreItem(item, queryTokens, { transparent = false, wantsIcon = false }
   if (phrase && normalized === phrase) score += 1.2;
   else if (phrase && normalized.startsWith(phrase)) score += 0.8;
   if (base.length > 1 && matched === base.length) score += 0.6;
+  // Palavras extras no título (que ninguém pediu) indicam outro assunto:
+  // "Hello Kitty traficante" perde para "Hello Kitty".
+  const extras = [...titleTokens].filter(token => !queryTokens.includes(token) && !GENERIC_TOKENS.has(token) && !STOP_WORDS.has(token)).length;
+  if (extras) score -= Math.min(0.55, extras * 0.16);
   // Pedido de fundo transparente: PNG, WebP e SVG têm chance de ter alfa.
   if (transparent && /svg|png|webp/i.test(item.kind || '')) score += 0.45;
   // Ícone, logo ou símbolo: vetor/PNG recortado é melhor que uma foto.
@@ -296,7 +373,8 @@ async function searchImages(query, page, limit, { transparent = false } = {}) {
     // pedido vem em português ("area de trabalho do windows" -> "windows").
     const meaningful = tokens(term).filter(token => token.length > 3 && !GENERIC_TOKENS.has(token) && !STOP_WORDS.has(token));
     const alternate = meaningful.length >= 2 ? meaningful.join(' ') : '';
-    const [commons, wiki, wikiEn, openverse, commonsAlt, wikiAlt, wikiEnAlt] = await Promise.allSettled([
+    const [bing, commons, wiki, wikiEn, openverse, commonsAlt, wikiAlt, wikiEnAlt] = await Promise.allSettled([
+      bingSearch(term, 30),
       commonsSearch(term, 30),
       wikipediaSearch(term, 6, 'pt.wikipedia.org'),
       wikipediaSearch(term, 6, 'en.wikipedia.org'),
@@ -313,6 +391,7 @@ async function searchImages(query, page, limit, { transparent = false } = {}) {
     ];
     const withLicenses = await resolveWikipediaLicenses(wikiItems);
     const all = [
+      ...(bing.status === 'fulfilled' ? bing.value : []),
       ...(commons.status === 'fulfilled' ? commons.value : []),
       ...(commonsAlt.status === 'fulfilled' ? commonsAlt.value : []),
       ...withLicenses,
@@ -334,7 +413,8 @@ async function searchImages(query, page, limit, { transparent = false } = {}) {
 
 const PROXY_HOSTS = [
   'wikimedia.org', 'wikipedia.org', 'openverse.org', 'flickr.com', 'staticflickr.com',
-  'pexels.com', 'pixabay.com', 'wikimediafoundation.org', 'creativecommons.org'
+  'pexels.com', 'pixabay.com', 'wikimediafoundation.org', 'creativecommons.org',
+  'bing.net', 'bing.com'
 ];
 
 function proxyAllowed(url) {

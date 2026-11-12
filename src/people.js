@@ -1,7 +1,7 @@
 import { groupRequest } from './collaboration-api.js';
 import { validTheme, validStyle } from './personalization.js';
 export const escapePerson=value=>String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-const hues={violet:275,ocean:195,forest:145,rose:330,sunset:24,amber:43,teal:176,indigo:237};
+const hues={violet:275,ocean:195,forest:145,rose:330,sunset:24,amber:43,teal:176,indigo:237,aurora:190,candy:330,galaxy:265,citrus:145};
 export class People {
  constructor(studio){this.studio=studio;this.cache=new Map();this.pending=new Map();studio.root.addEventListener('account-changed',()=>{this.generation=(this.generation||0)+1;for(const p of this.cache.values())if(p.photo)URL.revokeObjectURL(p.photo);this.cache.clear();this.pending.clear();});}
  get(id){if(id===this.studio.account.user?.id)return {...this.studio.account.user.user_metadata,photo:this.studio.account.settings.avatarUrl||this.studio.account.vault.list().find(s=>s.user.id===id)?.avatar_thumbnail};return this.cache.get(id)||{};}

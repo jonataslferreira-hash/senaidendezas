@@ -123,7 +123,7 @@ function joinForm() {
   if(user||!avatarChanged)selectedAvatar=isPhotoAvatar(photo)?photo:avatars[0];
   const name=joinNameTouched?joinNameDraft:user?.user_metadata?.display_name||'';
   return `<form id="join-form" class="join-card compact-join">
-    <h2>Entrar na sala<span>.</span></h2>
+    <div class="join-card-head"><span class="join-card-mark">${studioIcon('join')}</span><div><h2>Entrar na sala<span>.</span></h2><p>Digite o código de 6 números que o professor mostrou.</p></div></div>
     <label for="room-code">Código da sala</label><input id="room-code" name="code" inputmode="numeric" autocomplete="off" pattern="[0-9]{6}" maxlength="6" placeholder="000 000" value="${esc(codeDraft)}" required>
     <label for="player-name">Como podemos chamar você?</label><input id="player-name" name="name" autocomplete="nickname" maxlength="24" placeholder="Seu nome ou apelido" value="${esc(name.slice(0,24))}" required>
     ${user?'':`<label id="avatar-label">Avatar no ranking</label><div class="avatar-picker" role="group" aria-labelledby="avatar-label">${isPhotoAvatar(selectedAvatar)?`<button type="button" class="avatar active" data-avatar="${selectedAvatar}" aria-label="Minha foto enviada" aria-pressed="true">${avatarContent(selectedAvatar)}</button>`:''}${avatars.map(a=>`<button type="button" class="avatar ${a===selectedAvatar?'active':''}" data-avatar="${a}" aria-label="Avatar ${a}" aria-pressed="${a===selectedAvatar}">${avatarContent(a)}</button>`).join('')}</div>`}

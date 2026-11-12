@@ -5,6 +5,7 @@ import { rpc,getDocument,getSnapshot,putSnapshot,groupRequest } from './collabor
 import { hydrateLesson,archiveImportedPages } from './assets.js';
 import { validateLesson } from './lessons.js';
 import { canvasFromSlide } from './canvas-data.js';
+import { studioIcon } from './studio-icons.js';
 import './groups.css';
 const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const uuid=/^[a-f0-9-]{36}$/i;
@@ -49,7 +50,22 @@ export class GroupsPanel {
     }
   }
   async refreshMembers(){if(!this.live)return;const live=this.live;const rows=await rpc(this.client,'sl_collaborators',{p_document_id:live.row.id});if(this.live!==live)return;this.members=Array.isArray(rows)?rows:[];this.role=this.members.find(m=>m.user_id===this.studio.account.user?.id)?.role||'viewer';for(const p of this.members)this.studio.people.load(p.user_id);}
-  markup(){return `<section class="library-section group-library"><div class="library-section-title"><h2>Compartilhados</h2><button type="button" class="studio-btn quiet" data-group-action="refresh">Atualizar</button></div><p>Convide pelo e-mail dentro do editor e criem a mesma aula ao mesmo tempo.</p><p role="status" data-group-message>${esc(this.message)}</p><div class="group-documents">${this.documents.map(d=>`<button type="button" data-group-action="open" data-doc="${d.id}"><span>▤</span><div><strong>${esc(d.title)}</strong><small>Edição compartilhada · abrir ↗</small></div></button>`).join('')||'<small>As aulas compartilhadas com sua conta aparecem aqui.</small>'}</div></section>`;}
+  markup(){
+    const cards=this.documents.map(d=>{
+      const lesson=this.sharedLessons.get(d.id)?.lesson,cover=lesson?.thumbnail,slides=lesson?.slides?.filter(slide=>!slide.poll).length||0;
+      return `<button type="button" class="shared-card" data-group-action="open" data-doc="${esc(d.id)}"><span class="shared-card-art">${cover?`<img src="${esc(cover)}" alt="" loading="lazy">`:`<span class="shared-card-mark">${studioIcon('collaborate')}</span>`}<i>${studioIcon('cloud')}</i></span><span class="shared-card-copy"><strong>${esc(d.title)}</strong><small>${slides?slides+' slides · ':''}Edição ao vivo</small><span class="shared-card-open">Abrir aula ${studioIcon('chevron')}</span></span></button>`;
+    }).join('');
+    return `<section class="shared-page">
+      <header class="shared-hero">
+        <span class="shared-hero-mark">${studioIcon('collaborate')}</span>
+        <div class="shared-hero-copy"><span class="studio-kicker">TRABALHO EM EQUIPE</span><h1>Aulas <em>compartilhadas</em></h1><p>As aulas que chegaram até você ficam aqui. Abra e edite junto com a turma, em tempo real.</p></div>
+        <button type="button" class="studio-btn quiet shared-refresh" data-group-action="refresh"><span aria-hidden="true">↻</span> Atualizar</button>
+      </header>
+      <div class="shared-stats"><span><strong>${this.documents.length}</strong>${this.documents.length===1?'aula compartilhada':'aulas compartilhadas'}</span><span class="shared-live"><i></i>Edição ao vivo</span></div>
+      <p role="status" data-group-message class="shared-message">${esc(this.message)}</p>
+      ${cards?`<div class="shared-grid">${cards}</div>`:`<div class="shared-empty"><span>${studioIcon('collaborate')}</span><strong>Nenhuma aula compartilhada ainda</strong><p>Abra uma aula no editor e convide alguém pelo e-mail. O convite também aparece no Chat.</p></div>`}
+    </section>`;
+  }
   editorMarkup(){return `${this.shareDialog?`<dialog class="group-dialog" data-group-dialog aria-labelledby="collaboration-title"><button type="button" class="group-close" data-group-action="close" aria-label="Fechar colaboração">×</button><span class="studio-kicker">CRIEM JUNTOS</span><h2 id="collaboration-title">Convide alguém para sua aula.</h2><p>Convide por e-mail. A pessoa também recebe o convite no Chat da conta dela.</p><div class="collaborator-list">${this.members.map(p=>`<article>${this.studio.people.avatar(p.user_id,p.display_name)}<div><strong>${esc(p.display_name)}</strong><small>${p.role==='owner'?'Dono':'Colaborador'}</small></div>${p.role==='owner'?'':`<select data-group-role="${p.user_id}" aria-label="Permissão de ${esc(p.display_name)}" ${this.role==='owner'?'':'disabled'}>${[['viewer','Visualizar'],['commenter','Comentar'],['editor','Editar']].map(([v,t])=>`<option value="${v}" ${v===p.role?'selected':''}>${t}</option>`).join('')}</select>`}</article>`).join('')}</div><label for="collaborator-email">E-mail do colaborador</label><input id="collaborator-email" type="email" autocomplete="email" maxlength="254" placeholder="pessoa@exemplo.com"><label for="invite-role">Permissão</label><select id="invite-role"><option value="editor">Pode editar</option><option value="commenter">Pode comentar</option><option value="viewer">Pode visualizar</option></select><button type="button" class="studio-btn accent" data-group-action="invite" ${this.busy?'disabled':''}>${this.busy?'Preparando convite…':'Enviar convite'}</button><p role="status" data-group-message>${esc(this.message)}</p>${this.inviteLink?`<label for="collaborator-link">Link do convite</label><input id="collaborator-link" readonly value="${esc(this.inviteLink)}"><button type="button" class="studio-btn quiet" data-group-action="copy-link">Copiar convite</button>`:''}</dialog>`:''}`;}
   presenceAvatar(p){
     const photo=this.studio.people.get(p.uid).photo||this.photos.get(p.uid);

@@ -74,6 +74,8 @@ export class Studio {
     this.restoreRoute();
     if (!new URLSearchParams(location.search).has('presentation') && !routeParams().has('collab') && !['preview', 'present'].includes(new URLSearchParams(location.search).get('page'))) this.writeRoute(this.view, this.draft?.id, true);
     root.addEventListener('click', e => {
+      const drawer=this.root.querySelector('#studio-navigation');
+      if(drawer?.open&&(e.target===drawer||e.target.closest('#studio-navigation [data-studio-action], #studio-navigation [data-social-action]')))drawer.close();
       const menu=e.target.closest('.editor-top-actions details,.designer-toolbar details');
       for(const open of root.querySelectorAll('.editor-top-actions details[open],.designer-toolbar details[open]')){
         if(open!==menu)open.open=false;
@@ -152,7 +154,10 @@ export class Studio {
     if (['editor', 'preview', 'present'].includes(page) && this.library.lessons.some(l => l.id === params.get('lesson'))) {
       this.open(params.get('lesson'), false); this.tab = params.get('tab') === 'quiz' ? 'quiz' : 'slides';
       const selected=Math.max(0,Math.min(this.draft.slides.length-1,(Number(params.get('slide'))||1)-1));if(params.get('block'))this.selectBlock(params.get('block'));if(!this.draft.activityBlocks||this.currentBlock()?.items.includes(this.draft.slides[selected]?.id))this.index=selected;const question=Math.max(0,Math.min(this.draft.questions.length-1,(Number(params.get('question'))||1)-1));if(this.tab==='quiz'&&this.currentBlock()?.items.includes(this.draft.questions[question]?.id))this.questionIndex=question;
-    } else this.view = ['shared','storage-ai'].includes(page)?page:page === 'join' || (!page && params.has('s')) ? 'join' : 'library';
+    } else {
+      this.view = ['shared','storage-ai'].includes(page)?page:page === 'join' || (!page && params.has('s')) ? 'join' : 'library';
+      if(this.view==='storage-ai')this.ai.freshPending=true;
+    }
   }
   selectBlock(id){const block=activityBlocks(this.draft).find(b=>b.id===id);if(!block)return;this.blockId=block.id;this.tab=block.type==='quiz'?'quiz':'slides';const list=this.tab==='quiz'?this.draft.questions:this.draft.slides,key=this.tab==='quiz'?'questionIndex':'index',index=list.findIndex(i=>block.items.includes(i.id));if(index>=0)this[key]=index;}
   currentBlock(){const blocks=activityBlocks(this.draft);return blocks.find(b=>b.id===this.blockId)||blocks.find(b=>(b.type==='quiz'?'quiz':'slides')===this.tab);}
@@ -378,12 +383,29 @@ export class Studio {
   }
   railMarkup(closeButton = '') {
     const brand = this.brandMarkup();
-    return `<aside class="studio-rail">${closeButton ? `<div class="ai-rail-brand">${brand}${closeButton}</div>` : brand}${this.navigationMarkup()}<div class="rail-note"><div class="rail-quick-actions">${button('new','+ Nova aula','quiet')}${button('upload-slides','↑ Importar slides','quiet')}</div></div><div class="rail-bottom">CRIAR. ENSINAR. CONECTAR.</div></aside>`;
+    return `<aside class="studio-rail">${closeButton ? `<div class="ai-rail-brand">${brand}${closeButton}</div>` : brand}
+      <div class="rail-quick-actions">
+        ${button('new', studioIcon('add') + '<span>Nova aula</span>', 'quiet')}
+        ${button('upload-slides', studioIcon('upload') + '<span>Importar slides</span>', 'quiet')}
+      </div>
+      ${this.navigationMarkup()}
+      <div class="rail-profile" data-account-profile>${this.account.profile()}</div>
+    </aside>`;
+  }
+  // Barra superior do celular: logo, perfil e um único botão que abre o menu
+  // lateral. Antes os atalhos ficavam espremidos ao lado da logo e o perfil
+  // ocupava uma faixa inteira embaixo, o que empurrava o conteúdo e crescia
+  // sem controle ao trocar de tela.
+  topbarMarkup() {
+    const closeIcon = '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg>';
+    const close = `<button type="button" class="ai-nav-toggle" data-studio-action="close-navigation" aria-label="Fechar menu" title="Fechar menu" autofocus>${closeIcon}</button>`;
+    return `<header class="studio-header studio-topbar"><button type="button" class="ai-nav-toggle" data-studio-action="open-navigation" aria-label="Abrir menu" aria-controls="studio-navigation" aria-expanded="false" title="Abrir menu">${studioIcon('sidebar')}</button>${this.brandMarkup()}<span data-account-profile>${this.account.profile()}</span></header>
+      <dialog id="studio-navigation" class="ai-drawer studio-drawer" aria-label="Menu do Storage Lab">${this.railMarkup(close)}</dialog>`;
   }
   shell(content) {
     const editor = this.view === 'editor';
     const ai = this.view === 'storage-ai';
-    const header = editor ? '' : ai ? this.ai.navigationMarkup() : `<header class="studio-header"><span data-account-profile>${this.account.profile()}</span></header>`;
+    const header = editor ? '' : ai ? this.ai.navigationMarkup() : this.topbarMarkup();
     return `<div class="studio-shell ${editor ? 'editor-shell' : ai ? 'ai-shell' : ''}">${editor || ai ? '' : this.railMarkup()}<div class="studio-body">${header}${content}</div></div>${this.dialogMarkup()}${this.importMarkup()}${this.sharing.markup()}<div data-remote-dialog>${this.remote.dialog()}</div><div data-account-dialog></div><div data-chat-slot>${this.chat.markup()}</div><div data-social-slot>${this.social.markup()}</div>`;
   }
   markup() {
@@ -667,6 +689,8 @@ export class Studio {
     slide.model = 'custom'; slide.customModel = model; this.markDirty(); this.callbacks.render();
   }
   async action(action, target) {
+    if(action==='open-navigation'){const drawer=this.root.querySelector('#studio-navigation');if(drawer&&!drawer.open){drawer.showModal();drawer.querySelector('[data-studio-action="close-navigation"]')?.focus();}return;}
+    if(action==='close-navigation'){target.closest('dialog')?.close();return;}
     if(this.view==='editor'&&this.groups.live&&!this.groups.canEdit&&!['library','select-slide','select-question','tab-slides','tab-quiz','toggle-visual','preview-draft','present-draft','share-presentation','export-draft'].includes(action)){this.callbacks.toast('Sua permissão permite '+(this.groups.role==='commenter'?'comentar':'visualizar')+' esta aula.');return;}
     if (this.importing && action !== 'cancel-import') return;
     if (action.startsWith('cloud-')) { await this.cloudAction(action, target); return; }
@@ -675,6 +699,7 @@ export class Studio {
     if (['library', 'join','shared','storage-ai'].includes(action)) {
       if (this.groups.live) await this.groups.stop();
       if (this.dirty) this.save();
+      if(action==='storage-ai'&&this.view!=='storage-ai')this.ai.freshPending=true;
       this.view = action; this.writeRoute(); this.callbacks.render();
       if(action==='shared'&&this.account.user){await this.groups.refresh();if(this.view==='shared')this.callbacks.render();}
       return;

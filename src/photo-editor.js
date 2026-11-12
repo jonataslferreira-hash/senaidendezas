@@ -46,11 +46,22 @@ export class PhotoEditor {
     this.reset(); const version = this.version;
     const bitmap = await createImageBitmap(file);
     if (version !== this.version || this.account.mode !== 'profile') { bitmap.close(); return; }
-    this.bitmap = bitmap; this.zoom = 1; this.panX = this.panY = .5;
+    // Um clique basta: a foto é centralizada, recortada em quadrado e
+    // otimizada aqui. A tela de recorte manual saiu do perfil.
+    const side = Math.min(bitmap.width, bitmap.height);
+    const canvas = document.createElement('canvas'); canvas.width = canvas.height = 480;
+    canvas.getContext('2d').drawImage(bitmap, (bitmap.width - side) / 2, (bitmap.height - side) / 2, side, side, 0, 0, 480, 480);
+    bitmap.close();
+    const blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/webp', .85));
+    if (!blob || blob.size > 256 * 1024) throw Error('Não foi possível preparar a foto. Escolha outra imagem.');
+    if (this.settings.pending?.url) URL.revokeObjectURL(this.settings.pending.url);
+    this.settings.pending = { file: new File([blob], 'avatar.webp', { type: blob.type }), url: URL.createObjectURL(blob) };
+    this.settings.removing = false;
+    this.reset();
     this.account.paint();
   }
   markup() {
-    if(this.processing)return '<section class="photo-editor"><p role="status">Preparando animação… Usaremos até 3 segundos, com corte central quadrado.</p></section>';
+    if(this.processing)return '<section class="photo-editor"><p role="status">Preparando sua animação… Usaremos até 3 segundos no centro da foto.</p></section>';
     if (this.stream) return '<section class="photo-editor"><h3>Sua câmera</h3><video data-photo-camera autoplay muted playsinline></video><div><button type="button" data-photo-action="capture">Fotografar</button><button type="button" data-photo-action="cancel">Cancelar</button></div></section>';
     if (!this.bitmap) return '';
     return `<section class="photo-editor"><h3>Ajuste sua foto</h3><p>Arraste para enquadrar. Use dois dedos ou a roda do mouse para ampliar. Centralizar restaura a posição.</p><div class="photo-crop-preview"><canvas width="256" height="256" data-photo-canvas aria-label="Prévia do recorte da foto"></canvas></div><div class="photo-zoom-controls"><button type="button" data-photo-action="zoom-out" aria-label="Diminuir zoom">−</button><output data-photo-zoom>${Math.round(this.zoom*100)}%</output><button type="button" data-photo-action="zoom-in" aria-label="Aumentar zoom">+</button><button type="button" data-photo-action="reset">Centralizar</button></div><div><button type="button" data-photo-action="apply">Usar este recorte</button><button type="button" data-photo-action="cancel">Cancelar recorte</button></div></section>`;

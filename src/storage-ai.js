@@ -358,7 +358,7 @@ export class StorageAI {
   constructor(studio) {
     this.studio=studio;
     this.photoFiles=[];
-    this.messages=[];this.sessions=[];this.activeChatId='';this.sessionsUser=null;this.busy=false;this.showCount=false;this.attachmentOpen=false;
+    this.messages=[];this.sessions=[];this.activeChatId='';this.sessionsUser=null;this.busy=false;this.showCount=false;this.attachmentOpen=false;this.freshPending=false;
     this.quota=null;this.lastPrompt='';
     this.previews=new Map();
     this.previewModels=new CanvasModels();
@@ -748,6 +748,13 @@ export class StorageAI {
     this.queueCloudSave();
   }
   newChat(){if(this.busy)return;this.saveSessions();this.newSession();this.clearAttachments();this.renderCreate();}
+  startFresh(){
+    if(this.busy)return;
+    const active=this.sessions.find(s=>s.id===this.activeChatId);
+    const talked=active?.messages?.some(message=>message.role==='user');
+    if(!active||talked)this.newSession(false);
+    this.draftPrompt='';this.clearAttachments();
+  }
   switchChat(id){if(this.busy)return;const session=this.sessions.find(s=>s.id===id);if(!session)return;this.activeChatId=id;this.messages=session.messages;this.draftPrompt='';this.clearAttachments();this.saveSessions();this.renderCreate();}
   clearAttachments(){
     this.photoFiles=[];
@@ -806,6 +813,9 @@ export class StorageAI {
   }
   createMarkup() {
     this.ensureSessions();
+    // Entrar no Storage AI começa uma conversa nova. A conversa anterior
+    // continua no histórico, mas não é reaberta sozinha.
+    if(this.freshPending){this.freshPending=false;this.startFresh();}
     const session=this.sessions.find(s=>s.id===this.activeChatId);
     const revising=Boolean(linkedLessonId(session));
     const history=this.sessions.map(s=>`<div class="ai-history-row ${s.id===this.activeChatId?'active':''}"><button type="button" data-ai-action="open-chat" data-chat-id="${esc(s.id)}" ${this.busy?'disabled':''}><span>${studioIcon('chat')}</span><span>${esc(s.title||'Nova conversa')}</span></button><button type="button" data-ai-action="delete-chat" data-chat-id="${esc(s.id)}" aria-label="Excluir conversa" title="Excluir conversa" ${this.busy?'disabled':''}>${closeIcon}</button></div>`).join('');

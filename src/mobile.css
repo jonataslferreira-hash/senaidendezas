@@ -1,5 +1,34 @@
 /* Student screens have their own reading and touch layout. Authored slide colors stay intact. */
 .student-expand{display:block;margin:12px auto;border:1px solid #a88acb55;background:#bda1e51a;border-radius:12px;color:#9872b8;font:inherit;padding:12px 18px;min-height:44px;cursor:pointer}
+
+/* Atalhos junto à marca e perfil no rodapé da navegação. */
+#app .studio-rail .rail-quick-actions{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px;margin:14px 0 0}
+#app .studio-rail .rail-quick-actions .studio-btn{display:flex;flex-direction:column;justify-content:center;align-items:center;gap:5px;min-height:58px;min-width:0;padding:7px 4px;text-align:center;font-size:11px;line-height:1.2}
+#app .studio-rail .rail-profile{margin-top:auto;padding:14px 6px 8px;border-top:1px solid var(--studio-line,#ffffff12)}
+.studio-topbar{display:none}
+.studio-topbar .studio-wordmark{min-width:0}
+.studio-topbar [data-account-profile]{margin-left:auto;min-width:0}
+.studio-topbar .studio-account-button{max-width:190px}
+@media(max-width:900px){
+  /* O menu deixa de ser uma fileira de ícones espremida ao lado da logo. */
+  #app .studio-shell>.studio-rail{display:none!important}
+  #app .studio-topbar{display:flex;align-items:center;gap:10px;height:62px;min-height:62px;max-height:62px;padding:0 14px;position:sticky;top:0;z-index:30;background:color-mix(in srgb,var(--ui-panel,var(--studio-panel,#ffffff)) 86%,transparent);backdrop-filter:blur(16px) saturate(140%);border-bottom:1px solid var(--studio-line,#ffffff12);overflow:hidden}
+  #app .studio-topbar .studio-wordmark{font-size:19px;gap:8px;padding:0;white-space:nowrap;overflow:hidden}
+  #app .studio-topbar .studio-wordmark .lab-logo{width:34px;height:34px;border-radius:10px}
+  #app .studio-topbar .studio-account-button{display:inline-flex;align-items:center;gap:7px;max-width:min(40vw,160px);min-height:40px;padding:5px 9px 5px 5px;border-radius:999px;overflow:hidden}
+  #app .studio-topbar .studio-account-button>span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:12px}
+  #app .studio-topbar .ai-nav-toggle{flex:0 0 38px;width:38px;height:38px}
+  #app .studio-drawer>.studio-rail{display:flex!important;flex-direction:column;align-items:stretch;justify-content:flex-start;gap:0;padding:18px 14px calc(18px + env(safe-area-inset-bottom));height:100%;overflow:auto}
+  #app .studio-drawer .studio-rail nav{flex-direction:column;margin-top:20px;gap:7px}
+  #app .studio-drawer .rail-link{width:100%;font-size:12px;justify-content:flex-start}
+  #app .ai-drawer .studio-rail nav{margin-bottom:16px}
+}
+@media(max-width:380px){
+  #app .studio-topbar{gap:7px;padding-inline:9px}
+  #app .studio-topbar .studio-wordmark{font-size:16px;gap:5px}
+  #app .studio-topbar .studio-wordmark .lab-logo{width:29px;height:29px}
+}
+
 @media(max-width:700px){
   #app[data-role=student] .header{padding:14px 18px;min-height:66px;position:sticky;top:0;z-index:10;backdrop-filter:blur(12px)}
   #app[data-role=student] .header-center{display:none}#app[data-role=student] .header-right{margin-left:auto;gap:8px}#app[data-role=student] .connection{font-size:10px}
@@ -19,3 +48,99 @@
 html[data-appearance=light] #app[data-role=student] .room-code{color:#76548d}html[data-appearance=light] #app[data-role=student] .room-code strong{color:#65447e}
 html[data-appearance=light] #app[data-role=student] .callout p{color:#6d5287}
 #app[data-role=student] .answer-option:disabled{opacity:1}#app[data-role=student] .quiz-music-note{display:none}
+
+/* Editor no celular inspirado no Canva: cabeçalho fixo, tela cheia para o
+   slide, faixa de páginas e uma barra de ferramentas flutuante embaixo. */
+@media(max-width:900px){
+  html body #app .editor-shell .studio-editor{padding:0 0 calc(88px + env(safe-area-inset-bottom));max-width:100%;min-height:100dvh}
+  html body #app .editor-shell .editor-heading{position:sticky;top:0;z-index:32;margin:0;padding:8px 12px;min-height:56px;display:flex!important;flex-direction:row!important;align-items:center!important;justify-content:space-between;gap:10px!important;flex-wrap:nowrap!important;background:color-mix(in srgb,var(--ui-panel,#ffffff) 86%,transparent);border-bottom:1px solid var(--ui-line,#ffffff12);backdrop-filter:blur(18px) saturate(160%)}
+  html body #app .editor-shell .editor-heading>div:first-child{flex-wrap:nowrap;justify-content:flex-start!important;gap:8px;min-width:0;flex:1}
+  html body #app .editor-shell .editor-back{flex:0 0 36px;width:36px;min-height:36px;padding:6px;border-radius:12px}
+  html body #app .editor-shell .editor-title{font-size:14px;max-width:100%;min-width:0;letter-spacing:-.2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  html body #app .editor-shell .editor-context{display:flex;align-items:center;gap:6px;margin:0;padding:0;border:0;background:none;flex:0 0 auto;min-width:0}
+  html body #app .editor-shell .editor-context>[data-editor-music]{display:none}
+  html body #app .editor-shell .editor-context .studio-account-button{padding:7px 11px;border:1px solid var(--ui-line,#e8e0ef);background:var(--ui-panel,#ffffff);border-radius:11px;min-height:36px;max-width:none;font-size:11px;font-weight:650;line-height:1;white-space:nowrap;display:inline-flex;align-items:center;gap:6px}
+  html body #app .editor-shell .editor-context .studio-account-button>span:last-child{display:none}
+  html body #app .editor-shell .editor-command-row{flex-wrap:nowrap;justify-content:flex-start;gap:8px;margin:0;padding:8px 12px;overflow-x:auto;border-bottom:1px solid var(--ui-line,#ffffff12);scrollbar-width:none}
+  html body #app .editor-shell .editor-command-row::-webkit-scrollbar{display:none}
+  html body #app .editor-shell .editor-tabs{flex:none;border:0;margin:0;gap:3px;padding:4px;background:var(--ui-soft,#f3edf7);border-radius:13px}
+  html body #app .editor-shell .editor-tabs button{padding:7px 10px;border:0;border-radius:9px;font-size:12px;white-space:nowrap;color:var(--ui-muted,#847590)}
+  html body #app .editor-shell .editor-tabs button[aria-selected=true]{background:var(--ui-panel,#ffffff);color:var(--ui-accent,#7950b4);box-shadow:0 1px 4px #2b143f26}
+  html body #app .editor-shell .editor-top-actions{flex:none;margin:0;gap:6px;flex-wrap:nowrap}
+  html body #app .editor-shell .editor-top-actions .studio-btn{min-height:38px;padding:8px 11px;white-space:nowrap;font-size:11px}
+  html body #app .editor-shell .editor-more summary{min-height:38px;padding:8px 12px}
+  html body #app .editor-shell .editor-workspace{display:flex!important;flex-direction:column;gap:0;min-height:0;overflow:visible;align-items:stretch}
+  html body #app .editor-shell .visual-workspace{transform:none!important}
+  html body #app .editor-shell .editor-preview-area{display:none!important}
+
+  /* Faixa horizontal de páginas, como no Canva. */
+  html body #app .editor-shell .editor-outline{order:0;position:static;max-height:none;overflow:visible;display:flex;align-items:center;gap:6px;margin:0;padding:8px 12px;border-bottom:1px solid var(--ui-line,#ffffff12);background:color-mix(in srgb,var(--ui-panel,#ffffff) 92%,transparent)}
+  html body #app .editor-shell .editor-outline .outline-heading{display:none}
+  html body #app .editor-shell .editor-outline .outline-actions{display:flex;flex:none;gap:4px;padding:0}
+  html body #app .editor-shell .editor-outline .outline-actions>button{width:32px;min-width:32px;height:32px;min-height:32px;padding:0;border-radius:9px;font-size:13px}
+  html body #app .editor-shell .editor-outline .outline-items{display:flex;flex:1;gap:7px;overflow-x:auto;overflow-y:hidden;padding:2px;scrollbar-width:none;overscroll-behavior-inline:contain}
+  html body #app .editor-shell .editor-outline .outline-items::-webkit-scrollbar{display:none}
+  html body #app .editor-shell .editor-outline .outline-item{flex:0 0 auto;width:auto;min-width:128px;max-width:180px;min-height:0;padding:7px 10px;border-radius:11px;gap:8px}
+  html body #app .editor-shell .editor-outline .outline-item>span{font-size:10px}
+  html body #app .editor-shell .editor-outline .outline-item strong{font-size:11px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;display:block}
+  html body #app .editor-shell .editor-outline .outline-item small{display:none}
+
+  html body #app .editor-shell .editor-form-area{order:1;overflow:visible!important;padding:0;border:0;background:transparent}
+  html body #app .editor-shell .slide-designer{display:block}
+  html body #app .editor-shell .designer-stage-wrap{padding:12px 10px 16px;overflow:visible!important;min-height:0;height:auto!important;max-height:none!important;display:block!important;container-type:normal!important;background:radial-gradient(circle at 50% 0,color-mix(in srgb,var(--ui-accent,#7950b4) 9%,transparent),transparent 62%)}
+  html body #app .editor-shell .designer-stage{width:100%;max-width:none;max-height:none;min-height:0;height:auto;margin:0;aspect-ratio:var(--slide-aspect,1.777778);border-radius:10px;overflow:hidden;box-shadow:0 20px 48px #1d12304d,0 0 0 1px #00000012}
+  html body #app .editor-shell .designer-layer-list{height:auto;min-height:0;margin:8px 0 0;padding:2px;gap:6px}
+  html body #app .editor-shell .designer-layer-list button{height:28px;min-height:28px;max-width:150px;font-size:10px}
+  html body #app .editor-shell .designer-inspector{margin:10px;padding:14px;border:1px solid var(--ui-line,#e8e0ef);border-radius:20px;background:var(--ui-panel,#ffffff);max-height:none;overflow:visible;box-shadow:0 10px 28px #2b143f1a}
+  html body #app .editor-shell .designer-inspector::before{content:"";display:block;width:42px;height:4px;margin:-4px auto 12px;border-radius:99px;background:var(--ui-line,#e0d9e8)}
+  html body #app .editor-shell .designer-inspector :is(input,select,textarea){font-size:16px;min-height:42px}
+  html body #app .editor-shell .designer-position-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+
+  /* Barra de ferramentas flutuante na base, sempre ao alcance do polegar. */
+  html body #app .editor-shell .item-toolbar:has(.item-tools){position:fixed;left:0;right:0;bottom:0;z-index:40;display:flex;align-items:center;gap:8px;margin:0;padding:8px 10px calc(8px + env(safe-area-inset-bottom));border-top:1px solid var(--ui-line,#ffffff12);background:color-mix(in srgb,var(--ui-panel,#ffffff) 90%,transparent);backdrop-filter:blur(20px) saturate(170%);box-shadow:0 -8px 24px #2b143f12}
+  html body #app .editor-shell .item-toolbar:has(.item-tools) .item-identity{display:none}
+  html body #app .editor-shell .item-toolbar:has(.item-tools) .item-number{font-size:8px}
+  html body #app .editor-shell .item-toolbar:has(.item-tools) .save-state{font-size:8px;white-space:nowrap}
+  html body #app .editor-shell .item-toolbar:has(.item-tools) .item-tools{flex:1;min-width:0;width:auto;overflow-x:auto;overflow-y:hidden;scrollbar-width:none}
+  html body #app .editor-shell .item-toolbar:has(.item-tools) .item-tools::-webkit-scrollbar{display:none}
+  html body #app .editor-shell .designer-toolbar{flex-wrap:nowrap;width:100%;justify-content:flex-start!important;gap:5px;padding:0;border:0;background:none}
+  html body #app .editor-shell .designer-toolbar>span{display:none}
+  html body #app .editor-shell .designer-toolbar .slide-designer button,#app .editor-shell .designer-toolbar button{min-height:40px;padding:8px 11px;border-radius:11px;font-size:11px;white-space:nowrap;display:inline-flex;align-items:center;gap:5px}
+  html body #app .editor-shell .designer-toolbar select{min-height:40px;max-width:126px;font-size:11px;border-radius:11px}
+  html body #app .editor-shell .designer-insert-more{position:relative}
+  html body #app .editor-shell .designer-insert-more>div{position:absolute;bottom:calc(100% + 10px);left:0;z-index:50;display:flex;flex-direction:column;gap:5px;min-width:190px;padding:8px;border:1px solid var(--ui-line,#e8e0ef);border-radius:14px;background:var(--ui-panel,#ffffff);box-shadow:0 18px 44px #2b143f33}
+  html body #app .editor-shell .designer-insert-more>div button{width:100%;justify-content:flex-start}
+  html body #app .editor-shell .item-toolbar:has(.designer-insert-more[open]){backdrop-filter:none}
+  html body #app .editor-shell .designer-insert-more[open]>div{
+    position:fixed;
+    top:auto;
+    left:10px;
+    right:10px;
+    bottom:calc(66px + env(safe-area-inset-bottom));
+    width:auto;
+    max-height:calc(100dvh - 100px);
+    overflow-y:auto;
+  }
+}
+@media(max-width:600px){
+  html body #app .editor-shell .editor-heading{min-height:52px;padding:7px 10px}
+  html body #app .editor-shell .editor-title{font-size:13px}
+  html body #app .editor-shell .editor-command-row{padding:6px 10px}
+  html body #app .editor-shell .editor-tabs button{font-size:11px;padding:6px 9px}
+  html body #app .editor-shell .editor-outline{padding:6px 10px}
+  html body #app .editor-shell .designer-toolbar>select{display:none}
+  html body #app .editor-shell .designer-stage-wrap{padding:10px 8px 14px}
+  html body #app .editor-shell .designer-inspector{margin:8px;padding:12px;border-radius:17px}
+  html body #app .editor-shell .designer-toolbar .slide-designer button,#app .editor-shell .designer-toolbar button{min-height:42px;padding:9px 12px;font-size:11.5px}
+}
+
+/* Zoom suave quando o cartão chega ao meio da tela no celular. */
+@media(max-width:900px){
+  @supports (animation-timeline: view()){
+    #app :is(.lesson-card,.shared-card,.outline-item){animation:mobile-focus-zoom linear both;animation-timeline:view();animation-range:entry 4% cover 58%}
+    @keyframes mobile-focus-zoom{0%{transform:scale(.965)}55%{transform:scale(1.012)}100%{transform:scale(1)}}
+  }
+}
+@media(prefers-reduced-motion:reduce){
+  #app :is(.lesson-card,.shared-card,.outline-item){animation:none!important}
+}

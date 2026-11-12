@@ -180,7 +180,7 @@ export function expandImageQuery(query){
 }
 
 const searchWords=value=>String(value||'').toLowerCase().normalize('NFD').replace(/\p{M}/gu,'').match(/[\p{L}\p{N}]+/gu)||[];
-const imageStopWords=new Set('com sem para por uma dos das que and the with from foto imagem ilustracao photo image illustration futuro future conclusao conclusion introducao introduction mudancas changes logo logotipo logomarca png svg'.split(' '));
+const imageStopWords=new Set('com sem para por uma dos das que and the with from foto imagem ilustracao photo image illustration futuro future conclusao conclusion introducao introduction mudancas changes logo logotipo logomarca png svg personagem personagens character characters boneco boneca toy brinquedo desenho cartoon anime manga mascote mascot fundo background transparente transparent render wallpaper papel parede hd 4k'.split(' '));
 const subjectWords=value=>[...new Set(searchWords(value).filter(word=>word.length>2&&!imageStopWords.has(word)).map(word=>word.replace(/s$/,'')))];
 const isLogoQuery=value=>searchWords(value).some(word=>['logo','logotipo','logomarca'].includes(word));
 const isLogoTitle=value=>searchWords(value).some(word=>['logo','logotipo','logomarca','icon','icone','symbol','simbolo'].includes(word));
@@ -198,7 +198,8 @@ function choiceFromWorker(item){
     catalog:clean(item.catalog)||'Catálogo livre',
     kind:clean(item.kind),
     width:Number(item.width)||0,
-    height:Number(item.height)||0
+    height:Number(item.height)||0,
+    score:Number(item.score)||0
   };
 }
 
@@ -277,6 +278,7 @@ export async function findSlideImage(query, { transparent = false, aspectRatio =
     .filter(item=>item.relevance>=minimum)
     .sort((a,b)=>{
       if(b.relevance!==a.relevance)return b.relevance-a.relevance;
+      if(b.choice.score!==a.choice.score)return b.choice.score-a.choice.score;
       const ratio=choice=>choice.width&&choice.height?Math.abs(Math.log((choice.width/choice.height)/aspectRatio)):0;
       return ratio(a.choice)-ratio(b.choice);
     })
@@ -368,7 +370,7 @@ export async function searchImageChoices(query,page=1){
         logo:title.some(word=>['logo','logotipo','icon','icone'].includes(word))};
     })
     .filter(item=>!logo||!subjects.length||(item.match>0&&isLogoTitle(item.choice.title)))
-    .sort((a,b)=>b.relevance-a.relevance||b.match-a.match||Number(b.logo)-Number(a.logo)||a.index-b.index)
+    .sort((a,b)=>b.relevance-a.relevance||b.choice.score-a.choice.score||b.match-a.match||Number(b.logo)-Number(a.logo)||a.index-b.index)
     .map(item=>item.choice);
   const worker=await workerJson('/storage-ai/images?q='+encodeURIComponent(term)+'&page='+String(page)+'&limit=24');
   if(worker?.items?.length){

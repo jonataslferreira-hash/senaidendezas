@@ -1,4 +1,5 @@
 const paths = {
+  add:'M12 5v14M5 12h14',
   palette:'M12 3a9 9 0 1 0 0 18h1a2 2 0 0 0 1.5-3.3A1 1 0 0 1 15.3 16H18a3 3 0 0 0 3-3c0-6-4-10-9-10ZM7 11h.1M10 7h.1M15 7h.1M17 11h.1',
   sidebar: 'M3 5h18v14H3zM9 5v14',
   animate: 'M8 5l12 7-12 7zM3 8v8',
