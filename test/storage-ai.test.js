@@ -115,3 +115,60 @@ test('storageAI usa Groq primeiro e preserva as falhas de cada serviço quando a
  assert.equal(failed.status,502);
  assert.deepEqual(await failed.json(),{error:'ai_providers_failed',providers:[{provider:'groq',reason:'limit'},{provider:'gemini',reason:'access_denied'}]});
 });
+
+test('storageAI consulta o título do slide sem erro quando imageSearch não encontra foto',async t=>{
+ const {createServer}=await import('vite');
+ const previousR2=process.env.VITE_R2_API_URL;
+ const previousStorage=Object.getOwnPropertyDescriptor(globalThis,'localStorage');
+ const previousDocument=Object.getOwnPropertyDescriptor(globalThis,'document');
+ process.env.VITE_R2_API_URL='https://storage-lab-files.lagujf.workers.dev';
+ const server=await createServer({server:{middlewareMode:true},appType:'custom',logLevel:'silent'});
+ try{
+  const store=new Map();
+  globalThis.localStorage={getItem:k=>store.get(k)??null,setItem:(k,v)=>store.set(k,String(v))};
+  globalThis.document={hidden:true,createElement:()=>({style:{},content:{textContent:''}}),querySelector:()=>null};
+  const searched=[];
+  t.mock.method(globalThis,'fetch',async url=>{
+   const target=String(url);
+   if(target.endsWith('/storage-ai')){
+    return Response.json({
+     title:'Armazenamento Moderno',chatTitle:'HDD e SSD',description:'Comparação entre HDD e SSD',
+     slides:[{title:'Disco rígido',body:'Armazenamento magnético.',imageSearch:'semresultadoxyz',theme:'ocean'}]
+    });
+   }
+   if(target.includes('commons.wikimedia.org')){
+    searched.push(new URL(target).searchParams.get('gsrsearch')||'');
+    return Response.json({query:{pages:[]}});
+   }
+   return Response.json({query:{search:[],pages:[]},items:[]});
+  });
+  const {StorageAI}=await server.ssrLoadModule('/src/storage-ai.js');
+  const studio={
+   root:{addEventListener(){},querySelector(){return null;}},
+   account:{user:{id:'u1'},client:{auth:{getSession:async()=>({data:{session:{access_token:'tok'}}})}},show(){},profile(){return '';}},
+   callbacks:{render(){},toast(){}},
+   library:{lessons:[],import:l=>l,save:l=>l},
+   groups:{canEdit:true,isShared:()=>false},
+   cloudLinks:{},cloudItems:[],linkCloud(){},cloudAction:async()=>{},view:'storage-ai'
+  };
+  const ai=new StorageAI(studio);
+  ai.ensureSessions();
+  ai.sessions[0].slideCount=1;
+  await ai.create({elements:{prompt:{value:'Crie slides sobre HDD e SSD',focus(){}}}});
+  assert.equal(ai.messages.some(message=>/spec is not defined/i.test(message.text||'')),false);
+  assert.ok(searched.some(query=>query.includes('semresultadoxyz')));
+  assert.ok(searched.some(query=>query.includes('hard disk')));
+  assert.ok(searched.some(query=>query.includes('Armazenamento Moderno')));
+  const preview=ai.previews.get(ai.activeChatId);
+  assert.ok(preview);
+  assert.equal(preview.lesson.slides.length,3);
+ }finally{
+  if(previousR2===undefined)delete process.env.VITE_R2_API_URL;
+  else process.env.VITE_R2_API_URL=previousR2;
+  if(previousStorage)Object.defineProperty(globalThis,'localStorage',previousStorage);
+  else delete globalThis.localStorage;
+  if(previousDocument)Object.defineProperty(globalThis,'document',previousDocument);
+  else delete globalThis.document;
+  await server.close();
+ }
+});
