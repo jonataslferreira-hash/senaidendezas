@@ -13,6 +13,6 @@ export const themes=[
   ['galaxy','Galáxia','linear-gradient(135deg,#4957a1 0%,#7560b5 54%,#ba77b3 100%)'],
   ['citrus','Citrino','linear-gradient(135deg,#c0d883 0%,#79c997 52%,#4bbab1 100%)']
 ];
-export const styles=[['classic','Clássico'],['glass','Liquid Glass'],['aero','Frutiger Aero'],['minimal','Minimalista'],['editorial','Editorial'],['arcade','Arcade']];
+export const styles=[['classic','Clássico'],['glass','Liquid Glass'],['aero','Frutiger Aero'],['minimal','Minimalista'],['editorial','Office'],['arcade','8-Bit']];
 export const validTheme=value=>themes.some(([id])=>id===value)?value:'violet';
 export const validStyle=value=>value==='material'?'editorial':styles.some(([id])=>id===value)?value:'classic';

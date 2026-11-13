@@ -4,6 +4,7 @@ import { validateAudio } from './audio-data.js';
 import { validateCustomModel } from './model-files.js';
 import { openSlideThemes } from './open-slide-themes.js';
 import { studioSlideThemes } from './studio-slide-themes.js';
+import { simulationIds } from './simulations.js';
 export const canvasThemes = {
   midnight: { name: 'Noite violeta', background: '#171324', color: '#f1eaff', accent: '#baa4f4' },
   paper: { name: 'Papel', background: '#f8f6f0', color: '#202332', accent: '#654ca0' },
@@ -104,7 +105,7 @@ export function normalizeElements(elements, draft, validateImage) {
     const image = validateImage(e.image), customModel = validateCustomModel(e.customModel, draft);
     if (!draft && e.type === 'image' && !image && !assetId) throw Error('Carregue a imagem do elemento antes de apresentar.');
     if (!draft && e.type === 'model' && e.model === 'custom' && !customModel) throw Error('Carregue o modelo 3D do elemento antes de apresentar.');
-    return { ...newElement(e.type), simulation:['projectile','pendulum','neutralization','circuit'].includes(e.simulation)?e.simulation:'projectile', id, x: Math.max(-1000, Math.min(1000, number(e.x, 8))), y: Math.max(-1000, Math.min(1000, number(e.y, 15))), w, h,
+    return { ...newElement(e.type), simulation: simulationIds.includes(e.simulation) ? e.simulation : 'projectile', id, x: Math.max(-1000, Math.min(1000, number(e.x, 8))), y: Math.max(-1000, Math.min(1000, number(e.y, 15))), w, h,
       fontFamily:String(e.fontFamily||'Arial').replace(/["'<>;{}\\]/g,'').slice(0,100),italic:Boolean(e.italic),rotation:Math.max(-360,Math.min(360,number(e.rotation,0))),verticalAlign:e.verticalAlign==='center'?'center':e.verticalAlign==='end'?'end':'start',textPadding:Array.isArray(e.textPadding)&&e.textPadding.length===4?e.textPadding.map(n=>Math.max(0,Math.min(200,number(n,0)))):[0,0,0,0],text: String(e.text || '').slice(0, 6000), role: e.role === 'title' ? 'title' : '', fontSize: Math.max(1, Math.min(512, number(e.fontSize, 36))), color: colorValue(e.color), bold: Boolean(e.bold),
       align: ['left', 'center', 'right'].includes(e.align) ? e.align : 'left', background: colorValue(e.background, '#b7a0e8'), image, imageAlt: String(e.imageAlt || '').slice(0, 500),
       imageZoom: imageZoomValue(e.imageZoom), imageX: number(e.imageX, 0), imageY: number(e.imageY, 0),

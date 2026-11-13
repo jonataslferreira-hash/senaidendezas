@@ -1,52 +1,62 @@
+/* Office (editorial): Fluent ribbons, crisp white/charcoal surfaces and PowerPoint selection rings. */
 html[data-theme][data-ui-style=editorial] {
-  --space-heading: Georgia, 'Times New Roman', serif;
-  --space-radius: 3px;
-  --space-shadow: 0 8px 24px #271e160f;
-  --ui-base: hsl(var(--personal-hue) 16% 93%);
-  --ui-panel: #fffdf7;
-  --ui-soft: hsl(var(--personal-hue) 23% 94%);
-  --ui-ink: #292520;
-  --ui-muted: #62594e;
-  --ui-line: #c8bfb1;
-  --space-backdrop: repeating-linear-gradient(0deg, transparent 0 27px, #69594512 28px 29px);
+  --space-heading: 'Segoe UI', system-ui, sans-serif;
+  --space-radius: 6px;
+  --control-radius: 4px;
+  --space-shadow: 0 2px 8px rgba(0, 0, 0, .07), 0 0 1px rgba(0, 0, 0, .08);
+  --ui-base: #f3f2f1;
+  --ui-panel: #ffffff;
+  --ui-soft: #f6f5f4;
+  --ui-ink: #242424;
+  --ui-muted: #616161;
+  --ui-line: #e1dfdd;
+  --space-backdrop: linear-gradient(180deg, color-mix(in srgb, var(--ui-accent), transparent 93%) 0%, transparent 230px);
 }
 html[data-theme][data-ui-style=editorial][data-appearance=dark] {
-  --ui-base: #201d19;
-  --ui-panel: #2c2721;
-  --ui-soft: hsl(var(--personal-hue) 14% 24%);
-  --ui-ink: #fff4e5;
-  --ui-muted: #d1bfaa;
-  --ui-line: #766a5a;
-  --space-backdrop: repeating-linear-gradient(0deg, transparent 0 27px, #f0d6ab12 28px 29px);
+  --ui-base: #1f1f1f;
+  --ui-panel: #292929;
+  --ui-soft: #333333;
+  --ui-ink: #ffffff;
+  --ui-muted: #c8c6c4;
+  --ui-line: #3e3e3e;
+  --space-shadow: 0 4px 14px rgba(0, 0, 0, .35), 0 0 1px rgba(255, 255, 255, .08);
+  --space-backdrop: linear-gradient(180deg, color-mix(in srgb, var(--ui-accent), transparent 90%) 0%, transparent 230px);
 }
+/* 8-Bit (arcade): classic handheld/CRT pixel frames, hard 0-blur shadows and tactile bevels. */
 html[data-theme][data-ui-style=arcade] {
-  --space-heading: 'Courier New', monospace;
-  --space-radius: 8px;
+  --space-heading: 'Lucida Console', 'Courier New', ui-monospace, monospace;
+  --space-radius: 0px;
+  --control-radius: 0px;
   --space-shadow: 3px 3px 0 var(--ui-line);
-  --ui-base: hsl(var(--personal-hue) 32% 90%);
-  --ui-panel: hsl(var(--personal-hue) 45% 98%);
-  --ui-soft: hsl(var(--personal-hue) 46% 91%);
-  --ui-ink: #16142e;
-  --ui-muted: #474465;
-  --ui-line: #575073;
-  --space-backdrop: linear-gradient(90deg,#422d6b14 1px,transparent 1px),linear-gradient(#422d6b14 1px,transparent 1px);
+  --ui-base: hsl(var(--personal-hue) 26% 90%);
+  --ui-panel: #faf8ed;
+  --ui-soft: hsl(var(--personal-hue) 34% 86%);
+  --ui-ink: #1a182d;
+  --ui-muted: #4b4768;
+  --ui-line: #1a182d;
+  --space-backdrop: radial-gradient(color-mix(in srgb, var(--ui-line), transparent 82%) 1.5px, transparent 1.5px);
 }
 html[data-theme][data-ui-style=arcade][data-appearance=dark] {
-  --ui-base: #121121;
-  --ui-panel: hsl(var(--personal-hue) 26% 17%);
-  --ui-soft: hsl(var(--personal-hue) 32% 24%);
-  --ui-ink: #fbf8ff;
-  --ui-muted: #d0c6eb;
-  --ui-line: hsl(var(--personal-hue) 45% 55%);
-  --space-backdrop: linear-gradient(90deg,#ad92ec20 1px,transparent 1px),linear-gradient(#ad92ec20 1px,transparent 1px);
+  --ui-base: #131126;
+  --ui-panel: #1c1936;
+  --ui-soft: #29254c;
+  --ui-ink: #f9f7ee;
+  --ui-muted: #bdb6e0;
+  --ui-line: hsl(var(--personal-hue) 70% 66%);
+  --space-shadow: 3px 3px 0 #070612;
+  --space-backdrop: radial-gradient(color-mix(in srgb, var(--ui-line), transparent 76%) 1.5px, transparent 1.5px);
 }
 html[data-theme]:is([data-ui-style=editorial],[data-ui-style=arcade]) #app:not([data-scene=present]) {
   background-color: var(--ui-base);
   color: var(--ui-ink);
 }
-html[data-theme]:is([data-ui-style=editorial],[data-ui-style=arcade]) #app .studio-shell {
+html[data-theme][data-ui-style=editorial] #app .studio-shell {
   background: var(--space-backdrop), var(--ui-base)!important;
-  background-size: 28px 29px!important;
+  color: var(--ui-ink);
+}
+html[data-theme][data-ui-style=arcade] #app .studio-shell {
+  background: var(--space-backdrop), var(--ui-base)!important;
+  background-size: 14px 14px!important;
   color: var(--ui-ink);
 }
 html[data-theme]:is([data-ui-style=editorial],[data-ui-style=arcade]) #app :is(.studio-rail,.studio-header,.editor-heading,.editor-command-row,.item-toolbar,.editor-outline,.designer-inspector,.account-dialog,.music-panel,.shared-hero,.shared-card,.experience-feature,.compact-join,.lesson-card,.new-lesson-card,.chat-panel) {
@@ -58,25 +68,67 @@ html[data-theme]:is([data-ui-style=editorial],[data-ui-style=arcade]) #app :is(.
 html[data-theme]:is([data-ui-style=editorial],[data-ui-style=arcade]) #app :is(.shared-hero,.shared-card,.experience-feature,.compact-join,.lesson-card,.account-dialog) {
   box-shadow: var(--space-shadow);
 }
-html[data-theme]:is([data-ui-style=editorial],[data-ui-style=arcade]) #app :is(.studio-btn,.studio-account-button,.outline-item,.designer-toolbar button,.designer-toolbar summary,.profile-photo-button) {
+html[data-theme][data-ui-style=editorial] #app :is(.studio-btn,.studio-account-button,.outline-item,.designer-toolbar button,.designer-toolbar summary,.profile-photo-button) {
   color: var(--ui-ink)!important;
   background: var(--ui-soft)!important;
   border: 1px solid var(--ui-line)!important;
-  border-radius: var(--space-radius)!important;
+  border-radius: var(--control-radius)!important;
 }
-html[data-theme]:is([data-ui-style=editorial],[data-ui-style=arcade]) #app :is(.studio-btn.accent,.card-present,.rail-link.active,.outline-item.active) {
+html[data-theme][data-ui-style=editorial] #app :is(.studio-btn.accent,.card-present,.rail-link.active) {
   color: var(--ui-accent-ink)!important;
   background: var(--ui-accent)!important;
+  border-color: var(--ui-accent)!important;
+}
+html[data-theme][data-ui-style=editorial] #app .outline-item {
+  background: var(--ui-panel)!important;
+  border-radius: 6px!important;
+}
+html[data-theme][data-ui-style=editorial] #app .outline-item.active {
+  background: var(--ui-panel)!important;
+  color: var(--ui-ink)!important;
+  border-color: var(--ui-accent)!important;
+  box-shadow: 0 0 0 2px var(--ui-accent)!important;
+}
+html[data-theme][data-ui-style=editorial] #app .editor-command-row .editor-tabs {
+  background: var(--ui-soft)!important;
+  border-radius: 6px!important;
+}
+html[data-theme][data-ui-style=editorial] #app .editor-command-row .editor-tabs > button[role=tab][aria-selected=true] {
+  border-radius: 4px!important;
+  border-bottom: 2.5px solid var(--ui-accent)!important;
+}
+html[data-theme][data-ui-style=arcade] #app :is(.studio-btn,.studio-account-button,.outline-item,.designer-toolbar button,.designer-toolbar summary,.profile-photo-button) {
+  color: var(--ui-ink)!important;
+  background: var(--ui-soft)!important;
+  border: 2px solid var(--ui-line)!important;
+  border-radius: 0!important;
+  box-shadow: inset 2px 2px 0 rgba(255,255,255,.35), inset -2px -2px 0 rgba(0,0,0,.2), 2px 2px 0 var(--ui-line)!important;
+}
+html[data-theme][data-ui-style=arcade] #app :is(.studio-btn.accent,.card-present,.rail-link.active,.outline-item.active) {
+  color: var(--ui-accent-ink)!important;
+  background: var(--ui-accent)!important;
+  border-color: var(--ui-line)!important;
+}
+html[data-theme][data-ui-style=arcade] #app :is(.studio-rail,.studio-header,.editor-heading,.editor-command-row,.item-toolbar,.editor-outline,.designer-inspector,.account-dialog,.music-panel,.shared-hero,.shared-card,.experience-feature,.compact-join,.lesson-card,.new-lesson-card,.chat-panel) {
+  border-width: 2px!important;
+}
+html[data-theme][data-ui-style=arcade] #app :is(input:not([type=color]):not([type=checkbox]):not([type=radio]),textarea,select) {
+  border: 2px solid var(--ui-line)!important;
+  border-radius: 0!important;
+}
+html[data-theme][data-ui-style=arcade] #app :is(.studio-btn,.studio-account-button,.designer-toolbar button):active:not(:disabled) {
+  transform: translate(1px, 1px);
+  box-shadow: inset 1px 1px 0 rgba(0,0,0,.2)!important;
 }
 html[data-theme]:is([data-ui-style=editorial],[data-ui-style=arcade]) #app .outline-item.active strong {color:inherit}
 html[data-theme]:is([data-ui-style=editorial],[data-ui-style=arcade]) #app :is(.studio-btn,.studio-account-button):hover:not(:disabled) {box-shadow:var(--space-shadow)}
 html[data-theme]:is([data-ui-style=editorial],[data-ui-style=arcade]) #app :is(.studio-library,.shared-page,.studio-join,.account-dialog) :is(h1,h2,h3) {
   font-family:var(--space-heading);
-  letter-spacing:-.035em;
+  letter-spacing:-.025em;
   color:var(--ui-ink);
 }
 html[data-theme]:is([data-ui-style=editorial],[data-ui-style=arcade]) #app .account-dialog :is(label,input,select,textarea){color:var(--ui-ink)}
-html[data-theme][data-ui-style=arcade] #app :is(.studio-wordmark,.editor-title,.outline-heading){font-family:var(--space-heading)}
+html[data-theme][data-ui-style=arcade] #app :is(.studio-wordmark,.editor-title,.outline-heading){font-family:var(--space-heading);text-transform:uppercase;letter-spacing:.04em}
 #app .editor-shell :is(.mobile-slide-previews,.mobile-primary-actions,.mobile-activity-list){display:none}
 #app .storage-ai-page .ai-composer{
   grid-template-columns:36px minmax(0,1fr) repeat(3,36px);
@@ -105,7 +157,7 @@ html[data-theme][data-ui-style=arcade] #app :is(.studio-wordmark,.editor-title,.
 .mobile-stages-dialog button[aria-current=step]{outline:2px solid var(--ui-ink);outline-offset:-3px}
 .image-replacement [data-image-device]{margin-block:8px 14px}
 @media(min-width:901px){
-  #app .editor-shell{--inspector-width:clamp(218px,18vw,260px)}
+  #app .editor-shell{--inspector-width:clamp(248px,19.5vw,286px)}
   #app .editor-shell:has(.storage-ai-inspector){--inspector-width:clamp(310px,26vw,360px)}
 }
 @media(max-width:900px){
@@ -138,14 +190,6 @@ html[data-theme][data-ui-style=arcade] #app :is(.studio-wordmark,.editor-title,.
   html[data-ui-style] body #app .editor-shell .designer-stage{width:min(100%,calc(100cqh * var(--slide-aspect,1.777778)))}
   html[data-ui-style] body #app .editor-shell .designer-inspector:has(.storage-ai-inspector){max-height:48dvh;padding:0}
   #app .storage-ai-inspector .ai-composer textarea[name=prompt]{width:100%;flex:1;grid-column:auto;min-height:44px}
-}
-html[data-ui-style=editorial] #app :is(.studio-rail,.account-dialog,.lesson-card,.designer-inspector):not(:has(.storage-ai-inspector)){
-  background-image:repeating-linear-gradient(0deg,transparent 0 3px,color-mix(in srgb,var(--ui-line) 12%,transparent) 4px),linear-gradient(125deg,var(--ui-panel),var(--ui-soft));
-  border-color:var(--ui-line);
-}
-html[data-ui-style=arcade] #app :is(.studio-btn,.outline-item,.lesson-card,.designer-toolbar button){
-  border-radius:0;
-  clip-path:polygon(4px 0,calc(100% - 4px) 0,calc(100% - 4px) 4px,100% 4px,100% calc(100% - 4px),calc(100% - 4px) calc(100% - 4px),calc(100% - 4px) 100%,4px 100%,4px calc(100% - 4px),0 calc(100% - 4px),0 4px,4px 4px);
 }
 html[data-ui-style=arcade] #app :is(.profile-avatar img,.music-cover-button img,.studio-wordmark img){image-rendering:pixelated}
 .editor-icon-hint{
@@ -364,3 +408,192 @@ dialog#storage-image-search{height:min(720px,calc(100dvh - 32px));gap:16px;borde
 #storage-image-search .image-search-choice .image-search-title{font-size:12px;font-weight:650;color:var(--ui-ink);line-height:1.4}
 #storage-image-search .image-search-choice .image-search-credit{font-size:11px;color:var(--ui-ink);opacity:.8}
 @media(max-width:480px){dialog#storage-image-search{padding:16px;border-radius:20px;gap:12px}#storage-image-search .image-search-results{grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}}
+
+/* Unified editor stage mat, sleek slim scrollbars, inspector cards, and crisp layer chips */
+html[data-theme][data-ui-style] #app .editor-shell .designer-stage-wrap {
+  background-color: color-mix(in srgb, var(--ui-base), transparent 28%)!important;
+  background-image: radial-gradient(color-mix(in srgb, var(--ui-ink), transparent 87%) 1px, transparent 1px)!important;
+  background-size: 16px 16px!important;
+}
+html[data-theme]:is([data-ui-style=glass],[data-ui-style=aero]) #app .editor-shell .designer-stage-wrap {
+  background-color: color-mix(in srgb, var(--ui-panel), transparent 62%)!important;
+}
+html[data-theme][data-ui-style=editorial] #app .editor-shell .designer-stage-wrap {
+  background-color: #e6e5e3!important;
+  background-image: none!important;
+}
+html[data-theme][data-ui-style=editorial][data-appearance=dark] #app .editor-shell .designer-stage-wrap {
+  background-color: #161616!important;
+}
+html[data-theme][data-ui-style=arcade] #app .editor-shell .designer-stage-wrap {
+  background-color: color-mix(in srgb, var(--ui-base), transparent 14%)!important;
+  background-image: radial-gradient(color-mix(in srgb, var(--ui-line), transparent 78%) 1.5px, transparent 1.5px)!important;
+  background-size: 14px 14px!important;
+}
+#app .editor-shell :is(.editor-outline,.designer-inspector,#designer-layers) {
+  scrollbar-width: thin;
+  scrollbar-color: color-mix(in srgb, var(--ui-muted), transparent 55%) transparent;
+}
+#app .editor-shell :is(.editor-outline,.designer-inspector,#designer-layers)::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+#app .editor-shell :is(.editor-outline,.designer-inspector,#designer-layers)::-webkit-scrollbar-thumb {
+  background: color-mix(in srgb, var(--ui-muted), transparent 55%);
+  border-radius: 999px;
+}
+#app .editor-shell :is(.editor-outline,.designer-inspector,#designer-layers)::-webkit-scrollbar-track {
+  background: transparent;
+}
+#app .editor-shell .designer-inspector {
+  padding: 12px 14px;
+}
+#app .editor-shell .designer-selected-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding-bottom: 8px;
+  margin-bottom: 2px;
+  border-bottom: 1px solid var(--ui-line);
+}
+#app .editor-shell .inspector-layer-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 7px;
+  border-radius: 6px;
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--ui-muted);
+  background: color-mix(in srgb, var(--ui-soft), transparent 15%);
+  border: 1px solid var(--ui-line);
+  white-space: nowrap;
+}
+#app .editor-shell .inspector-section-label {
+  display: block;
+  margin: 14px 0 6px;
+  padding-top: 10px;
+  border-top: 1px solid var(--ui-line);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+  color: var(--ui-muted);
+}
+#app .editor-shell .designer-inspector label {
+  margin: 11px 0 5px;
+  font-size: 10.5px;
+  letter-spacing: .04em;
+}
+#app .editor-shell .designer-inspector :is(textarea,input:not([type=color]):not([type=checkbox]):not([type=radio]),select) {
+  border-radius: 8px!important;
+}
+#app .editor-shell .designer-inspector textarea {
+  min-height: 98px;
+}
+#app .editor-shell .designer-arrange :is(button,summary),
+#app .editor-shell .designer-image-actions button,
+#app .editor-shell .designer-format-row button,
+#app .editor-shell .slide-settings-tabs button,
+#app .editor-shell .designer-inspector details > summary {
+  border-radius: 8px!important;
+  box-shadow: none!important;
+  background: color-mix(in srgb, var(--ui-soft), transparent 15%)!important;
+  border: 1px solid var(--ui-line)!important;
+  color: var(--ui-ink)!important;
+}
+#app .editor-shell .designer-arrange [data-designer-action=delete] {
+  color: var(--ui-danger, #c93b5b)!important;
+}
+html[data-appearance=dark] #app .editor-shell .designer-arrange [data-designer-action=delete] {
+  color: #ff9eb2!important;
+}
+#app .editor-shell .designer-inspector details > summary {
+  padding: 8px 10px;
+  min-height: 36px;
+  font-size: 11.5px;
+  font-weight: 650;
+}
+#app .editor-shell .designer-inspector details[open] {
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--ui-line);
+}
+#app .editor-shell .designer-inspector details[open] > summary {
+  border-color: var(--ui-accent)!important;
+  background: var(--ui-tint)!important;
+}
+#app .editor-shell .slide-settings-tabs button[aria-selected=true],
+#app .editor-shell .designer-format-row button[aria-pressed=true] {
+  background: var(--ui-tint)!important;
+  border-color: var(--ui-accent)!important;
+  color: var(--ui-ink)!important;
+}
+html[data-ui-style=editorial] #app .editor-shell :is(.designer-arrange :is(button,summary),.designer-image-actions button,.designer-format-row button,.slide-settings-tabs button,.designer-inspector details > summary,.designer-inspector :is(textarea,input:not([type=color]):not([type=checkbox]):not([type=radio]),select)) {
+  border-radius: 4px!important;
+}
+html[data-ui-style=arcade] #app .editor-shell :is(.designer-arrange :is(button,summary),.designer-image-actions button,.designer-format-row button,.slide-settings-tabs button,.designer-inspector details > summary,.designer-inspector :is(textarea,input:not([type=color]):not([type=checkbox]):not([type=radio]),select),.inspector-layer-badge) {
+  border-radius: 0!important;
+  border-width: 2px!important;
+}
+#app .editor-shell #designer-layers {
+  background: transparent!important;
+  padding: 5px 2px 3px;
+  height: auto;
+  min-height: 36px;
+  gap: 6px;
+}
+#app .editor-shell #designer-layers .designer-layer-row {
+  display: inline-flex;
+  align-items: center;
+  flex: none;
+  gap: 0;
+  border: 1px solid var(--ui-line);
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--ui-panel), transparent 12%);
+  overflow: hidden;
+  transition: border-color .14s ease, background-color .14s ease;
+}
+#app .editor-shell #designer-layers .designer-layer-row:has(button[aria-pressed=true]) {
+  border-color: var(--ui-accent);
+  background: var(--ui-tint);
+}
+#app .editor-shell #designer-layers .designer-layer-row > button {
+  border: 0!important;
+  border-radius: 0!important;
+  box-shadow: none!important;
+  background: transparent!important;
+  backdrop-filter: none!important;
+  min-height: 28px;
+  height: 28px;
+  padding: 0 9px;
+  font-size: 11px;
+  color: var(--ui-ink)!important;
+}
+#app .editor-shell #designer-layers .designer-layer-row > button[aria-pressed=true] {
+  outline: none!important;
+  box-shadow: none!important;
+  font-weight: 700;
+}
+#app .editor-shell #designer-layers .designer-layer-row > .layer-grip {
+  min-width: 22px;
+  width: 22px;
+  min-height: 28px;
+  height: 28px;
+  border-radius: 0!important;
+  border-left: 1px solid color-mix(in srgb, var(--ui-line), transparent 38%);
+  font-size: 13px;
+  opacity: .56;
+}
+#app .editor-shell #designer-layers .designer-layer-row > .layer-grip:is(:hover,.dragging) {
+  opacity: 1;
+  background: color-mix(in srgb, var(--ui-soft), transparent 20%);
+}
+html[data-ui-style=editorial] #app .editor-shell #designer-layers .designer-layer-row {
+  border-radius: 4px;
+}
+html[data-ui-style=arcade] #app .editor-shell #designer-layers .designer-layer-row {
+  border-radius: 0;
+  border-width: 2px;
+  box-shadow: 2px 2px 0 var(--ui-line);
+}
+
