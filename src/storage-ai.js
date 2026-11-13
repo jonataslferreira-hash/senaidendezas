@@ -141,15 +141,16 @@ async function buildLesson(result,count,photos,onSlide,activities={},imageDefaul
   for(let index=0;index<searches.length;index+=4){
     await Promise.all(searches.slice(index,index+4).map(async([i,query,aspectRatio])=>{
       let image=await findSlideImage(query,{aspectRatio});
+      let titleQuery='';
       if(!image){
         // O título do slide costuma ser o termo que a pessoa digitaria no
         // Google. Vale tentar por ele antes de desistir.
-        const titleQuery=normalizeImageQuery(cleanSlideText(spec?.title,120));
+        titleQuery=normalizeImageQuery(cleanSlideText(specs[i]?.title,120));
         if(titleQuery&&titleQuery!==query)image=await findSlideImage(titleQuery,{aspectRatio});
       }
       if(!image){
         const fallback=normalizeImageQuery(text(result.title,100));
-        if(fallback&&fallback!==query)image=await findSlideImage(fallback,{aspectRatio});
+        if(fallback&&fallback!==query&&fallback!==titleQuery)image=await findSlideImage(fallback,{aspectRatio});
       }
       foundImages.set(i,image);
     }));
