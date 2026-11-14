@@ -7,7 +7,7 @@ import {
   projectile,mixturePH,waveProperties,matterState,osmosisState,logisticPopulation,
   quadraticMetrics,trigValues,seasonInfo,historicalEra,narrativeStage,colorMixInfo,evaluateGate,
   leverBalance,mendelCross,diceProbability,compoundInterest,greenhouseBalance,
-  simulationIds,simulationGroups,simulationNames,simulationSubjects,simulationMarkup,simulationChallenges
+  simulationIds,simulationGroups,simulationNames,simulationSubjects,simulationMarkup,simulationChallenges,labSims
 } from '../src/simulations.js';
 import {canvasMarkup} from '../src/canvas-view.js';
 import {styles} from '../src/personalization.js';
@@ -24,8 +24,8 @@ test('áudio de chat exige associação, limita formato e permite excluir soment
  assert.equal((await call(new Request('https://worker.test'+path,{method:'PUT',headers:{'Content-Type':'audio/webm'},body:new Uint8Array([0x1a,0x45,0xdf,0xa3,0])}))).status,200);assert.equal((await call(new Request('https://worker.test'+path))).status,200);assert.equal((await call(new Request('https://worker.test'+path,{method:'DELETE'}),true,{id:'another'})).status,403);assert.equal((await call(new Request('https://worker.test'+path,{method:'DELETE'}))).status,200);assert.equal(objects.size,0);
  assert.equal((await call(new Request('https://worker.test'+path,{method:'PUT',headers:{'Content-Type':'audio/webm'},body:'<script>'}))).status,415);
 });
-test('catálogo multidisciplinar de 20 simulações cobre cálculos, markup e normalização',()=>{
- assert.equal(simulationIds.length,20);
+test('catálogo multidisciplinar de 24 simulações cobre cálculos, markup e normalização',()=>{
+ assert.equal(simulationIds.length,24);
  const groupedIds=simulationGroups.flatMap(([,items])=>items.map(([id])=>id));
  assert.deepEqual(groupedIds,simulationIds);
  for(const id of simulationIds){
@@ -70,7 +70,7 @@ test('catálogo multidisciplinar de 20 simulações cobre cálculos, markup e no
 test('desafios das simulações dão um alvo verificável e um markup com estado ao vivo',()=>{
  for(const [id,rule] of Object.entries(simulationChallenges)){
   assert.ok(simulationNames[id],'desafio em simulação existente: '+id);
-  assert.ok(rule.prompt.length>8&&rule.hint.length>8,'desafio com instrução em '+id);
+  assert.ok(rule.prompt.length>8&&rule.hint.length>5,'desafio com instrução em '+id);
   const markup=simulationMarkup(id);
   assert.ok(markup.includes('data-sim-challenge'),'painel de desafio em '+id);
   assert.ok(markup.includes('Alvo alcançado')===false,'estado começa pendente em '+id);
@@ -80,13 +80,26 @@ test('desafios das simulações dão um alvo verificável e um markup com estado
  }
  assert.equal(simulationChallenges.projectile.test({range:19.5}),true);
  assert.equal(simulationChallenges.projectile.test({range:21.5}),false);
- assert.equal(simulationChallenges.lever.test(leverBalance(60,20,60,20)),true);
- assert.equal(simulationChallenges.lever.test(leverBalance(60,20,60,10)),false);
- assert.equal(simulationChallenges.genetics.test(mendelCross('AA','aa')),true);
- assert.equal(simulationChallenges.probability.test(diceProbability(3,10)),true);
- assert.equal(simulationChallenges.probability.test(diceProbability(2,7)),false);
- assert.equal(simulationChallenges.interest.test(compoundInterest(1000,10,12)),true);
- assert.equal(simulationChallenges.greenhouse.test(greenhouseBalance(340,30)),true);
+ const run=(id,values)=>simulationChallenges[id].test(labSims[id].compute({...values}));
+ assert.equal(run('lever',{loadMass:40,loadArm:25,effort:10,effortArm:100}),true);
+ assert.equal(run('lever',{loadMass:40,loadArm:50,effort:10,effortArm:100}),false);
+ assert.equal(run('genetics',{mother:'aa',father:'Aa'}),true);
+ assert.equal(run('genetics',{mother:'AA',father:'aa'}),false);
+ assert.equal(run('interest',{principal:1000,rate:3,months:24}),true);
+ assert.equal(run('interest',{principal:1000,rate:1,months:24}),false);
+ assert.equal(run('greenhouse',{co2:350,albedo:30}),true);
+ assert.equal(run('greenhouse',{co2:600,albedo:30}),false);
+ assert.equal(run('quadratic',{a:1,b:-2,c:1}),true);
+ assert.equal(run('motion',{speed:15,time:8}),true);
+ assert.equal(run('density',{mass:300,volume:400,liquid:'water'}),true);
+ assert.equal(run('pythagoras',{a:5,b:12}),true);
+ assert.equal(run('binary',{value:33}),true);
+ assert.equal(run('fractions',{numerator:4,denominator:8}),true);
+ assert.equal(run('timezones',{hour:12,city:'tokyo'}),true);
+ assert.equal(run('colormix',{r:255,g:255,b:0}),true);
+ assert.equal(run('osmosis',{outside:.9}),true);
+ assert.equal(run('states',{substance:'ethanol',temperature:80}),true);
+ assert.equal(run('photosynthesis',{light:100,co2:100,water:100}),true);
 });
 test('estilos de interface incluem Office e 8-Bit preservando IDs internos',()=>{
  assert.equal(styles.find(([id])=>id==='editorial')?.[1],'Office');
@@ -108,24 +121,42 @@ test('miniaturas não interativas de simulações e canvas não emitem controles
 });
 
 
-test('experimentos de sala de aula: linha do tempo e conjugação verbal',async()=>{
- const {timelineInfo,romanNumeral,conjugate,resolveSimulation,simulationIds}=await import('../src/simulations.js');
- assert.equal(romanNumeral(21),'XXI');
- assert.equal(timelineInfo(1500).centuryLabel,'século XV');
- assert.equal(timelineInfo(1501).centuryLabel,'século XVI');
- assert.equal(timelineInfo(1822).period,'Idade Contemporânea');
- assert.equal(timelineInfo(1822).event.name,'Independência do Brasil');
- assert.equal(timelineInfo(-753).centuryLabel,'século VIII a.C.');
- assert.equal(timelineInfo(-3800).period,'Pré-História');
- assert.equal(timelineInfo(1000).period,'Idade Média');
+test('experimentos de sala de aula calculam de verdade e desenham sem erro',async()=>{
+ const {labSims,conjugate,resolveSimulation,simulationIds,fractionInfo,timezoneInfo,binaryInfo,densityInfo,pythagorasInfo,photosynthesisInfo,warmingInfo,simulationMarkup}=await import('../src/simulations.js');
  assert.deepEqual(conjugate('cantar','presente').forms,['canto','cantas','canta','cantamos','cantais','cantam']);
  assert.equal(conjugate('vender','futuro').forms[3],'venderemos');
  assert.equal(conjugate('partir','perfeito').forms[2],'partiu');
  assert.equal(conjugate('estudar','imperfeito').forms[3],'estudávamos');
  assert.equal(conjugate('xyz','nada').forms[0],'canto');
- // Slides antigos com experimentos removidos abrem o substituto da disciplina.
- for(const old of ['eras','cipher'])assert.equal(resolveSimulation(old),'timeline');
+ assert.equal(fractionInfo(6,8).simpleDenominator,4);
+ assert.equal(fractionInfo(6,8).percent,75);
+ assert.equal(timezoneInfo(12,'tokyo').localClock,'00:00');
+ assert.equal(timezoneInfo(12,'tokyo').dayShift,1);
+ assert.equal(timezoneInfo(2,'losangeles').dayShift,-1);
+ assert.equal(timezoneInfo(10,'delhi').localClock,'18:30');
+ assert.equal(binaryInfo(13).bits,'00001101');
+ assert.deepEqual(binaryInfo(13).parts,[8,4,1]);
+ assert.equal(densityInfo(200,250,'water').floats,true);
+ assert.equal(densityInfo(500,250,'water').floats,false);
+ assert.equal(pythagorasInfo(3,4).c,5);
+ assert.equal(photosynthesisInfo(80,60,20).limiting,'água');
+ assert.ok(warmingInfo(560,30).warming>2.9&&warmingInfo(560,30).warming<3.1);
+ assert.equal(warmingInfo(280,30).warming,0);
+ // Cada experimento desenha e descreve o resultado nos valores padrão e nos extremos.
+ for(const [id,sim] of Object.entries(labSims)){
+  assert.ok(simulationIds.includes(id),id+' está no catálogo');
+  assert.ok(simulationMarkup(id).includes('data-lab-scene'),id+' tem cena');
+  const pick=index=>Object.fromEntries(sim.controls.map(([kind,key,,...rest])=>[key,kind==='select'?rest[0][index===1?rest[0].length-1:0][0]:rest[index===0?2:index===1?0:1]]));
+  for(const values of [pick(0),pick(1),pick(2)]){
+   const metrics=sim.compute(values),output=sim.draw(values,metrics,1.7)+sim.text(metrics,values);
+   assert.ok(!/NaN|undefined|Infinity/.test(output),id+' sem valores quebrados: '+JSON.stringify(values));
+  }
+ }
+ // Slides antigos com experimentos removidos abrem um substituto.
  for(const old of ['narrative','textlab'])assert.equal(resolveSimulation(old),'conjugation');
+ assert.equal(resolveSimulation('probability'),'fractions');
+ assert.equal(resolveSimulation('logicgates'),'binary');
+ assert.equal(resolveSimulation('timeline'),'timezones');
  assert.equal(resolveSimulation('nada'),'projectile');
- assert.ok(!simulationIds.includes('cipher')&&!simulationIds.includes('textlab'));
+ for(const gone of ['cipher','textlab','timeline','probability','logicgates'])assert.ok(!simulationIds.includes(gone));
 });

@@ -1,3 +1,4 @@
+import { validVideo } from './video-embed.js';
 import { createUuid } from './uuid.js';
 import { shapeFields } from './shapes.js';
 import { validateAudio } from './audio-data.js';
@@ -97,7 +98,7 @@ export function normalizeElements(elements, draft, validateImage) {
   if (elements.filter(e => e.type === 'model').length > 2) throw Error('Use até dois modelos 3D por slide para manter a aula fluida.');
   const ids = new Set();
   return elements.map(e => {
-    if (!e || !['text', 'image', 'model', 'shape','simulation'].includes(e.type)) throw Error('O slide contém um elemento inválido.');
+    if (!e || !['text', 'image', 'model', 'shape','simulation','video'].includes(e.type)) throw Error('O slide contém um elemento inválido.');
     const w = Math.max(.1, Math.min(1000, number(e.w, 40))), h = Math.max(.1, Math.min(1000, number(e.h, 20)));
     let id = typeof e.id === 'string' && /^[a-zA-Z0-9_-]{1,100}$/.test(e.id) ? e.id : createUuid();
     if (ids.has(id)) id = createUuid(); ids.add(id);
@@ -116,6 +117,7 @@ export function normalizeElements(elements, draft, validateImage) {
         imageLicense: String(e.imageLicense || '').slice(0, 300),
         imageCredit: String(e.imageCredit || '').slice(0, 120)
       } : {}),
+      ...(e.type === 'video' ? { video: validVideo(e.video) } : {}),
       ...(assetId ? { assetId } : {}), model: ['ssd', 'hdd', 'nvme', 'custom'].includes(e.model) ? e.model : 'ssd', customModel, modelLabel: typeof e.modelLabel === 'string' ? e.modelLabel.slice(0, 120) : '', modelDescription:typeof e.modelDescription==='string'?e.modelDescription.slice(0,500):'', modelDetailsHidden:Boolean(e.modelDetailsHidden), ...(e.type==='shape'?shapeFields(e):{}), ...(e.audio?{audio:validateAudio(e.audio)}:{}), locked: Boolean(e.locked) };
   });
 }

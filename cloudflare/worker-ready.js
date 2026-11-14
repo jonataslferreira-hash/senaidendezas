@@ -1159,6 +1159,7 @@ async function cached(key, loader) {
   } catch {
   }
   const value = await loader();
+  if (Array.isArray(value?.items) && !value.items.length) return value;
   try {
     await caches.default.put(url, new Response(JSON.stringify(value), { headers: { "Content-Type": "application/json", "Cache-Control": "public, max-age=" + CACHE_TTL_SECONDS } }));
   } catch {

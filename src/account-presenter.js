@@ -26,9 +26,21 @@ export class AccountPresenter{
    this.channel=this.studio.account.client.channel('sl-live:'+owner,{config:{private:true,broadcast:{ack:true},presence:{key:this.device}}})
     .on('presence',{event:'sync'},()=>{if(epoch!==this.epoch)return;this.sessions=Object.values(this.channel.presenceState()).flat().filter(p=>p.role==='presenter'&&p.device!==this.device&&/^\d{6}$/.test(p.code||'')).slice(0,10);this.paint();})
     .on('broadcast',{event:'control'},({payload})=>{if(epoch!==this.epoch||!this.local||payload?.target!==this.device||!commands.has(payload.action))return;this.studio.callbacks.remoteAction?.(payload.action);})
-    .subscribe((state,error)=>{if(epoch!==this.epoch)return;if(state==='SUBSCRIBED'){this.ready=true;this.track();this.status='';}else if(['CHANNEL_ERROR','TIMED_OUT','CLOSED'].includes(state)){this.ready=false;this.status=remoteConnectionMessage(state,error,navigator.onLine);}this.paint();});
-  }catch(error){if(epoch===this.epoch)this.status=remoteConnectionMessage('CHANNEL_ERROR',error,navigator.onLine);}
+    .subscribe((state,error)=>{if(epoch!==this.epoch)return;if(state==='SUBSCRIBED'){this.ready=true;this.failures=0;clearTimeout(this.retryTimer);this.track();this.status='';}else if(['CHANNEL_ERROR','TIMED_OUT','CLOSED'].includes(state)){this.ready=false;this.dropped(state,error,epoch);}this.paint();});
+  }catch(error){if(epoch===this.epoch)this.dropped('CHANNEL_ERROR',error,epoch);}
   finally{if(epoch===this.epoch){this.connecting=false;this.paint();}}
+ }
+ // Quedas do controle remoto são comuns (por exemplo ao sair de uma
+ // apresentação) e se resolvem sozinhas: reconecta em silêncio e só avisa na
+ // tela depois de várias tentativas seguidas sem sucesso.
+ dropped(state,error,epoch){
+  this.failures=(this.failures||0)+1;
+  const message=remoteConnectionMessage(state,error,navigator.onLine);
+  const fatal=/sessão do controle expirou/.test(message);
+  this.status=this.failures>=5||fatal?message:'';
+  clearTimeout(this.retryTimer);
+  if(fatal||!navigator.onLine)return;
+  this.retryTimer=setTimeout(()=>{if(epoch===this.epoch&&!this.ready&&this.owner){const kept=this.failures;this.connect(true).finally(()=>{this.failures=Math.max(this.failures||0,kept);});}},Math.min(30000,1500*2**Math.min(this.failures,5)));
  }
  setPresentation(value){const key=JSON.stringify(value);if(key===this.last)return;this.last=key;this.local=value;this.track();}
  track(){if(!this.channel||!this.ready)return;if(this.local)this.channel.track({...this.local,role:'presenter',device:this.device}).catch(()=>{});else this.channel.untrack().catch(()=>{});}

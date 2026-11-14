@@ -1,6 +1,7 @@
 // Item em destaque em tela cheia: o professor escolhe um item do slide
 // (experimento, modelo 3D ou imagem) e qualquer pessoa pode abri-lo ocupando a
 // tela inteira, no computador ou no celular, sem precisar rolar a página.
+import {videoMarkup} from './video-embed.js';
 import {simulationMarkup,simulationNames,Simulations} from './simulations.js';
 import {CanvasModels} from './canvas-view.js';
 import {fillAssetImages} from './assets.js';
@@ -12,6 +13,7 @@ export function focusLabel(resource){
   if(!resource)return '';
   if(resource.type==='simulation')return simulationNames[resource.simulation]||'Experimento';
   if(resource.type==='model')return 'Modelo 3D';
+  if(resource.type==='video')return 'Vídeo';
   return 'Imagem';
 }
 // Botão mostrado na apresentação quando o slide tem um item em destaque.
@@ -36,6 +38,7 @@ export class FocusView{
     dialog.className='focus-view';dialog.dataset.kind=resource.type;
     dialog.setAttribute('aria-label','Tela cheia: '+focusLabel(resource));
     const body=resource.type==='simulation'?simulationMarkup(resource.simulation)
+      :resource.type==='video'?`<div class="focus-video">${videoMarkup(resource,true)}</div>`
       :resource.type==='model'?`<div class="focus-model" data-canvas-model="${esc(resource.id)}"></div>${resource.model!=='custom'?`<button type="button" class="focus-explode" data-focus-explode>Abrir ou fechar camadas</button>`:''}`
       :`<img class="focus-image" ${resource.image?'src="'+esc(resource.image)+'"':resource.assetId?'data-asset-id="'+esc(resource.assetId)+'"':''} alt="${esc(resource.imageAlt||slide.title||'')}">`;
     dialog.innerHTML=`<header class="focus-view-bar"><strong>${esc(focusLabel(resource))}</strong><span>${esc(slide.title||'')}</span><button type="button" data-focus-close aria-label="Sair da tela cheia" title="Sair da tela cheia (Esc)">✕ Fechar</button></header><div class="focus-view-body">${body}</div>`;
