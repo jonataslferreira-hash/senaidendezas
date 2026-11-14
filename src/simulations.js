@@ -26,10 +26,10 @@ export const simulationGroups = [
     ['greenhouse', 'Efeito estufa e clima']
   ]],
   ['História', [
-    ['cipher', 'Cifra de César · mensagens secretas']
+    ['timeline', 'Linha do tempo · séculos e períodos']
   ]],
   ['Português', [
-    ['textlab', 'Raio-X do texto · frases e leitura']
+    ['conjugation', 'Conjugação verbal · tempos e pessoas']
   ]],
   ['Artes', [
     ['colormix', 'Mistura de cores RGB']
@@ -51,7 +51,7 @@ export const simulationIds = Object.keys(simulationNames);
 
 // Experimentos antigos que foram refeitos: slides salvos com o identificador
 // anterior abrem o experimento novo da mesma disciplina.
-export const simulationAliases = { eras: 'cipher', narrative: 'textlab' };
+export const simulationAliases = { eras: 'timeline', cipher: 'timeline', narrative: 'conjugation', textlab: 'conjugation' };
 export const resolveSimulation = type => Object.hasOwn(simulationNames, type) ? type : simulationAliases[type] || 'projectile';
 
 export function projectile(v, angle, g = 9.81) {
@@ -168,40 +168,67 @@ export function narrativeStage(progress = 60, intensity = 3) {
 
 // Cifra de César: cada letra anda `shift` casas no alfabeto. Acentos são
 // removidos antes (o alfabeto romano tinha só as letras básicas).
-export function caesarShift(text = '', shift = 3) {
-  const plain = String(text).normalize('NFD').replace(/\p{M}/gu, '').toUpperCase();
-  const amount = ((Math.round(Number(shift) || 0) % 26) + 26) % 26;
-  return plain.replace(/[A-Z]/g, letter => String.fromCharCode((letter.charCodeAt(0) - 65 + amount) % 26 + 65));
+// Linha do tempo: converte um ano em século (regra do 6º ano: 1500 ainda é
+// século XV) e no período da divisão tradicional da História.
+const romanPairs = [[1000,'M'],[900,'CM'],[500,'D'],[400,'CD'],[100,'C'],[90,'XC'],[50,'L'],[40,'XL'],[10,'X'],[9,'IX'],[5,'V'],[4,'IV'],[1,'I']];
+export function romanNumeral(value) {
+  let n = Math.max(1, Math.round(value)), out = '';
+  for (const [amount, symbol] of romanPairs) while (n >= amount) { out += symbol; n -= amount; }
+  return out;
 }
-
-export function letterFrequency(text = '') {
-  const letters = String(text).normalize('NFD').replace(/\p{M}/gu, '').toUpperCase().match(/[A-Z]/g) || [];
-  const counts = Array(26).fill(0);
-  for (const letter of letters) counts[letter.charCodeAt(0) - 65]++;
-  const top = counts.indexOf(Math.max(...counts));
-  return { counts, total: letters.length, top: letters.length ? String.fromCharCode(65 + top) : '' };
-}
-
-const TEXT_STOP_WORDS = new Set('a o as os um uma uns umas de do da dos das em no na nos nas por para pra com sem que e ou mas se como ao aos à às é foi ser são era tem mais muito já não sim eu tu ele ela nós eles elas me te lhe seu sua seus suas meu minha isso isto esse essa este esta pelo pela entre até sobre também quando onde'.split(' '));
-
-// Raio-X do texto: números que ajudam a revisar uma redação.
-export function textMetrics(text = '') {
-  const clean = String(text).trim();
-  const words = clean.toLowerCase().match(/[\p{L}\p{N}]+(?:-[\p{L}\p{N}]+)*/gu) || [];
-  const sentences = clean.split(/[.!?…]+(?:\s+|$)/u).map(part => part.trim()).filter(part => /[\p{L}\p{N}]/u.test(part));
-  const lengths = sentences.map(part => (part.match(/[\p{L}\p{N}]+(?:-[\p{L}\p{N}]+)*/gu) || []).length);
-  const average = lengths.length ? words.length / lengths.length : 0;
-  const tally = new Map();
-  for (const word of words) if (word.length > 2 && !TEXT_STOP_WORDS.has(word)) tally.set(word, (tally.get(word) || 0) + 1);
-  const repeated = [...tally].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0], 'pt-BR')).slice(0, 5);
+export const timelinePeriods = [
+  { name: 'Pré-História', from: -4000, to: -3500, color: '#94a3b8', mark: 'antes da escrita' },
+  { name: 'Idade Antiga', from: -3500, to: 476, color: '#fbbf24', mark: 'da escrita à queda de Roma' },
+  { name: 'Idade Média', from: 476, to: 1453, color: '#4ade80', mark: 'da queda de Roma à de Constantinopla' },
+  { name: 'Idade Moderna', from: 1453, to: 1789, color: '#38bdf8', mark: 'das navegações à Revolução Francesa' },
+  { name: 'Idade Contemporânea', from: 1789, to: 2030, color: '#c084fc', mark: 'da Revolução Francesa até hoje' }
+];
+const timelineEvents = [
+  [-3500, 'Invenção da escrita'], [-2560, 'Pirâmides de Gizé'], [-753, 'Fundação de Roma'], [-509, 'República Romana'],
+  [476, 'Queda de Roma'], [800, 'Império de Carlos Magno'], [1096, 'Primeira Cruzada'], [1453, 'Queda de Constantinopla'],
+  [1492, 'Colombo chega à América'], [1500, 'Portugueses chegam ao Brasil'], [1789, 'Revolução Francesa'],
+  [1822, 'Independência do Brasil'], [1888, 'Abolição da escravidão'], [1889, 'Proclamação da República'],
+  [1914, 'Primeira Guerra Mundial'], [1939, 'Segunda Guerra Mundial'], [1988, 'Constituição brasileira']
+];
+export function timelineInfo(year = 1500) {
+  let y = Math.max(-4000, Math.min(2025, Math.round(Number(year) || 0)));
+  if (y === 0) y = 1; // não existe ano zero no calendário
+  const bc = y < 0, century = Math.ceil(Math.abs(y) / 100);
+  const period = timelinePeriods.find(item => y < item.to) || timelinePeriods.at(-1);
+  const past = timelineEvents.filter(item => item[0] <= y).at(-1) || null;
   return {
-    words: words.length, sentences: sentences.length, lengths, average,
-    longest: lengths.length ? Math.max(...lengths) : 0,
-    unique: new Set(words).size,
-    variety: words.length ? new Set(words).size / words.length : 0,
-    seconds: Math.round(words.length / 130 * 60),
-    repeated,
-    level: !words.length ? 'Sem texto' : average <= 14 ? 'Frases curtas · leitura fácil' : average <= 22 ? 'Frases médias · leitura equilibrada' : 'Frases longas · leitura cansativa'
+    year: y, bc, century, roman: romanNumeral(century),
+    label: bc ? `${-y} a.C.` : `${y}`,
+    centuryLabel: `século ${romanNumeral(century)}${bc ? ' a.C.' : ''}`,
+    period: period.name, mark: period.mark,
+    event: past ? { year: past[0], name: past[1] } : null
+  };
+}
+
+// Conjugação dos verbos regulares no modo indicativo: radical + terminação.
+export const conjugationVerbs = ['cantar', 'estudar', 'vender', 'aprender', 'partir', 'dividir'];
+export const conjugationTenses = {
+  presente: 'Presente', perfeito: 'Pretérito perfeito', imperfeito: 'Pretérito imperfeito',
+  maisqueperfeito: 'Pretérito mais-que-perfeito', futuro: 'Futuro do presente', futuropreterito: 'Futuro do pretérito'
+};
+const conjugationEndings = {
+  ar: { presente: ['o','as','a','amos','ais','am'], perfeito: ['ei','aste','ou','amos','astes','aram'], imperfeito: ['ava','avas','ava','ávamos','áveis','avam'], maisqueperfeito: ['ara','aras','ara','áramos','áreis','aram'] },
+  er: { presente: ['o','es','e','emos','eis','em'], perfeito: ['i','este','eu','emos','estes','eram'], imperfeito: ['ia','ias','ia','íamos','íeis','iam'], maisqueperfeito: ['era','eras','era','êramos','êreis','eram'] },
+  ir: { presente: ['o','es','e','imos','is','em'], perfeito: ['i','iste','iu','imos','istes','iram'], imperfeito: ['ia','ias','ia','íamos','íeis','iam'], maisqueperfeito: ['ira','iras','ira','íramos','íreis','iram'] }
+};
+const futureEndings = { futuro: ['ei','ás','á','emos','eis','ão'], futuropreterito: ['ia','ias','ia','íamos','íeis','iam'] };
+export const conjugationPersons = ['eu', 'tu', 'ele/ela', 'nós', 'vós', 'eles/elas'];
+export function conjugate(verb = 'cantar', tense = 'presente') {
+  const safeVerb = conjugationVerbs.includes(verb) ? verb : 'cantar';
+  const safeTense = Object.hasOwn(conjugationTenses, tense) ? tense : 'presente';
+  const group = safeVerb.slice(-2), future = Object.hasOwn(futureEndings, safeTense);
+  // Nos futuros a terminação entra depois do infinitivo inteiro.
+  const stem = future ? safeVerb : safeVerb.slice(0, -2);
+  const endings = future ? futureEndings[safeTense] : conjugationEndings[group][safeTense];
+  return {
+    verb: safeVerb, tense: safeTense, tenseName: conjugationTenses[safeTense], stem,
+    group: group === 'ar' ? '1ª conjugação (-ar)' : group === 'er' ? '2ª conjugação (-er)' : '3ª conjugação (-ir)',
+    endings, forms: endings.map(ending => stem + ending)
   };
 }
 
@@ -294,9 +321,8 @@ const visuals = {
   quadratic: '<svg viewBox="0 0 400 220" aria-label="Gráfico da parábola"><path d="M20 110H380M200 16V204" stroke="currentColor" opacity=".28" stroke-width="1.5"/><path data-parabola fill="none" stroke="#c084fc" stroke-width="3"/><g data-points></g></svg>',
   trigonometry: '<svg viewBox="0 0 400 220" aria-label="Ciclo trigonométrico"><path d="M80 110H320M200 18V202" stroke="currentColor" opacity=".25"/><circle cx="200" cy="110" r="74" fill="none" stroke="currentColor" opacity=".4" stroke-width="2"/><line data-cos x1="200" y1="110" x2="252" y2="110" stroke="#38bdf8" stroke-width="4"/><line data-sin x1="252" y1="110" x2="252" y2="58" stroke="#fb7185" stroke-width="4"/><line data-radius x1="200" y1="110" x2="252" y2="58" stroke="#fde047" stroke-width="3"/><circle data-tip cx="252" cy="58" r="6" fill="#fde047"/></svg>',
   seasons: '<svg viewBox="0 0 400 220" aria-label="Sol e inclinação da Terra"><circle cx="72" cy="110" r="34" fill="#fbbf24"/><g stroke="#fde68a" stroke-width="2" opacity=".7"><line x1="116" y1="74" x2="210" y2="74"/><line x1="120" y1="110" x2="210" y2="110"/><line x1="116" y1="146" x2="210" y2="146"/></g><g data-earth transform="translate(275 110)"><circle r="44" fill="#2563eb"/><path data-shade d="M0-44A44 44 0 0 1 0 44Z" fill="#0f172a" opacity=".68"/><g data-tilt><line x1="-44" y1="0" x2="44" y2="0" stroke="#4ade80" stroke-width="2" stroke-dasharray="4 3"/><line x1="0" y1="-56" x2="0" y2="56" stroke="#f8fafc" stroke-width="2.5"/></g></g></svg>',
-  cipher: '<svg viewBox="0 0 400 220" aria-label="Disco da cifra de César"><g data-wheel-outer></g><g data-wheel-inner></g><circle cx="110" cy="110" r="30" fill="currentColor" opacity=".08"/><text data-wheel-shift x="110" y="116" text-anchor="middle" font-size="18" font-weight="700" fill="currentColor">+3</text><path d="M110 8v16" stroke="#fde047" stroke-width="3" stroke-linecap="round"/><text x="226" y="34" font-size="10" fill="currentColor" opacity=".7">LETRAS MAIS COMUNS NA CIFRA</text><path d="M226 190H384" stroke="currentColor" opacity=".25"/><g data-frequency></g></svg>',
-  textlab: '<svg viewBox="0 0 400 220" aria-label="Tamanho de cada frase do texto"><text x="24" y="26" font-size="10" fill="currentColor" opacity=".7">PALAVRAS EM CADA FRASE</text><path d="M24 150H376" stroke="currentColor" opacity=".25"/><line x1="24" x2="376" y1="90" y2="90" stroke="#fb7185" stroke-dasharray="5 5" stroke-width="1.5" opacity=".8"/><text x="376" y="84" text-anchor="end" font-size="9" fill="#fb7185">20 palavras · frase longa</text><g data-sentence-bars></g><text x="24" y="176" font-size="10" fill="currentColor" opacity=".7">PALAVRAS MAIS REPETIDAS</text><g data-repeated></g></svg>',
-  colormix: '<svg viewBox="0 0 400 220" aria-label="Mistura aditiva RGB"><rect x="24" y="24" width="175" height="172" rx="16" fill="#0b0e17" stroke="currentColor" opacity=".35"/><circle data-r cx="92" cy="96" r="42" fill="#ff0000" style="mix-blend-mode:screen"/><circle data-g cx="132" cy="96" r="42" fill="#00ff00" style="mix-blend-mode:screen"/><circle data-b cx="112" cy="132" r="42" fill="#0000ff" style="mix-blend-mode:screen"/><rect data-swatch x="220" y="26" width="154" height="114" rx="14" fill="#50afeb" stroke="#ffffff55" stroke-width="2"/><rect data-comp x="220" y="152" width="154" height="44" rx="10" fill="#eb8c50" stroke="#ffffff40"/><text data-contrast-text x="297" y="90" text-anchor="middle" font-size="22" font-weight="700" fill="#0f172a">Aa</text></svg>',
+  timeline: '<svg viewBox="0 0 400 220" aria-label="Linha do tempo da História"><text data-time-year x="200" y="42" text-anchor="middle" font-size="30" font-weight="800" fill="currentColor">1500</text><text data-time-century x="200" y="64" text-anchor="middle" font-size="13" font-weight="700" fill="#fde047">século XV</text><g data-time-bands></g><path data-time-marker d="M0 96v44" stroke="#fde047" stroke-width="3" stroke-linecap="round"/><circle data-time-dot cx="0" cy="96" r="6" fill="#fde047"/><text data-time-period x="200" y="170" text-anchor="middle" font-size="14" font-weight="700" fill="currentColor">Idade Moderna</text><text data-time-mark x="200" y="187" text-anchor="middle" font-size="10" fill="currentColor" opacity=".7"></text><text data-time-event x="200" y="208" text-anchor="middle" font-size="10.5" fill="currentColor" opacity=".9"></text></svg>',
+  conjugation: '<svg viewBox="0 0 400 220" aria-label="Tabela de conjugação do verbo"><text data-verb-title x="200" y="26" text-anchor="middle" font-size="13" font-weight="700" fill="currentColor"></text><g data-verb-rows></g><text x="200" y="212" text-anchor="middle" font-size="9.5" fill="currentColor" opacity=".7"><tspan fill="currentColor">radical</tspan> + <tspan fill="#fde047" font-weight="700">terminação</tspan></text></svg>',
   lever: '<svg viewBox="0 0 400 220" aria-label="Alavanca com carga e esforço"><path d="M200 186 170 214h60Z" fill="currentColor" opacity=".55"/><g data-beam><rect x="46" y="172" width="308" height="14" rx="7" fill="#94a3b8"/><rect data-load x="96" y="132" width="46" height="40" rx="6" fill="#fb7185"/><circle data-effort cx="316" cy="150" r="18" fill="#4ade80"/></g><path d="M46 200h308" stroke="currentColor" opacity=".18"/></svg>',
   genetics: '<svg viewBox="0 0 400 220" aria-label="Cruzamento de Mendel"><g data-punnett></g><g data-phenotypes></g></svg>',
   probability: '<svg viewBox="0 0 400 220" aria-label="Probabilidade de dados"><g data-die-sets></g><path d="M36 190H376" stroke="currentColor" opacity=".25"/><g data-bars></g></svg>',
@@ -317,8 +343,8 @@ const controlsFor = {
   quadratic: () => range('a', 'Coeficiente a', -3, 3, 1, .5) + range('b', 'Coeficiente b', -6, 6, -2, .5) + range('c', 'Termo c', -5, 5, -3, .5),
   trigonometry: () => range('angle', 'Ângulo (°)', 0, 360, 45, 1),
   seasons: () => range('month', 'Mês do ano', 1, 12, 12, 1) + range('tilt', 'Inclinação axial (°)', 0, 45, 23.5, .5),
-  cipher: () => textControl('message', 'Mensagem', 'VIM, VI E VENCI', 60) + range('shift', 'Deslocamento (casas)', 0, 25, 3),
-  textlab: () => textControl('text', 'Escreva ou cole um texto', 'A água é essencial para a vida porque sem ela as plantas, os animais e as pessoas não sobrevivem, e por isso economizar água em casa e na escola é uma atitude que protege o futuro de todos nós.', 600),
+  timeline: () => range('year', 'Ano (negativo = a.C.)', -4000, 2025, 1500, 5),
+  conjugation: () => selectControl('verb', 'Verbo', conjugationVerbs.map(verb => [verb, verb])) + selectControl('tense', 'Tempo (indicativo)', Object.entries(conjugationTenses)),
   colormix: () => range('r', 'Vermelho (R)', 0, 255, 80, 1) + range('g', 'Verde (G)', 0, 255, 175, 1) + range('b', 'Azul (B)', 0, 255, 235, 1),
   lever: () => range('loadMass', 'Carga (kg)', 0, 60, 20) + range('loadArm', 'Braço da carga (cm)', 10, 120, 60) + range('effortArm', 'Braço do esforço (cm)', 10, 120, 60) + range('effort', 'Força aplicada (kg)', 0, 80, 20),
   genetics: () => selectControl('first', 'Genitor 1', [['AA', 'AA · homozigoto dominante'], ['Aa', 'Aa · heterozigoto'], ['aa', 'aa · homozigoto recessivo']])
@@ -342,8 +368,8 @@ const notes = {
   quadratic: 'f(x) = ax² + bx + c, discriminante Δ e vértice da parábola.',
   trigonometry: 'Círculo de raio unitário: sen²θ + cos²θ = 1.',
   seasons: 'A inclinação do eixo terrestre define a incidência solar nos hemisférios.',
-  cipher: 'Júlio César trocava cada letra pela que fica 3 casas adiante. Há só 25 chaves: dá para quebrar testando todas.',
-  textlab: 'Frases com mais de 20 palavras cansam o leitor; repetir muito a mesma palavra empobrece o texto.',
+  timeline: 'O século I vai do ano 1 ao 100. Por isso 1500 ainda é século XV e 1501 já é século XVI.',
+  conjugation: 'Verbos regulares mantêm o radical; só a terminação muda conforme a pessoa e o tempo.',
   colormix: 'Síntese aditiva de luz RGB, cor complementar e contraste WCAG.',
   lever: 'Equilíbrio: carga × braço da carga = esforço × braço do esforço.',
   genetics: '1ª Lei de Mendel: segregação dos alelos na formação dos gametas.',
@@ -353,11 +379,11 @@ const notes = {
   logicgates: 'Álgebra booleana aplicada a circuitos digitais.'
 };
 
-const playable = new Set(['projectile', 'pendulum', 'circuit', 'waves', 'states', 'trigonometry', 'seasons', 'ecosystem']);
+const playable = new Set(['projectile', 'pendulum', 'circuit', 'waves', 'states', 'trigonometry', 'seasons', 'ecosystem', 'timeline']);
 // Animações "de ambiente" começam sozinhas: o experimento já aparece vivo.
 const ambient = new Set(['pendulum', 'circuit', 'waves', 'states']);
 // Nestas a animação conduz um controle; mexer nele recomeça a partir do novo valor.
-const restartOnInput = new Set(['projectile', 'trigonometry', 'seasons', 'ecosystem']);
+const restartOnInput = new Set(['projectile', 'trigonometry', 'seasons', 'ecosystem', 'timeline']);
 // Experiments that use a "desafio" goal: the slide asks for a target value and the
 // student has to tune the sliders until the live output matches it.
 export const simulationChallenges = {
@@ -368,8 +394,8 @@ export const simulationChallenges = {
   genetics: { label: 'Acerte o alvo', prompt: 'Obtenha 100% de descendentes dominantes', test: r => r.dominantRate === 1, hint: 'Um dos genitores precisa ser AA.' },
   probability: { label: 'Acerte o alvo', prompt: 'Use 3 dados e ache a soma mais provável', test: r => r.dice === 3 && (r.target === 10 || r.target === 11), hint: 'Com três dados, 10 e 11 dividem o topo: 27 de 216 combinações cada.' },
   interest: { label: 'Acerte o alvo', prompt: 'Dobre o capital em até 12 meses', test: r => r.amount >= r.principal * 2 && r.months <= 12, hint: 'Taxas maiores que 6% ao mês dobram o capital em 12 meses.' },
-  cipher: { label: 'Decifre', prompt: 'A mensagem “HAL” vira “IBM” com qual deslocamento?', test: r => r.plain === 'HAL' && r.encoded === 'IBM', hint: 'Escreva HAL na mensagem e avance uma casa de cada vez.' },
-  textlab: { label: 'Desafio de redação', prompt: '3 frases ou mais, média de até 15 palavras por frase', test: r => r.sentences >= 3 && r.average <= 15 && r.words >= 20, hint: 'Troque vírgulas por pontos para dividir as frases longas.' },
+  timeline: { label: 'Desafio', prompt: 'Em que século os portugueses chegaram ao Brasil (1500)? Pare o marcador nesse ano.', test: r => r.year === 1500, hint: 'Século = ano ÷ 100, arredondando para cima. 1500 ÷ 100 = 15.' },
+  conjugation: { label: 'Desafio', prompt: 'Encontre a forma “nós venderemos”', test: r => r.forms[3] === 'venderemos', hint: 'A ação ainda vai acontecer: escolha o verbo vender e um tempo do futuro.' },
   greenhouse: { label: 'Acerte o alvo', prompt: 'Mantenha a temperatura entre 13 °C e 15 °C', test: r => r.temperature >= 13 && r.temperature <= 15, hint: 'Reduza um pouco a retenção de gases.' }
 };
 
@@ -385,8 +411,8 @@ const defaultParams = {
   quadratic: { a: 1, b: -2, c: -3 },
   trigonometry: { angle: 45 },
   seasons: { month: 12, tilt: 23.5 },
-  cipher: { message: 'VIM, VI E VENCI', shift: 3 },
-  textlab: { text: '' },
+  timeline: { year: 1500 },
+  conjugation: { verb: 'cantar', tense: 'presente' },
   colormix: { r: 80, g: 175, b: 235 },
   lever: { loadMass: 20, loadArm: 60, effortArm: 60, effort: 10 },
   genetics: { first: 'Aa', second: 'Aa' },
@@ -419,6 +445,21 @@ function readSimulationValues(node) {
     ...Object.fromEntries([...node.querySelectorAll('[data-sim-text]')].map(n => [n.dataset.simText, n.value])),
     ...Object.fromEntries([...node.querySelectorAll('[data-sim-toggle]')].map(n => [n.dataset.simToggle, Number(n.dataset.value)]))
   };
+}
+
+const timelineX = year => 24 + (year + 4000) / 6030 * 352;
+function paintTimeline(node, info) {
+  const bands = node.querySelector('[data-time-bands]');
+  if (bands && !bands.childElementCount) bands.innerHTML = timelinePeriods.map(item => {
+    const x = timelineX(item.from), width = timelineX(item.to) - x;
+    return `<rect x="${x.toFixed(1)}" y="104" width="${width.toFixed(1)}" height="28" fill="${item.color}" opacity=".85"/>`;
+  }).join('') + [-3000, -2000, -1000, 1, 1000, 2000].map(year => `<text x="${timelineX(year).toFixed(1)}" y="147" text-anchor="middle" font-size="8" fill="currentColor" opacity=".6">${year < 0 ? -year + ' a.C.' : year}</text>`).join('');
+  const x = timelineX(info.year).toFixed(1);
+  node.querySelector('[data-time-marker]')?.setAttribute('transform', `translate(${x} 0)`);
+  node.querySelector('[data-time-dot]')?.setAttribute('cx', x);
+  const set = (name, value) => { const el = node.querySelector(`[data-time-${name}]`); if (el) el.textContent = value; };
+  set('year', info.label); set('century', info.centuryLabel); set('period', info.period); set('mark', info.mark);
+  set('event', info.event ? `${info.event.year < 0 ? -info.event.year + ' a.C.' : info.event.year} · ${info.event.name}` : '');
 }
 
 function paintParticles(node, phase, kinetic) {
@@ -607,53 +648,23 @@ function paintSimulationNode(node) {
     node.querySelector('[data-tilt]')?.setAttribute('transform', `rotate(${tiltRot.toFixed(1)})`);
     resultEl.textContent = `${s.monthName} · Sul: ${s.south} · Norte: ${s.north} · Declinação ${s.declination.toFixed(1)}°`;
   }
-  else if (type === 'cipher') {
-    const plain = caesarShift(p.message, 0), encoded = caesarShift(p.message, p.shift);
-    const shift = ((Math.round(p.shift) % 26) + 26) % 26;
-    metrics = { plain: plain.trim(), encoded: encoded.trim(), shift };
-    const ring = (radius, offset, size, color, weight) => Array.from({ length: 26 }, (_, i) => {
-      const angle = (i - offset) / 26 * Math.PI * 2 - Math.PI / 2;
-      return `<text x="${(110 + Math.cos(angle) * radius).toFixed(1)}" y="${(110 + Math.sin(angle) * radius + size * .35).toFixed(1)}" text-anchor="middle" font-size="${size}" font-weight="${weight}" fill="${color}">${String.fromCharCode(65 + i)}</text>`;
-    }).join('');
-    const outer = node.querySelector('[data-wheel-outer]'), inner = node.querySelector('[data-wheel-inner]');
-    if (outer) outer.innerHTML = `<circle cx="110" cy="110" r="98" fill="none" stroke="currentColor" opacity=".3"/><circle cx="110" cy="110" r="74" fill="none" stroke="currentColor" opacity=".3"/>${ring(86, 0, 11, 'currentColor', 600)}`;
-    if (inner) inner.innerHTML = `<circle cx="110" cy="110" r="50" fill="none" stroke="#a78bfa" opacity=".6"/>${ring(62, shift, 11, '#c4b5fd', 700)}`;
-    const label = node.querySelector('[data-wheel-shift]');
-    if (label) label.textContent = '+' + shift;
-    const freq = letterFrequency(encoded), bars = node.querySelector('[data-frequency]');
-    if (bars) {
-      const ranked = freq.counts.map((count, i) => [String.fromCharCode(65 + i), count]).filter(item => item[1]).sort((a, b) => b[1] - a[1]).slice(0, 7);
-      const peak = Math.max(1, ...ranked.map(item => item[1]));
-      bars.innerHTML = ranked.map(([letter, count], i) => {
-        const height = count / peak * 120, x = 232 + i * 22;
-        return `<rect x="${x}" y="${(188 - height).toFixed(1)}" width="16" height="${height.toFixed(1)}" rx="3" fill="${i ? '#38bdf8' : '#fde047'}" opacity="${i ? .7 : 1}"/><text x="${x + 8}" y="204" text-anchor="middle" font-size="11" font-weight="700" fill="currentColor">${letter}</text><text x="${x + 8}" y="${(182 - height).toFixed(1)}" text-anchor="middle" font-size="9" fill="currentColor" opacity=".75">${count}</text>`;
-      }).join('');
-    }
-    resultEl.textContent = plain.trim() ? `Cifrada: ${encoded.trim()} · A vira ${caesarShift('A', shift)}${freq.top ? ' · letra mais comum: ' + freq.top : ''}` : 'Escreva uma mensagem para cifrar.';
-  }
-  else if (type === 'textlab') {
-    const info = textMetrics(p.text);
+  else if (type === 'timeline') {
+    const info = timelineInfo(p.year);
     metrics = info;
-    const bars = node.querySelector('[data-sentence-bars]');
-    if (bars) {
-      const shown = info.lengths.slice(0, 14), slot = 352 / Math.max(6, shown.length);
-      bars.innerHTML = shown.map((count, i) => {
-        const height = Math.min(112, count * 3), x = 24 + i * slot;
-        return `<rect x="${(x + 2).toFixed(1)}" y="${(150 - height).toFixed(1)}" width="${Math.max(6, slot - 6).toFixed(1)}" height="${Math.max(2, height).toFixed(1)}" rx="3" fill="${count > 20 ? '#fb7185' : '#4ade80'}"/><text x="${(x + slot / 2 - 1).toFixed(1)}" y="${(145 - height).toFixed(1)}" text-anchor="middle" font-size="10" fill="currentColor">${count}</text>`;
-      }).join('');
-    }
-    const repeated = node.querySelector('[data-repeated]');
-    if (repeated) {
-      let x = 24;
-      repeated.innerHTML = info.repeated.map(([word, count]) => {
-        const label = word.slice(0, 14) + ' ×' + count, width = label.length * 6.2 + 14, at = x;
-        x += width + 6;
-        return at + width > 380 ? '' : `<rect x="${at}" y="184" width="${width.toFixed(1)}" height="22" rx="11" fill="${count > 2 ? '#fbbf2440' : '#ffffff14'}" stroke="${count > 2 ? '#fbbf24' : 'currentColor'}" stroke-opacity=".6"/><text x="${(at + width / 2).toFixed(1)}" y="199" text-anchor="middle" font-size="10.5" fill="currentColor">${label.replace(/[<>&]/g, '')}</text>`;
-      }).join('');
-    }
-    resultEl.textContent = info.words
-      ? `${info.words} palavras · ${info.sentences} ${info.sentences === 1 ? 'frase' : 'frases'} · média ${info.average.toFixed(1)} por frase · leitura em voz alta ≈ ${info.seconds} s · ${info.level}`
-      : 'Escreva um texto para analisar.';
+    paintTimeline(node, info);
+    resultEl.textContent = `${info.label} · ${info.centuryLabel} · ${info.period}${info.event ? ` · último marco: ${info.event.name}` : ''}`;
+  }
+  else if (type === 'conjugation') {
+    const info = conjugate(p.verb, p.tense);
+    metrics = info;
+    const title = node.querySelector('[data-verb-title]');
+    if (title) title.textContent = `${info.verb.toUpperCase()} · ${info.tenseName}`;
+    const rows = node.querySelector('[data-verb-rows]');
+    if (rows) rows.innerHTML = info.forms.map((form, i) => {
+      const col = i < 3 ? 0 : 1, y = 62 + (i % 3) * 46, x = 26 + col * 184;
+      return `<rect x="${x}" y="${y - 26}" width="168" height="38" rx="10" fill="currentColor" opacity=".07"/><text x="${x + 12}" y="${y - 2}" font-size="11" fill="currentColor" opacity=".65">${conjugationPersons[i]}</text><text x="${x + 156}" y="${y - 1}" text-anchor="end" font-size="16" font-weight="700" fill="currentColor">${info.stem}<tspan fill="#fde047">${info.endings[i]}</tspan></text>`;
+    }).join('');
+    resultEl.textContent = `${info.group} · radical “${info.stem}” · eu ${info.forms[0]}, nós ${info.forms[3]}`;
   }
   else if (type === 'colormix') {
     const c = colorMixInfo(p.r, p.g, p.b);
@@ -802,7 +813,7 @@ export class Simulations {
         if (!button) return;
         if (running) button.setAttribute('aria-pressed', 'true'); else button.removeAttribute('aria-pressed');
         const idle = type === 'projectile' ? '▶ Lançar' : '▶ Animar';
-        button.textContent = running ? (type === 'projectile' ? '↺ Lançar de novo' : '⏸ Pausar') : idle;
+        button.textContent = running ? '⏸ Pausar' : idle;
       };
       const type = node.dataset.simulation;
       const stop = () => { cancelAnimationFrame(item.frame); setRunning(false); paintSimulationNode(node); };
@@ -848,7 +859,7 @@ export class Simulations {
           return;
         }
         if (!event.target.closest('[data-sim-play]')) return;
-        if (item.running && type !== 'projectile') { stop(); return; }
+        if (item.running) { stop(); return; }
         start();
       });
       const frame = () => {
@@ -870,11 +881,12 @@ export class Simulations {
             paintElectrons(node, item.travelled, current);
           } else if (type === 'projectile') {
             const projResult = projectile(p.speed || 12, p.angle || 45, p.gravity || 9.81);
-            const t = Math.min(projResult.time, seconds);
+            // Em loop: voa, descansa meio segundo no chão e lança de novo.
+            const cycle = projResult.time + .6;
+            const t = Math.min(projResult.time, seconds % cycle);
             const x = p.speed * Math.cos(p.angle * Math.PI / 180) * t;
             const y = p.speed * Math.sin(p.angle * Math.PI / 180) * t - p.gravity * t * t / 2;
             node.querySelector('[data-motion]')?.setAttribute('transform', `translate(${x / Math.max(1, projResult.range) * 340} ${-y / Math.max(1, projResult.height) * 140})`);
-            if (t >= projResult.time) { setRunning(false); return; }
           } else if (type === 'waves') {
             item.phase = (item.phase || 0) + delta * (2 + p.frequency * 1.6);
             paintWave(node, p, item.phase);
@@ -912,6 +924,19 @@ export class Simulations {
               const tiltRot = p.tilt * Math.cos(2 * Math.PI * (s.month % 12) / 12);
               node.querySelector('[data-tilt]')?.setAttribute('transform', `rotate(${tiltRot.toFixed(1)})`);
               node.querySelector('.simulation-result').textContent = `${s.monthName} · Sul: ${s.south} · Norte: ${s.north} · Declinação ${s.declination.toFixed(1)}°`;
+            }
+          } else if (type === 'timeline') {
+            const input = node.querySelector('[data-param="year"]');
+            if (input) {
+              // Percorre a História a partir do ano escolhido e recomeça ao chegar em hoje.
+              const span = 2025 + 4000, year = -4000 + ((p.year + 4000 + seconds * 260) % span);
+              const snapped = Math.round(year / 5) * 5;
+              input.value = String(snapped);
+              const out = node.querySelector('[data-value="year"]');
+              if (out) out.textContent = String(snapped);
+              const info = timelineInfo(snapped);
+              paintTimeline(node, info);
+              node.querySelector('.simulation-result').textContent = `${info.label} · ${info.centuryLabel} · ${info.period}${info.event ? ` · último marco: ${info.event.name}` : ''}`;
             }
           } else if (type === 'ecosystem') {
             const input = node.querySelector('[data-param="time"]');

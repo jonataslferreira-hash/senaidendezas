@@ -163,15 +163,12 @@ html[data-theme][data-ui-style=aero][data-appearance=dark] body #app .studio-wat
 html[data-theme][data-ui-style=aero][data-appearance=light] body #app .account-dialog { color: var(--aero-ink); --ui-ink: var(--aero-ink); }
 
 /* ------------------------------------------------------------------ */
-/* 3. Salvar: menu "onde salvar"                                       */
+/* 3. Salvar: dispositivo e nuvem lado a lado                          */
 /* ------------------------------------------------------------------ */
 #app .editor-save-controls { display: inline-flex; align-items: center; gap: 4px; position: relative; }
-#app .editor-save-menu { position: relative; }
-#app .editor-save-menu > summary { min-width: 30px; min-height: 38px; padding-inline: 7px; display: grid; place-items: center; }
-#app .editor-save-menu > summary svg { rotate: -90deg; width: 14px; height: 14px; }
-#app .editor-save-menu[open] > summary svg { rotate: 90deg; }
-#app .editor-save-menu > div { min-width: 250px; right: 0; left: auto; }
-#app .editor-save-menu > div .studio-btn { justify-content: flex-start; gap: 8px; width: 100%; text-align: left; white-space: nowrap; }
+#app .editor-save-controls .editor-cloud-save { gap: 6px; }
+#app .editor-save-controls .editor-cloud-save svg { width: 17px; height: 17px; }
+#app .studio-dialog.leave-dialog > div { flex-wrap: wrap; gap: 8px; }
 
 /* ------------------------------------------------------------------ */
 /* 4. Camadas: arrastar pelo nome                                      */
@@ -261,3 +258,75 @@ dialog.simulation-modal .simulation-text textarea { min-height: 96px; font-size:
 /* Os menus do cabeçalho (Baixar, Salvar, Compartilhar) abriam atrás do palco. */
 #app .editor-shell .editor-heading { position: relative; z-index: 42; }
 #app .editor-shell .editor-command-row { position: relative; z-index: 41; }
+
+/* ------------------------------------------------------------------ */
+/* 7. Busca de imagens: rolagem sem fim                                */
+/* ------------------------------------------------------------------ */
+#storage-image-search .image-search-more { grid-column: 1 / -1; margin: 0; padding: 14px 8px 18px; text-align: center; font-size: 12px; opacity: .75; }
+#storage-image-search .image-search-more:empty { display: none; }
+#storage-image-search .image-search-more button { margin-left: 6px; padding: 6px 12px; border-radius: 999px; border: 1px solid currentColor; background: none; color: inherit; font: inherit; cursor: pointer; }
+
+/* ------------------------------------------------------------------ */
+/* 8. storageAI: mensagem provisória "o que estou fazendo"             */
+/* ------------------------------------------------------------------ */
+#app .storage-ai-messages p.ai-status { display: flex; align-items: center; gap: 8px; font-style: italic; opacity: .9; }
+#app .ai-status-dots { display: inline-flex; gap: 3px; flex: none; }
+#app .ai-status-dots i { width: 5px; height: 5px; border-radius: 50%; background: currentColor; animation: ai-status-bounce 1s ease-in-out infinite; }
+#app .ai-status-dots i:nth-child(2) { animation-delay: .15s; }
+#app .ai-status-dots i:nth-child(3) { animation-delay: .3s; }
+@keyframes ai-status-bounce { 0%, 80%, 100% { opacity: .3; transform: translateY(0); } 40% { opacity: 1; transform: translateY(-3px); } }
+@media (prefers-reduced-motion: reduce) { #app .ai-status-dots i { animation: none; } }
+
+/* ------------------------------------------------------------------ */
+/* 9. Item em destaque em tela cheia (computador e celular)            */
+/* ------------------------------------------------------------------ */
+.focus-open { display: inline-flex; align-items: center; gap: 6px; padding: 9px 14px; border-radius: 999px; border: 1px solid #ffffff40; background: #10142bd9; color: #fff; font: 600 13px/1 system-ui, sans-serif; cursor: pointer; -webkit-backdrop-filter: blur(10px); backdrop-filter: blur(10px); box-shadow: 0 6px 20px #0006; }
+.focus-open small { font: inherit; font-weight: 500; opacity: .8; max-width: 22ch; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.focus-open:hover, .focus-open:focus-visible { background: #2a2f5c; opacity: 1; }
+.document-stage { position: relative; }
+.document-stage > .focus-open { position: absolute; right: 12px; bottom: 12px; z-index: 6; opacity: .72; transition: opacity .15s; }
+.document-stage:hover > .focus-open { opacity: 1; }
+.mobile-lesson-content > .focus-open { width: 100%; justify-content: center; min-height: 46px; margin: 10px 0 4px; font-size: 14px; }
+
+dialog.focus-view { position: fixed; inset: 0; width: 100vw; height: 100vh; height: 100dvh; max-width: none; max-height: none; margin: 0; padding: 0; border: 0; box-sizing: border-box; background: #0b0f1d; color: #eef2ff; overflow: hidden; overscroll-behavior: contain; touch-action: manipulation; }
+dialog.focus-view[open] { display: flex; flex-direction: column; }
+dialog.focus-view::backdrop { background: #0b0f1d; }
+.focus-view-bar { flex: none; display: flex; align-items: center; gap: 10px; padding: max(8px, env(safe-area-inset-top)) max(12px, env(safe-area-inset-right)) 8px max(12px, env(safe-area-inset-left)); font: 14px/1.2 system-ui, sans-serif; }
+.focus-view-bar strong { font-size: 15px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.focus-view-bar span { flex: 1; min-width: 0; opacity: .6; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.focus-view-bar button, .focus-explode { flex: none; min-height: 38px; padding: 8px 14px; border-radius: 999px; border: 1px solid #ffffff38; background: #ffffff14; color: inherit; font: 600 13px/1 system-ui, sans-serif; cursor: pointer; }
+.focus-view-bar button:hover, .focus-explode:hover { background: #ffffff2b; }
+.focus-view-body { flex: 1; min-height: 0; min-width: 0; display: flex; flex-direction: column; align-items: stretch; gap: 8px; padding: 0 max(10px, env(safe-area-inset-right)) max(10px, env(safe-area-inset-bottom)) max(10px, env(safe-area-inset-left)); box-sizing: border-box; }
+.focus-view .focus-image { flex: 1; min-height: 0; width: 100%; object-fit: contain; }
+.focus-view .focus-model { flex: 1; min-height: 0; position: relative; border-radius: 16px; overflow: hidden; background: radial-gradient(circle at 50% 40%, #1d2646, #0b0f1d); }
+.focus-view .focus-model canvas { width: 100% !important; height: 100% !important; display: block; }
+.focus-view .focus-explode { align-self: center; }
+
+/* Experimento: tudo cabe na tela; só a lista de controles rola se faltar espaço. */
+.focus-view .simulation-widget { flex: 1; min-height: 0; height: auto; overflow: hidden; padding: clamp(10px, 2vmin, 22px); gap: clamp(6px, 1.2vmin, 12px); font-size: clamp(13px, 1.9vmin, 18px); }
+.focus-view .simulation-widget header strong { font-size: 1.15em; }
+.focus-view .simulation-widget header span { font-size: .7em; }
+.focus-view .simulation-widget > svg { flex: 1 1 30%; min-height: 110px; height: auto; max-height: none; }
+.focus-view .simulation-controls { flex: 0 1 auto; min-height: 0; overflow-y: auto; gap: clamp(6px, 1.2vmin, 12px); }
+.focus-view .simulation-controls label { font-size: 1em; }
+.focus-view .simulation-controls input[type=range] { height: 30px; }
+.focus-view .simulation-controls select { font-size: 1em; padding: 8px 10px; }
+.focus-view .simulation-controls .simulation-adj button { min-width: 34px; min-height: 30px; font-size: 1.05em; }
+.focus-view .simulation-result { font-size: 1.05em; flex: none; }
+.focus-view .simulation-challenge { flex: none; font-size: .92em; }
+.focus-view .simulation-widget > small { flex: none; font-size: .85em; opacity: .75; }
+.focus-view .simulation-widget [data-sim-play] { flex: none; min-height: 42px; font-size: 1em; }
+@media (min-aspect-ratio: 1/1) {
+  .focus-view .simulation-widget { display: grid; grid-template-columns: minmax(0, 1.6fr) minmax(250px, 1fr); grid-template-rows: auto auto auto auto auto minmax(0, 1fr); column-gap: clamp(12px, 2.5vmin, 28px); align-content: stretch; }
+  .focus-view .simulation-widget > header { grid-column: 1 / -1; grid-row: 1; }
+  .focus-view .simulation-widget > svg { grid-column: 1; grid-row: 2 / 7; width: 100%; height: 100%; min-height: 0; }
+  .focus-view .simulation-widget > :not(header):not(svg) { grid-column: 2; }
+  .focus-view .simulation-widget > small { align-self: end; }
+}
+@media (max-height: 430px) { .focus-view .simulation-widget > small, .focus-view .simulation-challenge-hint { display: none; } .focus-view-bar { padding-block: 4px; } .focus-view-bar button { min-height: 32px; } }
+@media (max-aspect-ratio: 1/1) and (max-height: 640px) { .focus-view .simulation-widget > small { display: none; } }
+#app .modal-backdrop { z-index: 90; }
+html.focus-locked, html.focus-locked body { overflow: hidden !important; overscroll-behavior: none; }
+.focus-view .simulation-controls label > input[type=range] { grid-column: 1; width: 100%; }
+.focus-view .simulation-controls label > .simulation-adj { grid-column: 2; display: inline-flex; gap: 4px; }
+dialog.focus-view .simulation-controls label { margin: 0; }

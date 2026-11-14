@@ -11,6 +11,7 @@ import {scanRoomCode} from './qr-reader.js';
 import './school-upgrade.css';
 import {presentationSlide,mobileMarkup} from './slide-display.js';
 import {fillAssetImages} from './assets.js';
+import {FocusView,focusButton} from './focus-view.js';
 import './classroom-display.css';
 import { avatarContent,isPhotoAvatar } from './player-avatar.js';
 import { PptxAnimations } from './pptx-animations.js';
@@ -69,6 +70,7 @@ const esc = value => String(value ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;
 const app = document.querySelector('#app');
 const viewer = new HardwareViewer({ defer: true });
 const canvasModels = new CanvasModels();
+const focusView = new FocusView();
 const pageMotion = new PageMotion();
 const pptxAnimations=new PptxAnimations();const simulations=new Simulations(),gameAudio=new GameAudio(),gameLayout=new GameLayout();
 let classroom, state, host = false, demo = false, busy = false, selectedAvatar = avatars[0];
@@ -165,7 +167,7 @@ function documentLesson(slide) {
   const audioTrigger = host ? slide.audio?.trigger : '';
   return `${header()}<main class="document-classroom ${mobile?'mobile-companion':''}">${presentationTop()}
     ${status !== 'online' && !demo ? '<div class="connection-banner" role="status">Reconectando à sala. <button class="text-btn" data-action="reconnect">Reconectar</button></div>' : ''}
-    ${mobile?mobileMarkup(slides[state.slide]):`<figure class="document-stage ${canvas ? 'canvas-stage' : ''}" ${!canvas&&audioTrigger==='background'?'data-play-slide-audio="background" tabindex="0" aria-label="Tocar áudio do slide"':''}>${canvas ? canvasMarkup(slide,{audioTrigger,audioHotspots:host}) : `<img ${slide.image?'src="'+esc(slide.image)+'"':slide.assetId?'data-asset-id="'+esc(slide.assetId)+'"':''} alt="${esc(slide.imageAlt || slide.title)}"><figcaption class="sr-only">${esc(slide.title)}</figcaption>`}</figure>`}
+    ${mobile?mobileMarkup(slides[state.slide]):`<figure class="document-stage ${canvas ? 'canvas-stage' : ''}" ${!canvas&&audioTrigger==='background'?'data-play-slide-audio="background" tabindex="0" aria-label="Tocar áudio do slide"':''}>${canvas ? canvasMarkup(slide,{audioTrigger,audioHotspots:host}) : `<img ${slide.image?'src="'+esc(slide.image)+'"':slide.assetId?'data-asset-id="'+esc(slide.assetId)+'"':''} alt="${esc(slide.imageAlt || slide.title)}"><figcaption class="sr-only">${esc(slide.title)}</figcaption>`}${focusButton(slides[state.slide])}</figure>`}
     ${!host&&!mobile ? `<button class="student-expand" data-action="fullscreen">⛶ Ampliar slide</button>` : ''}
     ${slide.prompt ? `<section class="document-discussion"><strong>${esc(slide.prompt)}</strong><button class="text-btn" data-action="solution">${solutionOpen ? 'Ocultar' : 'Conferir'} explicação</button>${solutionOpen ? `<p>${esc(slide.answer)}</p>` : ''}</section>` : ''}
     <footer class="document-footer"><div class="document-nav"><span class="slide-counter"><strong>${state.slide + 1}</strong> / ${slides.length}</span>${host ? `${state.totalQuestions?'<button class="text-btn" data-action="quiz">Ir para o quiz</button>':''}<button class="icon-btn bordered" data-action="previous" aria-label="Slide anterior" ${state.slide === 0 && !(state.animationStep>0) ? 'disabled' : ''}>${icon('left')}</button>${state.activity&&state.activity.slideIndices.at(-1)===state.slide&&!pendingPptxBuild()?`<button class="btn primary small" data-action="${state.activity.hasNext?'next-stage':'finish'}">${state.activity.hasNext?'Próxima etapa →':'Encerrar aula'}</button>`:state.slide < slides.length - 1 || pendingPptxBuild() ? `<button class="btn primary small" data-action="next-slide">Próximo ${icon('right')}</button>` : `<button class="btn primary small" data-action="${state.totalQuestions ? 'quiz' : 'finish'}">${state.totalQuestions ? 'Iniciar quiz' : 'Encerrar aula'} ${icon('check')}</button>`}` : '<span class="following-label">Sincronizado com a aula</span>'}</div></footer></main>${shareOpen ? shareDialog() : ''}`;
@@ -271,6 +273,7 @@ function render() {
   canvasModels.mount(state?.phase === 'lesson' ? app : null, state?.phase === 'lesson' ? presentationSlide(slides[state.slide]) : null);
   const upcoming = state?.phase === 'lesson' ? slides[state.slide + 1] : null;
   canvasModels.preload(upcoming ? presentationSlide(upcoming) : null);
+  focusView.sync(state?.phase==='lesson'?slides[state.slide]?.id:'');
   fillAssetImages(app);simulations.mount(state?.phase==='lesson'?app:null);if(state?.phase==='lesson')loadSlideFonts(slides[state.slide],activeLesson.customFonts);
   if (state && (shareOpen || (host && !demo && presenterSettings.qrVisible && state.phase === 'lesson'))) {
     const url = joinUrl();
@@ -440,7 +443,8 @@ async function action(name) {
     case 'preview': preview(); break;
     case 'connect-public-room': { const lesson=activeLesson;clearInterval(demoTimer);await connectSession({host:true,lesson});break; }
     case 'home': leave(false);studio.view='library';studio.writeRoute();render();break;
-    case 'leave': leave(); break;
+    case 'leave': focusView.close(); leave(); break;
+    case 'focus-item': if(state?.phase==='lesson'&&slides[state.slide])focusView.open(slides[state.slide]); break;
     case 'toggle-qr': presenterSettings.qrVisible=!presenterSettings.qrVisible;savePresenterSettings(presenterSettings);render();showPresentationControls();break;
     case 'next-stage':music=true;control('next-stage');break;
     case 'next-slide': if(pendingPptxBuild()){control('animation',nextBuildStep());break;}if(state.activity){const ids=state.activity.slideIndices,next=ids[ids.indexOf(state.slide)+1];if(next===undefined)control('next-stage');else control('slide',next);}else control('slide', Math.min(slides.length - 1, state.slide + 1)); break;

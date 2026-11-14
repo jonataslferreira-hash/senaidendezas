@@ -248,7 +248,7 @@ function addActivities(lesson,result){
   return added;
 }
 
-async function applyEdit(slide,result,target,photos=[]) {
+async function applyEdit(slide,result,target,photos=[],onStatus=()=>{}) {
   const edits=Array.isArray(result.changes)?result.changes.slice(0,40):[];
   const additions=Array.isArray(result.additions)?result.additions.slice(0,8):[];
   let count=!target&&applyCanvasTheme(slide,result.theme)?1:0;
@@ -292,6 +292,7 @@ async function applyEdit(slide,result,target,photos=[]) {
     update(element,change);
     if(element.type==='image'&&typeof change.imageSearch==='string'&&change.imageSearch.trim()){
       const transparent=change.imageTransparent===true;
+      onStatus('Procurando imagens de “'+text(change.imageSearch,60)+'”…');
       const image=await findSlideImage(normalizeImageQuery(change.imageSearch),{transparent});
       if(!image)throw Error('Não achei nenhuma imagem de “'+text(change.imageSearch,80)+'”. Diga o que deve aparecer com mais detalhes (ex.: “logo do Windows 11”) ou use Imagem › Buscar para escolher na galeria.');
       delete element.assetId;
@@ -305,6 +306,7 @@ async function applyEdit(slide,result,target,photos=[]) {
   }
   if(!target){
     if(result.imageSearch&&slide.elements.length<MAX_CANVAS_ELEMENTS){
+      onStatus('Procurando imagens de “'+text(result.imageSearch,60)+'”…');
       const image=await findSlideImage(normalizeImageQuery(result.imageSearch));
       if(image){
         slide.elements.push(newElement('image',{image:image.data,imageAlt:image.alt,x:56,y:15,w:37,h:70}));
@@ -511,7 +513,8 @@ export class StorageAI {
       if(!event.target.matches('#storage-ai-edit'))return;
       event.preventDefault();
       this.edit(event.target).catch(error=>{
-        if(error.name!=='AbortError')this.editMessages.push({role:'assistant',text:error.message});
+        // Tempo esgotado também merece resposta: antes o pedido sumia em silêncio.
+        this.editMessages.push({role:'assistant',text:['AbortError','TimeoutError'].includes(error.name)?'A IA demorou demais para responder. Tente de novo com um pedido mais curto.':error.message});
         this.paint();
       });
     });
@@ -1208,7 +1211,15 @@ export class StorageAI {
   updateInspectorControls(panel,reference) {
     const selection=this.scope==='selection';
     const form=panel.querySelector('form');
-    form.querySelector('button[type=submit]').disabled=this.busy||(selection&&(!reference.element||reference.element.locked));
+    const send=form.querySelector('button[type=submit]');
+    send.disabled=this.busy||(selection&&(!reference.element||reference.element.locked));
+    // O ícone precisa acompanhar o estado: antes o círculo de carregamento
+    // continuava girando depois que a resposta chegava.
+    if(send.dataset.busy!==String(this.busy)){
+      send.dataset.busy=String(this.busy);
+      send.classList.toggle('is-loading',this.busy);
+      send.innerHTML=this.busy?'<span class="ai-spinner" aria-hidden="true"></span>':studioIcon('send');
+    }
     form.setAttribute('aria-busy',String(this.busy));
     form.elements.prompt.placeholder=selection?'O que você quer mudar neste elemento?':'O que você quer mudar neste slide?';
   }
@@ -1237,7 +1248,7 @@ export class StorageAI {
     const selection=this.scope==='selection';
     return `<section class="storage-ai-inspector">
       <header><div class="ai-inspector-brand">${brandMark}<div><h2>${label}</h2><span>Assistente de edição</span></div></div><button type="button" data-storage-ai="toggle" aria-label="Fechar Storage AI">${closeIcon}</button></header>
-      <div class="storage-ai-messages" role="log">${this.editMessages.length?'':'<p data-role="assistant">Me diga o que você quer mudar.</p>'}${this.editMessages.map(m=>`<p data-role="${m.role}">${esc(m.text)}</p>`).join('')}</div>
+      <div class="storage-ai-messages" role="log">${this.editMessages.length?'':'<p data-role="assistant">Me diga o que você quer mudar.</p>'}${this.editMessages.map(m=>`<p data-role="${m.role}">${esc(m.text)}</p>`).join('')}${this.busy?`<p data-role="assistant" class="ai-status" data-ai-status><span class="ai-status-dots" aria-hidden="true"><i></i><i></i><i></i></span><span>${esc(this.editStatus||'Pensando…')}</span></p>`:''}</div>
       <form id="storage-ai-edit" aria-busy="${this.busy}"><label class="sr-only" for="storage-ai-prompt">Pedido para Storage AI</label>
       <div class="ai-scope-panel" ${this.scopeOpen?'':'hidden'}>
         <div class="storage-ai-scope" role="group" aria-label="Escopo da edição">
@@ -1304,8 +1315,11 @@ export class StorageAI {
       longest.text=longest.text.slice(0,Math.floor(longest.text.length/2));
     }
     this.editMessages.push({role:'user',text:prompt});this.editMessages=this.editMessages.slice(-30);this.editPrompt='';this.busy=true;
+    // Enquanto trabalha, o assistente conta o que está fazendo numa mensagem
+    // provisória; ela some quando a resposta de verdade chega.
+    const status=message=>{this.editStatus=message;this.paint();};
     try{
-      this.paint();
+      status(imageRequest||element?.type==='image'&&this.scope==='selection'?'Entendendo qual imagem você quer…':'Lendo o slide e pensando na mudança…');
       let result=await this.ask({mode:'edit',prompt,context},AbortSignal.timeout(80000));
       if(uid!==this.studio.account.user?.id||lessonId!==this.studio.draft?.id||slideId!==designer.original?.id||!this.open)return;
       if(!this.studio.groups.canEdit||JSON.stringify(designer.original)!==snapshot)throw Error('O slide mudou enquanto a IA respondia. Envie o pedido novamente.');
@@ -1330,13 +1344,14 @@ export class StorageAI {
           }]};
         }else throw Error('Não identifiquei qual imagem você quer usar. Tente: “troque esta imagem por um SSD gamer”.');
       }
-      const copy=structuredClone(slide),count=await applyEdit(copy,result,target);
+      status('Preparando as alterações…');
+      const copy=structuredClone(slide),count=await applyEdit(copy,result,target,[],status);
       if(uid!==this.studio.account.user?.id||lessonId!==this.studio.draft?.id||slideId!==designer.original?.id||!this.open)return;
       if(!this.studio.groups.canEdit)throw Error('Você perdeu a permissão de edição desta aula.');
       if(JSON.stringify(designer.original)!==snapshot)throw Error('O slide mudou enquanto a IA respondia. Envie o pedido novamente.');
       const reply=text(result.reply,1000);
       this.editMessages.push({role:'assistant',text:count?(reply||'Alterações aplicadas.'):(target&&slide.elements.some(e=>e.id===target&&e.type==='image')?`Nenhuma alteração aplicada.${reply?' '+reply:''}`:(reply||'Nenhuma alteração aplicada.'))});
       if(count)designer.mutate(current=>Object.assign(current,copy));
-    }finally{this.busy=false;this.paint();}
+    }finally{this.busy=false;this.editStatus='';this.paint();}
   }
 }

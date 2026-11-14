@@ -497,7 +497,9 @@ export async function handleStorageAIImages(request, env, user, headers) {
   }
 
   const query = clip(url.searchParams.get('q') || '', MAX_QUERY);
-  const page = Math.max(1, Math.min(6, Number(url.searchParams.get('page')) || 1));
+  // A galeria carrega páginas sem parar enquanto a pessoa rola; o limite antigo (6)
+  // fazia a página 7 em diante repetir a 6 e a lista "acabava".
+  const page = Math.max(1, Math.min(80, Number(url.searchParams.get('page')) || 1));
   const limit = Math.max(6, Math.min(MAX_LIMIT, Number(url.searchParams.get('limit')) || DEFAULT_LIMIT));
   const hinted = splitTransparentQuery(query);
   const transparent = url.searchParams.get('transparent') === '1' || hinted.transparent;

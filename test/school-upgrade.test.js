@@ -108,19 +108,24 @@ test('miniaturas não interativas de simulações e canvas não emitem controles
 });
 
 
-test('experimentos refeitos: cifra de César e raio-X do texto calculam de verdade',async()=>{
- const {caesarShift,letterFrequency,textMetrics,resolveSimulation}=await import('../src/simulations.js');
- assert.equal(caesarShift('HAL',1),'IBM');
- assert.equal(caesarShift('Vim, vi e venci',3),'YLP, YL H YHQFL');
- assert.equal(caesarShift(caesarShift('AÇÃO',7),-7),'ACAO');
- assert.equal(letterFrequency('banana').top,'A');
- const info=textMetrics('A casa é azul. O céu também é azul! E o mar?');
- assert.equal(info.sentences,3);
- assert.equal(info.words,12);
- assert.equal(info.repeated[0][0],'azul');
- assert.equal(textMetrics('').level,'Sem texto');
- // Slides antigos com os experimentos removidos abrem o substituto.
- assert.equal(resolveSimulation('eras'),'cipher');
- assert.equal(resolveSimulation('narrative'),'textlab');
+test('experimentos de sala de aula: linha do tempo e conjugação verbal',async()=>{
+ const {timelineInfo,romanNumeral,conjugate,resolveSimulation,simulationIds}=await import('../src/simulations.js');
+ assert.equal(romanNumeral(21),'XXI');
+ assert.equal(timelineInfo(1500).centuryLabel,'século XV');
+ assert.equal(timelineInfo(1501).centuryLabel,'século XVI');
+ assert.equal(timelineInfo(1822).period,'Idade Contemporânea');
+ assert.equal(timelineInfo(1822).event.name,'Independência do Brasil');
+ assert.equal(timelineInfo(-753).centuryLabel,'século VIII a.C.');
+ assert.equal(timelineInfo(-3800).period,'Pré-História');
+ assert.equal(timelineInfo(1000).period,'Idade Média');
+ assert.deepEqual(conjugate('cantar','presente').forms,['canto','cantas','canta','cantamos','cantais','cantam']);
+ assert.equal(conjugate('vender','futuro').forms[3],'venderemos');
+ assert.equal(conjugate('partir','perfeito').forms[2],'partiu');
+ assert.equal(conjugate('estudar','imperfeito').forms[3],'estudávamos');
+ assert.equal(conjugate('xyz','nada').forms[0],'canto');
+ // Slides antigos com experimentos removidos abrem o substituto da disciplina.
+ for(const old of ['eras','cipher'])assert.equal(resolveSimulation(old),'timeline');
+ for(const old of ['narrative','textlab'])assert.equal(resolveSimulation(old),'conjugation');
  assert.equal(resolveSimulation('nada'),'projectile');
+ assert.ok(!simulationIds.includes('cipher')&&!simulationIds.includes('textlab'));
 });

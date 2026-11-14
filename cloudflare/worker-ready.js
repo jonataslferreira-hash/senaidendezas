@@ -1257,7 +1257,7 @@ async function handleStorageAIImages(request, env, user, headers) {
     }
   }
   const query = clip2(url.searchParams.get("q") || "", MAX_QUERY);
-  const page = Math.max(1, Math.min(6, Number(url.searchParams.get("page")) || 1));
+  const page = Math.max(1, Math.min(80, Number(url.searchParams.get("page")) || 1));
   const limit = Math.max(6, Math.min(MAX_LIMIT, Number(url.searchParams.get("limit")) || DEFAULT_LIMIT));
   const hinted = splitTransparentQuery(query);
   const transparent = url.searchParams.get("transparent") === "1" || hinted.transparent;
