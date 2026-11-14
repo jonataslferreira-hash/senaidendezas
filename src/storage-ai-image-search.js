@@ -380,24 +380,41 @@ export function imageSourceNote(image){
     image.source,image.licenseUrl].filter(Boolean).join('\n');
 }
 
-export async function searchImageChoices(query,page=1,{transparent=false}={}){
-  const wantsAlpha=transparent||wantsTransparentImage(query);
+// Dentro de cada página, vêm primeiro as imagens cujo título, página ou arquivo
+// citam o assunto pedido (em português ou na tradução). As outras continuam na
+// lista, depois: o buscador às vezes devolve um produto ou uma marca com o mesmo nome.
+const plainWords=value=>String(value||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().split(/[^a-z0-9]+/).filter(Boolean);
+const queryNoise=new Set(['png','sem','fundo','transparente','transparent','recortado','clipart','icone','imagens','imagem','fotos','foto','ilustracao','desenho','hd','arte','exemplos','de','da','do','das','dos','the','of','com','para','em','um','uma']);
+export function rankImageChoices(choices,query){
+  const wanted=[...new Set([...plainWords(query),...plainWords(normalizeImageQuery(query))])].filter(word=>word.length>2&&!queryNoise.has(word));
+  if(!wanted.length)return choices;
+  const stems=wanted.map(word=>word.length>4?word.replace(/(?:es|s)$/,''):word);
+  const score=choice=>{
+    const title=plainWords(choice.title).join(' '),rest=plainWords([choice.source,choice.original].join(' ')).join(' ');
+    if(stems.some(stem=>title.includes(stem)))return 0;
+    return stems.some(stem=>rest.includes(stem))?1:2;
+  };
+  return choices.map((choice,index)=>({choice,index,score:score(choice)})).sort((a,b)=>a.score-b.score||a.index-b.index).map(item=>item.choice);
+}
+
+// Um JPEG nunca guarda transparência: nem vale a pena baixar para conferir.
+export const mayBeTransparent=choice=>!/\.jpe?g(?:$|[?#])/i.test(choice?.original||'');
+
+export async function searchImageChoices(query,page=1,{transparent=false,raw=false}={}){
+  const wantsAlpha=!raw&&(transparent||wantsTransparentImage(query));
   const spoken=normalizeImageQuery(query,{translate:false});
-  const term=spoken.replace(transparentWords,' ').replace(/\s+/g,' ').trim()||spoken;
+  const term=raw?spoken:spoken.replace(transparentWords,' ').replace(/\s+/g,' ').trim()||spoken;
   if(!term)return [];
-  // A galeria mostra os resultados na ordem do Bing. Reordenar pelas palavras
-  // do título colocava na frente imagens que só tinham o nome pedido e
-  // empurrava para baixo as que o buscador considerava mais certas.
-  const worker=await workerJson('/storage-ai/images?source=bing&q='+encodeURIComponent(term)+'&page='+String(page)+'&limit=24'+(wantsAlpha?'&transparent=1':''));
+  const worker=await workerJson('/storage-ai/images?source=bing&q='+encodeURIComponent(term)+'&page='+String(page)+'&limit=24'+(wantsAlpha?'&transparent=1':'')+(raw?'&raw=1':''));
   // A transparência só é afirmada depois de conferida no arquivo (verifyTransparentChoice).
-  const usable=payload=>(payload?.items||[]).map(choiceFromWorker)
+  const usable=payload=>rankImageChoices((payload?.items||[]).map(choiceFromWorker)
     .filter(choice=>choice.thumbnail&&choice.url&&!isDocumentChoice(choice))
-    .map(choice=>({...choice,transparent:false}));
+    .map(choice=>({...choice,transparent:false})),query);
   const found=usable(worker);
   if(found.length)return found;
   // Bing sem resposta na primeira página: os catálogos livres (Commons,
   // Wikipédia, Openverse) evitam uma galeria vazia.
-  if(page===1){
+  if(page===1&&!raw){
     const catalogs=await workerJson('/storage-ai/images?q='+encodeURIComponent(term)+'&page=1&limit=24'+(wantsAlpha?'&transparent=1':''));
     const extra=usable(catalogs);
     if(extra.length)return extra;
@@ -411,7 +428,7 @@ export async function searchImageChoices(query,page=1,{transparent=false}={}){
 // A miniatura do buscador é JPEG e nunca guarda transparência, então só o
 // original responde. Devolve o arquivo conferido (reaproveitado ao inserir).
 export async function verifyTransparentChoice(choice){
-  if(!choice.original)return null;
+  if(!choice.original||!mayBeTransparent(choice))return null;
   try{
     const blob=await fetchImageBlob(choice.original);
     if(!blob||!blob.type.startsWith('image/')||blob.size>6_000_000||blob.type==='image/jpeg')return null;

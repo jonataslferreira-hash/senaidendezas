@@ -14,7 +14,7 @@ import {slideStylePicker,localLayouts} from './slide-style-picker.js';
 import { canvasMarkup, CanvasModels, esc } from './canvas-view.js';
 import { importModelFiles } from './model-files.js';
 import { storePages, fillAssetImages, fillAssetAudio } from './assets.js';
-import { searchImageChoices, importImageChoice, verifyTransparentChoice } from './storage-ai-image-search.js';
+import { searchImageChoices, importImageChoice, verifyTransparentChoice, mayBeTransparent } from './storage-ai-image-search.js';
 const copy = value => JSON.parse(JSON.stringify(value));
 const btn = (action, text, extra = '') => `<button type="button" data-designer-action="${action}" ${extra}>${text}</button>`;
 function snapAxis(position,size,pixels,bypass,targets=[]) {
@@ -844,17 +844,21 @@ export class SlideDesigner {
     const form=dialog.querySelector('.image-finder-form'),input=form.elements.query,scroller=dialog.querySelector('.image-finder-scroll'),grid=dialog.querySelector('[data-finder-grid]'),status=dialog.querySelector('.image-finder-status'),empty=dialog.querySelector('[data-finder-empty]'),more=dialog.querySelector('[data-finder-more]');
     const urls=[];
     // Quando a busca exata acaba, a galeria segue com variações do mesmo assunto.
-    const variants=(term,alpha)=>alpha?[term+' png',term,term+' sem fundo',term+' recortado',term+' clipart png',term+' ícone png']:[term,...['imagens','fotos','ilustração','desenho','hd','arte','exemplos'].map(extra=>term+' '+extra)];
+    // No modo transparente alterna o filtro do Bing com buscas comuns por PNG (raw); todas são conferidas.
+    const variants=(term,alpha)=>alpha
+      ?[[term,false],[term+' png transparente',true],[term+' png sem fundo',true],[term+' desenho',false],[term+' transparent png',true],[term+' recortado png',true],[term+' ícone',false],[term+' clipart png',true],[term+' ilustração',false],[term+' sticker png',true],[term+' vetor png',true],[term+' logo',false],[term+' render png',true],[term+' cartoon png',true]]
+      :[term,...['imagens','fotos','ilustração','desenho','hd','arte','exemplos','wallpaper','close','natureza','infantil','realista','png'].map(extra=>term+' '+extra)].map(text=>[text,false]);
     const seen=new Set();
-    let term='',alpha=false,loading=false,ended=false,queries=[],queryIndex=0,page=0,dry=0,failures=0,token=0,shown=0,checking=0,checked=0;
-    const nearEnd=()=>scroller.scrollHeight-scroller.scrollTop-scroller.clientHeight<480;
+    let term='',alpha=false,loading=false,ended=false,queries=[],queryIndex=0,page=0,dry=0,failures=0,token=0,shown=0,checking=0,checked=0,stalled=false;
+    // Mantém algumas telas de imagens já carregadas abaixo do que a pessoa vê.
+    const nearEnd=()=>scroller.scrollHeight-scroller.scrollTop-scroller.clientHeight<Math.max(1600,scroller.clientHeight*3);
     const skeleton=count=>{for(let i=0;i<count;i++){const cell=document.createElement('div');cell.className='image-finder-skeleton';cell.setAttribute('aria-hidden','true');grid.append(cell);}};
     const clearSkeleton=()=>grid.querySelectorAll('.image-finder-skeleton').forEach(cell=>cell.remove());
     const showEmpty=(title,text,withIdeas=false)=>{empty.hidden=false;empty.querySelector('strong').textContent=title;empty.querySelector('span').textContent=text;empty.querySelector('div').hidden=!withIdeas;};
     const report=()=>{
       if(!term){status.textContent='';return;}
-      if(alpha)status.textContent=shown?`${shown} ${shown===1?'imagem':'imagens'} com fundo transparente conferido${checking?' · conferindo mais…':''}`:checking||loading?`Conferindo quais imagens têm fundo transparente de verdade… (${checked} analisadas)`:'';
-      else status.textContent=shown?`${shown} ${shown===1?'imagem':'imagens'} para “${term}”`:loading?'Buscando imagens…':'';
+      if(alpha)status.textContent=shown?`${shown} ${shown===1?'imagem':'imagens'} com fundo transparente${loading?` · procurando mais (${checked} analisadas)…`:''}`:checking||loading?`Procurando imagens com fundo transparente… ${checked} analisadas até agora`:'';
+      else status.textContent=shown?`${shown} ${shown===1?'imagem':'imagens'} para “${term}”${loading?' · carregando mais…':''}`:loading?'Buscando imagens…':'';
     };
     const insert=async(choice,button)=>{
       button.disabled=true;button.dataset.busy='true';
@@ -885,7 +889,8 @@ export class SlideDesigner {
     };
     // Fundo transparente: cada imagem só aparece depois de conferida no arquivo original.
     const verifyAll=async(choices,run)=>{
-      const queue=[...choices];
+      // JPEG não tem transparência: sai da fila sem baixar nada.
+      const queue=choices.filter(choice=>{if(mayBeTransparent(choice))return true;checked++;return false;});
       const worker=async()=>{
         while(queue.length&&run===token&&dialog.open){
           const choice=queue.shift();checking++;report();
@@ -895,23 +900,23 @@ export class SlideDesigner {
           if(run===token)report();
         }
       };
-      await Promise.all(Array.from({length:4},worker));
+      await Promise.all(Array.from({length:8},worker));
     };
     const loadMore=async()=>{
       if(loading||ended||!term||!dialog.open)return;
-      loading=true;const run=token;
-      more.textContent='';skeleton(shown?4:8);report();
+      loading=true;stalled=false;const run=token;
+      more.textContent='';if(!shown||alpha)skeleton(shown?4:8);report();
       try{
         // Continua até encher a tela; enquanto não houver nenhuma imagem, não para.
         let burst=0;
-        while(run===token&&dialog.open&&!ended&&(nearEnd()||!shown)&&burst++<(shown?4:12)){
+        while(run===token&&dialog.open&&!ended&&(nearEnd()||!shown)&&burst++<(shown?12:60)){
           let choices;
-          try{choices=await searchImageChoices(queries[queryIndex],++page,{transparent:alpha});failures=0;}
+          try{const [text,raw]=queries[queryIndex];choices=await searchImageChoices(text,++page,{transparent:alpha&&!raw,raw});failures=0;}
           catch{
             page--;
             if(run!==token)return;
             if(++failures<3){burst--;await new Promise(resolve=>setTimeout(resolve,900*failures));continue;}
-            failures=0;clearSkeleton();
+            failures=0;stalled=true;clearSkeleton();
             if(!shown)showEmpty('Não consegui falar com o buscador','Confira a internet e tente de novo.');
             more.replaceChildren();const retry=document.createElement('button');retry.type='button';retry.textContent='Tentar de novo';retry.addEventListener('click',loadMore);more.append(retry);
             return;
@@ -922,7 +927,7 @@ export class SlideDesigner {
           if(run!==token)return;
           dry=fresh.length?0:dry+1;
           // Duas páginas seguidas sem novidade: passa para a próxima variação.
-          if(dry>=2||page>=80||alpha&&page>=4){queryIndex++;page=0;dry=0;if(queryIndex>=queries.length)ended=true;}
+          if(dry>=2||page>=80||alpha&&page>=8){queryIndex++;page=0;dry=0;if(queryIndex>=queries.length)ended=true;}
         }
         if(run!==token)return;
         clearSkeleton();
@@ -930,8 +935,8 @@ export class SlideDesigner {
           ended=true;
           if(alpha)showEmpty('Nenhuma imagem com fundo transparente','Analisei '+checked+' imagens e nenhuma tinha o fundo recortado. Tente outra palavra ou busque em “Todas as imagens”.');
           else showEmpty('Nada encontrado para “'+term+'”','Tente outra palavra, no singular ou em inglês.',true);
-        }else more.textContent=ended?'Você viu todas as imagens desta busca.':'Role para carregar mais';
-      }finally{if(run===token){loading=false;clearSkeleton();report();}}
+        }else more.textContent=ended?'Você viu todas as imagens desta busca.':'';
+      }finally{if(run===token){loading=false;clearSkeleton();report();if(!ended&&!stalled&&shown&&dialog.open&&nearEnd())setTimeout(loadMore,0);}}
     };
     const startSearch=()=>{
       const value=input.value.trim();if(!value)return;
@@ -1028,7 +1033,7 @@ export class SlideDesigner {
           <label class="simulation-modal-select-wrap">Experimento<select class="simulation-modal-select" aria-label="Escolher experimento"></select></label>
           <div class="simulation-modal-filters" role="tablist" aria-label="Filtrar por disciplina">${filtersMarkup}</div>
           <div class="simulation-modal-list" role="listbox" aria-label="Experimentos"></div>
-          ${canEdit?`<div class="simulation-modal-import"><button type="button" data-sim-import>↑ Importar experimento</button><button type="button" data-sim-template>↓ Baixar modelo para IA</button><input type="file" accept=".html,.htm,.txt,text/html,text/plain" hidden><p role="status" data-sim-import-status></p></div>`:''}
+          ${canEdit?`<div class="simulation-modal-import"><div class="simulation-modal-import-row"><button type="button" data-sim-import>${studioIcon('upload')}<span>Importar experimento</span></button><button type="button" data-sim-template>${studioIcon('download')}<span>Baixar modelo para IA</span></button></div><input type="file" accept=".html,.htm,.txt,text/html,text/plain" hidden><p role="status" data-sim-import-status></p></div>`:''}
         </aside>
       </div>
       <footer class="simulation-modal-foot"><span class="simulation-modal-current"></span><div class="simulation-modal-actions"><button type="button" class="studio-btn quiet" data-sim-cancel>${canEdit?'Cancelar':'Fechar'}</button>${canEdit?`<button type="button" class="studio-btn studio-launch" data-sim-confirm>${targetId?'Aplicar no slide':'Inserir no slide'}</button>`:''}</div></footer>`;

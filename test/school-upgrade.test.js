@@ -7,7 +7,7 @@ import {
   projectile,mixturePH,waveProperties,matterState,osmosisState,logisticPopulation,
   quadraticMetrics,trigValues,seasonInfo,historicalEra,narrativeStage,colorMixInfo,evaluateGate,
   leverBalance,mendelCross,diceProbability,compoundInterest,greenhouseBalance,
-  simulationIds,simulationGroups,simulationNames,simulationSubjects,simulationMarkup,simulationChallenges,labSims
+  simulationIds,simulationGroups,simulationNames,simulationSubjects,simulationMarkup,labSims
 } from '../src/simulations.js';
 import {canvasMarkup} from '../src/canvas-view.js';
 import {styles} from '../src/personalization.js';
@@ -24,8 +24,8 @@ test('áudio de chat exige associação, limita formato e permite excluir soment
  assert.equal((await call(new Request('https://worker.test'+path,{method:'PUT',headers:{'Content-Type':'audio/webm'},body:new Uint8Array([0x1a,0x45,0xdf,0xa3,0])}))).status,200);assert.equal((await call(new Request('https://worker.test'+path))).status,200);assert.equal((await call(new Request('https://worker.test'+path,{method:'DELETE'}),true,{id:'another'})).status,403);assert.equal((await call(new Request('https://worker.test'+path,{method:'DELETE'}))).status,200);assert.equal(objects.size,0);
  assert.equal((await call(new Request('https://worker.test'+path,{method:'PUT',headers:{'Content-Type':'audio/webm'},body:'<script>'}))).status,415);
 });
-test('catálogo multidisciplinar de 24 simulações cobre cálculos, markup e normalização',()=>{
- assert.equal(simulationIds.length,24);
+test('catálogo multidisciplinar de 30 simulações cobre cálculos, markup e normalização',()=>{
+ assert.equal(simulationIds.length,30);
  const groupedIds=simulationGroups.flatMap(([,items])=>items.map(([id])=>id));
  assert.deepEqual(groupedIds,simulationIds);
  for(const id of simulationIds){
@@ -67,39 +67,57 @@ test('catálogo multidisciplinar de 24 simulações cobre cálculos, markup e no
  assert.ok(greenhouseBalance(340,30).temperature<greenhouseBalance(340,80).temperature);
 });
 
-test('desafios das simulações dão um alvo verificável e um markup com estado ao vivo',()=>{
- for(const [id,rule] of Object.entries(simulationChallenges)){
-  assert.ok(simulationNames[id],'desafio em simulação existente: '+id);
-  assert.ok(rule.prompt.length>8&&rule.hint.length>5,'desafio com instrução em '+id);
+test('experimentos não trazem mais a caixa de desafio "Acerte o alvo"',()=>{
+ for(const id of simulationIds){
   const markup=simulationMarkup(id);
-  assert.ok(markup.includes('data-sim-challenge'),'painel de desafio em '+id);
-  assert.ok(markup.includes('Alvo alcançado')===false,'estado começa pendente em '+id);
-  assert.ok(markup.includes('Ajuste os valores'),'estado inicial em '+id);
-  // Simulações com sliders ganham passos +/−; as que só têm select não precisam.
+  assert.ok(!/data-sim-challenge|Acerte o alvo|Ajuste os valores/.test(markup),'sem desafio em '+id);
   if(markup.includes('type="range"'))assert.ok(markup.includes('data-sim-step'),'passo +/− nos controles de '+id);
  }
- assert.equal(simulationChallenges.projectile.test({range:19.5}),true);
- assert.equal(simulationChallenges.projectile.test({range:21.5}),false);
- const run=(id,values)=>simulationChallenges[id].test(labSims[id].compute({...values}));
- assert.equal(run('lever',{loadMass:40,loadArm:25,effort:10,effortArm:100}),true);
- assert.equal(run('lever',{loadMass:40,loadArm:50,effort:10,effortArm:100}),false);
- assert.equal(run('genetics',{mother:'aa',father:'Aa'}),true);
- assert.equal(run('genetics',{mother:'AA',father:'aa'}),false);
- assert.equal(run('interest',{principal:1000,rate:3,months:24}),true);
- assert.equal(run('interest',{principal:1000,rate:1,months:24}),false);
- assert.equal(run('greenhouse',{co2:350,albedo:30}),true);
- assert.equal(run('greenhouse',{co2:600,albedo:30}),false);
- assert.equal(run('quadratic',{a:1,b:-2,c:1}),true);
- assert.equal(run('motion',{speed:15,time:8}),true);
- assert.equal(run('density',{mass:300,volume:400,liquid:'water'}),true);
- assert.equal(run('pythagoras',{a:5,b:12}),true);
- assert.equal(run('binary',{value:33}),true);
- assert.equal(run('fractions',{numerator:4,denominator:8}),true);
- assert.equal(run('timezones',{hour:12,city:'tokyo'}),true);
- assert.equal(run('colormix',{r:255,g:255,b:0}),true);
- assert.equal(run('osmosis',{outside:.9}),true);
- assert.equal(run('states',{substance:'ethanol',temperature:80}),true);
- assert.equal(run('photosynthesis',{light:100,co2:100,water:100}),true);
+ const run=(id,values)=>labSims[id].compute({...values});
+ assert.equal(run('lever',{massA:40,armA:75,massB:20,armB:150}).balanced,true);
+ assert.equal(run('lever',{massA:40,armA:75,massB:20,armB:100}).side,'esquerda');
+ assert.equal(run('neutralization',{acid:50,base:50}).ph,7);
+ assert.equal(run('neutralization',{acid:80,base:20}).kind,'ácido');
+ assert.equal(run('neutralization',{acid:20,base:80}).kind,'básico');
+ assert.equal(run('states',{substance:'water',heat:0}).state,'sólido');
+ assert.equal(run('states',{substance:'water',heat:100}).state,'gasoso');
+ assert.equal(run('states',{substance:'iron',heat:10}).state,'sólido');
+ assert.equal(run('states',{substance:'oxygen',heat:100}).state,'gasoso');
+ assert.equal(run('balance',{a:3,b:4,total:19,x:5}).balanced,true);
+ assert.equal(run('balance',{a:3,b:4,total:19,x:2}).side,'direita');
+ assert.equal(run('moon',{day:0}).name,'Lua nova');
+ assert.equal(run('moon',{day:15}).name,'Lua cheia');
+ assert.equal(run('seasons',{month:1,tilt:23.5}).south,'Verão');
+ assert.equal(run('seasons',{month:7,tilt:23.5}).south,'Inverno');
+ assert.equal(run('seasons',{month:7,tilt:23.5}).north,'Verão');
+ assert.ok(run('seasons',{month:1,tilt:23.5}).daylight>run('seasons',{month:7,tilt:23.5}).daylight);
+ assert.ok(run('heart',{activity:'run',age:14}).bpm>run('heart',{activity:'rest',age:14}).bpm);
+ assert.ok(run('contagion',{vaccinated:0,spread:4,day:30}).reached>run('contagion',{vaccinated:90,spread:4,day:30}).reached);
+ assert.equal(run('contagion',{vaccinated:90,spread:4,day:30}).protectedGroup,true);
+ assert.ok(run('reaction',{temperature:60,form:'powder'}).seconds<run('reaction',{temperature:10,form:'whole'}).seconds);
+ assert.ok(Math.abs(run('refraction',{angle:45,material:'water'}).refracted-32.1)<.1);
+ assert.equal(run('pixels',{size:8,colors:'full'}).bytes,192);
+ assert.ok(Math.abs(run('solar',{planet:'mars',age:12}).localAge-6.38)<.01);
+ // Bancada de misturas: cada toque soma uma dose e a mistura reage.
+ const mixing=labSims.mixing;let pot={water:0,vinegar:0,bicarb:0,cabbage:0,oil:0,soap:0,last:-1,stamp:-9};
+ const pour=id=>{pot={...pot,...mixing.act(pot,'pour:'+id,3)};return mixing.compute(pot);};
+ assert.equal(pour('vinegar').kind,'ácida');
+ assert.equal(pour('bicarb').reacted,1);
+ assert.equal(mixing.compute(pot).kind,'neutra');
+ assert.equal(pour('bicarb').kind,'básica');
+ assert.ok(pour('cabbage').facts.some(text=>text.includes('verde')));
+ assert.equal(pour('oil').oilLayer,1);
+ const soapy=pour('soap');assert.equal(soapy.oilLayer,0);assert.equal(soapy.emulsion,true);assert.ok(soapy.foam>1);
+ for(let i=0;i<6;i++)pour('water');
+ assert.equal(mixing.compute(pot).water,4,'cada líquido tem um limite de doses');
+ assert.ok(!/NaN|undefined/.test(mixing.draw(pot,mixing.compute(pot),3.5)+mixing.text(mixing.compute(pot))));
+ assert.equal(mixing.compute({...pot,...mixing.act(pot,'reset',0)}).total,0);
+ assert.ok(simulationMarkup('mixing').includes('data-lab-act="pour:water"'));
+ assert.ok(Math.abs(run('hooke',{mass:500,spring:'soft'}).stretch-49)<1e-9);
+ assert.ok(Math.abs(run('hooke',{mass:200,spring:'soft'}).stretch*2-run('hooke',{mass:400,spring:'soft'}).stretch)<1e-9);
+ assert.equal(run('microscope',{sample:'onion',objective:'10',focus:55}).sharp,true);
+ assert.equal(run('microscope',{sample:'onion',objective:'40',focus:55}).sharp,false);
+ assert.equal(run('microscope',{sample:'blood',objective:'40',focus:70}).zoom,400);
 });
 test('estilos de interface incluem Office e 8-Bit preservando IDs internos',()=>{
  assert.equal(styles.find(([id])=>id==='editorial')?.[1],'Office');
@@ -146,7 +164,7 @@ test('experimentos de sala de aula calculam de verdade e desenham sem erro',asyn
  for(const [id,sim] of Object.entries(labSims)){
   assert.ok(simulationIds.includes(id),id+' está no catálogo');
   assert.ok(simulationMarkup(id).includes('data-lab-scene'),id+' tem cena');
-  const pick=index=>Object.fromEntries(sim.controls.map(([kind,key,,...rest])=>[key,kind==='select'?rest[0][index===1?rest[0].length-1:0][0]:rest[index===0?2:index===1?0:1]]));
+  const pick=index=>Object.fromEntries(sim.controls.filter(([kind])=>kind!=='buttons').map(([kind,key,,...rest])=>[key,kind==='hidden'?rest[0]:kind==='select'?rest[0][index===1?rest[0].length-1:0][0]:rest[index===0?2:index===1?0:1]]));
   for(const values of [pick(0),pick(1),pick(2)]){
    const metrics=sim.compute(values),output=sim.draw(values,metrics,1.7)+sim.text(metrics,values);
    assert.ok(!/NaN|undefined|Infinity/.test(output),id+' sem valores quebrados: '+JSON.stringify(values));
@@ -155,10 +173,13 @@ test('experimentos de sala de aula calculam de verdade e desenham sem erro',asyn
  // Slides antigos com experimentos removidos abrem um substituto.
  for(const old of ['narrative','textlab'])assert.equal(resolveSimulation(old),'conjugation');
  assert.equal(resolveSimulation('probability'),'fractions');
- assert.equal(resolveSimulation('logicgates'),'binary');
+ assert.equal(resolveSimulation('logicgates'),'pixels');
+ assert.equal(resolveSimulation('osmosis'),'heart');
+ assert.equal(resolveSimulation('pythagoras'),'balance');
+ assert.equal(resolveSimulation('greenhouse'),'seasons');
  assert.equal(resolveSimulation('timeline'),'timezones');
  assert.equal(resolveSimulation('nada'),'projectile');
- for(const gone of ['cipher','textlab','timeline','probability','logicgates'])assert.ok(!simulationIds.includes(gone));
+ for(const gone of ['cipher','textlab','timeline','probability','logicgates','osmosis','ecosystem','pythagoras','greenhouse','binary'])assert.ok(!simulationIds.includes(gone));
 });
 
 test('experimentos importados: leitura do modelo, validação e isolamento',async()=>{
