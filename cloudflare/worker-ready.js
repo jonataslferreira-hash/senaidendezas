@@ -921,11 +921,15 @@ async function bingSearch(query, limit, page = 1, { transparent = false } = {}) 
     first: String((page - 1) * limit + 1),
     count: String(Math.min(35, Math.max(limit, 12))),
     mmasync: "1",
-    adlt: "moderate"
+    adlt: "moderate",
+    // Sem o mercado, o Bing responde pelo país do servidor e lê "cachorro" em outro idioma.
+    mkt: "pt-BR",
+    setlang: "pt-BR",
+    cc: "BR"
   });
   if (transparent) params.set("qft", "+filterui:photo-transparent");
   const response = await fetch("https://www.bing.com/images/async?" + params, {
-    headers: { Accept: "text/html,application/xhtml+xml", "User-Agent": BROWSER_USER_AGENT, "Accept-Language": "pt-BR,pt;q=0.9,en;q=0.7" },
+    headers: { Accept: "text/html,application/xhtml+xml", "User-Agent": BROWSER_USER_AGENT, "Accept-Language": "pt-BR,pt;q=0.9,en;q=0.7", Cookie: "_EDGE_CD=m=pt-br&u=pt-br; _EDGE_S=mkt=pt-br&ui=pt-br" },
     signal: AbortSignal.timeout(UPSTREAM_TIMEOUT)
   });
   if (!response.ok) throw Error("bing_" + response.status);
@@ -1168,7 +1172,7 @@ async function cached(key, loader) {
 }
 async function searchImages(query, page, limit, { transparent = false, bingOnly = false } = {}) {
   const term = clip2(query, MAX_QUERY);
-  const key = "v4-" + (bingOnly ? "bing-" : "") + encodeURIComponent(term.toLowerCase()) + "-" + page + "-" + limit + (transparent ? "-png" : "");
+  const key = "v5-" + (bingOnly ? "bing-" : "") + encodeURIComponent(term.toLowerCase()) + "-" + page + "-" + limit + (transparent ? "-png" : "");
   return cached(key, async () => {
     if (bingOnly) {
       let items = await bingSearch(term, limit, page, { transparent });
@@ -1260,8 +1264,9 @@ async function handleStorageAIImages(request, env, user, headers) {
   const query = clip2(url.searchParams.get("q") || "", MAX_QUERY);
   const page = Math.max(1, Math.min(80, Number(url.searchParams.get("page")) || 1));
   const limit = Math.max(6, Math.min(MAX_LIMIT, Number(url.searchParams.get("limit")) || DEFAULT_LIMIT));
-  const hinted = splitTransparentQuery(query);
-  const transparent = url.searchParams.get("transparent") === "1" || hinted.transparent;
+  const raw = url.searchParams.get("raw") === "1";
+  const hinted = raw ? { transparent: false, subject: query } : splitTransparentQuery(query);
+  const transparent = !raw && (url.searchParams.get("transparent") === "1" || hinted.transparent);
   if (!query) return json({ error: "invalid_query", items: [] }, 400);
   try {
     const result = await searchImages(hinted.subject, page, limit, { transparent, bingOnly: url.searchParams.get("source") === "bing" });

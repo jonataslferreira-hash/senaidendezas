@@ -1,5 +1,11 @@
 import { labSims } from './sim-lab.js';
+import { moreSims } from './sim-lab-2.js';
 export { labSims, conjugate, conjugationVerbs, conjugationTenses, conjugationPersons, fractionInfo, timezoneInfo, binaryInfo, densityInfo, pythagorasInfo, photosynthesisInfo, warmingInfo } from './sim-lab.js';
+export { seesawInfo, phInfo, matterInfo, heartInfo, contagionInfo, equationInfo, moonInfo, pixelInfo, refractionInfo, reactionInfo, planetInfo, seasonsInfo } from './sim-lab-2.js';
+
+// Experimentos trocados por outros mais próximos do laboratório da escola.
+for (const old of ['osmosis', 'ecosystem', 'pythagoras', 'greenhouse', 'binary']) delete labSims[old];
+Object.assign(labSims, moreSims);
 
 export const simulationGroups = [
   ['Física', [
@@ -8,16 +14,18 @@ export const simulationGroups = [
     ['circuit', 'Circuito · Lei de Ohm'],
     ['waves', 'Ondas e frequência'],
     ['lever', labSims.lever.name],
-    ['motion', labSims.motion.name]
+    ['motion', labSims.motion.name],
+    ['refraction', labSims.refraction.name]
   ]],
   ['Química', [
-    ['neutralization', 'Ácido e base · pH'],
+    ['neutralization', labSims.neutralization.name],
     ['states', labSims.states.name],
-    ['density', labSims.density.name]
+    ['density', labSims.density.name],
+    ['reaction', labSims.reaction.name]
   ]],
   ['Biologia', [
-    ['osmosis', labSims.osmosis.name],
-    ['ecosystem', labSims.ecosystem.name],
+    ['heart', labSims.heart.name],
+    ['contagion', labSims.contagion.name],
     ['genetics', labSims.genetics.name],
     ['photosynthesis', labSims.photosynthesis.name]
   ]],
@@ -26,11 +34,12 @@ export const simulationGroups = [
     ['trigonometry', 'Ciclo trigonométrico'],
     ['fractions', labSims.fractions.name],
     ['interest', labSims.interest.name],
-    ['pythagoras', labSims.pythagoras.name]
+    ['balance', labSims.balance.name]
   ]],
   ['Geografia', [
-    ['seasons', 'Estações e inclinação axial'],
-    ['greenhouse', labSims.greenhouse.name],
+    ['seasons', labSims.seasons.name],
+    ['moon', labSims.moon.name],
+    ['solar', labSims.solar.name],
     ['timezones', labSims.timezones.name]
   ]],
   ['Português', [
@@ -40,7 +49,7 @@ export const simulationGroups = [
     ['colormix', labSims.colormix.name]
   ]],
   ['Tecnologia', [
-    ['binary', labSims.binary.name]
+    ['pixels', labSims.pixels.name]
   ]]
 ];
 
@@ -56,7 +65,7 @@ export const simulationIds = Object.keys(simulationNames);
 
 // Experimentos antigos que foram refeitos: slides salvos com o identificador
 // anterior abrem o experimento novo da mesma disciplina.
-export const simulationAliases = { eras: 'timezones', cipher: 'timezones', timeline: 'timezones', narrative: 'conjugation', textlab: 'conjugation', probability: 'fractions', logicgates: 'binary' };
+export const simulationAliases = { eras: 'timezones', cipher: 'timezones', timeline: 'timezones', narrative: 'conjugation', textlab: 'conjugation', probability: 'fractions', logicgates: 'pixels', binary: 'pixels', osmosis: 'heart', ecosystem: 'contagion', pythagoras: 'balance', greenhouse: 'seasons' };
 export const resolveSimulation = type => Object.hasOwn(simulationNames, type) ? type : simulationAliases[type] || 'projectile';
 
 export function projectile(v, angle, g = 9.81) {
@@ -319,19 +328,6 @@ const playable = new Set(['projectile', 'pendulum', 'circuit', 'waves', 'states'
 const ambient = new Set(['pendulum', 'circuit', 'waves', 'states']);
 // Nestas a animação conduz um controle; mexer nele recomeça a partir do novo valor.
 const restartOnInput = new Set(['projectile', 'trigonometry', 'seasons', 'ecosystem']);
-// Experiments that use a "desafio" goal: the slide asks for a target value and the
-// student has to tune the sliders until the live output matches it.
-export const simulationChallenges = {
-  projectile: { label: 'Acerte o alvo', prompt: 'Alcance entre 19 m e 20,5 m', test: r => r.range >= 19 && r.range <= 20.5, hint: 'Com 45°, o alcance cresce com o quadrado da velocidade: tente 14 m/s.' },
-  neutralization: { label: 'Acerte o alvo', prompt: 'Deixe o pH entre 6,9 e 7,1', test: r => r.ph >= 6.9 && r.ph <= 7.1, hint: 'Iguale os volumes de ácido e base.' },
-  circuit: { label: 'Acerte o alvo', prompt: 'Corrente de 50 mA (tolerância 2 mA)', test: r => Math.abs(r.current * 1000 - 50) <= 2, hint: 'I = V / R: combine tensão e resistência.' },
-  lever: { label: 'Acerte o alvo', prompt: 'Deixe a alavanca em equilíbrio', test: r => r.balanced, hint: 'Carga × braço da carga deve igualar a força aplicada × braço do esforço.' },
-  genetics: { label: 'Acerte o alvo', prompt: 'Obtenha 100% de descendentes dominantes', test: r => r.dominantRate === 1, hint: 'Um dos genitores precisa ser AA.' },
-  probability: { label: 'Acerte o alvo', prompt: 'Use 3 dados e ache a soma mais provável', test: r => r.dice === 3 && (r.target === 10 || r.target === 11), hint: 'Com três dados, 10 e 11 dividem o topo: 27 de 216 combinações cada.' },
-  interest: { label: 'Acerte o alvo', prompt: 'Dobre o capital em até 12 meses', test: r => r.amount >= r.principal * 2 && r.months <= 12, hint: 'Taxas maiores que 6% ao mês dobram o capital em 12 meses.' },
-  greenhouse: { label: 'Acerte o alvo', prompt: 'Mantenha a temperatura entre 13 °C e 15 °C', test: r => r.temperature >= 13 && r.temperature <= 15, hint: 'Reduza um pouco a retenção de gases.' }
-};
-
 const defaultParams = {
   projectile: { speed: 12, angle: 45, gravity: 9.81 },
   pendulum: { length: 1, gravity: 9.81 },
@@ -360,12 +356,11 @@ for (const [id, sim] of Object.entries(labSims)) {
   controlsFor[id] = () => sim.controls.map(([kind, key, label, ...rest]) => kind === 'select' ? selectControl(key, label, rest[0]) : range(key, label, rest[0], rest[1], rest[2], rest[3] ?? 1)).join('');
   notes[id] = sim.note;
   defaultParams[id] = Object.fromEntries(sim.controls.map(([kind, key, , ...rest]) => [key, kind === 'select' ? rest[0][0][0] : rest[2]]));
-  simulationChallenges[id] = sim.challenge;
   if (sim.drive || sim.ambient) playable.add(id);
   if (sim.ambient) ambient.add(id); else ambient.delete(id);
   if (sim.drive) restartOnInput.add(id); else restartOnInput.delete(id);
 }
-for (const table of [visuals, controlsFor, notes, defaultParams, simulationChallenges]) for (const old of ['timeline', 'probability', 'logicgates']) delete table[old];
+for (const table of [visuals, controlsFor, notes, defaultParams]) for (const old of ['timeline', 'probability', 'logicgates']) delete table[old];
 
 function paintLab(node, p, time = 0) {
   const sim = labSims[node.dataset.simulation], metrics = sim.compute(p), scene = node.querySelector('[data-lab-scene]');
@@ -375,7 +370,7 @@ function paintLab(node, p, time = 0) {
   return metrics;
 }
 
-export function simulationMarkup(type = 'projectile', { interactive = true, challenge = true } = {}) {
+export function simulationMarkup(type = 'projectile', { interactive = true } = {}) {
   const safeType = resolveSimulation(type);
   const subject = simulationSubjects[safeType] || 'LAB';
   const visual = visuals[safeType] || visuals.projectile;
@@ -383,11 +378,7 @@ export function simulationMarkup(type = 'projectile', { interactive = true, chal
     return `<section class="simulation-widget simulation-thumbnail" data-simulation="${safeType}"><header><strong>${simulationNames[safeType]}</strong><span>${subject.toUpperCase()}</span></header>${visual}<span class="simulation-result"></span><small>${notes[safeType] || ''}</small></section>`;
   }
   const controls = (controlsFor[safeType] || controlsFor.projectile)();
-  const challengeInfo = challenge ? simulationChallenges[safeType] : null;
-  const challengeMarkup = challengeInfo
-    ? `<div class="simulation-challenge" data-sim-challenge><span class="simulation-challenge-goal">${challengeInfo.label}: ${challengeInfo.prompt}</span><span class="simulation-challenge-state" role="status">Ajuste os valores…</span><small class="simulation-challenge-hint">${challengeInfo.hint}</small></div>`
-    : '';
-  return `<section class="simulation-widget" data-simulation="${safeType}"><header><strong>${simulationNames[safeType]}</strong><span>${subject.toUpperCase()}</span></header>${visual}<div class="simulation-controls">${controls}</div><output class="simulation-result" aria-live="polite"></output>${challengeMarkup}${playable.has(safeType) ? `<button type="button" data-sim-play>${safeType === 'projectile' ? '▶ Lançar' : '▶ Animar'}</button>` : ''}<small>${notes[safeType] || ''}</small></section>`;
+  return `<section class="simulation-widget" data-simulation="${safeType}"><header><strong>${simulationNames[safeType]}</strong><span>${subject.toUpperCase()}</span></header>${visual}<div class="simulation-controls">${controls}</div><output class="simulation-result" aria-live="polite"></output>${playable.has(safeType) ? `<button type="button" data-sim-play>${safeType === 'projectile' ? '▶ Lançar' : '▶ Animar'}</button>` : ''}<small>${notes[safeType] || ''}</small></section>`;
 }
 
 function readSimulationValues(node) {
@@ -693,14 +684,6 @@ function paintSimulationNode(node) {
     resultEl.textContent = `A(${res.a}) ${res.gate} B(${res.b}) = Saída ${res.out}`;
   }
 
-  const challengeRule = simulationChallenges[type], challengeEl = node.querySelector('[data-sim-challenge]');
-  if (challengeRule && challengeEl) {
-    let solved = false;
-    try { solved = Boolean(metrics && challengeRule.test(metrics)); } catch { solved = false; }
-    challengeEl.toggleAttribute('data-solved', solved);
-    const state = challengeEl.querySelector('.simulation-challenge-state');
-    if (state) state.textContent = solved ? 'Alvo alcançado ✓' : 'Ajuste os valores…';
-  }
 }
 
 export class Simulations {

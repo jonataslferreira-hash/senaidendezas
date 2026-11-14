@@ -113,8 +113,7 @@ export const labSims = {
         ${p.effort > 0 ? arrow(effortX, 144 - 22 - p.effort * .6, effortX, 141, '#4ade80', 4) : ''}${label(effortX, 144 - 28 - p.effort * .6, `${p.effort} kgf`, { size: 10, weight: 700, color: '#4ade80' })}</g>
         <path d="M200 153 178 190h44Z" fill="#94a3b8"/><path d="M24 190h352" stroke="currentColor" opacity=".3"/>${label(200, 206, 'apoio', { size: 9, opacity: .7 })}`;
     },
-    text: m => m.balanced ? `Equilíbrio: ${m.loadMass} kg × ${m.loadArm} cm = ${m.effort} kgf × ${m.effortArm} cm` : `Para equilibrar a ${m.effortArm} cm do apoio são precisos ${short(m.required)} kgf (você aplicou ${m.effort})`,
-    challenge: { label: 'Desafio', prompt: 'Equilibre uma carga de 40 kg usando só 10 kgf', test: r => r.loadMass === 40 && r.effort === 10 && r.balanced, hint: 'Aproxime a carga do apoio e afaste a força: 40 × 25 = 10 × 100.' }
+    text: m => m.balanced ? `Equilíbrio: ${m.loadMass} kg × ${m.loadArm} cm = ${m.effort} kgf × ${m.effortArm} cm` : `Para equilibrar a ${m.effortArm} cm do apoio são precisos ${short(m.required)} kgf (você aplicou ${m.effort})`
   },
   motion: {
     name: 'Movimento uniforme · velocidade', subject: 'Física', aria: 'Carro em movimento uniforme e gráfico de posição',
@@ -132,8 +131,7 @@ export const labSims = {
         <path d="M${gx(0)} ${gy(0)}L${gx(20)} ${gy(p.speed * 20).toFixed(1)}" stroke="#a78bfa" stroke-width="2.5" fill="none"/>
         <path d="M${gx(p.time).toFixed(1)} 200V${gy(m.distance).toFixed(1)}H50" stroke="#fde047" stroke-dasharray="3 3" fill="none" opacity=".7"/><circle cx="${gx(p.time).toFixed(1)}" cy="${gy(m.distance).toFixed(1)}" r="5" fill="#fde047"/>`;
     },
-    text: m => `distância = velocidade × tempo = ${m.speed} × ${short(m.time)} = ${short(m.distance)} m`,
-    challenge: { label: 'Desafio', prompt: 'Percorra exatamente 120 m em 8 s', test: r => r.time === 8 && r.distance === 120, hint: 'velocidade = distância ÷ tempo = 120 ÷ 8.' }
+    text: m => `distância = velocidade × tempo = ${m.speed} × ${short(m.time)} = ${short(m.distance)} m`
   },
   states: {
     name: 'Estados da matéria', subject: 'Química', aria: 'Partículas de uma substância em um recipiente',
@@ -160,8 +158,7 @@ export const labSims = {
         ${[['funde', m.melt], ['ferve', m.boil]].map(([name, value]) => `<path d="M286 ${ty(value).toFixed(1)}h26" stroke="#fde047" stroke-width="1.5"/>${label(316, ty(value) + 3, `${name} a ${value} °C`, { size: 9, anchor: 'start', color: '#fde047' })}`).join('')}
         ${label(280, ty(p.temperature) + 4, `${p.temperature} °C`, { size: 11, anchor: 'end', weight: 700 })}`;
     },
-    text: m => `${m.name} a ${m.temperature} °C está no estado ${m.state} · funde a ${m.melt} °C e ferve a ${m.boil} °C`,
-    challenge: { label: 'Desafio', prompt: 'Transforme o etanol em gás sem passar de 100 °C', test: r => r.substance === 'ethanol' && r.state === 'gasoso' && r.temperature <= 100, hint: 'O etanol ferve a 78 °C, antes da água.' }
+    text: m => `${m.name} a ${m.temperature} °C está no estado ${m.state} · funde a ${m.melt} °C e ferve a ${m.boil} °C`
   },
   density: {
     name: 'Densidade · flutua ou afunda?', subject: 'Química', aria: 'Bloco dentro de um recipiente com líquido',
@@ -177,8 +174,7 @@ export const labSims = {
         ${label(325, 116, `${m.liquidName}: ${short(m.liquidDensity)} g/cm³`, { size: 10, opacity: .8 })}${label(325, 150, m.floats ? 'FLUTUA' : 'AFUNDA', { size: 18, weight: 800, color: m.floats ? '#4ade80' : '#fb7185' })}
         ${m.floats ? label(325, 170, `${Math.round(m.submerged * 100)}% dentro do líquido`, { size: 10, opacity: .8 }) : ''}`;
     },
-    text: m => `densidade = ${m.mass} g ÷ ${m.volume} cm³ = ${num(m.density, 2)} g/cm³ · ${m.floats ? 'menor' : 'maior'} que ${m.liquidName.toLowerCase()} (${short(m.liquidDensity)}): ${m.floats ? 'flutua' : 'afunda'}`,
-    challenge: { label: 'Desafio', prompt: 'Faça um bloco de 300 g flutuar na água', test: r => r.mass === 300 && r.liquid === 'water' && r.floats, hint: 'Aumente o volume até a densidade ficar abaixo de 1 g/cm³.' }
+    text: m => `densidade = ${m.mass} g ÷ ${m.volume} cm³ = ${num(m.density, 2)} g/cm³ · ${m.floats ? 'menor' : 'maior'} que ${m.liquidName.toLowerCase()} (${short(m.liquidDensity)}): ${m.floats ? 'flutua' : 'afunda'}`
   },
   osmosis: {
     name: 'Osmose · a célula e o sal', subject: 'Biologia', aria: 'Célula mergulhada em água com sal',
@@ -206,8 +202,7 @@ export const labSims = {
         ${label(322, 46, info[0], { size: 13, weight: 800, color: m.state === 'isotônico' ? '#fde047' : '#7dd3fc' })}${info.slice(1).map((line, i) => label(322, 70 + i * 15, line, { size: 10, opacity: .85 })).join('')}
         ${label(322, 150, `fora: ${num(p.outside)}% de sal`, { size: 10, weight: 700 })}${label(322, 166, 'dentro: 0,9% de sal', { size: 10, weight: 700 })}${label(322, 190, '• = sal   → = água', { size: 9, opacity: .65 })}`;
     },
-    text: m => `Meio ${m.state} (${num(m.outside)}% de sal fora, 0,9% dentro): ${m.state === 'isotônico' ? 'a célula fica como está' : m.state === 'hipotônico' ? 'a água entra e a célula incha' : 'a água sai e a célula murcha'}`,
-    challenge: { label: 'Desafio', prompt: 'Deixe a célula em equilíbrio com o meio', test: r => r.state === 'isotônico', hint: 'O soro fisiológico tem 0,9% de sal, igual ao interior da célula.' }
+    text: m => `Meio ${m.state} (${num(m.outside)}% de sal fora, 0,9% dentro): ${m.state === 'isotônico' ? 'a célula fica como está' : m.state === 'hipotônico' ? 'a água entra e a célula incha' : 'a água sai e a célula murcha'}`
   },
   ecosystem: {
     name: 'Crescimento populacional', subject: 'Biologia', aria: 'Gráfico do crescimento de uma população',
@@ -227,8 +222,7 @@ export const labSims = {
         <path d="M${gx(p.time).toFixed(1)} 186V${gy(m.population).toFixed(1)}" stroke="#fde047" stroke-dasharray="3 3" opacity=".7"/><circle cx="${gx(p.time).toFixed(1)}" cy="${gy(m.population).toFixed(1)}" r="6" fill="#fde047"/>
         ${label(clamp(gx(p.time), 90, 330), gy(m.population) - 12, `${Math.round(m.population)} indivíduos`, { size: 11, weight: 700, color: '#fde047' })}`;
     },
-    text: m => `Dia ${short(m.time)}: ${Math.round(m.population)} indivíduos · ${m.phase} · limite do ambiente ${m.capacity}`,
-    challenge: { label: 'Desafio', prompt: 'Chegue a 90% do limite antes do dia 12', test: r => r.time <= 12 && r.population >= r.capacity * .9, hint: 'Aumente o ritmo de reprodução.' }
+    text: m => `Dia ${short(m.time)}: ${Math.round(m.population)} indivíduos · ${m.phase} · limite do ambiente ${m.capacity}`
   },
   genetics: {
     name: 'Genética · ervilhas de Mendel', subject: 'Biologia', aria: 'Quadro de cruzamento das ervilhas',
@@ -249,8 +243,7 @@ export const labSims = {
         ${label(306, 116, `${m.yellow} amarela${m.yellow === 1 ? '' : 's'} · ${m.yellow * 25}%`, { size: 14, weight: 800, color: '#facc15' })}${label(306, 142, `${m.green} verde${m.green === 1 ? '' : 's'} · ${m.green * 25}%`, { size: 14, weight: 800, color: '#4ade80' })}
         ${label(306, 176, 'A = amarela (manda)', { size: 10, opacity: .8 })}${label(306, 192, 'a = verde (só aparece em aa)', { size: 10, opacity: .8 })}`;
     },
-    text: m => `${m.mother} × ${m.father}: ${m.yellow * 25}% amarelas e ${m.green * 25}% verdes · combinações: ${m.AA} AA, ${m.Aa} Aa, ${m.aa} aa`,
-    challenge: { label: 'Desafio', prompt: 'Consiga metade das ervilhas verdes', test: r => r.green === 2, hint: 'Cruze uma planta verde (aa) com uma amarela que carrega o verde (Aa).' }
+    text: m => `${m.mother} × ${m.father}: ${m.yellow * 25}% amarelas e ${m.green * 25}% verdes · combinações: ${m.AA} AA, ${m.Aa} Aa, ${m.aa} aa`
   },
   photosynthesis: {
     name: 'Fotossíntese', subject: 'Biologia', aria: 'Planta fazendo fotossíntese',
@@ -270,8 +263,7 @@ export const labSims = {
         ${bubbles}${label(262, 20, 'oxigênio', { size: 9, color: '#7dd3fc' })}
         <rect x="336" y="40" width="22" height="130" rx="6" fill="currentColor" opacity=".12"/><rect x="336" y="${(170 - m.rate * 1.3).toFixed(1)}" width="22" height="${(m.rate * 1.3).toFixed(1)}" rx="6" fill="#facc15"/>${label(347, 30, `${m.rate}%`, { size: 12, weight: 800, color: '#facc15' })}${label(347, 186, 'açúcar', { size: 9, opacity: .8 })}`;
     },
-    text: m => m.rate ? `Produção de açúcar e oxigênio: ${m.rate}% · o que está faltando mais: ${m.limiting}` : `Sem ${m.limiting} a fotossíntese para`,
-    challenge: { label: 'Desafio', prompt: 'Chegue a 100% de produção', test: r => r.rate === 100, hint: 'A produção acompanha sempre o ingrediente que está em menor quantidade.' }
+    text: m => m.rate ? `Produção de açúcar e oxigênio: ${m.rate}% · o que está faltando mais: ${m.limiting}` : `Sem ${m.limiting} a fotossíntese para`
   },
   quadratic: {
     name: 'Função quadrática · parábola', subject: 'Matemática', aria: 'Gráfico da função quadrática',
@@ -294,8 +286,7 @@ export const labSims = {
       return `${grid}<path d="M32 110H368M200 15V205" stroke="currentColor" opacity=".45" stroke-width="1.5"/><path d="${path}" fill="none" stroke="#a78bfa" stroke-width="3" stroke-linecap="round"/>${vertex}${roots}
         ${label(38, 28, `y = ${short(p.a)}x² ${sign(p.b)}x ${sign(p.c)}`, { size: 12, anchor: 'start', weight: 700 })}`;
     },
-    text: m => m.linear ? 'Com a = 0 não há parábola: o gráfico vira uma reta' : `Δ = ${short(m.delta)} · ${m.roots.length === 2 ? `corta o eixo x em ${short(m.roots[0])} e ${short(m.roots[1])}` : m.roots.length ? `toca o eixo x só em ${short(m.roots[0])}` : 'não corta o eixo x'} · vértice (${short(m.vertex[0])}; ${short(m.vertex[1])}) · abre para ${m.a > 0 ? 'cima' : 'baixo'}`,
-    challenge: { label: 'Desafio', prompt: 'Faça a parábola tocar o eixo x em um único ponto', test: r => !r.linear && r.delta === 0, hint: 'Isso acontece quando Δ = b² − 4ac = 0. Tente a = 1, b = −2, c = 1.' }
+    text: m => m.linear ? 'Com a = 0 não há parábola: o gráfico vira uma reta' : `Δ = ${short(m.delta)} · ${m.roots.length === 2 ? `corta o eixo x em ${short(m.roots[0])} e ${short(m.roots[1])}` : m.roots.length ? `toca o eixo x só em ${short(m.roots[0])}` : 'não corta o eixo x'} · vértice (${short(m.vertex[0])}; ${short(m.vertex[1])}) · abre para ${m.a > 0 ? 'cima' : 'baixo'}`
   },
   fractions: {
     name: 'Frações · partes do inteiro', subject: 'Matemática', aria: 'Fração representada em círculos divididos',
@@ -317,8 +308,7 @@ export const labSims = {
       return `${drawn}${label(320, 62, String(m.numerator), { size: 36, weight: 800, color: '#c4b5fd' })}<path d="M292 72h56" stroke="currentColor" stroke-width="3"/>${label(320, 108, String(m.denominator), { size: 36, weight: 800 })}
         ${label(320, 140, `= ${short(m.value)}`, { size: 14, weight: 700 })}${label(320, 162, `= ${short(m.percent)}%`, { size: 14, weight: 700, color: '#fde047' })}${simpler ? label(320, 186, `simplificando: ${simpler}`, { size: 10, opacity: .85 }) : ''}`;
     },
-    text: m => `${m.numerator}/${m.denominator} = ${short(m.value)} = ${short(m.percent)}% · fração ${m.kind}${m.simpleDenominator !== m.denominator ? ` · simplificada: ${m.simpleNumerator}${m.simpleDenominator === 1 ? '' : '/' + m.simpleDenominator}` : ''}`,
-    challenge: { label: 'Desafio', prompt: 'Represente 50% usando oitavos', test: r => r.denominator === 8 && r.numerator === 4, hint: 'Metade de 8 partes.' }
+    text: m => `${m.numerator}/${m.denominator} = ${short(m.value)} = ${short(m.percent)}% · fração ${m.kind}${m.simpleDenominator !== m.denominator ? ` · simplificada: ${m.simpleNumerator}${m.simpleDenominator === 1 ? '' : '/' + m.simpleDenominator}` : ''}`
   },
   interest: {
     name: 'Juros compostos', subject: 'Matemática', aria: 'Gráfico de crescimento do dinheiro com juros',
@@ -340,8 +330,7 @@ export const labSims = {
         ${label(378, 210, 'meses', { size: 9, anchor: 'end', opacity: .7 })}${label(52, 22, '■ valor inicial', { size: 9, anchor: 'start', color: '#38bdf8' })}${label(128, 22, '■ juros', { size: 9, anchor: 'start', color: '#facc15' })}${label(172, 22, '- - juros simples', { size: 9, anchor: 'start', color: '#f472b6' })}
         ${label(378, 36, money(m.amount), { size: 13, anchor: 'end', weight: 800, color: '#fde047' })}`;
     },
-    text: m => `${money(m.principal)} a ${short(m.rate)}% ao mês por ${m.months} meses vira ${money(m.amount)} · juros ${money(m.interest)} · com juros simples seria ${money(m.simple)}`,
-    challenge: { label: 'Desafio', prompt: 'Dobre o dinheiro em até 24 meses', test: r => r.months <= 24 && r.amount >= r.principal * 2, hint: 'Com 3% ao mês o valor dobra em cerca de 24 meses.' }
+    text: m => `${money(m.principal)} a ${short(m.rate)}% ao mês por ${m.months} meses vira ${money(m.amount)} · juros ${money(m.interest)} · com juros simples seria ${money(m.simple)}`
   },
   pythagoras: {
     name: 'Teorema de Pitágoras', subject: 'Matemática', aria: 'Triângulo retângulo com um quadrado em cada lado',
@@ -359,8 +348,7 @@ export const labSims = {
         ${label(325, 40, 'a² + b² = c²', { size: 14, weight: 800 })}${label(325, 70, `${m.a}² + ${m.b}² = c²`, { size: 12, opacity: .85 })}${label(325, 92, `${m.a * m.a} + ${m.b * m.b} = ${m.square}`, { size: 12, opacity: .85 })}
         ${label(325, 128, `c = √${m.square}`, { size: 13, weight: 700 })}${label(325, 156, `c ${m.exact ? '=' : '≈'} ${short(m.c)}`, { size: 18, weight: 800, color: '#fde047' })}`;
     },
-    text: m => `c = √(${m.a}² + ${m.b}²) = √${m.square} ${m.exact ? '=' : '≈'} ${short(m.c)}`,
-    challenge: { label: 'Desafio', prompt: 'Monte um triângulo com hipotenusa exatamente 13', test: r => r.c === 13, hint: 'Procure dois números cujos quadrados somem 169: 25 + 144.' }
+    text: m => `c = √(${m.a}² + ${m.b}²) = √${m.square} ${m.exact ? '=' : '≈'} ${short(m.c)}`
   },
   greenhouse: {
     name: 'Efeito estufa e clima', subject: 'Geografia', aria: 'Luz do Sol, atmosfera e calor retido na Terra',
@@ -380,8 +368,7 @@ export const labSims = {
         <rect x="336" y="36" width="14" height="152" rx="7" fill="currentColor" opacity=".12"/><rect x="336" y="${ty.toFixed(1)}" width="14" height="${(188 - ty).toFixed(1)}" rx="7" fill="#f87171"/>
         ${label(343, 26, `${num(m.temperature)} °C`, { size: 13, weight: 800, color: '#fde047' })}${label(343, 204, `${m.warming >= 0 ? '+' : '−'}${num(Math.abs(m.warming))} °C`, { size: 11, weight: 700, color: m.warming > 1.5 ? '#f87171' : '#4ade80' })}${label(343, 216, 'desde 1850', { size: 8, opacity: .7 })}`;
     },
-    text: m => `Com ${m.co2} ppm de gás carbônico a temperatura média fica perto de ${num(m.temperature)} °C (${m.warming >= 0 ? '+' : '−'}${num(Math.abs(m.warming))} °C em relação a 1850)`,
-    challenge: { label: 'Desafio', prompt: 'Mantenha o aquecimento em até 1,5 °C sem mexer na reflexão', test: r => r.albedo === 30 && r.warming > 0 && r.warming <= 1.5, hint: 'Reduza o gás carbônico: em 1850 havia 280 ppm.' }
+    text: m => `Com ${m.co2} ppm de gás carbônico a temperatura média fica perto de ${num(m.temperature)} °C (${m.warming >= 0 ? '+' : '−'}${num(Math.abs(m.warming))} °C em relação a 1850)`
   },
   timezones: {
     name: 'Fusos horários', subject: 'Geografia', aria: 'Faixa de fusos horários e relógios de duas cidades',
@@ -406,8 +393,7 @@ export const labSims = {
         ${clock(104, m.base, '#4ade80', 'Brasília', m.baseClock)}${clock(296, m.local, '#f472b6', m.name, m.localClock + (m.dayShift > 0 ? ' (amanhã)' : m.dayShift < 0 ? ' (ontem)' : ''))}
         ${m.difference ? arrow(150, 140, 250, 140, 'currentColor', 1.5) : ''}${label(200, 132, ahead, { size: 10, weight: 700 })}`;
     },
-    text: m => `Quando são ${m.baseClock} em Brasília, são ${m.localClock}${m.dayShift > 0 ? ' do dia seguinte' : m.dayShift < 0 ? ' do dia anterior' : ''} em ${m.name} (${m.difference === 0 ? 'mesmo horário' : `${short(Math.abs(m.difference))} h ${m.difference > 0 ? 'à frente' : 'atrás'}`})`,
-    challenge: { label: 'Desafio', prompt: 'Descubra a hora de Brasília para ser meia-noite em Tóquio', test: r => r.name === 'Tóquio' && r.local === 0, hint: 'Tóquio está 12 horas à frente de Brasília.' }
+    text: m => `Quando são ${m.baseClock} em Brasília, são ${m.localClock}${m.dayShift > 0 ? ' do dia seguinte' : m.dayShift < 0 ? ' do dia anterior' : ''} em ${m.name} (${m.difference === 0 ? 'mesmo horário' : `${short(Math.abs(m.difference))} h ${m.difference > 0 ? 'à frente' : 'atrás'}`})`
   },
   conjugation: {
     name: 'Conjugação verbal · tempos e pessoas', subject: 'Português', aria: 'Tabela de conjugação do verbo',
@@ -429,8 +415,7 @@ export const labSims = {
       return `<text x="20" y="30" font-size="17" font-weight="800" fill="currentColor">${m.verb.slice(0, -2).toUpperCase()}<tspan fill="#fde047">${m.verb.slice(-2).toUpperCase()}</tspan></text>${label(20, 44, m.tenseName, { size: 9, anchor: 'start', opacity: .75 })}
         <path d="M244 24h124" stroke="currentColor" opacity=".3"/>${axis}${rows}${label(200, 196, `“${m.sentence}”`, { size: 12, weight: 700 })}${label(200, 212, 'radical + terminação', { size: 8, opacity: .6 })}`;
     },
-    text: m => `${m.group} · ${conjugationPersons[m.person]}: ${m.stem} + ${m.endings[m.person]} = ${m.forms[m.person]}`,
-    challenge: { label: 'Desafio', prompt: 'Encontre a forma “nós venderemos”', test: r => r.forms[3] === 'venderemos', hint: 'A ação ainda vai acontecer: escolha o verbo vender e um tempo do futuro.' }
+    text: m => `${m.group} · ${conjugationPersons[m.person]}: ${m.stem} + ${m.endings[m.person]} = ${m.forms[m.person]}`
   },
   colormix: {
     name: 'Mistura de cores RGB', subject: 'Artes', aria: 'Três luzes coloridas se misturando',
@@ -450,8 +435,7 @@ export const labSims = {
         ${label(318, 140, m.near, { size: 15, weight: 800 })}${label(318, 156, 'cor mais parecida', { size: 8, opacity: .65 })}
         ${[['R', m.r, '#f87171'], ['G', m.g, '#4ade80'], ['B', m.b, '#60a5fa']].map(([name, value, color], i) => `${label(262, 180 + i * 13, name, { size: 9, weight: 700, color })}<rect x="272" y="${173 + i * 13}" width="${(value / 255 * 100).toFixed(1)}" height="7" rx="3.5" fill="${color}"/>`).join('')}`;
     },
-    text: m => `${m.hex} · vermelho ${Math.round(m.r / 2.55)}%, verde ${Math.round(m.g / 2.55)}%, azul ${Math.round(m.b / 2.55)}% · parece ${m.near}`,
-    challenge: { label: 'Desafio', prompt: 'Faça amarelo misturando só duas luzes', test: r => r.r >= 230 && r.g >= 230 && r.b <= 30, hint: 'Luz vermelha + luz verde = amarelo.' }
+    text: m => `${m.hex} · vermelho ${Math.round(m.r / 2.55)}%, verde ${Math.round(m.g / 2.55)}%, azul ${Math.round(m.b / 2.55)}% · parece ${m.near}`
   },
   binary: {
     name: 'Números binários · bits', subject: 'Tecnologia', aria: 'Oito lâmpadas representando um número em binário',
@@ -466,7 +450,8 @@ export const labSims = {
       }).join('');
       return `${label(200, 34, `${m.decimal} em decimal`, { size: 15, weight: 800 })}${lamps}${label(200, 178, m.parts.length ? `${m.parts.join(' + ')} = ${m.decimal}` : 'todas apagadas = 0', { size: 13, weight: 700, color: '#fde047' })}${label(200, 200, `binário: ${m.bits}`, { size: 11, opacity: .8 })}`;
     },
-    text: m => `${m.decimal} em binário é ${m.bits}${m.parts.length ? ` · ${m.parts.join(' + ')} = ${m.decimal}` : ''}`,
-    challenge: { label: 'Desafio', prompt: 'Acenda só as lâmpadas 32 e 1', test: r => r.decimal === 33, hint: '32 + 1.' }
+    text: m => `${m.decimal} em binário é ${m.bits}${m.parts.length ? ` · ${m.parts.join(' + ')} = ${m.decimal}` : ''}`
   }
 };
+
+export { num, short, clamp, label, arrow, seeded, wave };
