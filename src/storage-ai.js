@@ -5,7 +5,7 @@ import {archiveImportedPages,fillAssetImages,hydrateLesson,removePageAssets} fro
 import {newLesson,newQuestion,newSlide,validateLesson} from './lessons.js';
 import {ensureBlocks} from './activity-blocks.js';
 import {studioIcon} from './studio-icons.js';
-import {simulationNames} from './simulations.js';
+import {Simulations,simulationNames} from './simulations.js';
 import {prefersReducedMotion} from './motion-preference.js';
 import {canvasMarkup,CanvasModels,esc} from './canvas-view.js';
 import {createSlideModel,createSlideSound} from './storage-ai-media.js';
@@ -365,6 +365,7 @@ export class StorageAI {
     this.quota=null;this.lastPrompt='';
     this.previews=new Map();
     this.previewModels=new CanvasModels();
+    this.previewSimulations=new Simulations();
     this.editMessages=[];this.editPrompt='';
     studio.root.addEventListener('click',async event=>{
       if(this.attachmentOpen&&!event.target.closest('.ai-add-wrap')){this.attachmentOpen=false;this.studio.root.querySelector('.ai-attachment-menu')?.remove();}
@@ -798,7 +799,7 @@ export class StorageAI {
       return `<button type="button" class="ai-palette-chip ${draft.palette===id?'is-active':''}" data-ai-action="ai-palette" data-palette="${esc(id)}" title="${esc(theme.name||id)}" aria-label="Paleta ${esc(theme.name||id)}" aria-pressed="${draft.palette===id}"><i style="background:${esc(theme.background)}"></i><i style="background:${esc(theme.accent)}"></i></button>`;
     }).join('');
     return `<article class="ai-lesson-preview"><h2>${esc(lesson.title)}</h2><p>${content.length} slides · ${quizzes} quizzes · ${lesson.slides.length-content.length} enquetes</p>
-      <div class="ai-lesson-preview-stage">${canvasMarkup(content[0])}</div>
+      <div class="ai-lesson-preview-stage" inert aria-hidden="true">${canvasMarkup(content[0],{interactive:false})}</div>
       <div class="ai-palette-row"><span>Paleta de cores</span><div class="ai-palette-list" role="group" aria-label="Paleta de cores da apresentação">${palettes}</div></div>
       <details><summary>Ver roteiro dos slides</summary><ol>${content.map(slide=>`<li>${esc(slide.title)}</li>`).join('')}</ol></details>
       <p>${esc(draft.reviewQuestion||'Está bom assim? Você pode aprovar ou pedir mudanças aqui no chat.')}</p>
@@ -845,6 +846,7 @@ export class StorageAI {
       this.previewStage=stage;
       this.previewModels.mount(stage,this.previews.get(this.activeChatId)?.lesson.slides[0]).catch(()=>{});
     }
+    this.previewSimulations.mountStatic(this.studio.root);
     const drawer=this.studio.root.querySelector('#ai-navigation');
     if(drawer&&!drawer.dataset.bound){
       drawer.dataset.bound='true';
@@ -1174,7 +1176,7 @@ export class StorageAI {
     return `<main class="ai-generation"><header><div>${label}<h1>${esc(job.title)}</h1></div><button class="studio-btn quiet" type="button" data-ai-action="leave-generation">Voltar à conversa</button></header>
       <div class="ai-generation-editor" aria-busy="true">
         <aside aria-label="Sequência da aula">${Array.from({length:job.count},(_,i)=>`<div class="ai-generation-slide ${i===job.slides.length-1?'active':''}"><span>${String(i+1).padStart(2,'0')}</span><strong>${esc(job.slides[i]?.title||'Aguardando')}</strong></div>`).join('')}</aside>
-        <section class="ai-generation-stage">${slide?canvasMarkup(slide):`<div class="ai-generation-placeholder">${studioIcon('sparkle')}<p>Preparando a apresentação</p></div>`}</section>
+        <section class="ai-generation-stage" inert aria-hidden="true">${slide?canvasMarkup(slide,{interactive:false}):`<div class="ai-generation-placeholder">${studioIcon('sparkle')}<p>Preparando a apresentação</p></div>`}</section>
       </div><p class="ai-generation-status" role="status">${job.slides.length} de ${job.count} slides montados · Edição liberada ao terminar</p></main>`;
   }
   selectedReference(slide) {

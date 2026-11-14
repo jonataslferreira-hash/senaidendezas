@@ -84,6 +84,7 @@ html[data-theme][data-ui-style=aero] #app :is(input:not([type=color]):not([type=
 html[data-theme][data-ui-style=aero] #app .studio-watermark-glow,html[data-ui-style=aero] .experience-copy h2 em{color:#1c8fa8!important}
 /* Liquid Glass: transparência real, refração e brilho de iPhone. */
 html[data-ui-style=glass] body{background:linear-gradient(135deg,#bcd3ff,#e5c9ff 44%,#c3f5ef)}
+html[data-ui-style=glass][data-appearance=dark] body{background:linear-gradient(150deg,#101426,#1a1730 48%,#111e2b)}
 html[data-theme][data-ui-style=glass]{--ui-radius:26px;--ui-panel:hsl(var(--personal-hue) 65% 99% / .72);--ui-soft:hsl(var(--personal-hue) 70% 96% / .52);--ui-line:hsl(var(--personal-hue) 55% 88% / .68)}
 html[data-theme][data-ui-style=glass][data-appearance=dark]{--ui-panel:hsl(var(--personal-hue) 26% 18% / .76);--ui-soft:hsl(var(--personal-hue) 24% 28% / .58);--ui-line:hsl(var(--personal-hue) 40% 86% / .26)}
 html[data-theme][data-ui-style=glass] #app .studio-shell{background:radial-gradient(ellipse 55% 45% at 8% 4%,hsl(var(--personal-hue) 95% 82% / .95),transparent 62%),radial-gradient(ellipse 50% 45% at 94% 0%,hsl(calc(var(--personal-hue) + 55) 95% 84% / .9),transparent 60%),radial-gradient(ellipse 60% 55% at 62% 100%,hsl(var(--personal-secondary) 90% 84% / .85),transparent 65%),linear-gradient(150deg,hsl(var(--personal-hue) 90% 94%),hsl(var(--personal-secondary) 85% 93%))!important;background-color:hsl(var(--personal-hue) 85% 94%)!important;color:hsl(var(--personal-hue) 35% 18%)!important}

@@ -13,7 +13,7 @@ html[data-theme][data-ui-style] #app :is(.studio-shell,.account-dialog,.studio-d
 html[data-theme][data-ui-style=aero] #app :is(.studio-shell,.account-dialog,.studio-dialog,.group-dialog,.lesson-chat) :is(button,input[type=submit]):is(.accent,.primary,.card-present,[data-photo-action=apply],[data-photo-action=capture]){
  background:linear-gradient(180deg,hsl(var(--personal-hue) 70% 91%),hsl(var(--personal-hue) 55% 76%) 48%,hsl(var(--personal-hue) 45% 59%) 51%,hsl(var(--personal-secondary) 46% 77%))!important;color:hsl(var(--personal-hue) 50% 18%)!important;
 }
-html[data-theme][data-ui-style] #app :is(.studio-shell,.account-dialog,.studio-dialog,.group-dialog,.lesson-chat) :is(button,summary):is(.active,[aria-selected=true],[aria-pressed=true]):not(.avatar,[data-profile-theme]){background:var(--ui-tint)!important;border-color:var(--ui-accent)!important}
+html[data-theme][data-ui-style] #app :is(.studio-shell,.account-dialog,.studio-dialog,.group-dialog,.lesson-chat) :is(button,summary):is(.active,[aria-selected=true],[aria-pressed=true]):not(.avatar,[data-profile-theme],.slide-canvas *,.hardware-view *){background:var(--ui-tint)!important;border-color:var(--ui-accent)!important}
 html[data-theme][data-ui-style] #app :is(.studio-shell,.account-dialog,.studio-dialog,.group-dialog,.lesson-chat) :is(button,summary):is(.danger-text,[data-account-action=logout],[data-social-action=decline]){--control-ink:#a82e45}
 html[data-theme][data-ui-style] #app :is(.studio-shell,.account-dialog,.studio-dialog,.group-dialog,.lesson-chat,.music-panel,.slide-audio-popover) :is(button,summary):focus-visible{outline:2px solid var(--ui-accent);outline-offset:3px}
 

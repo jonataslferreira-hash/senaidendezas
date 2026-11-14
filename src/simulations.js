@@ -241,238 +241,286 @@ const notes = {
 
 const playable = new Set(['projectile', 'pendulum', 'waves', 'states', 'trigonometry', 'seasons', 'ecosystem']);
 
-export function simulationMarkup(type = 'projectile') {
+const defaultParams = {
+  projectile: { speed: 12, angle: 45, gravity: 9.81 },
+  pendulum: { length: 1, gravity: 9.81 },
+  neutralization: { acid: 50, base: 25 },
+  circuit: { voltage: 9, resistance: 100 },
+  waves: { frequency: 2, amplitude: 36, speed: 340 },
+  states: { substance: 'water', temperature: 25 },
+  osmosis: { outside: 180, inside: 300 },
+  ecosystem: { rate: .45, capacity: 500, time: 10 },
+  quadratic: { a: 1, b: -2, c: -3 },
+  trigonometry: { angle: 45 },
+  seasons: { month: 12, tilt: 23.5 },
+  eras: { year: 1500 },
+  narrative: { progress: 60, intensity: 3 },
+  colormix: { r: 80, g: 175, b: 235 },
+  logicgates: { gate: 'AND', a: 1, b: 0 }
+};
+
+export function simulationMarkup(type = 'projectile', { interactive = true } = {}) {
   const safeType = Object.hasOwn(simulationNames, type) ? type : 'projectile';
   const subject = simulationSubjects[safeType] || 'LAB';
   const visual = visuals[safeType] || visuals.projectile;
+  if (!interactive) {
+    return `<section class="simulation-widget simulation-thumbnail" data-simulation="${safeType}"><header><strong>${simulationNames[safeType]}</strong><span>${subject.toUpperCase()}</span></header>${visual}<span class="simulation-result"></span><small>${notes[safeType] || ''}</small></section>`;
+  }
   const controls = (controlsFor[safeType] || controlsFor.projectile)();
   return `<section class="simulation-widget" data-simulation="${safeType}"><header><strong>${simulationNames[safeType]}</strong><span>${subject.toUpperCase()}</span></header>${visual}<div class="simulation-controls">${controls}</div><output class="simulation-result" aria-live="polite"></output>${playable.has(safeType) ? '<button type="button" data-sim-play>▶ Experimentar</button>' : ''}<small>${notes[safeType] || ''}</small></section>`;
 }
 
+function readSimulationValues(node) {
+  return {
+    ...(defaultParams[node.dataset.simulation] || {}),
+    ...Object.fromEntries([...node.querySelectorAll('[data-param]')].map(n => [n.dataset.param, Number(n.value)])),
+    ...Object.fromEntries([...node.querySelectorAll('[data-sim-select]')].map(n => [n.dataset.simSelect, n.value])),
+    ...Object.fromEntries([...node.querySelectorAll('[data-sim-toggle]')].map(n => [n.dataset.simToggle, Number(n.dataset.value)]))
+  };
+}
+
+function paintParticles(node, phase, kinetic) {
+  const host = node.querySelector('[data-particles]');
+  if (!host) return;
+  const dots = [];
+  for (let i = 0; i < 12; i++) {
+    let x, y;
+    if (kinetic < .25) {
+      const col = i % 4, row = Math.floor(i / 4);
+      x = 148 + col * 34 + Math.sin(phase * 14 + i) * 2.5;
+      y = 115 + row * 25 + Math.cos(phase * 13 + i * 2) * 2.5;
+    } else if (kinetic < .8) {
+      const col = i % 4, row = Math.floor(i / 4);
+      x = 118 + col * 52 + Math.sin(phase * 3 + i * 1.4) * 18;
+      y = 132 + row * 20 + Math.cos(phase * 3.6 + i) * 9;
+    } else {
+      x = 100 + ((i * 59 + phase * 110 * (1 + (i % 3) * .35)) % 200);
+      y = 42 + ((i * 47 + Math.abs(Math.sin(phase * (1.8 + (i % 4) * .3) + i)) * 130) % 136);
+    }
+    dots.push(`<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="8" fill="${kinetic < .25 ? '#93c5fd' : kinetic < .8 ? '#38bdf8' : '#fb923c'}"/>`);
+  }
+  host.innerHTML = dots.join('');
+}
+
+function paintWave(node, p, shift = 0) {
+  const prop = waveProperties(p.frequency, p.speed);
+  const pts = Array.from({ length: 65 }, (_, i) => {
+    const x = 20 + (i / 64) * 360;
+    const y = 110 - p.amplitude * Math.sin((i / 64) * p.frequency * Math.PI * 2 - shift);
+    return `${i ? 'L' : 'M'}${x.toFixed(1)} ${y.toFixed(1)}`;
+  }).join(' ');
+  node.querySelector('[data-wave]')?.setAttribute('d', pts);
+  node.querySelector('[data-amp]')?.setAttribute('y2', String(110 - p.amplitude));
+  return prop;
+}
+
+function paintSimulationNode(node) {
+  const p = readSimulationValues(node), type = node.dataset.simulation;
+  for (const field of node.querySelectorAll('[data-param]')) {
+    const out = node.querySelector(`[data-value="${field.dataset.param}"]`);
+    if (out) out.textContent = field.value;
+  }
+  const resultEl = node.querySelector('.simulation-result');
+  if (!resultEl) return;
+
+  if (type === 'projectile') {
+    const result = projectile(p.speed, p.angle, p.gravity);
+    resultEl.textContent = `Alcance ${result.range.toFixed(1)} m · Altura ${result.height.toFixed(1)} m · Voo ${result.time.toFixed(1)} s`;
+    const path = Array.from({ length: 51 }, (_, i) => {
+      const t = result.time * i / 50;
+      const x = p.speed * Math.cos(p.angle * Math.PI / 180) * t;
+      const y = p.speed * Math.sin(p.angle * Math.PI / 180) * t - p.gravity * t * t / 2;
+      return `${i ? 'L' : 'M'}${30 + x / Math.max(1, result.range) * 340} ${180 - y / Math.max(1, result.height) * 140}`;
+    }).join(' ');
+    node.querySelector('[data-trajectory]')?.setAttribute('d', path);
+    node.querySelector('[data-motion]')?.setAttribute('transform', '');
+  }
+  else if (type === 'pendulum') {
+    const period = 2 * Math.PI * Math.sqrt(p.length / p.gravity);
+    resultEl.textContent = `Período ${period.toFixed(2)} s`;
+    node.querySelector('[data-trajectory]')?.setAttribute('d', 'M200 20 L200 170');
+    const motion = node.querySelector('[data-motion]');
+    if (motion) {
+      motion.innerHTML = '<circle cx="200" cy="170" r="14" fill="#7bbba1"/>';
+      motion.setAttribute('transform', '');
+    }
+    node.querySelector('[data-trajectory]')?.setAttribute('transform', '');
+  }
+  else if (type === 'neutralization') {
+    const ph = mixturePH(p.acid, p.base);
+    resultEl.textContent = `pH ${ph.toFixed(2)} · ${ph < 6.99 ? 'Ácido' : ph > 7.01 ? 'Básico' : 'Neutro'}`;
+    node.querySelector('[data-liquid]')?.setAttribute('fill', `hsl(${ph * 19} 65% 60%)`);
+  }
+  else if (type === 'circuit') {
+    const current = p.voltage / p.resistance, power = p.voltage * current;
+    resultEl.textContent = `Corrente ${(current * 1000).toFixed(1)} mA · Potência ${power.toFixed(2)} W`;
+    node.querySelector('[data-bulb]')?.setAttribute('opacity', String(.2 + Math.min(.8, power / 4)));
+  }
+  else if (type === 'waves') {
+    const prop = paintWave(node, p, 0);
+    resultEl.textContent = `λ = ${prop.wavelength.toFixed(1)} m · Período T = ${prop.period.toFixed(2)} s`;
+  }
+  else if (type === 'states') {
+    const info = matterState(p.temperature, p.substance);
+    paintParticles(node, 0, info.kinetic);
+    resultEl.textContent = `${info.state} · Fusão ${info.melt} °C · Ebulição ${info.boil} °C`;
+  }
+  else if (type === 'osmosis') {
+    const os = osmosisState(p.outside, p.inside);
+    const cell = node.querySelector('[data-cell]');
+    cell?.setAttribute('rx', (58 * os.scale).toFixed(1));
+    cell?.setAttribute('ry', (44 * os.scale).toFixed(1));
+    const solutes = node.querySelector('[data-solutes]');
+    if (solutes) {
+      const count = Math.round((p.outside / 600) * 20);
+      solutes.innerHTML = Array.from({ length: count }, (_, i) => {
+        const angle = i * 2.39996, r = 95 + (i % 4) * 14;
+        const x = Math.max(34, Math.min(366, 200 + Math.cos(angle) * r * 1.45));
+        const y = Math.max(30, Math.min(190, 110 + Math.sin(angle) * r * .72));
+        return `<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="4" fill="#fef08a" opacity=".85"/>`;
+      }).join('');
+    }
+    const arrows = node.querySelector('[data-arrows]');
+    if (arrows) {
+      arrows.innerHTML = os.tonicity === 'Isotônica' ? '' : os.tonicity === 'Hipotônica'
+        ? '<path d="M55 110h42m-9-8 9 8-9 8M345 110h-42m9-8-9 8 9 8"/>'
+        : '<path d="M105 110H63m9-8-9 8 9 8M295 110h42m-9-8 9 8-9 8"/>';
+    }
+    resultEl.textContent = `Solução ${os.tonicity} · ${os.flow}`;
+  }
+  else if (type === 'ecosystem') {
+    const pts = Array.from({ length: 41 }, (_, i) => {
+      const t = i * .5, n = logisticPopulation(t, p.rate, p.capacity, 20);
+      const x = 36 + (t / 20) * 336, y = 190 - (n / p.capacity) * 148;
+      return `${i ? 'L' : 'M'}${x.toFixed(1)} ${y.toFixed(1)}`;
+    }).join(' ');
+    node.querySelector('[data-curve]')?.setAttribute('d', pts);
+    const nowN = logisticPopulation(p.time, p.rate, p.capacity, 20);
+    const mx = 36 + (p.time / 20) * 336, my = 190 - (nowN / p.capacity) * 148;
+    node.querySelector('[data-marker]')?.setAttribute('cx', mx.toFixed(1));
+    node.querySelector('[data-marker]')?.setAttribute('cy', my.toFixed(1));
+    resultEl.textContent = `N(${p.time}) = ${Math.round(nowN)} indivíduos · K = ${p.capacity}`;
+  }
+  else if (type === 'quadratic') {
+    const m = quadraticMetrics(p.a, p.b, p.c);
+    const pts = Array.from({ length: 65 }, (_, i) => {
+      const x = -8 + (i / 64) * 16;
+      const y = p.a * x * x + p.b * x + p.c;
+      const px = 200 + x * 22, py = Math.max(-40, Math.min(260, 110 - y * 10));
+      return `${i ? 'L' : 'M'}${px.toFixed(1)} ${py.toFixed(1)}`;
+    }).join(' ');
+    node.querySelector('[data-parabola]')?.setAttribute('d', pts);
+    const marks = [];
+    if (!m.linear) marks.push(`<circle cx="${(200 + m.xv * 22).toFixed(1)}" cy="${Math.max(10, Math.min(210, 110 - m.yv * 10)).toFixed(1)}" r="5" fill="#fde047"/>`);
+    for (const r of m.roots) marks.push(`<circle cx="${(200 + r * 22).toFixed(1)}" cy="110" r="5" fill="#4ade80"/>`);
+    const ptsHost = node.querySelector('[data-points]');
+    if (ptsHost) ptsHost.innerHTML = marks.join('');
+    resultEl.textContent = m.linear
+      ? `Reta (${p.b}x + ${p.c >= 0 ? p.c : `(${p.c})`}) · Raiz: ${m.roots.length ? m.roots[0].toFixed(1) : 'nenhuma'}`
+      : `Δ = ${m.delta.toFixed(1)} · Vértice (${m.xv.toFixed(1)}, ${m.yv.toFixed(1)}) · ${m.roots.length ? 'Raízes: ' + m.roots.map(r => r.toFixed(1)).join(' e ') : 'Sem raízes reais'}`;
+  }
+  else if (type === 'trigonometry') {
+    const t = trigValues(p.angle);
+    const cx = 200 + 74 * t.cos, cy = 110 - 74 * t.sin;
+    node.querySelector('[data-cos]')?.setAttribute('x2', cx.toFixed(1));
+    node.querySelector('[data-sin]')?.setAttribute('x1', cx.toFixed(1));
+    node.querySelector('[data-sin]')?.setAttribute('x2', cx.toFixed(1));
+    node.querySelector('[data-sin]')?.setAttribute('y2', cy.toFixed(1));
+    node.querySelector('[data-radius]')?.setAttribute('x2', cx.toFixed(1));
+    node.querySelector('[data-radius]')?.setAttribute('y2', cy.toFixed(1));
+    node.querySelector('[data-tip]')?.setAttribute('cx', cx.toFixed(1));
+    node.querySelector('[data-tip]')?.setAttribute('cy', cy.toFixed(1));
+    resultEl.textContent = `sen(${t.deg}°) = ${t.sin.toFixed(2)} · cos(${t.deg}°) = ${t.cos.toFixed(2)} · ${t.quadrant}`;
+  }
+  else if (type === 'seasons') {
+    const s = seasonInfo(p.month, p.tilt);
+    const tiltRot = p.tilt * Math.cos(2 * Math.PI * (s.month % 12) / 12);
+    node.querySelector('[data-tilt]')?.setAttribute('transform', `rotate(${tiltRot.toFixed(1)})`);
+    resultEl.textContent = `${s.monthName} · Sul: ${s.south} · Norte: ${s.north} · Declinação ${s.declination.toFixed(1)}°`;
+  }
+  else if (type === 'eras') {
+    const info = historicalEra(p.year);
+    const eras = [
+      [-3000, 476, '#f59e0b', 'Antiga'],
+      [476, 1453, '#38bdf8', 'Média'],
+      [1453, 1789, '#a78bfa', 'Moderna'],
+      [1789, 2026, '#4ade80', 'Contemp.']
+    ];
+    const bars = node.querySelector('[data-eras-bars]');
+    if (bars) {
+      bars.innerHTML = eras.map(([start, end, color, name]) => {
+        const x1 = 28 + ((start + 3000) / 5026) * 344, x2 = 28 + ((end + 3000) / 5026) * 344;
+        return `<rect x="${x1.toFixed(1)}" y="86" width="${Math.max(4, x2 - x1).toFixed(1)}" height="28" rx="4" fill="${color}" opacity=".85"/><text x="${((x1 + x2) / 2).toFixed(1)}" y="132" text-anchor="middle" font-size="9" fill="currentColor">${name}</text>`;
+      }).join('');
+    }
+    const px = 28 + ((info.year + 3000) / 5026) * 344;
+    node.querySelector('[data-era-pin]')?.setAttribute('transform', `translate(${(px - 200).toFixed(1)} 0)`);
+    resultEl.textContent = `${info.label} · ${info.era} · ${info.milestone}`;
+  }
+  else if (type === 'narrative') {
+    const st = narrativeStage(p.progress, p.intensity);
+    const pts = Array.from({ length: 51 }, (_, i) => {
+      const pr = i * 2, val = narrativeStage(pr, p.intensity).tension;
+      return `${i ? 'L' : 'M'}${(26 + pr * 3.48).toFixed(1)} ${(184 - val * 1.45).toFixed(1)}`;
+    }).join(' ');
+    node.querySelector('[data-arc]')?.setAttribute('d', pts);
+    node.querySelector('[data-story-dot]')?.setAttribute('cx', (26 + p.progress * 3.48).toFixed(1));
+    node.querySelector('[data-story-dot]')?.setAttribute('cy', (184 - st.tension * 1.45).toFixed(1));
+    resultEl.textContent = `${st.phase} (${st.progress}%) · Tensão ${st.tension}%`;
+  }
+  else if (type === 'colormix') {
+    const c = colorMixInfo(p.r, p.g, p.b);
+    node.querySelector('[data-r]')?.setAttribute('fill', `rgb(${p.r},0,0)`);
+    node.querySelector('[data-g]')?.setAttribute('fill', `rgb(0,${p.g},0)`);
+    node.querySelector('[data-b]')?.setAttribute('fill', `rgb(0,0,${p.b})`);
+    node.querySelector('[data-swatch]')?.setAttribute('fill', c.hex);
+    node.querySelector('[data-comp]')?.setAttribute('fill', c.complement);
+    const txt = node.querySelector('[data-contrast-text]');
+    if (txt) txt.setAttribute('fill', c.contrastBlack >= c.contrastWhite ? '#0f172a' : '#f8fafc');
+    resultEl.textContent = `${c.hex} · Compl. ${c.complement} · Contraste ${Math.max(c.contrastBlack, c.contrastWhite).toFixed(1)}:1`;
+  }
+  else if (type === 'logicgates') {
+    const res = evaluateGate(p.gate, p.a, p.b);
+    const wireColor = v => v ? '#4ade80' : '#64748b';
+    node.querySelector('[data-wire-a]')?.setAttribute('stroke', wireColor(res.a));
+    node.querySelector('[data-wire-b]')?.setAttribute('stroke', wireColor(res.b));
+    node.querySelector('[data-wire-out]')?.setAttribute('stroke', wireColor(res.out));
+    const gateLabel = node.querySelector('[data-gate-label]');
+    if (gateLabel) gateLabel.textContent = res.gate;
+    node.querySelector('[data-led]')?.setAttribute('fill', res.out ? '#4ade80' : '#334155');
+    resultEl.textContent = `A(${res.a}) ${res.gate} B(${res.b}) = Saída ${res.out}`;
+  }
+}
+
 export class Simulations {
   constructor() { this.items = new Map(); }
+  dispose() {
+    for (const item of this.items.values()) cancelAnimationFrame(item.frame);
+    this.items.clear();
+  }
+  mountStatic(root) {
+    for (const node of root?.querySelectorAll('.simulation-thumbnail[data-simulation], [inert] [data-simulation]') || []) {
+      paintSimulationNode(node);
+    }
+  }
   mount(root) {
     for (const [node, item] of this.items) {
       if (!root?.contains(node)) { cancelAnimationFrame(item.frame); this.items.delete(node); }
     }
     for (const node of root?.querySelectorAll('[data-simulation]') || []) {
+      if (node.classList.contains('simulation-thumbnail') || node.closest('[inert]')) {
+        paintSimulationNode(node);
+        continue;
+      }
       if (this.items.has(node)) continue;
       const item = { node, running: false, frame: 0 };
       this.items.set(node, item);
-      const values = () => ({
-        ...Object.fromEntries([...node.querySelectorAll('[data-param]')].map(n => [n.dataset.param, Number(n.value)])),
-        ...Object.fromEntries([...node.querySelectorAll('[data-sim-select]')].map(n => [n.dataset.simSelect, n.value])),
-        ...Object.fromEntries([...node.querySelectorAll('[data-sim-toggle]')].map(n => [n.dataset.simToggle, Number(n.dataset.value)]))
-      });
-
-      const paintParticles = (phase, kinetic) => {
-        const host = node.querySelector('[data-particles]');
-        if (!host) return;
-        const dots = [];
-        for (let i = 0; i < 12; i++) {
-          let x, y;
-          if (kinetic < .25) {
-            const col = i % 4, row = Math.floor(i / 4);
-            x = 148 + col * 34 + Math.sin(phase * 14 + i) * 2.5;
-            y = 115 + row * 25 + Math.cos(phase * 13 + i * 2) * 2.5;
-          } else if (kinetic < .8) {
-            const col = i % 4, row = Math.floor(i / 4);
-            x = 118 + col * 52 + Math.sin(phase * 3 + i * 1.4) * 18;
-            y = 132 + row * 20 + Math.cos(phase * 3.6 + i) * 9;
-          } else {
-            x = 100 + ((i * 59 + phase * 110 * (1 + (i % 3) * .35)) % 200);
-            y = 42 + ((i * 47 + Math.abs(Math.sin(phase * (1.8 + (i % 4) * .3) + i)) * 130) % 136);
-          }
-          dots.push(`<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="8" fill="${kinetic < .25 ? '#93c5fd' : kinetic < .8 ? '#38bdf8' : '#fb923c'}"/>`);
-        }
-        host.innerHTML = dots.join('');
-      };
-
-      const paintWave = (p, shift = 0) => {
-        const prop = waveProperties(p.frequency, p.speed);
-        const pts = Array.from({ length: 65 }, (_, i) => {
-          const x = 20 + (i / 64) * 360;
-          const y = 110 - p.amplitude * Math.sin((i / 64) * p.frequency * Math.PI * 2 - shift);
-          return `${i ? 'L' : 'M'}${x.toFixed(1)} ${y.toFixed(1)}`;
-        }).join(' ');
-        node.querySelector('[data-wave]')?.setAttribute('d', pts);
-        node.querySelector('[data-amp]')?.setAttribute('y2', String(110 - p.amplitude));
-        return prop;
-      };
 
       const update = () => {
         cancelAnimationFrame(item.frame);
         item.running = false;
         node.querySelector('[data-sim-play]')?.removeAttribute('aria-pressed');
-        const p = values(), type = node.dataset.simulation;
-        for (const field of node.querySelectorAll('[data-param]')) {
-          const out = node.querySelector(`[data-value="${field.dataset.param}"]`);
-          if (out) out.textContent = field.value;
-        }
-        const resultEl = node.querySelector('.simulation-result');
-
-        if (type === 'projectile') {
-          const result = projectile(p.speed, p.angle, p.gravity);
-          resultEl.textContent = `Alcance ${result.range.toFixed(1)} m · Altura ${result.height.toFixed(1)} m · Voo ${result.time.toFixed(1)} s`;
-          const path = Array.from({ length: 51 }, (_, i) => {
-            const t = result.time * i / 50;
-            const x = p.speed * Math.cos(p.angle * Math.PI / 180) * t;
-            const y = p.speed * Math.sin(p.angle * Math.PI / 180) * t - p.gravity * t * t / 2;
-            return `${i ? 'L' : 'M'}${30 + x / Math.max(1, result.range) * 340} ${180 - y / Math.max(1, result.height) * 140}`;
-          }).join(' ');
-          node.querySelector('[data-trajectory]').setAttribute('d', path);
-          node.querySelector('[data-motion]').setAttribute('transform', '');
-        }
-        else if (type === 'pendulum') {
-          const period = 2 * Math.PI * Math.sqrt(p.length / p.gravity);
-          resultEl.textContent = `Período ${period.toFixed(2)} s`;
-          node.querySelector('[data-trajectory]').setAttribute('d', 'M200 20 L200 170');
-          node.querySelector('[data-motion]').innerHTML = '<circle cx="200" cy="170" r="14" fill="#7bbba1"/>';
-          node.querySelector('[data-motion]').setAttribute('transform', '');
-          node.querySelector('[data-trajectory]').setAttribute('transform', '');
-        }
-        else if (type === 'neutralization') {
-          const ph = mixturePH(p.acid, p.base);
-          resultEl.textContent = `pH ${ph.toFixed(2)} · ${ph < 6.99 ? 'Ácido' : ph > 7.01 ? 'Básico' : 'Neutro'}`;
-          node.querySelector('[data-liquid]').setAttribute('fill', `hsl(${ph * 19} 65% 60%)`);
-        }
-        else if (type === 'circuit') {
-          const current = p.voltage / p.resistance, power = p.voltage * current;
-          resultEl.textContent = `Corrente ${(current * 1000).toFixed(1)} mA · Potência ${power.toFixed(2)} W`;
-          node.querySelector('[data-bulb]').setAttribute('opacity', String(.2 + Math.min(.8, power / 4)));
-        }
-        else if (type === 'waves') {
-          const prop = paintWave(p, 0);
-          resultEl.textContent = `λ = ${prop.wavelength.toFixed(1)} m · Período T = ${prop.period.toFixed(2)} s`;
-        }
-        else if (type === 'states') {
-          const info = matterState(p.temperature, p.substance);
-          paintParticles(0, info.kinetic);
-          resultEl.textContent = `${info.state} · Fusão ${info.melt} °C · Ebulição ${info.boil} °C`;
-        }
-        else if (type === 'osmosis') {
-          const os = osmosisState(p.outside, p.inside);
-          const cell = node.querySelector('[data-cell]');
-          cell?.setAttribute('rx', (58 * os.scale).toFixed(1));
-          cell?.setAttribute('ry', (44 * os.scale).toFixed(1));
-          const solutes = node.querySelector('[data-solutes]');
-          if (solutes) {
-            const count = Math.round((p.outside / 600) * 20);
-            solutes.innerHTML = Array.from({ length: count }, (_, i) => {
-              const angle = i * 2.39996, r = 95 + (i % 4) * 14;
-              const x = Math.max(34, Math.min(366, 200 + Math.cos(angle) * r * 1.45));
-              const y = Math.max(30, Math.min(190, 110 + Math.sin(angle) * r * .72));
-              return `<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="4" fill="#fef08a" opacity=".85"/>`;
-            }).join('');
-          }
-          const arrows = node.querySelector('[data-arrows]');
-          if (arrows) {
-            arrows.innerHTML = os.tonicity === 'Isotônica' ? '' : os.tonicity === 'Hipotônica'
-              ? '<path d="M55 110h42m-9-8 9 8-9 8M345 110h-42m9-8-9 8 9 8"/>'
-              : '<path d="M105 110H63m9-8-9 8 9 8M295 110h42m-9-8 9 8-9 8"/>';
-          }
-          resultEl.textContent = `Solução ${os.tonicity} · ${os.flow}`;
-        }
-        else if (type === 'ecosystem') {
-          const pts = Array.from({ length: 41 }, (_, i) => {
-            const t = i * .5, n = logisticPopulation(t, p.rate, p.capacity, 20);
-            const x = 36 + (t / 20) * 336, y = 190 - (n / p.capacity) * 148;
-            return `${i ? 'L' : 'M'}${x.toFixed(1)} ${y.toFixed(1)}`;
-          }).join(' ');
-          node.querySelector('[data-curve]')?.setAttribute('d', pts);
-          const nowN = logisticPopulation(p.time, p.rate, p.capacity, 20);
-          const mx = 36 + (p.time / 20) * 336, my = 190 - (nowN / p.capacity) * 148;
-          node.querySelector('[data-marker]')?.setAttribute('cx', mx.toFixed(1));
-          node.querySelector('[data-marker]')?.setAttribute('cy', my.toFixed(1));
-          resultEl.textContent = `N(${p.time}) = ${Math.round(nowN)} indivíduos · K = ${p.capacity}`;
-        }
-        else if (type === 'quadratic') {
-          const m = quadraticMetrics(p.a, p.b, p.c);
-          const pts = Array.from({ length: 65 }, (_, i) => {
-            const x = -8 + (i / 64) * 16;
-            const y = p.a * x * x + p.b * x + p.c;
-            const px = 200 + x * 22, py = Math.max(-40, Math.min(260, 110 - y * 10));
-            return `${i ? 'L' : 'M'}${px.toFixed(1)} ${py.toFixed(1)}`;
-          }).join(' ');
-          node.querySelector('[data-parabola]')?.setAttribute('d', pts);
-          const marks = [];
-          if (!m.linear) marks.push(`<circle cx="${(200 + m.xv * 22).toFixed(1)}" cy="${Math.max(10, Math.min(210, 110 - m.yv * 10)).toFixed(1)}" r="5" fill="#fde047"/>`);
-          for (const r of m.roots) marks.push(`<circle cx="${(200 + r * 22).toFixed(1)}" cy="110" r="5" fill="#4ade80"/>`);
-          node.querySelector('[data-points]').innerHTML = marks.join('');
-          resultEl.textContent = m.linear
-            ? `Reta (${p.b}x + ${p.c >= 0 ? p.c : `(${p.c})`}) · Raiz: ${m.roots.length ? m.roots[0].toFixed(1) : 'nenhuma'}`
-            : `Δ = ${m.delta.toFixed(1)} · Vértice (${m.xv.toFixed(1)}, ${m.yv.toFixed(1)}) · ${m.roots.length ? 'Raízes: ' + m.roots.map(r => r.toFixed(1)).join(' e ') : 'Sem raízes reais'}`;
-        }
-        else if (type === 'trigonometry') {
-          const t = trigValues(p.angle);
-          const cx = 200 + 74 * t.cos, cy = 110 - 74 * t.sin;
-          node.querySelector('[data-cos]')?.setAttribute('x2', cx.toFixed(1));
-          node.querySelector('[data-sin]')?.setAttribute('x1', cx.toFixed(1));
-          node.querySelector('[data-sin]')?.setAttribute('x2', cx.toFixed(1));
-          node.querySelector('[data-sin]')?.setAttribute('y2', cy.toFixed(1));
-          node.querySelector('[data-radius]')?.setAttribute('x2', cx.toFixed(1));
-          node.querySelector('[data-radius]')?.setAttribute('y2', cy.toFixed(1));
-          node.querySelector('[data-tip]')?.setAttribute('cx', cx.toFixed(1));
-          node.querySelector('[data-tip]')?.setAttribute('cy', cy.toFixed(1));
-          resultEl.textContent = `sen(${t.deg}°) = ${t.sin.toFixed(2)} · cos(${t.deg}°) = ${t.cos.toFixed(2)} · ${t.quadrant}`;
-        }
-        else if (type === 'seasons') {
-          const s = seasonInfo(p.month, p.tilt);
-          const tiltRot = p.tilt * Math.cos(2 * Math.PI * (s.month % 12) / 12);
-          node.querySelector('[data-tilt]')?.setAttribute('transform', `rotate(${tiltRot.toFixed(1)})`);
-          resultEl.textContent = `${s.monthName} · Sul: ${s.south} · Norte: ${s.north} · Declinação ${s.declination.toFixed(1)}°`;
-        }
-        else if (type === 'eras') {
-          const info = historicalEra(p.year);
-          const eras = [
-            [-3000, 476, '#f59e0b', 'Antiga'],
-            [476, 1453, '#38bdf8', 'Média'],
-            [1453, 1789, '#a78bfa', 'Moderna'],
-            [1789, 2026, '#4ade80', 'Contemp.']
-          ];
-          const bars = node.querySelector('[data-eras-bars]');
-          if (bars) {
-            bars.innerHTML = eras.map(([start, end, color, name]) => {
-              const x1 = 28 + ((start + 3000) / 5026) * 344, x2 = 28 + ((end + 3000) / 5026) * 344;
-              return `<rect x="${x1.toFixed(1)}" y="86" width="${Math.max(4, x2 - x1).toFixed(1)}" height="28" rx="4" fill="${color}" opacity=".85"/><text x="${((x1 + x2) / 2).toFixed(1)}" y="132" text-anchor="middle" font-size="9" fill="currentColor">${name}</text>`;
-            }).join('');
-          }
-          const px = 28 + ((info.year + 3000) / 5026) * 344;
-          node.querySelector('[data-era-pin]')?.setAttribute('transform', `translate(${(px - 200).toFixed(1)} 0)`);
-          resultEl.textContent = `${info.label} · ${info.era} · ${info.milestone}`;
-        }
-        else if (type === 'narrative') {
-          const st = narrativeStage(p.progress, p.intensity);
-          const pts = Array.from({ length: 51 }, (_, i) => {
-            const pr = i * 2, val = narrativeStage(pr, p.intensity).tension;
-            return `${i ? 'L' : 'M'}${(26 + pr * 3.48).toFixed(1)} ${(184 - val * 1.45).toFixed(1)}`;
-          }).join(' ');
-          node.querySelector('[data-arc]')?.setAttribute('d', pts);
-          node.querySelector('[data-story-dot]')?.setAttribute('cx', (26 + p.progress * 3.48).toFixed(1));
-          node.querySelector('[data-story-dot]')?.setAttribute('cy', (184 - st.tension * 1.45).toFixed(1));
-          resultEl.textContent = `${st.phase} (${st.progress}%) · Tensão ${st.tension}%`;
-        }
-        else if (type === 'colormix') {
-          const c = colorMixInfo(p.r, p.g, p.b);
-          node.querySelector('[data-r]')?.setAttribute('fill', `rgb(${p.r},0,0)`);
-          node.querySelector('[data-g]')?.setAttribute('fill', `rgb(0,${p.g},0)`);
-          node.querySelector('[data-b]')?.setAttribute('fill', `rgb(0,0,${p.b})`);
-          node.querySelector('[data-swatch]')?.setAttribute('fill', c.hex);
-          node.querySelector('[data-comp]')?.setAttribute('fill', c.complement);
-          const txt = node.querySelector('[data-contrast-text]');
-          if (txt) txt.setAttribute('fill', c.contrastBlack >= c.contrastWhite ? '#0f172a' : '#f8fafc');
-          resultEl.textContent = `${c.hex} · Compl. ${c.complement} · Contraste ${Math.max(c.contrastBlack, c.contrastWhite).toFixed(1)}:1`;
-        }
-        else if (type === 'logicgates') {
-          const res = evaluateGate(p.gate, p.a, p.b);
-          const wireColor = v => v ? '#4ade80' : '#64748b';
-          node.querySelector('[data-wire-a]')?.setAttribute('stroke', wireColor(res.a));
-          node.querySelector('[data-wire-b]')?.setAttribute('stroke', wireColor(res.b));
-          node.querySelector('[data-wire-out]')?.setAttribute('stroke', wireColor(res.out));
-          node.querySelector('[data-gate-label]').textContent = res.gate;
-          node.querySelector('[data-led]')?.setAttribute('fill', res.out ? '#4ade80' : '#334155');
-          resultEl.textContent = `A(${res.a}) ${res.gate} B(${res.b}) = Saída ${res.out}`;
-        }
+        paintSimulationNode(node);
       };
 
       node.addEventListener('input', update);
@@ -491,7 +539,7 @@ export class Simulations {
         if (item.running) { update(); return; }
         item.running = true;
         node.querySelector('[data-sim-play]')?.setAttribute('aria-pressed', 'true');
-        const p = values(), started = performance.now(), type = node.dataset.simulation;
+        const p = readSimulationValues(node), started = performance.now(), type = node.dataset.simulation;
         const projResult = projectile(p.speed || 12, p.angle || 45, p.gravity || 9.81);
         const frame = () => {
           if (!node.isConnected || document.hidden || !item.running) { item.running = false; return; }
@@ -507,10 +555,10 @@ export class Simulations {
             node.querySelector('[data-motion]')?.setAttribute('transform', `translate(${x / Math.max(1, projResult.range) * 340} ${-y / Math.max(1, projResult.height) * 140})`);
             if (t >= projResult.time) { item.running = false; node.querySelector('[data-sim-play]')?.removeAttribute('aria-pressed'); return; }
           } else if (type === 'waves') {
-            paintWave(p, seconds * 5.2);
+            paintWave(node, p, seconds * 5.2);
           } else if (type === 'states') {
             const info = matterState(p.temperature, p.substance);
-            paintParticles(seconds, info.kinetic);
+            paintParticles(node, seconds, info.kinetic);
           } else if (type === 'trigonometry') {
             const input = node.querySelector('[data-param="angle"]');
             if (input) {

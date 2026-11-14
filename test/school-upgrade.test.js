@@ -8,6 +8,7 @@ import {
   quadraticMetrics,trigValues,seasonInfo,historicalEra,narrativeStage,colorMixInfo,evaluateGate,
   simulationIds,simulationGroups,simulationNames,simulationSubjects,simulationMarkup
 } from '../src/simulations.js';
+import {canvasMarkup} from '../src/canvas-view.js';
 import {styles} from '../src/personalization.js';
 import {handleChatAudio} from '../cloudflare/chat-audio-worker.js';
 
@@ -57,5 +58,19 @@ test('catálogo multidisciplinar de 15 simulações cobre cálculos, markup e no
 test('estilos de interface incluem Office e 8-Bit preservando IDs internos',()=>{
  assert.equal(styles.find(([id])=>id==='editorial')?.[1],'Office');
  assert.equal(styles.find(([id])=>id==='arcade')?.[1],'8-Bit');
+});
+test('miniaturas não interativas de simulações e canvas não emitem controles interativos aninhados',()=>{
+ for(const id of simulationIds){
+  const thumb=simulationMarkup(id,{interactive:false});
+  assert.ok(thumb.includes('class="simulation-widget simulation-thumbnail"'),`classe thumbnail em ${id}`);
+  assert.doesNotMatch(thumb,/<(button|input|select|textarea|label)\b/i,`sem controles aninhados em ${id}`);
+  assert.doesNotMatch(thumb,/\btabindex=/i,`sem tabindex em ${id}`);
+  const slide={id:'s1',kind:'canvas',title:'Prévia',background:'#171324',elements:[newElement('simulation',{simulation:id}),newElement('model',{model:'ssd'})]};
+  const staticCanvas=canvasMarkup(slide,{interactive:false,audioTrigger:'element:x',audioHotspots:true});
+  assert.doesNotMatch(staticCanvas,/<(button|input|select|textarea|label)\b/i,`canvas estático sem controles em ${id}`);
+  assert.doesNotMatch(staticCanvas,/\btabindex=/i,`canvas estático sem tabindex em ${id}`);
+  const editingCanvas=canvasMarkup(slide,{editing:true});
+  assert.ok(editingCanvas.includes(`aria-label="Elemento: ${simulationNames[id]}"`),`aria-label descritivo em ${id}`);
+ }
 });
 
