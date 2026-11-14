@@ -24,8 +24,8 @@ test('áudio de chat exige associação, limita formato e permite excluir soment
  assert.equal((await call(new Request('https://worker.test'+path,{method:'PUT',headers:{'Content-Type':'audio/webm'},body:new Uint8Array([0x1a,0x45,0xdf,0xa3,0])}))).status,200);assert.equal((await call(new Request('https://worker.test'+path))).status,200);assert.equal((await call(new Request('https://worker.test'+path,{method:'DELETE'}),true,{id:'another'})).status,403);assert.equal((await call(new Request('https://worker.test'+path,{method:'DELETE'}))).status,200);assert.equal(objects.size,0);
  assert.equal((await call(new Request('https://worker.test'+path,{method:'PUT',headers:{'Content-Type':'audio/webm'},body:'<script>'}))).status,415);
 });
-test('catálogo multidisciplinar de 27 simulações cobre cálculos, markup e normalização',()=>{
- assert.equal(simulationIds.length,27);
+test('catálogo multidisciplinar de 30 simulações cobre cálculos, markup e normalização',()=>{
+ assert.equal(simulationIds.length,30);
  const groupedIds=simulationGroups.flatMap(([,items])=>items.map(([id])=>id));
  assert.deepEqual(groupedIds,simulationIds);
  for(const id of simulationIds){
@@ -98,6 +98,26 @@ test('experimentos não trazem mais a caixa de desafio "Acerte o alvo"',()=>{
  assert.ok(Math.abs(run('refraction',{angle:45,material:'water'}).refracted-32.1)<.1);
  assert.equal(run('pixels',{size:8,colors:'full'}).bytes,192);
  assert.ok(Math.abs(run('solar',{planet:'mars',age:12}).localAge-6.38)<.01);
+ // Bancada de misturas: cada toque soma uma dose e a mistura reage.
+ const mixing=labSims.mixing;let pot={water:0,vinegar:0,bicarb:0,cabbage:0,oil:0,soap:0,last:-1,stamp:-9};
+ const pour=id=>{pot={...pot,...mixing.act(pot,'pour:'+id,3)};return mixing.compute(pot);};
+ assert.equal(pour('vinegar').kind,'ácida');
+ assert.equal(pour('bicarb').reacted,1);
+ assert.equal(mixing.compute(pot).kind,'neutra');
+ assert.equal(pour('bicarb').kind,'básica');
+ assert.ok(pour('cabbage').facts.some(text=>text.includes('verde')));
+ assert.equal(pour('oil').oilLayer,1);
+ const soapy=pour('soap');assert.equal(soapy.oilLayer,0);assert.equal(soapy.emulsion,true);assert.ok(soapy.foam>1);
+ for(let i=0;i<6;i++)pour('water');
+ assert.equal(mixing.compute(pot).water,4,'cada líquido tem um limite de doses');
+ assert.ok(!/NaN|undefined/.test(mixing.draw(pot,mixing.compute(pot),3.5)+mixing.text(mixing.compute(pot))));
+ assert.equal(mixing.compute({...pot,...mixing.act(pot,'reset',0)}).total,0);
+ assert.ok(simulationMarkup('mixing').includes('data-lab-act="pour:water"'));
+ assert.ok(Math.abs(run('hooke',{mass:500,spring:'soft'}).stretch-49)<1e-9);
+ assert.ok(Math.abs(run('hooke',{mass:200,spring:'soft'}).stretch*2-run('hooke',{mass:400,spring:'soft'}).stretch)<1e-9);
+ assert.equal(run('microscope',{sample:'onion',objective:'10',focus:55}).sharp,true);
+ assert.equal(run('microscope',{sample:'onion',objective:'40',focus:55}).sharp,false);
+ assert.equal(run('microscope',{sample:'blood',objective:'40',focus:70}).zoom,400);
 });
 test('estilos de interface incluem Office e 8-Bit preservando IDs internos',()=>{
  assert.equal(styles.find(([id])=>id==='editorial')?.[1],'Office');
@@ -144,7 +164,7 @@ test('experimentos de sala de aula calculam de verdade e desenham sem erro',asyn
  for(const [id,sim] of Object.entries(labSims)){
   assert.ok(simulationIds.includes(id),id+' está no catálogo');
   assert.ok(simulationMarkup(id).includes('data-lab-scene'),id+' tem cena');
-  const pick=index=>Object.fromEntries(sim.controls.map(([kind,key,,...rest])=>[key,kind==='select'?rest[0][index===1?rest[0].length-1:0][0]:rest[index===0?2:index===1?0:1]]));
+  const pick=index=>Object.fromEntries(sim.controls.filter(([kind])=>kind!=='buttons').map(([kind,key,,...rest])=>[key,kind==='hidden'?rest[0]:kind==='select'?rest[0][index===1?rest[0].length-1:0][0]:rest[index===0?2:index===1?0:1]]));
   for(const values of [pick(0),pick(1),pick(2)]){
    const metrics=sim.compute(values),output=sim.draw(values,metrics,1.7)+sim.text(metrics,values);
    assert.ok(!/NaN|undefined|Infinity/.test(output),id+' sem valores quebrados: '+JSON.stringify(values));

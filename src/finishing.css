@@ -531,8 +531,8 @@ dialog.simulation-modal .simulation-modal-catalog>.simulation-modal-import{align
 
 /* 19. Rodada 6: botões de importar lado a lado, ícone + texto centralizados e modo escuro */
 dialog.simulation-modal .simulation-modal-import-row{display:grid;grid-template-columns:1fr 1fr;gap:8px}
-dialog.simulation-modal .simulation-modal-import-row button{display:flex;align-items:center;justify-content:center;gap:7px;height:auto;min-height:42px;padding:6px 5px;gap:5px;line-height:1.15;text-align:center;font-size:11.5px;overflow-wrap:anywhere}
-dialog.simulation-modal .simulation-modal-import-row button svg{flex:none;width:16px;height:16px}
+dialog.simulation-modal .simulation-modal-import-row button{display:flex;align-items:center;justify-content:center;gap:7px;height:auto;min-height:42px;padding:6px 4px;gap:4px;line-height:1.15;text-align:center;font-size:11px;letter-spacing:-.1px}
+dialog.simulation-modal .simulation-modal-import-row button svg{flex:none;width:14px;height:14px}
 dialog.simulation-modal .simulation-modal-import-row button{min-width:0}dialog.simulation-modal .simulation-modal-import-row button span{min-width:0}
 html[data-appearance=dark] dialog.simulation-modal .simulation-modal-import [data-sim-import]{background:color-mix(in srgb,var(--sim-accent,#6c4cf1) 26%,transparent);border-color:color-mix(in srgb,var(--sim-accent,#6c4cf1) 70%,transparent);color:color-mix(in srgb,var(--sim-accent,#6c4cf1) 45%,#fff)}
 html[data-appearance=dark] dialog.simulation-modal .simulation-modal-import [data-sim-import]:hover{color:#fff;filter:none;background:color-mix(in srgb,var(--sim-accent,#6c4cf1) 40%,transparent)}
@@ -549,3 +549,12 @@ html[data-appearance=dark] .image-finder-modes button[aria-checked=true]{backgro
 html[data-appearance=dark] dialog.video-dialog{background:var(--ui-panel,#22252b);color:var(--ui-ink,#eef0f3);border-color:var(--ui-line,#ffffff24)}
 html[data-appearance=dark] .video-dialog-hint[data-state=ok]{color:#6ee7b7}
 html[data-appearance=dark] .video-dialog-hint[data-state=error]{color:#fca5a5}
+
+/* 20. Botões de ação dos experimentos de bancada (despejar, esvaziar) */
+.simulation-controls .simulation-actions{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+.simulation-controls .simulation-actions>span{flex:1 0 100%;font-weight:650}
+.simulation-controls .simulation-actions button{flex:1 1 auto;display:inline-flex;align-items:center;justify-content:center;min-height:30px;padding:4px 10px;border:1.5px solid color-mix(in srgb,currentColor 26%,transparent);border-radius:9px;background:color-mix(in srgb,currentColor 8%,transparent);color:inherit;font:inherit;font-size:.92em;font-weight:650;cursor:pointer}
+.simulation-controls .simulation-actions button:hover{background:color-mix(in srgb,currentColor 18%,transparent)}
+.slide-canvas .simulation-controls .simulation-actions{gap:.4cqw}
+.slide-canvas .simulation-controls .simulation-actions button{min-height:0;padding:.3cqw .7cqw;border-radius:.6cqw;border-width:.12cqw}
+.simulation-widget [data-lab-act]{touch-action:manipulation}

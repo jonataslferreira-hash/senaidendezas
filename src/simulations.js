@@ -1,11 +1,13 @@
 import { labSims } from './sim-lab.js';
 import { moreSims } from './sim-lab-2.js';
+import { benchSims } from './sim-lab-3.js';
 export { labSims, conjugate, conjugationVerbs, conjugationTenses, conjugationPersons, fractionInfo, timezoneInfo, binaryInfo, densityInfo, pythagorasInfo, photosynthesisInfo, warmingInfo } from './sim-lab.js';
+export { mixInfo, hookeInfo, microscopeInfo } from './sim-lab-3.js';
 export { seesawInfo, phInfo, matterInfo, heartInfo, contagionInfo, equationInfo, moonInfo, pixelInfo, refractionInfo, reactionInfo, planetInfo, seasonsInfo } from './sim-lab-2.js';
 
 // Experimentos trocados por outros mais próximos do laboratório da escola.
 for (const old of ['osmosis', 'ecosystem', 'pythagoras', 'greenhouse', 'binary']) delete labSims[old];
-Object.assign(labSims, moreSims);
+Object.assign(labSims, moreSims, benchSims);
 
 export const simulationGroups = [
   ['Física', [
@@ -15,19 +17,22 @@ export const simulationGroups = [
     ['waves', 'Ondas e frequência'],
     ['lever', labSims.lever.name],
     ['motion', labSims.motion.name],
-    ['refraction', labSims.refraction.name]
+    ['refraction', labSims.refraction.name],
+    ['hooke', labSims.hooke.name]
   ]],
   ['Química', [
     ['neutralization', labSims.neutralization.name],
     ['states', labSims.states.name],
     ['density', labSims.density.name],
-    ['reaction', labSims.reaction.name]
+    ['reaction', labSims.reaction.name],
+    ['mixing', labSims.mixing.name]
   ]],
   ['Biologia', [
     ['heart', labSims.heart.name],
     ['contagion', labSims.contagion.name],
     ['genetics', labSims.genetics.name],
-    ['photosynthesis', labSims.photosynthesis.name]
+    ['photosynthesis', labSims.photosynthesis.name],
+    ['microscope', labSims.microscope.name]
   ]],
   ['Matemática', [
     ['quadratic', labSims.quadratic.name],
@@ -353,9 +358,12 @@ const defaultParams = {
 const labVisual = sim => `<svg viewBox="0 0 400 220" aria-label="${sim.aria}"><g data-lab-scene></g></svg>`;
 for (const [id, sim] of Object.entries(labSims)) {
   visuals[id] = labVisual(sim);
-  controlsFor[id] = () => sim.controls.map(([kind, key, label, ...rest]) => kind === 'select' ? selectControl(key, label, rest[0]) : range(key, label, rest[0], rest[1], rest[2], rest[3] ?? 1)).join('');
+  controlsFor[id] = () => sim.controls.map(([kind, key, label, ...rest]) => kind === 'select' ? selectControl(key, label, rest[0])
+    : kind === 'hidden' ? `<input type="hidden" data-param="${key}" value="${rest[0]}">`
+    : kind === 'buttons' ? `<div class="simulation-actions" role="group" aria-label="${label}"><span>${label}</span>${rest[0].map(([action, name]) => `<button type="button" data-lab-act="${action}">${name}</button>`).join('')}</div>`
+    : range(key, label, rest[0], rest[1], rest[2], rest[3] ?? 1)).join('');
   notes[id] = sim.note;
-  defaultParams[id] = Object.fromEntries(sim.controls.map(([kind, key, , ...rest]) => [key, kind === 'select' ? rest[0][0][0] : rest[2]]));
+  defaultParams[id] = Object.fromEntries(sim.controls.filter(([kind]) => kind !== 'buttons').map(([kind, key, , ...rest]) => [key, kind === 'select' ? rest[0][0][0] : kind === 'hidden' ? rest[0] : rest[2]]));
   if (sim.drive || sim.ambient) playable.add(id);
   if (sim.ambient) ambient.add(id); else ambient.delete(id);
   if (sim.drive) restartOnInput.add(id); else restartOnInput.delete(id);
@@ -741,6 +749,20 @@ export class Simulations {
 
       node.addEventListener('input', update);
       node.addEventListener('change', update);
+      // Peças clicáveis da cena e botões de ação (ex.: despejar um béquer).
+      // Na cena vale o pointerdown: o SVG é redesenhado a cada quadro e o "click" se perderia.
+      const act = event => {
+        const target = event.target.closest?.('[data-lab-act]'), sim = labSims[type];
+        if (!target || !sim?.act || !node.contains(target)) return;
+        const inScene = Boolean(target.closest('svg'));
+        if (inScene !== (event.type === 'pointerdown')) return;
+        const next = sim.act(readSimulationValues(node), target.dataset.labAct, node.labTime || 0);
+        if (!next) return;
+        for (const [key, value] of Object.entries(next)) { const field = node.querySelector(`[data-param="${key}"]`); if (field) field.value = String(value); }
+        update();
+      };
+      node.addEventListener('pointerdown', act);
+      node.addEventListener('click', act);
       node.addEventListener('click', event => {
         const stepper = event.target.closest('[data-sim-step]');
         if (stepper) {
