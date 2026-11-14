@@ -214,3 +214,107 @@ html:is([data-theme=aurora],[data-theme=candy],[data-theme=galaxy],[data-theme=c
   background:var(--palette-surface)!important;
 }
 .profile-swatches .profile-swatch.is-gradient[aria-pressed=true]{outline-color:var(--ui-ink)}
+
+/* Cabeçalho do editor: um único ritmo vertical em cima e embaixo do perfil.
+   Antes o bloco do título não tinha base e a coluna do perfil ficava solta. */
+html[data-theme][data-ui-style] #app .editor-shell .editor-heading {
+  display: flex !important;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  margin: 0;
+  padding: 12px 0;
+  min-height: 56px;
+  box-sizing: border-box;
+}
+html[data-theme][data-ui-style] #app .editor-shell .editor-heading > div:first-child {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex: 1 1 auto;
+  min-width: 0;
+}
+html[data-theme][data-ui-style] #app .editor-shell .editor-context {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: none;
+  flex: 0 0 auto;
+}
+html[data-theme][data-ui-style] #app .editor-shell .editor-context > * {
+  margin-block: 0;
+  align-self: center;
+}
+html[data-theme][data-ui-style] #app .editor-shell .editor-context [data-account-profile] {
+  display: flex;
+  align-items: center;
+  margin: 0;
+}
+@media (max-width: 900px) {
+  html[data-theme][data-ui-style] #app .editor-shell .editor-heading { padding: 8px 0; min-height: 52px; }
+}
+
+/* Entrada de painel: o que aparece junto entra junto.
+   Antes só alguns blocos tinham animação, o que deixava a tela "pulando". */
+@keyframes editor-panel-enter {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: none; }
+}
+@media (prefers-reduced-motion: no-preference) {
+  html:not([data-motion=reduced]) #app .editor-shell :is(
+    .editor-outline,
+    .editor-form-area,
+    .designer-inspector,
+    .designer-toolbar,
+    .item-toolbar,
+    .editor-command-row,
+    .editor-heading,
+    .designer-stage-wrap
+  ) {
+    animation: editor-panel-enter .26s cubic-bezier(.2,.7,.2,1) both;
+  }
+  html:not([data-motion=reduced]) #app .editor-shell .editor-outline { animation-delay: .02s; }
+  html:not([data-motion=reduced]) #app .editor-shell .designer-inspector { animation-delay: .06s; }
+  html:not([data-motion=reduced]) #app .editor-shell .designer-stage-wrap { animation-delay: .04s; }
+  /* A troca de slide no editor entra pelo palco, junto com o inspetor. */
+  html:not([data-motion=reduced]) #app .editor-shell .designer-stage > .slide-canvas {
+    animation: editor-panel-enter .22s cubic-bezier(.2,.7,.2,1) both;
+  }
+  html:not([data-motion=reduced]) #app .editor-shell :is(.designer-layer-row, .outline-item) {
+    animation: editor-panel-enter .2s cubic-bezier(.2,.7,.2,1) both;
+  }
+  html:not([data-motion=reduced]) #app .editor-shell :is(.designer-layer-row, .outline-item):nth-child(n+2) { animation-delay: .02s; }
+  html:not([data-motion=reduced]) #app .editor-shell :is(.designer-layer-row, .outline-item):nth-child(n+4) { animation-delay: .04s; }
+  html:not([data-motion=reduced]) #app .editor-shell :is(.designer-layer-row, .outline-item):nth-child(n+6) { animation-delay: .06s; }
+  html:not([data-motion=reduced]) dialog.simulation-modal[open],
+  html:not([data-motion=reduced]) dialog.simulation-modal[open] .simulation-modal-stage > .simulation-widget {
+    animation: editor-panel-enter .22s cubic-bezier(.2,.7,.2,1) both;
+  }
+}
+
+/* Título e subtítulo do header do editor: mesma entrada e mesma distância
+   entre o texto e a coluna do perfil, sem espaço sobrando no topo. */
+html[data-theme][data-ui-style] #app .editor-shell .editor-title-block {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+  flex: 1 1 auto;
+}
+html[data-theme][data-ui-style] #app .editor-shell .editor-heading-meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 16px;
+  font-size: 11px;
+  color: var(--ui-muted);
+  line-height: 1.2;
+}
+html[data-theme][data-ui-style] #app .editor-shell .editor-heading-hint {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}

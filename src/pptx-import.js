@@ -6,6 +6,20 @@ import {MAX_AUDIO_BYTES} from './audio-data.js';
 import {fontAvailable,loadPptxFont} from './fonts.js';
 export const pptxEffects=['appear','fadeIn','fadeOut','floatIn','flyIn','flyOut','splitIn','wipeIn','zoomIn'];
 const wait=()=>new Promise(r=>setTimeout(r,0));
+// `<a:r>` runs and soft breaks / field placeholders share the DrawingML paragraph,
+// but the format reader indexes runs only. Reading paragraph.length (which counts
+// `<a:br>` and `<a:fld>` too) throws "run index N out of range in paragraph 0".
+const runIndexes=(items)=>items.reduce((indexes,item,index)=>{
+ if(item.kind==='r')indexes.push(index);
+ return indexes;
+},[]);
+// Empty paragraphs have no runs at all, so asking for run 0 would also throw.
+const firstRunFont=(pres,shape,paragraph=0,run=0)=>{
+ try{return pptx.getShapeRunFormatEffective(pres,shape,paragraph,run)?.font||'';}catch{return '';}
+};
+const firstRunFormat=(pres,shape,paragraph=0)=>{
+ try{return pptx.getShapeRunFormatEffective(pres,shape,paragraph,0)||{};}catch{return {};}
+};
 function audioDataUrl(media){
  const mime=({ 'audio/mpeg':'mpeg','audio/mp3':'mp3','audio/wav':'wav','audio/x-wav':'x-wav','audio/ogg':'ogg','audio/mp4':'mp4','audio/x-m4a':'mp4','audio/aac':'aac','audio/webm':'webm' })[media.contentType?.toLowerCase()];
  if(!mime)throw Error('Formato de áudio incorporado não suportado: '+(media.contentType||'desconhecido'));
@@ -96,9 +110,9 @@ export async function editablePptx(bytes,{signal,progress}){
  for(const slide of slides)for(const shape of pptx.getSlideShapes(slide)){
   const sample=pptx.getShapeText(shape)?.trim().slice(0,130);
   if(!sample)continue;
-  for(const [paragraph,runs] of pptx.getShapeParagraphElements(shape).entries()){
-   for(let run=0;run<runs.filter(item=>item.kind!=='break').length;run++){
-    const family=pptx.getShapeRunFormatEffective(pres,shape,paragraph,run)?.font;
+  for(const [paragraph,items] of pptx.getShapeParagraphElements(shape).entries()){
+   for(const run of runIndexes(items)){
+    const family=firstRunFont(pres,shape,paragraph,run);
     if(family&&!fonts.has(family))fonts.set(family,sample);
    }
   }
@@ -208,7 +222,7 @@ export async function editablePptx(bytes,{signal,progress}){
       if(art)elements.push(newElement('image',{id:'pptx-shape-bg-'+id,...art,imageAlt:'Forma de '+pptx.getShapeName(shape)}));
      }finally{geometry.remove();}
     }
-    const format=pptx.getShapeRunFormatEffective(pres,shape,0,0),shapeDoc=new DOMParser().parseFromString('<root xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main">'+xml.replace(/<\?xml.*?\?>/,'')+'</root>','text/xml'),body=shapeDoc.getElementsByTagNameNS('*','bodyPr')[0],px=1280/size.width;
+    const format=firstRunFormat(pres,shape),shapeDoc=new DOMParser().parseFromString('<root xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main">'+xml.replace(/<\?xml.*?\?>/,'')+'</root>','text/xml'),body=shapeDoc.getElementsByTagNameNS('*','bodyPr')[0],px=1280/size.width;
     const margin=(name,fallback)=>Number(body?.getAttribute(name)||fallback)*px;
     const renderedText=group.querySelector('text');
     const renderedRun=renderedText?.querySelector('tspan')||renderedText;

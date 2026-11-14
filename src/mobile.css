@@ -57,6 +57,7 @@ html[data-appearance=light] #app[data-role=student] .callout p{color:#6d5287}
   html body #app .editor-shell .studio-editor{padding:0 0 calc(88px + env(safe-area-inset-bottom));max-width:100%;min-height:100dvh}
   html body #app .editor-shell .editor-heading{position:sticky;top:0;z-index:32;margin:0;padding:8px 12px;min-height:56px;display:flex!important;flex-direction:row!important;align-items:center!important;justify-content:space-between;gap:10px!important;flex-wrap:nowrap!important;background:color-mix(in srgb,var(--ui-panel,#ffffff) 86%,transparent);border-bottom:1px solid var(--ui-line,#ffffff12);backdrop-filter:blur(18px) saturate(160%)}
   html body #app .editor-shell .editor-heading>div:first-child{flex-wrap:nowrap;justify-content:flex-start!important;gap:8px;min-width:0;flex:1}
+  html body #app .editor-shell .editor-heading-hint{display:none}
   html body #app .editor-shell .editor-back{flex:0 0 36px;width:36px;min-height:36px;padding:6px;border-radius:12px}
   html body #app .editor-shell .editor-title{font-size:14px;max-width:100%;min-width:0;letter-spacing:-.2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
   html body #app .editor-shell .editor-context{display:flex;align-items:center;gap:6px;margin:0;padding:0;border:0;background:none;flex:0 0 auto;min-width:0}
