@@ -491,3 +491,8 @@ dialog#storage-image-search.image-finder .image-finder-form input{border:0;backg
 #app .viewer-tools .my-room-avatar img{width:100%;height:100%;object-fit:cover}
 #app .viewer-tools .my-room-avatar{background:#1b1630!important;border-color:#8f6bff!important;opacity:1}
 #app .viewer-tools .my-room-avatar svg{opacity:1}
+
+/* 17. Cabeçalho do editor: mesma folga acima dos botões e abaixo deles até a linha */
+@media (min-width:761px){
+  html[data-theme][data-ui-style] body #app .editor-shell .studio-editor .editor-heading{padding-top:0!important;padding-bottom:14px!important}
+}
