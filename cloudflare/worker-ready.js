@@ -896,7 +896,7 @@ async function openverseSearch(query, limit) {
       licenseUrl: clip2(result.license_url, 300),
       width: Number(result.width) || 0,
       height: Number(result.height) || 0,
-      kind: "image"
+      kind: /\.png(?:$|[?#])/i.test(original) ? "image/png" : /\.svg(?:$|[?#])/i.test(original) ? "image/svg+xml" : /\.webp(?:$|[?#])/i.test(original) ? "image/webp" : "image"
     });
   }
   return items;
@@ -906,9 +906,16 @@ function decodeEntities(value) {
 }
 function bingSized(url, width, height) {
   if (!url) return "";
-  return url + (url.includes("?") ? "&" : "?") + "w=" + width + "&h=" + height + "&c=7&rs=1&qlt=90";
+  return url + (url.includes("?") ? "&" : "?") + "w=" + width + "&h=" + height + "&rs=1&qlt=90";
 }
-async function bingSearch(query, limit, page = 1) {
+var TRANSPARENT_HINT = /\b(?:png|transparente?s?|transparent|sem\s+fundo|fundo\s+removido|recortad[oa]s?|no\s+background|cutout)\b/giu;
+function splitTransparentQuery(query) {
+  const text = clean2(query);
+  const wanted = new RegExp(TRANSPARENT_HINT.source, "iu").test(text);
+  const subject = wanted ? text.replace(TRANSPARENT_HINT, " ").replace(/\b(?:com|de|em)\s+fundo\b/giu, " ").replace(/\s+/g, " ").trim() : text;
+  return { transparent: wanted, subject: subject || text };
+}
+async function bingSearch(query, limit, page = 1, { transparent = false } = {}) {
   const params = new URLSearchParams({
     q: query,
     first: String((page - 1) * limit + 1),
@@ -916,6 +923,7 @@ async function bingSearch(query, limit, page = 1) {
     mmasync: "1",
     adlt: "moderate"
   });
+  if (transparent) params.set("qft", "+filterui:photo-transparent");
   const response = await fetch("https://www.bing.com/images/async?" + params, {
     headers: { Accept: "text/html,application/xhtml+xml", "User-Agent": BROWSER_USER_AGENT, "Accept-Language": "pt-BR,pt;q=0.9,en;q=0.7" },
     signal: AbortSignal.timeout(UPSTREAM_TIMEOUT)
@@ -933,7 +941,7 @@ async function bingSearch(query, limit, page = 1) {
       continue;
     }
     const original = clean2(meta.murl);
-    const thumbnail = clean2(meta.turl);
+    const thumbnail = clean2(meta.turl).replace(/^http:\/\//, "https://");
     if (!thumbnail || !/^https:\/\//.test(thumbnail)) continue;
     if (isDocument({ file: original, title: meta.t })) continue;
     const page2 = clean2(meta.purl);
@@ -944,7 +952,11 @@ async function bingSearch(query, limit, page = 1) {
       file: clip2(title || query, 200),
       description: clip2(plainText(meta.desc || ""), 300),
       thumbnail: bingSized(thumbnail, 480, 360),
-      url: bingSized(thumbnail, 900, 700),
+      url: bingSized(thumbnail, 1200, 1200),
+      // Arquivo original: é ele que guarda a transparência do PNG. A miniatura
+      // do Bing fica como reserva quando o site de origem bloqueia o download.
+      original: /^https:\/\//.test(original) ? clip2(original, 900) : "",
+      transparent,
       source: /^https:\/\//.test(page2) ? clip2(page2, 600) : "",
       catalog: "Bing Imagens",
       author: "",
@@ -952,7 +964,7 @@ async function bingSearch(query, limit, page = 1) {
       licenseUrl: "",
       width: 0,
       height: 0,
-      kind: "image"
+      kind: /\.png(?:$|[?#])/i.test(original) ? "image/png" : /\.svg(?:$|[?#])/i.test(original) ? "image/svg+xml" : /\.webp(?:$|[?#])/i.test(original) ? "image/webp" : "image"
     });
   }
   return items;
@@ -1155,18 +1167,19 @@ async function cached(key, loader) {
 }
 async function searchImages(query, page, limit, { transparent = false, bingOnly = false } = {}) {
   const term = clip2(query, MAX_QUERY);
-  const key = "v3-" + (bingOnly ? "bing-" : "") + encodeURIComponent(term.toLowerCase()) + "-" + page + "-" + limit + (transparent ? "-png" : "");
+  const key = "v4-" + (bingOnly ? "bing-" : "") + encodeURIComponent(term.toLowerCase()) + "-" + page + "-" + limit + (transparent ? "-png" : "");
   return cached(key, async () => {
     if (bingOnly) {
-      const items = await bingSearch(term, limit, page);
-      return { query: term, page, items, total: page * limit + (items.length ? 1 : 0) };
+      let items = await bingSearch(term, limit, page, { transparent });
+      if (transparent && !items.length && page === 1) items = await bingSearch(term + " png", limit, page);
+      return { query: term, page, transparent, items, total: page * limit + (items.length ? 1 : 0) };
     }
     const queryTokens = tokens(term).filter((token) => token.length > 1 && !STOP_WORDS.has(token));
     const wantsIcon = queryTokens.some((token) => ["logo", "logotipo", "logomarca", "icon", "icone", "simbolo", "symbol"].includes(token));
     const meaningful = tokens(term).filter((token) => token.length > 3 && !GENERIC_TOKENS.has(token) && !STOP_WORDS.has(token));
     const alternate = meaningful.length >= 2 ? meaningful.join(" ") : "";
     const [bing, commons, wiki, wikiEn, openverse, commonsAlt, wikiAlt, wikiEnAlt] = await Promise.allSettled([
-      bingSearch(term, limit, page),
+      bingSearch(term, limit, page, { transparent }).then((items) => items.length || !transparent ? items : bingSearch(term + " png", limit, page)),
       commonsSearch(term, 30),
       wikipediaSearch(term, 6, "pt.wikipedia.org"),
       wikipediaSearch(term, 6, "en.wikipedia.org"),
@@ -1189,40 +1202,37 @@ async function searchImages(query, page, limit, { transparent = false, bingOnly 
       ...withLicenses,
       ...openverse.status === "fulfilled" ? openverse.value : []
     ];
-    const ranked = all.filter((item) => !isDocument(item) && item.thumbnail && item.url).map((item) => ({ ...item, score: scoreItem(item, queryTokens, { transparent, wantsIcon }) })).sort((a, b) => b.score - a.score || b.width * b.height - a.width * a.height);
+    const ranked = all.filter((item) => !isDocument(item) && item.thumbnail && item.url).map((item, position) => ({ ...item, position, score: scoreItem(item, queryTokens, { transparent, wantsIcon }) })).sort((a, b) => b.score - a.score || b.width * b.height - a.width * a.height);
     const unique = dedupe(ranked);
-    const web = unique.filter((item) => item.catalog === "Bing Imagens");
+    const web = unique.filter((item) => item.catalog === "Bing Imagens").sort((a, b) => a.position - b.position);
     const start = (page - 1) * limit;
     const selected = web.length ? web.slice(0, limit) : unique.slice(start, start + limit);
-    return { query: term, page, items: selected.map(({ fileTitle, ...item }) => item), total: web.length ? page * limit + (web.length >= limit ? 1 : 0) : unique.length };
+    return { query: term, page, items: selected.map(({ fileTitle, position, ...item }) => item), total: web.length ? page * limit + (web.length >= limit ? 1 : 0) : unique.length };
   });
 }
-var PROXY_HOSTS = [
-  "wikimedia.org",
-  "wikipedia.org",
-  "openverse.org",
-  "flickr.com",
-  "staticflickr.com",
-  "pexels.com",
-  "pixabay.com",
-  "wikimediafoundation.org",
-  "creativecommons.org",
-  "bing.net",
-  "bing.com"
-];
+var WIKI_HOSTS = ["wikimedia.org", "wikipedia.org", "wikimediafoundation.org"];
 function proxyAllowed(url) {
   try {
     const parsed = new URL(url);
-    if (parsed.protocol !== "https:") return false;
+    if (parsed.protocol !== "https:" || parsed.port || parsed.username || parsed.password) return false;
     const host = parsed.hostname.toLowerCase();
-    return PROXY_HOSTS.some((allowed) => host === allowed || host.endsWith("." + allowed));
+    if (!host.includes(".") || host.endsWith(".")) return false;
+    if (/^[\d.]+$/.test(host) || host.includes(":") || host.startsWith("[")) return false;
+    if (/(?:^|\.)(?:localhost|local|internal|lan|home|corp|intranet|test|invalid|example|onion)$/.test(host)) return false;
+    return true;
   } catch {
     return false;
   }
 }
 async function proxyImage(url) {
   if (!proxyAllowed(url)) throw Error("Origem n\xE3o permitida.");
-  const response = await fetch(url, { headers: { "User-Agent": USER_AGENT }, redirect: "follow", signal: AbortSignal.timeout(2e4) });
+  const wiki = WIKI_HOSTS.some((allowed) => new URL(url).hostname.toLowerCase().endsWith(allowed));
+  const response = await fetch(url, {
+    headers: wiki ? { "User-Agent": USER_AGENT } : { "User-Agent": BROWSER_USER_AGENT, Accept: "image/avif,image/webp,image/png,image/svg+xml,image/*;q=0.8" },
+    redirect: "follow",
+    signal: AbortSignal.timeout(2e4)
+  });
+  if (response.url && !proxyAllowed(response.url)) throw Error("Origem n\xE3o permitida.");
   if (!response.ok) throw Error("upstream_" + response.status);
   const type = clip2(response.headers.get("Content-Type"), 80).split(";")[0].trim();
   if (!type.startsWith("image/")) throw Error("tipo inv\xE1lido");
@@ -1249,10 +1259,11 @@ async function handleStorageAIImages(request, env, user, headers) {
   const query = clip2(url.searchParams.get("q") || "", MAX_QUERY);
   const page = Math.max(1, Math.min(6, Number(url.searchParams.get("page")) || 1));
   const limit = Math.max(6, Math.min(MAX_LIMIT, Number(url.searchParams.get("limit")) || DEFAULT_LIMIT));
-  const transparent = url.searchParams.get("transparent") === "1";
+  const hinted = splitTransparentQuery(query);
+  const transparent = url.searchParams.get("transparent") === "1" || hinted.transparent;
   if (!query) return json({ error: "invalid_query", items: [] }, 400);
   try {
-    const result = await searchImages(query, page, limit, { transparent, bingOnly: url.searchParams.get("source") === "bing" });
+    const result = await searchImages(hinted.subject, page, limit, { transparent, bingOnly: url.searchParams.get("source") === "bing" });
     return json(result, 200, { "Cache-Control": "private, max-age=300" });
   } catch {
     return json({ error: "search_unavailable", items: [] }, 502);

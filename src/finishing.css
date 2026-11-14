@@ -1,0 +1,263 @@
+/* Acabamento carregado por último: corrige estilos que as camadas anteriores
+   deixavam com cor fixa ou com vidro opaco. */
+
+/* ------------------------------------------------------------------ */
+/* 1. Liquid Glass — vidro de verdade: translúcido, com o fundo bem    */
+/*    desfocado aparecendo por trás e brilho nas bordas.               */
+/* ------------------------------------------------------------------ */
+html[data-ui-style=glass] {
+  --glass-blur: blur(34px) saturate(190%) brightness(1.06);
+  --glass-fill: linear-gradient(140deg, #ffffff66, #ffffff26 45%, #ffffff40);
+  --glass-fill-strong: linear-gradient(140deg, #ffffff8c, #ffffff4d 50%, #ffffff66);
+  --glass-edge: #ffffffb3;
+  --glass-shine: inset 0 1px 0 #ffffffd9, inset 1px 0 0 #ffffff59, inset 0 -1px 0 #ffffff2e, 0 10px 34px #1f2a5524;
+  --glass-field: #ffffff47;
+}
+html[data-ui-style=glass][data-appearance=dark] {
+  --glass-blur: blur(34px) saturate(150%) brightness(.9);
+  --glass-fill: linear-gradient(140deg, #ffffff1f, #ffffff0a 45%, #ffffff14);
+  --glass-fill-strong: linear-gradient(140deg, #23263d99, #14172a80 50%, #1e213899);
+  --glass-edge: #ffffff3d;
+  --glass-shine: inset 0 1px 0 #ffffff4d, inset 1px 0 0 #ffffff1f, inset 0 -1px 0 #ffffff0f, 0 12px 38px #00000052;
+  --glass-field: #ffffff17;
+}
+/* O fundo precisa ter cor e forma para o vidro ter o que desfocar. */
+html[data-theme][data-ui-style=glass][data-appearance] body #app .studio-shell {
+  background:
+    radial-gradient(circle at 12% 12%, hsl(var(--personal-hue) 95% 72%) 0 9%, transparent 30%),
+    radial-gradient(circle at 88% 8%, hsl(calc(var(--personal-hue) + 60) 95% 74%) 0 8%, transparent 32%),
+    radial-gradient(circle at 72% 82%, hsl(var(--personal-secondary) 85% 70%) 0 10%, transparent 36%),
+    radial-gradient(circle at 22% 88%, hsl(calc(var(--personal-hue) - 45) 90% 76%) 0 7%, transparent 30%),
+    linear-gradient(140deg, hsl(var(--personal-hue) 80% 92%), hsl(var(--personal-secondary) 70% 92%)) !important;
+  background-attachment: fixed !important;
+}
+html[data-theme][data-ui-style=glass][data-appearance=dark] body #app .studio-shell {
+  background:
+    radial-gradient(circle at 12% 12%, hsl(var(--personal-hue) 70% 38%) 0 7%, transparent 32%),
+    radial-gradient(circle at 88% 8%, hsl(calc(var(--personal-hue) + 40) 62% 34%) 0 6%, transparent 32%),
+    radial-gradient(circle at 72% 82%, hsl(var(--personal-secondary) 60% 34%) 0 8%, transparent 36%),
+    radial-gradient(circle at 22% 88%, hsl(calc(var(--personal-hue) - 40) 60% 32%) 0 5%, transparent 30%),
+    linear-gradient(140deg, hsl(var(--personal-hue) 36% 9%), hsl(var(--personal-secondary) 32% 8%)) !important;
+  background-attachment: fixed !important;
+}
+html[data-theme][data-ui-style=glass][data-appearance] body #app :is(.studio-rail, .studio-header, .studio-body .lesson-card, .new-lesson-card, .cloud-file-list article, .experience-feature, .home-hero, .storage-ai-page, .editor-outline, .editor-form-area, .designer-inspector, .designer-toolbar, .item-toolbar, .editor-command-row, .editor-heading, .designer-layer-list) {
+  background: var(--glass-fill) !important;
+  border-color: var(--glass-edge) !important;
+  box-shadow: var(--glass-shine) !important;
+  -webkit-backdrop-filter: var(--glass-blur) !important;
+  backdrop-filter: var(--glass-blur) !important;
+}
+/* Janelas e painéis flutuantes: um pouco mais de corpo para o texto, mas
+   ainda deixando ver a tela desfocada atrás. */
+html[data-theme][data-ui-style=glass][data-appearance] body #app :is(.account-dialog, .group-dialog, .studio-dialog, .lesson-chat, .music-panel, .slide-audio-popover, .lesson-menu > div, .editor-more > div),
+html[data-ui-style=glass] body dialog:is(.simulation-modal, .storage-image-search, .export-dialog) {
+  background: var(--glass-fill-strong) !important;
+  border: 1px solid var(--glass-edge) !important;
+  box-shadow: var(--glass-shine), 0 30px 90px #0f163a40 !important;
+  -webkit-backdrop-filter: blur(44px) saturate(200%) !important;
+  backdrop-filter: blur(44px) saturate(200%) !important;
+}
+html[data-theme][data-ui-style=glass][data-appearance] body #app :is(.studio-shell, .account-dialog, .group-dialog, .studio-dialog, .lesson-chat) :is(input:not([type=color]):not([type=checkbox]):not([type=radio]):not([type=range]):not([type=file]), textarea, select) {
+  background: var(--glass-field) !important;
+  border-color: var(--glass-edge) !important;
+  -webkit-backdrop-filter: blur(12px);
+  backdrop-filter: blur(12px);
+}
+html[data-theme][data-ui-style=glass][data-appearance] body #app .outline-item {
+  background: linear-gradient(150deg, #ffffff4d, #ffffff1a) !important;
+  border-color: var(--glass-edge) !important;
+}
+html[data-theme][data-ui-style=glass][data-appearance=dark] body #app .outline-item {
+  background: linear-gradient(150deg, #ffffff1c, #ffffff08) !important;
+}
+html[data-theme][data-ui-style=glass][data-appearance] body #app .outline-item.active {
+  background: linear-gradient(150deg, color-mix(in srgb, var(--ui-accent), transparent 55%), #ffffff33) !important;
+  border-color: var(--ui-accent) !important;
+}
+/* Com uma janela aberta, a página atrás fica desfocada como atrás de um vidro. */
+html[data-ui-style=glass] body :is(.modal-backdrop, .account-backdrop) {
+  background: #ffffff1f !important;
+  -webkit-backdrop-filter: blur(18px) saturate(140%);
+  backdrop-filter: blur(18px) saturate(140%);
+}
+html[data-ui-style=glass][data-appearance=dark] body :is(.modal-backdrop, .account-backdrop) { background: #0508142e !important; }
+html[data-ui-style=glass] body dialog::backdrop {
+  background: #ffffff1f;
+  -webkit-backdrop-filter: blur(18px) saturate(140%);
+  backdrop-filter: blur(18px) saturate(140%);
+}
+html[data-ui-style=glass][data-appearance=dark] body dialog::backdrop { background: #0508142e; }
+@media (prefers-reduced-transparency: reduce) {
+  html[data-ui-style=glass] { --glass-fill: var(--ui-panel); --glass-fill-strong: var(--ui-panel); --glass-blur: none; }
+}
+
+/* ------------------------------------------------------------------ */
+/* 2. Frutiger Aero segue a cor do perfil (antes era sempre azul/verde) */
+/* ------------------------------------------------------------------ */
+html[data-ui-style=aero] {
+  --aero-panel: linear-gradient(175deg, #fffffff0, hsl(var(--personal-hue) 75% 95% / .93));
+  --aero-card: linear-gradient(165deg, #ffffff 0%, hsl(var(--personal-hue) 85% 97%) 55%, hsl(var(--personal-secondary) 65% 94%) 100%);
+  --aero-line: hsl(var(--personal-hue) 45% 76%);
+  --aero-ink: hsl(var(--personal-hue) 45% 21%);
+  --aero-button: linear-gradient(180deg, #ffffff 0%, hsl(var(--personal-hue) 80% 96%) 46%, hsl(var(--personal-hue) 68% 87%) 51%, hsl(var(--personal-secondary) 62% 93%) 100%);
+  --aero-accent: linear-gradient(180deg, hsl(var(--personal-hue) 95% 96%) 0%, hsl(var(--personal-hue) 78% 85%) 42%, hsl(var(--personal-hue) 64% 68%) 50%, hsl(var(--personal-secondary) 58% 80%) 100%);
+  --aero-accent-ink: hsl(var(--personal-hue) 55% 17%);
+  --aero-field: linear-gradient(180deg, #ffffff, hsl(var(--personal-hue) 80% 98%));
+  --aero-shell: radial-gradient(ellipse 65% 45% at 8% 0%, hsl(var(--personal-hue) 90% 84% / .7), transparent 62%), radial-gradient(ellipse 55% 40% at 92% 10%, hsl(var(--personal-secondary) 85% 84% / .62), transparent 60%), radial-gradient(circle at 86% 72%, #ffffff8c 0 6%, #ffffff26 6.3% 6.8%, transparent 7%), linear-gradient(160deg, hsl(var(--personal-hue) 85% 96%), #ffffff 45%, hsl(var(--personal-secondary) 70% 94%));
+  --aero-shadow: inset 0 1px 0 #ffffffd9, 0 5px 16px hsl(var(--personal-hue) 45% 40% / .14);
+}
+html[data-ui-style=aero][data-appearance=dark] {
+  --aero-panel: linear-gradient(155deg, hsl(var(--personal-hue) 36% 18% / .94), hsl(var(--personal-hue) 28% 13% / .93) 58%, hsl(var(--personal-secondary) 30% 16% / .94));
+  --aero-card: var(--aero-panel);
+  --aero-line: hsl(var(--personal-hue) 34% 42%);
+  --aero-ink: hsl(var(--personal-hue) 60% 95%);
+  --aero-button: linear-gradient(180deg, hsl(var(--personal-hue) 30% 38%), hsl(var(--personal-hue) 32% 26%) 48%, hsl(var(--personal-hue) 36% 18%) 52%, hsl(var(--personal-secondary) 30% 26%));
+  --aero-field: hsl(var(--personal-hue) 30% 13%);
+  --aero-shell: radial-gradient(ellipse 60% 45% at 10% 4%, hsl(var(--personal-hue) 60% 38% / .5), transparent 60%), radial-gradient(ellipse 55% 40% at 92% 10%, hsl(var(--personal-secondary) 50% 34% / .4), transparent 60%), linear-gradient(155deg, hsl(var(--personal-hue) 30% 15%), hsl(var(--personal-hue) 26% 10%) 58%, hsl(var(--personal-secondary) 26% 16%));
+  --aero-shadow: inset 0 1px 0 #ffffff2b, 0 8px 24px #00000047;
+}
+html[data-theme][data-ui-style=aero][data-appearance] body #app .studio-shell,
+html[data-theme][data-ui-style=aero][data-appearance] body #app .studio-shell:has(> .studio-body) {
+  background: var(--aero-shell) !important;
+  color: var(--aero-ink);
+}
+html[data-theme][data-ui-style=aero][data-appearance] body #app :is(.studio-rail, .studio-header, .editor-heading, .editor-command-row, .item-toolbar, .designer-toolbar, .editor-outline, .designer-inspector, .editor-form-area, .music-panel, .slide-audio-popover, .designer-layer-list) {
+  background: var(--aero-panel) !important;
+  border-color: var(--aero-line) !important;
+  box-shadow: var(--aero-shadow) !important;
+}
+html[data-theme][data-ui-style=aero][data-appearance] body #app :is(.lesson-card, .account-dialog, .group-dialog, .studio-dialog, .home-hero, .experience-feature, .new-lesson-card, .cloud-file-list article, .lesson-menu > div, .editor-more > div),
+html[data-ui-style=aero] body dialog:is(.simulation-modal, .storage-image-search, .export-dialog) {
+  background: var(--aero-card) !important;
+  border-color: var(--aero-line) !important;
+  color: var(--aero-ink);
+  --ui-ink: var(--aero-ink);
+}
+html[data-theme][data-ui-style=aero][data-appearance] body #app :is(.studio-btn, .designer-toolbar button, .studio-account-button, .profile-shortcuts button, .outline-item) {
+  background: var(--aero-button) !important;
+  border-color: var(--aero-line) !important;
+  color: var(--aero-ink) !important;
+}
+html[data-theme][data-ui-style=aero][data-appearance] body #app .outline-item.active {
+  background: linear-gradient(175deg, #ffffff, hsl(var(--personal-hue) 75% 88%)) !important;
+  border-color: var(--ui-accent) !important;
+}
+html[data-theme][data-ui-style=aero][data-appearance=dark] body #app .outline-item.active {
+  background: linear-gradient(180deg, hsl(var(--personal-hue) 46% 42%), hsl(var(--personal-hue) 38% 28%)) !important;
+}
+html[data-theme][data-ui-style=aero][data-appearance] body #app :is(.studio-shell, .account-dialog, .studio-dialog, .group-dialog, .lesson-chat) :is(button, input[type=submit]):is(.accent, .primary, .card-present, [data-photo-action=apply], [data-photo-action=capture]),
+html[data-theme][data-ui-style=aero][data-appearance] body #app .btn.primary {
+  background: var(--aero-accent) !important;
+  color: var(--aero-accent-ink) !important;
+  border-color: hsl(var(--personal-hue) 45% 58%) !important;
+  text-shadow: 0 1px 0 #ffffff80;
+}
+html[data-theme][data-ui-style=aero][data-appearance] body #app :is(input:not([type=color]):not([type=checkbox]):not([type=radio]):not([type=range]):not([type=file]), textarea, select) {
+  background: var(--aero-field) !important;
+  border-color: var(--aero-line) !important;
+  color: var(--aero-ink) !important;
+}
+html[data-theme][data-ui-style=aero][data-appearance] body #app .studio-watermark-glow,
+html[data-ui-style=aero] body .experience-copy h2 em { color: hsl(var(--personal-hue) 62% 42%) !important; }
+html[data-theme][data-ui-style=aero][data-appearance=dark] body #app .studio-watermark-glow { color: hsl(var(--personal-hue) 70% 72%) !important; }
+html[data-theme][data-ui-style=aero][data-appearance=light] body #app .account-dialog { color: var(--aero-ink); --ui-ink: var(--aero-ink); }
+
+/* ------------------------------------------------------------------ */
+/* 3. Salvar: menu "onde salvar"                                       */
+/* ------------------------------------------------------------------ */
+#app .editor-save-controls { display: inline-flex; align-items: center; gap: 4px; position: relative; }
+#app .editor-save-menu { position: relative; }
+#app .editor-save-menu > summary { min-width: 30px; min-height: 38px; padding-inline: 7px; display: grid; place-items: center; }
+#app .editor-save-menu > summary svg { rotate: -90deg; width: 14px; height: 14px; }
+#app .editor-save-menu[open] > summary svg { rotate: 90deg; }
+#app .editor-save-menu > div { min-width: 250px; right: 0; left: auto; }
+#app .editor-save-menu > div .studio-btn { justify-content: flex-start; gap: 8px; width: 100%; text-align: left; white-space: nowrap; }
+
+/* ------------------------------------------------------------------ */
+/* 4. Camadas: arrastar pelo nome                                      */
+/* ------------------------------------------------------------------ */
+#app #designer-layers .designer-layer-row > button { cursor: grab; touch-action: pan-x; user-select: none; }
+#app #designer-layers.layer-dragging,
+#app #designer-layers.layer-dragging .designer-layer-row > button { cursor: grabbing; }
+#app #designer-layers .designer-layer-row.dragging { opacity: .45; }
+#app #designer-layers .designer-layer-row.layer-drop-before { box-shadow: -3px 0 0 var(--ui-accent) !important; }
+#app #designer-layers .designer-layer-row.layer-drop-after { box-shadow: 3px 0 0 var(--ui-accent) !important; }
+#app .editor-music button svg, #app .music-panel button svg { pointer-events: none; }
+
+/* ------------------------------------------------------------------ */
+/* 5. Busca de imagens                                                 */
+/* ------------------------------------------------------------------ */
+.storage-image-search .image-search-filter { display: flex; align-items: center; gap: 8px; margin: -4px 0 10px; font-size: 12px; cursor: pointer; }
+.storage-image-search .image-search-filter input { width: 16px; height: 16px; accent-color: var(--search-accent, var(--ui-accent)); }
+.storage-image-search .image-search-choice img { object-fit: contain; background: #ffffff0f; }
+.storage-image-search .image-search-choice[data-transparent] img {
+  background: repeating-conic-gradient(#d9dbe3 0 25%, #f6f7fa 0 50%) 0 0 / 14px 14px;
+}
+
+/* ------------------------------------------------------------------ */
+/* 6. Laboratório de simulações: uma lista só e nada de rolagem         */
+/* ------------------------------------------------------------------ */
+dialog.simulation-modal[open] {
+  width: min(1120px, 96vw);
+  height: min(740px, 94dvh);
+  max-height: 94dvh;
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  overflow: hidden;
+}
+dialog.simulation-modal .simulation-modal-body { grid-template-columns: 250px minmax(0, 1fr); }
+dialog.simulation-modal .simulation-modal-catalog { order: -1; border-left: 0; border-right: 1px solid var(--ui-line); grid-template-rows: auto minmax(0, 1fr); }
+/* No computador a escolha é feita na lista; o seletor só existe no celular. */
+dialog.simulation-modal .simulation-modal-select-wrap { display: none; }
+dialog.simulation-modal .simulation-modal-stage { padding: 14px; overflow: hidden; }
+dialog.simulation-modal .simulation-modal-stage > .simulation-widget {
+  display: grid;
+  grid-template-columns: minmax(0, 1.2fr) minmax(250px, .8fr);
+  grid-template-rows: auto minmax(0, 1fr) auto auto auto auto;
+  grid-template-areas: "head head" "visual controls" "visual result" "visual challenge" "visual play" "note note";
+  gap: 10px 16px;
+  min-height: 0;
+  height: 100%;
+  padding: 16px;
+  overflow: hidden;
+}
+dialog.simulation-modal .simulation-modal-stage > .simulation-widget > header { grid-area: head; }
+dialog.simulation-modal .simulation-modal-stage > .simulation-widget > svg { grid-area: visual; width: 100%; height: 100%; min-height: 0; align-self: stretch; }
+dialog.simulation-modal .simulation-modal-stage > .simulation-widget > .simulation-controls { grid-area: controls; align-content: start; overflow: auto; min-height: 0; gap: 9px; }
+dialog.simulation-modal .simulation-modal-stage > .simulation-widget > .simulation-result { grid-area: result; }
+dialog.simulation-modal .simulation-modal-stage > .simulation-widget > .simulation-challenge { grid-area: challenge; }
+dialog.simulation-modal .simulation-modal-stage > .simulation-widget > [data-sim-play] { grid-area: play; }
+dialog.simulation-modal .simulation-modal-stage > .simulation-widget > small { grid-area: note; }
+/* Controle compacto: − [barra] + na mesma linha do valor. */
+dialog.simulation-modal .simulation-controls label:has(> .simulation-adj) { grid-template-columns: auto minmax(0, 1fr) auto; gap: 4px 8px; }
+dialog.simulation-modal .simulation-controls label:has(> .simulation-adj) > output { grid-column: 3; grid-row: 1; }
+dialog.simulation-modal .simulation-controls label > .simulation-adj { display: contents; }
+dialog.simulation-modal .simulation-controls label > .simulation-adj button { grid-row: 2; min-height: 28px; width: 30px; padding: 0; }
+dialog.simulation-modal .simulation-controls label > .simulation-adj button:first-child { grid-column: 1; }
+dialog.simulation-modal .simulation-controls label > .simulation-adj button:last-child { grid-column: 3; }
+dialog.simulation-modal .simulation-controls label > input[type=range] { grid-column: 2; grid-row: 2; align-self: center; }
+.simulation-widget .simulation-controls label.simulation-text { display: grid; grid-template-columns: minmax(0, 1fr); gap: 4px; }
+.simulation-widget .simulation-controls label.simulation-text > textarea { grid-column: 1; }
+.simulation-widget .simulation-text textarea {
+  width: 100%; box-sizing: border-box; resize: none; padding: 7px 9px; border-radius: 8px;
+  border: 1px solid #849ac255; background: #22293e; color: #e8eefc; font: inherit; line-height: 1.4;
+}
+dialog.simulation-modal .simulation-text textarea { min-height: 96px; font-size: 13px; }
+.slide-canvas .simulation-widget .simulation-text textarea { padding: .4cqw .6cqw; border-radius: .5cqw; font-size: .95cqw; }
+.simulation-widget [data-sim-play][aria-pressed=true] { background: #7dd3fc; color: #082f49; }
+@media (max-width: 760px) {
+  dialog.simulation-modal[open] { height: 94dvh; }
+  dialog.simulation-modal .simulation-modal-body { grid-template-columns: 1fr; grid-template-rows: auto minmax(0, 1fr); overflow: auto; }
+  dialog.simulation-modal .simulation-modal-catalog { order: -1; border-right: 0; border-bottom: 1px solid var(--ui-line); }
+  dialog.simulation-modal .simulation-modal-select-wrap { display: grid; }
+  dialog.simulation-modal .simulation-modal-filters { display: none; }
+  dialog.simulation-modal .simulation-modal-stage { overflow: auto; }
+  dialog.simulation-modal .simulation-modal-stage > .simulation-widget {
+    display: flex; height: auto; overflow: visible;
+  }
+  dialog.simulation-modal .simulation-modal-stage > .simulation-widget > svg { height: auto; min-height: 180px; }
+}
+
+/* Os menus do cabeçalho (Baixar, Salvar, Compartilhar) abriam atrás do palco. */
+#app .editor-shell .editor-heading { position: relative; z-index: 42; }
+#app .editor-shell .editor-command-row { position: relative; z-index: 41; }

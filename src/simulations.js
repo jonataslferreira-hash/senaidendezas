@@ -26,10 +26,10 @@ export const simulationGroups = [
     ['greenhouse', 'Efeito estufa e clima']
   ]],
   ['História', [
-    ['eras', 'Linha do tempo histórica']
+    ['cipher', 'Cifra de César · mensagens secretas']
   ]],
   ['Português', [
-    ['narrative', 'Arco narrativo']
+    ['textlab', 'Raio-X do texto · frases e leitura']
   ]],
   ['Artes', [
     ['colormix', 'Mistura de cores RGB']
@@ -48,6 +48,11 @@ export const simulationSubjects = Object.fromEntries(
 );
 
 export const simulationIds = Object.keys(simulationNames);
+
+// Experimentos antigos que foram refeitos: slides salvos com o identificador
+// anterior abrem o experimento novo da mesma disciplina.
+export const simulationAliases = { eras: 'cipher', narrative: 'textlab' };
+export const resolveSimulation = type => Object.hasOwn(simulationNames, type) ? type : simulationAliases[type] || 'projectile';
 
 export function projectile(v, angle, g = 9.81) {
   const a = angle * Math.PI / 180;
@@ -161,6 +166,45 @@ export function narrativeStage(progress = 60, intensity = 3) {
   return { progress: p, phase, tension: Math.round(tension * 100) };
 }
 
+// Cifra de César: cada letra anda `shift` casas no alfabeto. Acentos são
+// removidos antes (o alfabeto romano tinha só as letras básicas).
+export function caesarShift(text = '', shift = 3) {
+  const plain = String(text).normalize('NFD').replace(/\p{M}/gu, '').toUpperCase();
+  const amount = ((Math.round(Number(shift) || 0) % 26) + 26) % 26;
+  return plain.replace(/[A-Z]/g, letter => String.fromCharCode((letter.charCodeAt(0) - 65 + amount) % 26 + 65));
+}
+
+export function letterFrequency(text = '') {
+  const letters = String(text).normalize('NFD').replace(/\p{M}/gu, '').toUpperCase().match(/[A-Z]/g) || [];
+  const counts = Array(26).fill(0);
+  for (const letter of letters) counts[letter.charCodeAt(0) - 65]++;
+  const top = counts.indexOf(Math.max(...counts));
+  return { counts, total: letters.length, top: letters.length ? String.fromCharCode(65 + top) : '' };
+}
+
+const TEXT_STOP_WORDS = new Set('a o as os um uma uns umas de do da dos das em no na nos nas por para pra com sem que e ou mas se como ao aos à às é foi ser são era tem mais muito já não sim eu tu ele ela nós eles elas me te lhe seu sua seus suas meu minha isso isto esse essa este esta pelo pela entre até sobre também quando onde'.split(' '));
+
+// Raio-X do texto: números que ajudam a revisar uma redação.
+export function textMetrics(text = '') {
+  const clean = String(text).trim();
+  const words = clean.toLowerCase().match(/[\p{L}\p{N}]+(?:-[\p{L}\p{N}]+)*/gu) || [];
+  const sentences = clean.split(/[.!?…]+(?:\s+|$)/u).map(part => part.trim()).filter(part => /[\p{L}\p{N}]/u.test(part));
+  const lengths = sentences.map(part => (part.match(/[\p{L}\p{N}]+(?:-[\p{L}\p{N}]+)*/gu) || []).length);
+  const average = lengths.length ? words.length / lengths.length : 0;
+  const tally = new Map();
+  for (const word of words) if (word.length > 2 && !TEXT_STOP_WORDS.has(word)) tally.set(word, (tally.get(word) || 0) + 1);
+  const repeated = [...tally].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0], 'pt-BR')).slice(0, 5);
+  return {
+    words: words.length, sentences: sentences.length, lengths, average,
+    longest: lengths.length ? Math.max(...lengths) : 0,
+    unique: new Set(words).size,
+    variety: words.length ? new Set(words).size / words.length : 0,
+    seconds: Math.round(words.length / 130 * 60),
+    repeated,
+    level: !words.length ? 'Sem texto' : average <= 14 ? 'Frases curtas · leitura fácil' : average <= 22 ? 'Frases médias · leitura equilibrada' : 'Frases longas · leitura cansativa'
+  };
+}
+
 const hexByte = n => Math.max(0, Math.min(255, Math.round(Number(n) || 0))).toString(16).padStart(2, '0').toUpperCase();
 const linearChannel = c => {
   const s = c / 255;
@@ -236,12 +280,13 @@ export function greenhouseBalance(energy = 340, absorbed = 70) {
 
 const range = (key, label, min, max, value, step = 1) => `<label>${label} <output data-value="${key}">${value}</output><input aria-label="${label}" type="range" min="${min}" max="${max}" value="${value}" step="${step}" data-param="${key}"><span class="simulation-adj"><button type="button" data-sim-step="${key}" data-step="-1" aria-label="Diminuir ${label}" title="Diminuir">−</button><button type="button" data-sim-step="${key}" data-step="1" aria-label="Aumentar ${label}" title="Aumentar">+</button></span></label>`;
 const selectControl = (key, label, options) => `<label>${label}<select aria-label="${label}" data-sim-select="${key}">${options.map(([v, name]) => `<option value="${v}">${name}</option>`).join('')}</select></label>`;
+const textControl = (key, label, value, max = 160) => `<label class="simulation-text">${label}<textarea aria-label="${label}" data-sim-text="${key}" maxlength="${max}" rows="2" spellcheck="false">${value}</textarea></label>`;
 
 const visuals = {
   projectile: '<svg viewBox="0 0 400 220" aria-label="Visualização da simulação"><path d="M20 190H380" stroke="currentColor" opacity=".25"/><path data-trajectory fill="none" stroke="#a78bfa" stroke-width="3"/><g data-motion><circle cx="30" cy="180" r="12" fill="#a78bfa"/></g></svg>',
   pendulum: '<svg viewBox="0 0 400 220" aria-label="Visualização do pêndulo"><path d="M120 20H280" stroke="currentColor" opacity=".28" stroke-width="4" stroke-linecap="round"/><path data-trajectory fill="none" stroke="#a78bfa" stroke-width="3"/><g data-motion><circle cx="200" cy="170" r="14" fill="#7bbba1"/></g></svg>',
   neutralization: '<svg viewBox="0 0 400 220" aria-label="Solução e indicador de pH"><path d="M120 30v145q0 20 20 20h120q20 0 20-20V30" fill="none" stroke="currentColor" stroke-width="5"/><path data-liquid d="M124 95h152v80q0 16-16 16H140q-16 0-16-16Z" fill="#9d80e7" opacity=".8"/><text x="200" y="70" text-anchor="middle" fill="currentColor" font-size="20">H⁺ + OH⁻ → H₂O</text></svg>',
-  circuit: '<svg viewBox="0 0 400 220" aria-label="Circuito elétrico"><path d="M70 110V40h250v140H70v-50" fill="none" stroke="#77b7d5" stroke-width="5"/><path d="M45 110h50m-40 20h30" stroke="currentColor" stroke-width="5"/><circle data-bulb cx="320" cy="110" r="32" fill="#ffe594"/><path d="m300 95 40 30m0-30-40 30" stroke="#835a22" stroke-width="3"/><text x="180" y="30" text-anchor="middle" fill="currentColor" font-size="16">V = R · I</text></svg>',
+  circuit: '<svg viewBox="0 0 400 220" aria-label="Circuito elétrico"><path d="M70 110V40h250v140H70v-50" fill="none" stroke="#77b7d5" stroke-width="5"/><path d="M45 110h50m-40 20h30" stroke="currentColor" stroke-width="5"/><g data-electrons></g><circle data-bulb cx="320" cy="110" r="32" fill="#ffe594"/><path d="m300 95 40 30m0-30-40 30" stroke="#835a22" stroke-width="3"/><text x="180" y="30" text-anchor="middle" fill="currentColor" font-size="16">V = R · I</text></svg>',
   waves: '<svg viewBox="0 0 400 220" aria-label="Visualização de onda"><path d="M20 110H380" stroke="currentColor" opacity=".2" stroke-dasharray="5 5"/><path data-wave fill="none" stroke="#38bdf8" stroke-width="3.5" stroke-linecap="round"/><line data-amp x1="80" y1="110" x2="80" y2="70" stroke="#f472b6" stroke-width="2.5"/><text x="200" y="24" text-anchor="middle" fill="currentColor" font-size="14" opacity=".8">λ = v / f</text></svg>',
   states: '<svg viewBox="0 0 400 220" aria-label="Partículas da matéria"><rect x="75" y="24" width="250" height="172" rx="14" fill="#ffffff08" stroke="currentColor" stroke-width="3" opacity=".8"/><g data-particles></g></svg>',
   osmosis: '<svg viewBox="0 0 400 220" aria-label="Osmose celular"><rect x="20" y="18" width="360" height="184" rx="18" fill="#60a5fa1a" stroke="currentColor" opacity=".35"/><g data-solutes></g><ellipse data-cell cx="200" cy="110" rx="58" ry="44" fill="#fb7185" fill-opacity=".8" stroke="#fda4af" stroke-width="4"/><g data-arrows stroke="#7dd3fc" stroke-width="3" fill="none" stroke-linecap="round"></g></svg>',
@@ -249,8 +294,8 @@ const visuals = {
   quadratic: '<svg viewBox="0 0 400 220" aria-label="Gráfico da parábola"><path d="M20 110H380M200 16V204" stroke="currentColor" opacity=".28" stroke-width="1.5"/><path data-parabola fill="none" stroke="#c084fc" stroke-width="3"/><g data-points></g></svg>',
   trigonometry: '<svg viewBox="0 0 400 220" aria-label="Ciclo trigonométrico"><path d="M80 110H320M200 18V202" stroke="currentColor" opacity=".25"/><circle cx="200" cy="110" r="74" fill="none" stroke="currentColor" opacity=".4" stroke-width="2"/><line data-cos x1="200" y1="110" x2="252" y2="110" stroke="#38bdf8" stroke-width="4"/><line data-sin x1="252" y1="110" x2="252" y2="58" stroke="#fb7185" stroke-width="4"/><line data-radius x1="200" y1="110" x2="252" y2="58" stroke="#fde047" stroke-width="3"/><circle data-tip cx="252" cy="58" r="6" fill="#fde047"/></svg>',
   seasons: '<svg viewBox="0 0 400 220" aria-label="Sol e inclinação da Terra"><circle cx="72" cy="110" r="34" fill="#fbbf24"/><g stroke="#fde68a" stroke-width="2" opacity=".7"><line x1="116" y1="74" x2="210" y2="74"/><line x1="120" y1="110" x2="210" y2="110"/><line x1="116" y1="146" x2="210" y2="146"/></g><g data-earth transform="translate(275 110)"><circle r="44" fill="#2563eb"/><path data-shade d="M0-44A44 44 0 0 1 0 44Z" fill="#0f172a" opacity=".68"/><g data-tilt><line x1="-44" y1="0" x2="44" y2="0" stroke="#4ade80" stroke-width="2" stroke-dasharray="4 3"/><line x1="0" y1="-56" x2="0" y2="56" stroke="#f8fafc" stroke-width="2.5"/></g></g></svg>',
-  eras: '<svg viewBox="0 0 400 220" aria-label="Linha do tempo das eras"><g data-eras-bars></g><line x1="28" y1="138" x2="372" y2="138" stroke="currentColor" opacity=".35" stroke-width="2"/><g data-era-pin><line x1="200" y1="54" x2="200" y2="142" stroke="#fde047" stroke-width="3"/><circle cx="200" cy="50" r="7" fill="#fde047"/></g></svg>',
-  narrative: '<svg viewBox="0 0 400 220" aria-label="Pirâmide de Freytag"><path d="M26 184H374" stroke="currentColor" opacity=".25"/><path data-arc fill="none" stroke="#f472b6" stroke-width="3.5" stroke-linejoin="round"/><circle data-story-dot cx="220" cy="55" r="8" fill="#fef08a"/><g font-size="10" fill="currentColor" opacity=".7"><text x="36" y="202">Início</text><text x="218" y="202" text-anchor="middle">Clímax</text><text x="366" y="202" text-anchor="end">Desfecho</text></g></svg>',
+  cipher: '<svg viewBox="0 0 400 220" aria-label="Disco da cifra de César"><g data-wheel-outer></g><g data-wheel-inner></g><circle cx="110" cy="110" r="30" fill="currentColor" opacity=".08"/><text data-wheel-shift x="110" y="116" text-anchor="middle" font-size="18" font-weight="700" fill="currentColor">+3</text><path d="M110 8v16" stroke="#fde047" stroke-width="3" stroke-linecap="round"/><text x="226" y="34" font-size="10" fill="currentColor" opacity=".7">LETRAS MAIS COMUNS NA CIFRA</text><path d="M226 190H384" stroke="currentColor" opacity=".25"/><g data-frequency></g></svg>',
+  textlab: '<svg viewBox="0 0 400 220" aria-label="Tamanho de cada frase do texto"><text x="24" y="26" font-size="10" fill="currentColor" opacity=".7">PALAVRAS EM CADA FRASE</text><path d="M24 150H376" stroke="currentColor" opacity=".25"/><line x1="24" x2="376" y1="90" y2="90" stroke="#fb7185" stroke-dasharray="5 5" stroke-width="1.5" opacity=".8"/><text x="376" y="84" text-anchor="end" font-size="9" fill="#fb7185">20 palavras · frase longa</text><g data-sentence-bars></g><text x="24" y="176" font-size="10" fill="currentColor" opacity=".7">PALAVRAS MAIS REPETIDAS</text><g data-repeated></g></svg>',
   colormix: '<svg viewBox="0 0 400 220" aria-label="Mistura aditiva RGB"><rect x="24" y="24" width="175" height="172" rx="16" fill="#0b0e17" stroke="currentColor" opacity=".35"/><circle data-r cx="92" cy="96" r="42" fill="#ff0000" style="mix-blend-mode:screen"/><circle data-g cx="132" cy="96" r="42" fill="#00ff00" style="mix-blend-mode:screen"/><circle data-b cx="112" cy="132" r="42" fill="#0000ff" style="mix-blend-mode:screen"/><rect data-swatch x="220" y="26" width="154" height="114" rx="14" fill="#50afeb" stroke="#ffffff55" stroke-width="2"/><rect data-comp x="220" y="152" width="154" height="44" rx="10" fill="#eb8c50" stroke="#ffffff40"/><text data-contrast-text x="297" y="90" text-anchor="middle" font-size="22" font-weight="700" fill="#0f172a">Aa</text></svg>',
   lever: '<svg viewBox="0 0 400 220" aria-label="Alavanca com carga e esforço"><path d="M200 186 170 214h60Z" fill="currentColor" opacity=".55"/><g data-beam><rect x="46" y="172" width="308" height="14" rx="7" fill="#94a3b8"/><rect data-load x="96" y="132" width="46" height="40" rx="6" fill="#fb7185"/><circle data-effort cx="316" cy="150" r="18" fill="#4ade80"/></g><path d="M46 200h308" stroke="currentColor" opacity=".18"/></svg>',
   genetics: '<svg viewBox="0 0 400 220" aria-label="Cruzamento de Mendel"><g data-punnett></g><g data-phenotypes></g></svg>',
@@ -272,8 +317,8 @@ const controlsFor = {
   quadratic: () => range('a', 'Coeficiente a', -3, 3, 1, .5) + range('b', 'Coeficiente b', -6, 6, -2, .5) + range('c', 'Termo c', -5, 5, -3, .5),
   trigonometry: () => range('angle', 'Ângulo (°)', 0, 360, 45, 1),
   seasons: () => range('month', 'Mês do ano', 1, 12, 12, 1) + range('tilt', 'Inclinação axial (°)', 0, 45, 23.5, .5),
-  eras: () => range('year', 'Ano histórico', -3000, 2026, 1500, 10),
-  narrative: () => range('progress', 'Progresso (%)', 0, 100, 60, 1) + range('intensity', 'Intensidade dramática', 1, 5, 3, .5),
+  cipher: () => textControl('message', 'Mensagem', 'VIM, VI E VENCI', 60) + range('shift', 'Deslocamento (casas)', 0, 25, 3),
+  textlab: () => textControl('text', 'Escreva ou cole um texto', 'A água é essencial para a vida porque sem ela as plantas, os animais e as pessoas não sobrevivem, e por isso economizar água em casa e na escola é uma atitude que protege o futuro de todos nós.', 600),
   colormix: () => range('r', 'Vermelho (R)', 0, 255, 80, 1) + range('g', 'Verde (G)', 0, 255, 175, 1) + range('b', 'Azul (B)', 0, 255, 235, 1),
   lever: () => range('loadMass', 'Carga (kg)', 0, 60, 20) + range('loadArm', 'Braço da carga (cm)', 10, 120, 60) + range('effortArm', 'Braço do esforço (cm)', 10, 120, 60) + range('effort', 'Força aplicada (kg)', 0, 80, 20),
   genetics: () => selectControl('first', 'Genitor 1', [['AA', 'AA · homozigoto dominante'], ['Aa', 'Aa · heterozigoto'], ['aa', 'aa · homozigoto recessivo']])
@@ -297,8 +342,8 @@ const notes = {
   quadratic: 'f(x) = ax² + bx + c, discriminante Δ e vértice da parábola.',
   trigonometry: 'Círculo de raio unitário: sen²θ + cos²θ = 1.',
   seasons: 'A inclinação do eixo terrestre define a incidência solar nos hemisférios.',
-  eras: 'Escala proporcional entre 3000 a.C. e a atualidade.',
-  narrative: 'Estrutura clássica de cinco etapas dramáticas.',
+  cipher: 'Júlio César trocava cada letra pela que fica 3 casas adiante. Há só 25 chaves: dá para quebrar testando todas.',
+  textlab: 'Frases com mais de 20 palavras cansam o leitor; repetir muito a mesma palavra empobrece o texto.',
   colormix: 'Síntese aditiva de luz RGB, cor complementar e contraste WCAG.',
   lever: 'Equilíbrio: carga × braço da carga = esforço × braço do esforço.',
   genetics: '1ª Lei de Mendel: segregação dos alelos na formação dos gametas.',
@@ -308,7 +353,11 @@ const notes = {
   logicgates: 'Álgebra booleana aplicada a circuitos digitais.'
 };
 
-const playable = new Set(['projectile', 'pendulum', 'waves', 'states', 'trigonometry', 'seasons', 'ecosystem']);
+const playable = new Set(['projectile', 'pendulum', 'circuit', 'waves', 'states', 'trigonometry', 'seasons', 'ecosystem']);
+// Animações "de ambiente" começam sozinhas: o experimento já aparece vivo.
+const ambient = new Set(['pendulum', 'circuit', 'waves', 'states']);
+// Nestas a animação conduz um controle; mexer nele recomeça a partir do novo valor.
+const restartOnInput = new Set(['projectile', 'trigonometry', 'seasons', 'ecosystem']);
 // Experiments that use a "desafio" goal: the slide asks for a target value and the
 // student has to tune the sliders until the live output matches it.
 export const simulationChallenges = {
@@ -319,6 +368,8 @@ export const simulationChallenges = {
   genetics: { label: 'Acerte o alvo', prompt: 'Obtenha 100% de descendentes dominantes', test: r => r.dominantRate === 1, hint: 'Um dos genitores precisa ser AA.' },
   probability: { label: 'Acerte o alvo', prompt: 'Use 3 dados e ache a soma mais provável', test: r => r.dice === 3 && (r.target === 10 || r.target === 11), hint: 'Com três dados, 10 e 11 dividem o topo: 27 de 216 combinações cada.' },
   interest: { label: 'Acerte o alvo', prompt: 'Dobre o capital em até 12 meses', test: r => r.amount >= r.principal * 2 && r.months <= 12, hint: 'Taxas maiores que 6% ao mês dobram o capital em 12 meses.' },
+  cipher: { label: 'Decifre', prompt: 'A mensagem “HAL” vira “IBM” com qual deslocamento?', test: r => r.plain === 'HAL' && r.encoded === 'IBM', hint: 'Escreva HAL na mensagem e avance uma casa de cada vez.' },
+  textlab: { label: 'Desafio de redação', prompt: '3 frases ou mais, média de até 15 palavras por frase', test: r => r.sentences >= 3 && r.average <= 15 && r.words >= 20, hint: 'Troque vírgulas por pontos para dividir as frases longas.' },
   greenhouse: { label: 'Acerte o alvo', prompt: 'Mantenha a temperatura entre 13 °C e 15 °C', test: r => r.temperature >= 13 && r.temperature <= 15, hint: 'Reduza um pouco a retenção de gases.' }
 };
 
@@ -334,8 +385,8 @@ const defaultParams = {
   quadratic: { a: 1, b: -2, c: -3 },
   trigonometry: { angle: 45 },
   seasons: { month: 12, tilt: 23.5 },
-  eras: { year: 1500 },
-  narrative: { progress: 60, intensity: 3 },
+  cipher: { message: 'VIM, VI E VENCI', shift: 3 },
+  textlab: { text: '' },
   colormix: { r: 80, g: 175, b: 235 },
   lever: { loadMass: 20, loadArm: 60, effortArm: 60, effort: 10 },
   genetics: { first: 'Aa', second: 'Aa' },
@@ -346,7 +397,7 @@ const defaultParams = {
 };
 
 export function simulationMarkup(type = 'projectile', { interactive = true, challenge = true } = {}) {
-  const safeType = Object.hasOwn(simulationNames, type) ? type : 'projectile';
+  const safeType = resolveSimulation(type);
   const subject = simulationSubjects[safeType] || 'LAB';
   const visual = visuals[safeType] || visuals.projectile;
   if (!interactive) {
@@ -357,7 +408,7 @@ export function simulationMarkup(type = 'projectile', { interactive = true, chal
   const challengeMarkup = challengeInfo
     ? `<div class="simulation-challenge" data-sim-challenge><span class="simulation-challenge-goal">${challengeInfo.label}: ${challengeInfo.prompt}</span><span class="simulation-challenge-state" role="status">Ajuste os valores…</span><small class="simulation-challenge-hint">${challengeInfo.hint}</small></div>`
     : '';
-  return `<section class="simulation-widget" data-simulation="${safeType}"><header><strong>${simulationNames[safeType]}</strong><span>${subject.toUpperCase()}</span></header>${visual}<div class="simulation-controls">${controls}</div><output class="simulation-result" aria-live="polite"></output>${challengeMarkup}${playable.has(safeType) ? '<button type="button" data-sim-play>▶ Experimentar</button>' : ''}<small>${notes[safeType] || ''}</small></section>`;
+  return `<section class="simulation-widget" data-simulation="${safeType}"><header><strong>${simulationNames[safeType]}</strong><span>${subject.toUpperCase()}</span></header>${visual}<div class="simulation-controls">${controls}</div><output class="simulation-result" aria-live="polite"></output>${challengeMarkup}${playable.has(safeType) ? `<button type="button" data-sim-play>${safeType === 'projectile' ? '▶ Lançar' : '▶ Animar'}</button>` : ''}<small>${notes[safeType] || ''}</small></section>`;
 }
 
 function readSimulationValues(node) {
@@ -365,6 +416,7 @@ function readSimulationValues(node) {
     ...(defaultParams[node.dataset.simulation] || {}),
     ...Object.fromEntries([...node.querySelectorAll('[data-param]')].map(n => [n.dataset.param, Number(n.value)])),
     ...Object.fromEntries([...node.querySelectorAll('[data-sim-select]')].map(n => [n.dataset.simSelect, n.value])),
+    ...Object.fromEntries([...node.querySelectorAll('[data-sim-text]')].map(n => [n.dataset.simText, n.value])),
     ...Object.fromEntries([...node.querySelectorAll('[data-sim-toggle]')].map(n => [n.dataset.simToggle, Number(n.dataset.value)]))
   };
 }
@@ -390,6 +442,25 @@ function paintParticles(node, phase, kinetic) {
     dots.push(`<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="8" fill="${kinetic < .25 ? '#93c5fd' : kinetic < .8 ? '#38bdf8' : '#fb923c'}"/>`);
   }
   host.innerHTML = dots.join('');
+}
+
+// Elétrons percorrem o fio retangular do circuito; quanto maior a corrente,
+// mais cargas aparecem e mais depressa elas andam.
+function paintElectrons(node, travelled, current) {
+  const host = node.querySelector('[data-electrons]');
+  if (!host) return;
+  const count = current > 0 ? Math.max(4, Math.min(18, Math.round(4 + current * 60))) : 0;
+  const at = distance => {
+    const d = ((distance % 780) + 780) % 780;
+    if (d < 250) return [70 + d, 40];
+    if (d < 390) return [320, 40 + d - 250];
+    if (d < 640) return [320 - (d - 390), 180];
+    return [70, 180 - (d - 640)];
+  };
+  host.innerHTML = Array.from({ length: count }, (_, i) => {
+    const [x, y] = at(travelled + i * 780 / count);
+    return `<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="4" fill="#fde047"/>`;
+  }).join('');
 }
 
 function paintWave(node, p, shift = 0) {
@@ -430,10 +501,12 @@ function paintSimulationNode(node) {
   else if (type === 'pendulum') {
     const period = 2 * Math.PI * Math.sqrt(p.length / p.gravity);
     resultEl.textContent = `Período ${period.toFixed(2)} s`;
-    node.querySelector('[data-trajectory]')?.setAttribute('d', 'M200 20 L200 170');
+    // O fio desenhado acompanha o comprimento escolhido.
+    const bobY = (52 + p.length / 3 * 128).toFixed(1);
+    node.querySelector('[data-trajectory]')?.setAttribute('d', 'M200 20 L200 ' + bobY);
     const motion = node.querySelector('[data-motion]');
     if (motion) {
-      motion.innerHTML = '<circle cx="200" cy="170" r="14" fill="#7bbba1"/>';
+      motion.innerHTML = `<circle cx="200" cy="${bobY}" r="14" fill="#7bbba1"/>`;
       motion.setAttribute('transform', '');
     }
     node.querySelector('[data-trajectory]')?.setAttribute('transform', '');
@@ -449,6 +522,7 @@ function paintSimulationNode(node) {
     metrics = { current };
     resultEl.textContent = `Corrente ${(current * 1000).toFixed(1)} mA · Potência ${power.toFixed(2)} W`;
     node.querySelector('[data-bulb]')?.setAttribute('opacity', String(.2 + Math.min(.8, power / 4)));
+    paintElectrons(node, 0, current);
   }
   else if (type === 'waves') {
     const prop = paintWave(node, p, 0);
@@ -533,35 +607,53 @@ function paintSimulationNode(node) {
     node.querySelector('[data-tilt]')?.setAttribute('transform', `rotate(${tiltRot.toFixed(1)})`);
     resultEl.textContent = `${s.monthName} · Sul: ${s.south} · Norte: ${s.north} · Declinação ${s.declination.toFixed(1)}°`;
   }
-  else if (type === 'eras') {
-    const info = historicalEra(p.year);
-    const eras = [
-      [-3000, 476, '#f59e0b', 'Antiga'],
-      [476, 1453, '#38bdf8', 'Média'],
-      [1453, 1789, '#a78bfa', 'Moderna'],
-      [1789, 2026, '#4ade80', 'Contemp.']
-    ];
-    const bars = node.querySelector('[data-eras-bars]');
+  else if (type === 'cipher') {
+    const plain = caesarShift(p.message, 0), encoded = caesarShift(p.message, p.shift);
+    const shift = ((Math.round(p.shift) % 26) + 26) % 26;
+    metrics = { plain: plain.trim(), encoded: encoded.trim(), shift };
+    const ring = (radius, offset, size, color, weight) => Array.from({ length: 26 }, (_, i) => {
+      const angle = (i - offset) / 26 * Math.PI * 2 - Math.PI / 2;
+      return `<text x="${(110 + Math.cos(angle) * radius).toFixed(1)}" y="${(110 + Math.sin(angle) * radius + size * .35).toFixed(1)}" text-anchor="middle" font-size="${size}" font-weight="${weight}" fill="${color}">${String.fromCharCode(65 + i)}</text>`;
+    }).join('');
+    const outer = node.querySelector('[data-wheel-outer]'), inner = node.querySelector('[data-wheel-inner]');
+    if (outer) outer.innerHTML = `<circle cx="110" cy="110" r="98" fill="none" stroke="currentColor" opacity=".3"/><circle cx="110" cy="110" r="74" fill="none" stroke="currentColor" opacity=".3"/>${ring(86, 0, 11, 'currentColor', 600)}`;
+    if (inner) inner.innerHTML = `<circle cx="110" cy="110" r="50" fill="none" stroke="#a78bfa" opacity=".6"/>${ring(62, shift, 11, '#c4b5fd', 700)}`;
+    const label = node.querySelector('[data-wheel-shift]');
+    if (label) label.textContent = '+' + shift;
+    const freq = letterFrequency(encoded), bars = node.querySelector('[data-frequency]');
     if (bars) {
-      bars.innerHTML = eras.map(([start, end, color, name]) => {
-        const x1 = 28 + ((start + 3000) / 5026) * 344, x2 = 28 + ((end + 3000) / 5026) * 344;
-        return `<rect x="${x1.toFixed(1)}" y="86" width="${Math.max(4, x2 - x1).toFixed(1)}" height="28" rx="4" fill="${color}" opacity=".85"/><text x="${((x1 + x2) / 2).toFixed(1)}" y="132" text-anchor="middle" font-size="9" fill="currentColor">${name}</text>`;
+      const ranked = freq.counts.map((count, i) => [String.fromCharCode(65 + i), count]).filter(item => item[1]).sort((a, b) => b[1] - a[1]).slice(0, 7);
+      const peak = Math.max(1, ...ranked.map(item => item[1]));
+      bars.innerHTML = ranked.map(([letter, count], i) => {
+        const height = count / peak * 120, x = 232 + i * 22;
+        return `<rect x="${x}" y="${(188 - height).toFixed(1)}" width="16" height="${height.toFixed(1)}" rx="3" fill="${i ? '#38bdf8' : '#fde047'}" opacity="${i ? .7 : 1}"/><text x="${x + 8}" y="204" text-anchor="middle" font-size="11" font-weight="700" fill="currentColor">${letter}</text><text x="${x + 8}" y="${(182 - height).toFixed(1)}" text-anchor="middle" font-size="9" fill="currentColor" opacity=".75">${count}</text>`;
       }).join('');
     }
-    const px = 28 + ((info.year + 3000) / 5026) * 344;
-    node.querySelector('[data-era-pin]')?.setAttribute('transform', `translate(${(px - 200).toFixed(1)} 0)`);
-    resultEl.textContent = `${info.label} · ${info.era} · ${info.milestone}`;
+    resultEl.textContent = plain.trim() ? `Cifrada: ${encoded.trim()} · A vira ${caesarShift('A', shift)}${freq.top ? ' · letra mais comum: ' + freq.top : ''}` : 'Escreva uma mensagem para cifrar.';
   }
-  else if (type === 'narrative') {
-    const st = narrativeStage(p.progress, p.intensity);
-    const pts = Array.from({ length: 51 }, (_, i) => {
-      const pr = i * 2, val = narrativeStage(pr, p.intensity).tension;
-      return `${i ? 'L' : 'M'}${(26 + pr * 3.48).toFixed(1)} ${(184 - val * 1.45).toFixed(1)}`;
-    }).join(' ');
-    node.querySelector('[data-arc]')?.setAttribute('d', pts);
-    node.querySelector('[data-story-dot]')?.setAttribute('cx', (26 + p.progress * 3.48).toFixed(1));
-    node.querySelector('[data-story-dot]')?.setAttribute('cy', (184 - st.tension * 1.45).toFixed(1));
-    resultEl.textContent = `${st.phase} (${st.progress}%) · Tensão ${st.tension}%`;
+  else if (type === 'textlab') {
+    const info = textMetrics(p.text);
+    metrics = info;
+    const bars = node.querySelector('[data-sentence-bars]');
+    if (bars) {
+      const shown = info.lengths.slice(0, 14), slot = 352 / Math.max(6, shown.length);
+      bars.innerHTML = shown.map((count, i) => {
+        const height = Math.min(112, count * 3), x = 24 + i * slot;
+        return `<rect x="${(x + 2).toFixed(1)}" y="${(150 - height).toFixed(1)}" width="${Math.max(6, slot - 6).toFixed(1)}" height="${Math.max(2, height).toFixed(1)}" rx="3" fill="${count > 20 ? '#fb7185' : '#4ade80'}"/><text x="${(x + slot / 2 - 1).toFixed(1)}" y="${(145 - height).toFixed(1)}" text-anchor="middle" font-size="10" fill="currentColor">${count}</text>`;
+      }).join('');
+    }
+    const repeated = node.querySelector('[data-repeated]');
+    if (repeated) {
+      let x = 24;
+      repeated.innerHTML = info.repeated.map(([word, count]) => {
+        const label = word.slice(0, 14) + ' ×' + count, width = label.length * 6.2 + 14, at = x;
+        x += width + 6;
+        return at + width > 380 ? '' : `<rect x="${at}" y="184" width="${width.toFixed(1)}" height="22" rx="11" fill="${count > 2 ? '#fbbf2440' : '#ffffff14'}" stroke="${count > 2 ? '#fbbf24' : 'currentColor'}" stroke-opacity=".6"/><text x="${(at + width / 2).toFixed(1)}" y="199" text-anchor="middle" font-size="10.5" fill="currentColor">${label.replace(/[<>&]/g, '')}</text>`;
+      }).join('');
+    }
+    resultEl.textContent = info.words
+      ? `${info.words} palavras · ${info.sentences} ${info.sentences === 1 ? 'frase' : 'frases'} · média ${info.average.toFixed(1)} por frase · leitura em voz alta ≈ ${info.seconds} s · ${info.level}`
+      : 'Escreva um texto para analisar.';
   }
   else if (type === 'colormix') {
     const c = colorMixInfo(p.r, p.g, p.b);
@@ -703,11 +795,33 @@ export class Simulations {
       const item = { node, running: false, frame: 0 };
       this.items.set(node, item);
 
+      const playButton = () => node.querySelector('[data-sim-play]');
+      const setRunning = running => {
+        item.running = running;
+        const button = playButton();
+        if (!button) return;
+        if (running) button.setAttribute('aria-pressed', 'true'); else button.removeAttribute('aria-pressed');
+        const idle = type === 'projectile' ? '▶ Lançar' : '▶ Animar';
+        button.textContent = running ? (type === 'projectile' ? '↺ Lançar de novo' : '⏸ Pausar') : idle;
+      };
+      const type = node.dataset.simulation;
+      const stop = () => { cancelAnimationFrame(item.frame); setRunning(false); paintSimulationNode(node); };
+      // Mexer em um controle NÃO para a animação: os valores novos entram no
+      // quadro seguinte. Só as animações que conduzem o próprio controle
+      // recomeçam do valor escolhido.
       const update = () => {
-        cancelAnimationFrame(item.frame);
-        item.running = false;
-        node.querySelector('[data-sim-play]')?.removeAttribute('aria-pressed');
         paintSimulationNode(node);
+        if (!item.running) return;
+        item.p = readSimulationValues(node);
+        if (restartOnInput.has(type)) item.started = performance.now();
+      };
+      const start = () => {
+        cancelAnimationFrame(item.frame);
+        item.p = readSimulationValues(node);
+        item.started = performance.now();
+        item.travelled = 0; item.last = item.started;
+        setRunning(true);
+        item.frame = requestAnimationFrame(frame);
       };
 
       node.addEventListener('input', update);
@@ -734,29 +848,40 @@ export class Simulations {
           return;
         }
         if (!event.target.closest('[data-sim-play]')) return;
-        if (item.running) { update(); return; }
-        item.running = true;
-        node.querySelector('[data-sim-play]')?.setAttribute('aria-pressed', 'true');
-        const p = readSimulationValues(node), started = performance.now(), type = node.dataset.simulation;
-        const projResult = projectile(p.speed || 12, p.angle || 45, p.gravity || 9.81);
-        const frame = () => {
-          if (!node.isConnected || document.hidden || !item.running) { item.running = false; return; }
-          const seconds = (performance.now() - started) / 1000;
+        if (item.running && type !== 'projectile') { stop(); return; }
+        start();
+      });
+      const frame = () => {
+          if (!node.isConnected || !item.running) { item.running = false; return; }
+          // Aba em segundo plano: espera sem perder o estado de "tocando".
+          if (document.hidden) { item.frame = requestAnimationFrame(frame); return; }
+          const now = performance.now(), p = item.p, started = item.started;
+          const seconds = (now - started) / 1000, delta = Math.min(.1, (now - (item.last || now)) / 1000);
+          item.last = now;
           if (type === 'pendulum') {
-            const angle = Math.sin(seconds * 2 * Math.PI / (2 * Math.PI * Math.sqrt(p.length / p.gravity))) * 22;
+            // Fase acumulada: mudar o comprimento altera o ritmo sem dar salto.
+            item.phase = (item.phase || 0) + delta * Math.sqrt(p.gravity / p.length);
+            const angle = Math.sin(item.phase) * 24;
             node.querySelector('[data-motion]')?.setAttribute('transform', `rotate(${angle} 200 20)`);
             node.querySelector('[data-trajectory]')?.setAttribute('transform', `rotate(${angle} 200 20)`);
+          } else if (type === 'circuit') {
+            const current = p.voltage / p.resistance;
+            item.travelled = (item.travelled || 0) + delta * (30 + current * 900);
+            paintElectrons(node, item.travelled, current);
           } else if (type === 'projectile') {
+            const projResult = projectile(p.speed || 12, p.angle || 45, p.gravity || 9.81);
             const t = Math.min(projResult.time, seconds);
             const x = p.speed * Math.cos(p.angle * Math.PI / 180) * t;
             const y = p.speed * Math.sin(p.angle * Math.PI / 180) * t - p.gravity * t * t / 2;
             node.querySelector('[data-motion]')?.setAttribute('transform', `translate(${x / Math.max(1, projResult.range) * 340} ${-y / Math.max(1, projResult.height) * 140})`);
-            if (t >= projResult.time) { item.running = false; node.querySelector('[data-sim-play]')?.removeAttribute('aria-pressed'); return; }
+            if (t >= projResult.time) { setRunning(false); return; }
           } else if (type === 'waves') {
-            paintWave(node, p, seconds * 5.2);
+            item.phase = (item.phase || 0) + delta * (2 + p.frequency * 1.6);
+            paintWave(node, p, item.phase);
           } else if (type === 'states') {
             const info = matterState(p.temperature, p.substance);
-            paintParticles(node, seconds, info.kinetic);
+            item.phase = (item.phase || 0) + delta * (.35 + info.kinetic * 1.1);
+            paintParticles(node, item.phase, info.kinetic);
           } else if (type === 'trigonometry') {
             const input = node.querySelector('[data-param="angle"]');
             if (input) {
@@ -804,9 +929,9 @@ export class Simulations {
           }
           item.frame = requestAnimationFrame(frame);
         };
-        item.frame = requestAnimationFrame(frame);
-      });
-      update();
+      paintSimulationNode(node);
+      const calm = globalThis.document?.documentElement.dataset.motion === 'reduced' || globalThis.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+      if (ambient.has(type) && !calm) start();
     }
   }
 }

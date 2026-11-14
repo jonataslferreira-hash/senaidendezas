@@ -112,24 +112,6 @@ function modelPanel(landing = false) {
     <span class="model-footnote">Modelo didático · proporções e componentes simplificados</span>
   </section>`;
 }
-// Slides sem animação própria (ou com elementos fora da lista) recebem uma
-// entrada em cascata: nenhum objeto aparece "seco" enquanto outro anima.
-let revealedKey='';
-function stageReveal(app,slide,key){
-  // Só revela quando o slide muda: um recado novo no chat não reinicia a entrada.
-  if(revealedKey===key)return;
-  revealedKey=key;
-  if(!app?.querySelector('.canvas-presenting'))return;
-  const reduced=document.documentElement.dataset.motion==='reduced'||matchMedia('(prefers-reduced-motion: reduce)').matches;
-  const objects=[...app.querySelectorAll('.canvas-presenting .canvas-object')].filter(node=>!node.style.animationName);
-  for(const [index,node] of objects.entries()){
-    const animated=(slide.animations||[]).some(effect=>effect.id===node.dataset.objectId);
-    if(animated)continue;
-    node.style.setProperty('--reveal-index',String(Math.min(index,14)));
-    node.classList.add('object-reveal');
-    if(reduced)node.style.opacity='1';
-  }
-}
 function animationGroups() {
   const slide=slides[state.slide],ids=new Set(slide.elements?.map(e=>e.id));
   return [...new Set((slide.animations||[]).filter(a=>ids.has(a.id)).map(a=>a.group||0))].sort((a,b)=>a-b);
@@ -296,7 +278,7 @@ function render() {
     if (qrCache.has(url)) setQR(qrCache.get(url));
     else QRCode.toDataURL(url, { width: 460, margin: 2 }).then(src => { qrCache.set(url, src); setQR(src); }).catch(() => toast('Não foi possível gerar o QR Code. Use o link ou código.'));
   }
-  if(state?.phase==='lesson'){pptxAnimations.mount(app,slides[state.slide],activeLesson.id+':'+state.slide,state.animationStep||0);stageReveal(app,slides[state.slide],activeLesson.id+':'+state.slide);}else{pptxAnimations.key=null;revealedKey='';}
+  if(state?.phase==='lesson'){pptxAnimations.mount(app,slides[state.slide],activeLesson.id+':'+state.slide,state.animationStep||0);}else{pptxAnimations.key=null;}
   const motionKey=state
     ? `${activeLesson.id}:${state.phase}:${state.slide}:${state.questionIndex}`
     : studio.view==='editor'?`editor:${studio.draft?.id||''}`:studio.view;
@@ -700,3 +682,4 @@ app.addEventListener('account-changed',()=>{avatarChanged=false;joinNameTouched=
 
 import './account-live.css';
 import './workspace-styles.css';
+import './finishing.css';

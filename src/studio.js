@@ -288,7 +288,11 @@ export class Studio {
     return `<div class="editor-save-controls">${button('save',studioIcon(linked?'cloud':'download')+label,'quiet '+(needsSave?'':'is-saved'),
       `aria-label="Salvar aula" title="${linked?'Salvar no dispositivo e na nuvem':'Salvar no dispositivo'}" ${disabled||(!needsSave?'disabled':'')}`)}
       ${cloudConfigured&&!linked?button('cloud-save',studioIcon('cloud')+'<span class="mobile-action-label">Enviar à nuvem</span>','quiet editor-icon',
-      `aria-label="Salvar na nuvem" title="Salvar na nuvem" ${disabled}`):''}</div>`;
+      `aria-label="Salvar na nuvem" title="Salvar na nuvem" ${disabled}`):''}</div>
+      <details class="editor-more editor-save-menu"><summary aria-label="Onde salvar" title="Escolher onde salvar">${studioIcon('chevron')}</summary><div>
+      ${button('save-local',studioIcon('download')+'Salvar neste dispositivo','quiet',canEdit?'':'disabled')}
+      ${cloudConfigured?button('cloud-save',studioIcon('cloud')+'Salvar na nuvem','quiet',disabled):''}
+      ${button('export-draft',studioIcon('download')+'Baixar arquivo da aula (.json)','quiet')}</div></details>`;
   }
   needsSave() {
     if(this.dirty)return true;
@@ -825,6 +829,15 @@ export class Studio {
     else if (action === 'restore-demo') { const l = this.library.restoreDemo(); this.open(l.id); }
     else if (action === 'edit') {if(await this.groups.openForLesson(id))return;this.open(id);}
     else if (action === 'save') { await this.saveEditor(); return; }
+    else if (action === 'save-local') {
+      // Salvar no dispositivo continua disponível mesmo quando a aula já tem cópia na nuvem.
+      if(!this.groups.canEdit)return;
+      for(const menu of this.root.querySelectorAll('details.editor-save-menu'))menu.open=false;
+      await this.saveLocalEditor();
+      this.callbacks.toast(this.hasCloudCopy()?'Aula salva neste dispositivo. A cópia da nuvem não foi alterada.':'Aula salva neste dispositivo.');
+      this.callbacks.render();
+      return;
+    }
     else if (action === 'duplicate') { this.library.duplicate(id); this.callbacks.toast('Cópia adicionada à biblioteca.'); }
     else if (action === 'rename' || action === 'delete') this.dialog = { type: action, id };
     else if (action === 'cancel-dialog') this.dialog = null;
