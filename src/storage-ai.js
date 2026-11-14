@@ -1197,7 +1197,7 @@ export class StorageAI {
     const names={image:'Imagem',text:'Texto',shape:'Forma',model:'Modelo 3D',simulation:'Simulação'};
     const detail=element.type==='image'
       ? (/^objeto do pptx$/i.test(element.imageAlt?.trim())?'':element.imageAlt)
-      : element.type==='text'?element.text:element.type==='model'?element.modelLabel:element.type==='simulation'?(simulationNames[element.simulation]||'Simulação interativa'):'';
+      : element.type==='text'?element.text:element.type==='model'?element.modelLabel:element.type==='simulation'?(element.customSim?.name||simulationNames[element.simulation]||'Simulação interativa'):'';
     const icon={image:'image',text:'library',shape:'preview',model:'animate',simulation:'sparkle'};
     const thumbnail=element.type==='image'&&(element.image||element.assetId)
       ?`<img ${element.image?`src="${esc(element.image)}"`:`data-asset-id="${esc(element.assetId)}"`} alt="">`

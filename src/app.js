@@ -219,7 +219,7 @@ function render() {
   app.dataset.role = state ? host ? 'presenter' : 'student' : 'studio';
   // Aula sem quiz não tem tela de encerramento: quem apresenta volta direto
   // para onde estava e quem assiste volta ao início.
-  if (state?.phase === 'finished' && !state.totalQuestions) { const wasHost = host; focusView.close(); leave(); toast(wasHost ? 'Aula encerrada.' : 'O professor encerrou a aula.'); return; }
+  if (state?.phase === 'finished' && !state.totalQuestions) { focusView.close(); leave(); return; }
   app.classList.toggle('quiz-party', Boolean(state && state.phase !== 'lesson'));
   const markup = sharedLoading || busy && host && !state ? `${header()}<main class="public-loading"><p role="status">Carregando apresentação…</p></main>` : sharedError ? `${header()}<main class="public-loading"><h1>Apresentação indisponível</h1><p>${esc(sharedError)}</p><button class="btn secondary" data-action="home">Voltar</button></main>` : !state ? studio.markup() : state.phase === 'lesson' ? lesson() : ['lobby', 'countdown'].includes(state.phase) ? lobbyMarkup(state, { host, demo, header, shareDialog, shareOpen }) : state.phase === 'finished' ? finished() : state.phase==='leaderboard'?leaderboardMarkup(state,{header,host,offset:timerOffset}):state.poll ? pollMarkup() : quiz();
   const chatSlots = '[data-chat-slot], [data-social-slot]';
@@ -563,12 +563,25 @@ function syncPresentationMode() {
   app.classList.toggle('show-image-text', imageText);
   requestAnimationFrame(() => viewer.resize());
 }
-function showPresentationControls() {
+function showPresentationControls(delay = 2200) {
   if (!document.fullscreenElement || state?.phase !== 'lesson') return;
   app.classList.add('presenter-controls-visible');
   clearTimeout(controlsTimer);
-  controlsTimer = setTimeout(() => app.classList.remove('presenter-controls-visible'), 2200);
+  controlsTimer = setTimeout(() => app.classList.remove('presenter-controls-visible'), delay);
 }
+// Toque (celular e tablet): encostar no alto da tela mostra a barra; o toque
+// que a revela não aciona nenhum botão. Tocar fora dela a esconde.
+let controlsRevealedAt = 0;
+document.addEventListener('pointerdown', e => {
+  if (e.pointerType === 'mouse' || !document.fullscreenElement || state?.phase !== 'lesson') return;
+  const visible = app.classList.contains('presenter-controls-visible');
+  if (e.target.closest?.('.document-top') && visible) { showPresentationControls(5000); return; }
+  if (!visible && e.clientY <= Math.max(130, innerHeight * .3)) { controlsRevealedAt = Date.now(); showPresentationControls(5000); }
+  else if (visible) { clearTimeout(controlsTimer); app.classList.remove('presenter-controls-visible'); }
+}, true);
+document.addEventListener('click', e => {
+  if (Date.now() - controlsRevealedAt < 450 && e.target.closest?.('.document-top')) { e.preventDefault(); e.stopPropagation(); }
+}, true);
 // "Editar slide" sai da apresentação e abre o editor de verdade no slide atual.
 async function editInStudio() {
   if (!host || readOnlyPresentation || state?.phase !== 'lesson') return;

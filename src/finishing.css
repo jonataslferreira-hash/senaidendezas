@@ -496,3 +496,35 @@ dialog#storage-image-search.image-finder .image-finder-form input{border:0;backg
 @media (min-width:761px){
   html[data-theme][data-ui-style] body #app .editor-shell .studio-editor .editor-heading{padding-top:0!important;padding-bottom:14px!important}
 }
+
+/* 18. Experimentos importados -------------------------------------------- */
+.simulation-widget.custom-sim{padding:0;gap:0;overflow:hidden}
+.simulation-widget.custom-sim>header{padding:10px 14px;flex:none}
+.slide-canvas .simulation-widget.custom-sim>header{padding:.7cqw 1cqw}
+.simulation-widget.custom-sim>iframe{flex:1 1 0;width:100%;min-height:0;border:0;display:block;background:#171c2c}
+.canvas-editing .canvas-object:not([data-interacting=true]) .custom-sim>iframe{pointer-events:none}
+.simulation-widget.custom-sim-card>p{margin:auto;padding:12px;text-align:center;opacity:.7}
+.mobile-lesson-content>.simulation-widget.custom-sim{height:min(70vh,520px)}
+dialog.simulation-modal .simulation-modal-catalog{grid-template-rows:auto auto minmax(0,1fr) auto}
+.simulation-modal-custom{display:grid;grid-template-rows:minmax(0,1fr) auto;gap:10px;height:100%;min-height:0}
+.simulation-modal-custom>.simulation-widget{min-height:320px;height:100%}
+.simulation-modal-manage{display:flex;flex-wrap:wrap;gap:10px;align-items:end}
+.simulation-modal-manage label{display:grid;gap:4px;font-size:12px;font-weight:650;flex:1 1 160px}
+.simulation-modal-manage :is(input,select){width:100%;box-sizing:border-box;min-height:38px;padding:0 10px;border:1.5px solid color-mix(in srgb,currentColor 22%,transparent);border-radius:10px;background:transparent;color:inherit;font:inherit}
+.simulation-modal-manage button,.simulation-modal-import button{min-height:38px;padding:0 13px;border:1.5px solid color-mix(in srgb,currentColor 22%,transparent);border-radius:10px;background:none;color:inherit;font:inherit;font-size:12.5px;font-weight:650;cursor:pointer}
+.simulation-modal-manage button:hover,.simulation-modal-import button:hover{border-color:var(--sim-accent,#6c4cf1);color:var(--sim-accent,#6c4cf1)}
+.simulation-modal-manage [data-sim-delete]:hover{border-color:#c0392b;color:#c0392b}
+.simulation-modal-import{display:grid;gap:7px;padding-top:10px;border-top:1px solid color-mix(in srgb,currentColor 12%,transparent)}
+.simulation-modal-import [data-sim-import]{background:var(--sim-accent,#6c4cf1);border-color:transparent;color:#fff}
+.simulation-modal-import [data-sim-import]:hover{color:#fff;filter:brightness(1.1)}
+.simulation-modal-import p{margin:0;font-size:11.5px;line-height:1.35;opacity:.8}
+.simulation-modal-import p:empty{display:none}
+.simulation-modal-none{margin:8px 2px;font-size:12.5px;line-height:1.45;opacity:.75}
+.simulation-modal-import{align-content:end;align-self:end}
+.simulation-modal-import button{height:40px}
+dialog.simulation-modal .simulation-modal-manage label{color:inherit;opacity:1}
+dialog.simulation-modal .simulation-modal-manage :is(input,select){color:inherit;opacity:1;font-weight:500}
+dialog.simulation-modal .simulation-modal-catalog{display:flex;flex-direction:column;min-height:0}
+dialog.simulation-modal .simulation-modal-catalog>*{flex:none}
+dialog.simulation-modal .simulation-modal-catalog>.simulation-modal-list{flex:1 1 0;min-height:0;overflow:auto}
+dialog.simulation-modal .simulation-modal-catalog>.simulation-modal-import{align-self:stretch}

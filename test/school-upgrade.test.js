@@ -160,3 +160,31 @@ test('experimentos de sala de aula calculam de verdade e desenham sem erro',asyn
  assert.equal(resolveSimulation('nada'),'projectile');
  for(const gone of ['cipher','textlab','timeline','probability','logicgates'])assert.ok(!simulationIds.includes(gone));
 });
+
+test('experimentos importados: leitura do modelo, validação e isolamento',async()=>{
+ const {experimentTemplate,parseExperimentFile,validCustomSim,sandboxDocument,customSimMarkup,experimentMarkup,experimentName,CUSTOM_SIM_MAX}=await import('../src/custom-sim.js');
+ const sim=parseExperimentFile(experimentTemplate(),'modelo.html');
+ assert.equal(sim.name,'Queda livre');
+ assert.equal(sim.category,'Física');
+ assert.throws(()=>parseExperimentFile('só um texto qualquer','a.txt'),/não parece um experimento/);
+ assert.throws(()=>parseExperimentFile('<div>'+'x'.repeat(CUSTOM_SIM_MAX)+'</div>','a.html'),/limite/);
+ assert.equal(validCustomSim({html:'sem marcação'}),null);
+ assert.equal(validCustomSim({name:'<b>Nome</b>',category:'Inexistente',html:'<p>ok</p>'}).category,'Física');
+ // O documento do iframe bloqueia rede e o iframe não tem acesso à página.
+ const doc=sandboxDocument(sim.html);
+ assert.ok(doc.indexOf("default-src 'none'")<doc.indexOf('<style>'),'política vem antes do conteúdo');
+ assert.ok(sandboxDocument('<p>solto</p>').includes("default-src 'none'"));
+ const markup=customSimMarkup(sim);
+ assert.ok(markup.includes('sandbox="allow-scripts"')&&!markup.includes('allow-same-origin'));
+ assert.ok(!markup.includes('<script>'),'o código vai escapado no srcdoc');
+ assert.ok(!customSimMarkup(sim,{interactive:false}).includes('<iframe'),'miniatura não carrega o experimento');
+ // O experimento viaja dentro do slide e sobrevive à normalização.
+ const [kept]=normalizeElements([newElement('simulation',{simulation:'custom',customSim:sim})],false,v=>v||'');
+ assert.equal(kept.simulation,'custom');
+ assert.equal(kept.customSim.html,sim.html);
+ assert.equal(experimentName(kept),'Queda livre');
+ assert.ok(experimentMarkup(kept).includes('data-custom-sim'));
+ const [broken]=normalizeElements([newElement('simulation',{simulation:'custom',customSim:{html:''}})],false,v=>v||'');
+ assert.equal(broken.simulation,'projectile');
+ assert.equal(broken.customSim,undefined);
+});

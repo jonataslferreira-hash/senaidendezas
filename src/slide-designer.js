@@ -1,3 +1,4 @@
+import {loadCustomSims,saveCustomSims,parseExperimentFile,customSimMarkup,experimentTemplate,experimentName,experimentSubject,isCustomExperiment,CUSTOM_SIM_MAX} from './custom-sim.js';
 import {videoSource,videoMarkup} from './video-embed.js';
 import { createUuid } from './uuid.js';
 import { pickShape } from './shapes.js';
@@ -358,7 +359,7 @@ export class SlideDesigner {
     const slide = this.display();
     if(this.selected!==null&&!slide.elements.some(e => e.id === this.selected)) this.selected = (slide.elements.find(e=>!e.locked)||slide.elements[0])?.id || '';
     const unavailable=[...new Set((slide.importWarnings||[]).map(w=>/^Fonte indisponível neste dispositivo: (.+)\.$/.exec(w)?.[1]).filter(Boolean))];
-    return `<div class="slide-designer">${slide.importWarnings?.length?`<details class="pptx-compatibility"><summary>Compatibilidade do PPTX · ${slide.importWarnings.length} observações</summary><ul>${slide.importWarnings.map(w=>'<li>'+esc(w)+'</li>').join('')}</ul>${unavailable.map(font=>`<div class="pptx-font-replace"><span>“${esc(font)}” não existe aqui. Trocar por:</span><select data-missing-font="${esc(font)}">${['Arial','Verdana','Georgia','Trebuchet MS','Times New Roman'].map(name=>`<option value="${name}">${name}</option>`).join('')}</select>${btn('replace-font','Aplicar fonte',`data-source-font="${esc(font)}"`)}</div>`).join('')}</details>`:''}${showTools?this.toolbarMarkup():''}<div class="designer-workspace ${fieldsOnly ? 'fields-only' : ''}">${fieldsOnly ? '' : `<div class="designer-stage-wrap"><div class="designer-stage" style="--slide-aspect:${slide.sourceType&&slide.pageWidth&&slide.pageHeight?slide.pageWidth/slide.pageHeight:16/9}">${canvasMarkup(slide, { editing: true, selected: this.selected, interacting: this.interacting })}</div><div class="designer-layer-list" id="designer-layers" aria-label="Camadas do slide">${slide.elements.map((e, i) => `<span class="designer-layer-row" data-layer-row="${esc(e.id)}">${btn('select', (i + 1) + ' · ' + esc(e.type === 'text' ? e.text.slice(0, 25) || 'Texto' : e.type === 'model' ? 'Modelo 3D' : e.type === 'shape' ? 'Forma' : e.type === 'simulation' ? simulationNames[e.simulation] || 'Simulação' : e.type === 'video' ? 'Vídeo' : 'Imagem'), `data-id="${e.id}" aria-pressed="${e.id === this.selected}"`)}${this.studio.groups.canEdit ? `<span class="layer-grip" data-layer-grip="${esc(e.id)}" title="Arraste para mover a camada" aria-hidden="true">&#8942;</span>` : ''}</span>`).join('')}</div></div>`}
+    return `<div class="slide-designer">${slide.importWarnings?.length?`<details class="pptx-compatibility"><summary>Compatibilidade do PPTX · ${slide.importWarnings.length} observações</summary><ul>${slide.importWarnings.map(w=>'<li>'+esc(w)+'</li>').join('')}</ul>${unavailable.map(font=>`<div class="pptx-font-replace"><span>“${esc(font)}” não existe aqui. Trocar por:</span><select data-missing-font="${esc(font)}">${['Arial','Verdana','Georgia','Trebuchet MS','Times New Roman'].map(name=>`<option value="${name}">${name}</option>`).join('')}</select>${btn('replace-font','Aplicar fonte',`data-source-font="${esc(font)}"`)}</div>`).join('')}</details>`:''}${showTools?this.toolbarMarkup():''}<div class="designer-workspace ${fieldsOnly ? 'fields-only' : ''}">${fieldsOnly ? '' : `<div class="designer-stage-wrap"><div class="designer-stage" style="--slide-aspect:${slide.sourceType&&slide.pageWidth&&slide.pageHeight?slide.pageWidth/slide.pageHeight:16/9}">${canvasMarkup(slide, { editing: true, selected: this.selected, interacting: this.interacting })}</div><div class="designer-layer-list" id="designer-layers" aria-label="Camadas do slide">${slide.elements.map((e, i) => `<span class="designer-layer-row" data-layer-row="${esc(e.id)}">${btn('select', (i + 1) + ' · ' + esc(e.type === 'text' ? e.text.slice(0, 25) || 'Texto' : e.type === 'model' ? 'Modelo 3D' : e.type === 'shape' ? 'Forma' : e.type === 'simulation' ? experimentName(e) : e.type === 'video' ? 'Vídeo' : 'Imagem'), `data-id="${e.id}" aria-pressed="${e.id === this.selected}"`)}${this.studio.groups.canEdit ? `<span class="layer-grip" data-layer-grip="${esc(e.id)}" title="Arraste para mover a camada" aria-hidden="true">&#8942;</span>` : ''}</span>`).join('')}</div></div>`}
       <aside class="designer-inspector" id="designer-inspector" data-mobile-panel="${this.mobilePanel||''}">${this.inspectorContent()}</aside></div></div>`;
   }
   inspectorContent() {
@@ -382,7 +383,7 @@ export class SlideDesigner {
     return `<details class="designer-timeline" ${this.timelineOpen?'open':''}><summary>${studioIcon('animate')} Animações <span>${ordered.length}</span></summary>
       ${ordered.length?`<ol>${ordered.map(({effect,index},position)=>{
         const object=slide.elements.find(element=>element.id===effect.id);
-        const name=object?.type==='text'?object.text.slice(0,44):object?.imageAlt||({image:'Imagem',shape:'Forma',model:'Modelo 3D',video:'Vídeo',simulation:simulationNames[object?.simulation]||'Simulação'})[object?.type]||'Elemento';
+        const name=object?.type==='text'?object.text.slice(0,44):object?.imageAlt||({image:'Imagem',shape:'Forma',model:'Modelo 3D',video:'Vídeo',simulation:experimentName(object)})[object?.type]||'Elemento';
         return `<li><div><strong>${esc(name)}</strong><small>${effect.group?'Clique '+effect.group:'Ao entrar'} · ${effect.duration} ms</small></div><div class="timeline-actions">
           ${btn('animation-up','↑',`data-effect-index="${index}" aria-label="Mover animação para cima" ${position===0?'disabled':''}`)}
           ${btn('animation-down','↓',`data-effect-index="${index}" aria-label="Mover animação para baixo" ${position===ordered.length-1?'disabled':''}`)}</div></li>`;
@@ -429,7 +430,7 @@ export class SlideDesigner {
       <label>Descrição da imagem<input data-element-field="imageAlt" value="${esc(e.imageAlt)}"></label>${e.imageSource||e.imageLicense?`<p class="designer-image-credit"><strong>Créditos</strong> ${esc([e.imageCredit,e.imageLicense].filter(Boolean).join(' · '))}${e.imageSource?`<a href="${esc(e.imageSource)}" target="_blank" rel="noopener noreferrer">Ver origem</a>`:''}</p>`:''}` : ''}
       ${e.type === 'model' ? `<label>Modelo<select data-element-field="model" aria-label="Modelo do elemento">${[['ssd', 'SSD SATA'], ['hdd', 'HDD'], ['nvme', 'SSD NVMe'], ['custom', e.customModel?.name || 'Meu modelo enviado']].map(([v, label]) => `<option value="${v}" ${e.model === v ? 'selected' : ''}>${esc(label)}</option>`).join('')}</select></label><label>Nome do modelo<input data-element-field="modelLabel" maxlength="120" value="${esc(e.modelLabel||'')}" placeholder="${esc(e.model==='custom'?e.customModel?.name||'Modelo 3D':'Nome da peça selecionada')}"></label><label>Descrição do modelo<textarea data-element-field="modelDescription" maxlength="500" placeholder="Descrição ao explorar o modelo">${esc(e.modelDescription||'')}</textarea></label><label class="model-details-toggle"><input type="checkbox" data-element-field="modelDetailsHidden" ${e.modelDetailsHidden?'checked':''}> Mostrar somente o modelo 3D</label><div class="designer-model-actions">${btn('replace-model', '↑ Enviar GLB / GLTF / OBJ')}${btn('interact', this.interacting === e.id ? 'Voltar à edição' : 'Explorar o modelo')}</div>` : ''}
       ${e.type==='video'?`<p class="designer-video-note">${esc(videoSource(e.video)?.label||'Sem vídeo')} · o vídeo toca na apresentação; aqui aparece só a capa.</p><div class="designer-simulation-actions">${btn('change-video','Trocar link do vídeo')}</div>`:''}
-      ${e.type==='simulation'?`<label>Disciplina: ${esc(simulationSubjects[e.simulation]||'Ciências')}<select data-element-field="simulation" aria-label="Tipo de simulação">${simulationGroups.map(([subject,items])=>`<optgroup label="${esc(subject)}">${items.map(([id,name])=>`<option value="${id}" ${e.simulation===id?'selected':''}>${esc(name)}</option>`).join('')}</optgroup>`).join('')}</select></label><div class="designer-simulation-actions">${btn('interact',this.interacting===e.id?'Voltar à edição':'Experimentar no slide')}${btn('preview-simulation','Abrir laboratório')}</div>`:''}${e.type === 'shape' ? `<div class="designer-type-settings"><label>Cor da forma<input type="color" data-element-field="background" value="${e.background}"></label><label>Cor da borda<input type="color" data-element-field="borderColor" value="${e.borderColor||'#ffffff'}"></label></div>
+      ${e.type==='simulation'?`<label>Disciplina: ${esc(experimentSubject(e))}<select data-element-field="simulation" aria-label="Tipo de simulação">${isCustomExperiment(e)?`<option value="custom" selected>Importado · ${esc(e.customSim.name)}</option>`:''}${simulationGroups.map(([subject,items])=>`<optgroup label="${esc(subject)}">${items.map(([id,name])=>`<option value="${id}" ${e.simulation===id?'selected':''}>${esc(name)}</option>`).join('')}</optgroup>`).join('')}</select></label><div class="designer-simulation-actions">${btn('interact',this.interacting===e.id?'Voltar à edição':'Experimentar no slide')}${btn('preview-simulation','Abrir laboratório')}</div>`:''}${e.type === 'shape' ? `<div class="designer-type-settings"><label>Cor da forma<input type="color" data-element-field="background" value="${e.background}"></label><label>Cor da borda<input type="color" data-element-field="borderColor" value="${e.borderColor||'#ffffff'}"></label></div>
       <div class="designer-type-settings">${number('Largura da borda','borderWidth',e.borderWidth||0,0,40)}${!['ellipse','icon'].includes(e.shapeType)?number('Curvatura','cornerRadius',e.cornerRadius??5,0,100):''}</div>` : ''}
       <span class="inspector-section-label">Posição e tamanho</span>
       <div class="designer-position-grid">${number('Posição X (%)', 'x', e.x, -1000, 1000)}${number('Posição Y (%)', 'y', e.y, -1000, 1000)}${number('Largura (%)', 'w', e.w, e.type==='image'?.1:5, 1000)}${number('Altura (%)', 'h', e.h, e.type==='image'?.1:5, 1000)}</div>
@@ -563,7 +564,7 @@ export class SlideDesigner {
     else if (el) {
       el[key] = key==='modelDetailsHidden' ? target.checked
         : ['x', 'y', 'w', 'h', 'fontSize','borderWidth','cornerRadius','imageX','imageY'].includes(key) ? Number(target.value) : target.value;
-      if(key==='simulation'){this.studio.markDirty();this.studio.callbacks.render();return;}
+      if(key==='simulation'){delete el.customSim;this.studio.markDirty();this.studio.callbacks.render();return;}
       if(key==='borderWidth'||key==='cornerRadius')el[key]=Math.max(0,Math.min(key==='borderWidth'?40:100,el[key]));
       if (key === 'fontSize') el.fontSize = Math.max(1, Math.min(512, el.fontSize));
       if (['w', 'h'].includes(key)) el[key] = Math.max(el.type === 'image' ? .1 : 5, Math.min(1000, el[key]));
@@ -695,7 +696,7 @@ export class SlideDesigner {
     if(action==='browse-images'){this.openImageSearch(null);return;}
     if(action==='search-image'){this.openImageSearch(e?.type==='image'?e.id:null);return;}
     if(action==='simulation'){if(!this.studio.groups.canEdit)return;button?.closest?.('details')?.removeAttribute('open');this.openSimulationModal('projectile',null);return;}
-    if(action==='preview-simulation'){if(e?.type==='simulation')this.openSimulationModal(e.simulation,e.id);return;}
+    if(action==='preview-simulation'){if(e?.type==='simulation')this.openSimulationModal(e.simulation,e.id,isCustomExperiment(e)?e.customSim:null);return;}
     if(action==='crop-image'){this.ensure();this.imageEditing=this.imageEditing===e.id?'':e.id;this.refreshSelection();return;}
     if(['image-plus','image-minus','image-reset'].includes(action)){
       this.mutate(s=>{const image=s.elements.find(item=>item.id===e?.id);if(!image)return;if(action==='image-reset'){image.imageZoom=1;image.imageX=image.imageY=0;}else image.imageZoom=imageZoomValue((image.imageZoom||1)*(action==='image-plus'?1.25:.8));}, true);return;
@@ -998,10 +999,18 @@ export class SlideDesigner {
     dialog.addEventListener('close',()=>dialog.remove(),{once:true});
     document.body.append(dialog);check();dialog.showModal();input.focus();
   }
-  openSimulationModal(initialType='projectile',targetId=null){
+  openSimulationModal(initialType='projectile',targetId=null,initialCustom=null){
     document.querySelector('#simulation-lab-modal')?.remove();
+    // Importados ficam na biblioteca deste navegador; o que já está no slide entra na lista também.
+    let customs=loadCustomSims();
     let activeType=Object.hasOwn(simulationNames,initialType)?initialType:'projectile';
+    if(initialCustom){
+      let match=customs.find(item=>item.html===initialCustom.html);
+      if(!match){match={id:'slide-'+createUuid(),...initialCustom,unsaved:true};customs=[match,...customs];}
+      activeType='custom:'+match.id;
+    }
     let activeSubject='all';
+    const canEdit=this.studio.groups.canEdit;
     const modalSims=new Simulations();
     const dialog=document.createElement('dialog');
     dialog.id='simulation-lab-modal';
@@ -1009,37 +1018,68 @@ export class SlideDesigner {
     dialog.setAttribute('aria-labelledby','simulation-modal-title');
     const accent=getComputedStyle(this.studio.root.querySelector('.designer-inspector')||this.studio.root).getPropertyValue('--studio-accent').trim();
     if(accent)dialog.style.setProperty('--sim-accent',accent);
-    const selectMarkup=simulationGroups.map(([subject,items])=>`<optgroup label="${esc(subject)}">${items.map(([id,name])=>`<option value="${id}" ${id===activeType?'selected':''}>${esc(name)}</option>`).join('')}</optgroup>`).join('');
-    const filtersMarkup=[['all','Todas'],...simulationGroups.map(([subject])=>[subject,subject])].map(([key,label])=>`<button type="button" role="tab" class="simulation-modal-filter" data-sim-filter="${esc(key)}" aria-selected="${key===activeSubject}">${esc(label)}</button>`).join('');
-    const listMarkup=simulationGroups.flatMap(([subject,items])=>items.map(([id,name])=>`<button type="button" role="option" class="simulation-modal-choice" data-sim-choice="${esc(id)}" data-subject="${esc(subject)}" aria-selected="${id===activeType}"><strong>${esc(name)}</strong><span>${esc(subject)}</span></button>`)).join('');
+    const subjects=simulationGroups.map(([subject])=>subject);
+    const customOf=type=>type.startsWith('custom:')?customs.find(item=>item.id===type.slice(7)):null;
+    const filtersMarkup=[['all','Todas'],...subjects.map(subject=>[subject,subject]),['mine','Importados']].map(([key,label])=>`<button type="button" role="tab" class="simulation-modal-filter" data-sim-filter="${esc(key)}" aria-selected="${key===activeSubject}">${esc(label)}</button>`).join('');
     dialog.innerHTML=`<form method="dialog" class="simulation-modal-head"><div><strong id="simulation-modal-title">Laboratório de simulações</strong></div><button type="submit" class="simulation-modal-close" aria-label="Fechar">×</button></form>
       <div class="simulation-modal-body">
         <section class="simulation-modal-stage" aria-live="polite"></section>
         <aside class="simulation-modal-catalog">
-          <label class="simulation-modal-select-wrap">Simulação<select class="simulation-modal-select" aria-label="Tipo de simulação">${selectMarkup}</select></label>
+          <label class="simulation-modal-select-wrap">Experimento<select class="simulation-modal-select" aria-label="Escolher experimento"></select></label>
           <div class="simulation-modal-filters" role="tablist" aria-label="Filtrar por disciplina">${filtersMarkup}</div>
-          <div class="simulation-modal-list" role="listbox" aria-label="Atalhos por disciplina">${listMarkup}</div>
+          <div class="simulation-modal-list" role="listbox" aria-label="Experimentos"></div>
+          ${canEdit?`<div class="simulation-modal-import"><button type="button" data-sim-import>↑ Importar experimento</button><button type="button" data-sim-template>↓ Baixar modelo para IA</button><input type="file" accept=".html,.htm,.txt,text/html,text/plain" hidden><p role="status" data-sim-import-status></p></div>`:''}
         </aside>
       </div>
-      <footer class="simulation-modal-foot"><span class="simulation-modal-current"></span><div class="simulation-modal-actions"><button type="button" class="studio-btn quiet" data-sim-cancel>${this.studio.groups.canEdit?'Cancelar':'Fechar'}</button>${this.studio.groups.canEdit?`<button type="button" class="studio-btn studio-launch" data-sim-confirm>${targetId?'Aplicar no slide':'Inserir no slide'}</button>`:''}</div></footer>`;
-    const select=dialog.querySelector('.simulation-modal-select');
+      <footer class="simulation-modal-foot"><span class="simulation-modal-current"></span><div class="simulation-modal-actions"><button type="button" class="studio-btn quiet" data-sim-cancel>${canEdit?'Cancelar':'Fechar'}</button>${canEdit?`<button type="button" class="studio-btn studio-launch" data-sim-confirm>${targetId?'Aplicar no slide':'Inserir no slide'}</button>`:''}</div></footer>`;
     const stage=dialog.querySelector('.simulation-modal-stage');
     const current=dialog.querySelector('.simulation-modal-current');
-    const choices=[...dialog.querySelectorAll('[data-sim-choice]')];
-    const filters=[...dialog.querySelectorAll('[data-sim-filter]')];
+    const list=dialog.querySelector('.simulation-modal-list');
+    const importStatus=dialog.querySelector('[data-sim-import-status]')||document.createElement('p');
+    const select=dialog.querySelector('.simulation-modal-select');
+    const fileInput=dialog.querySelector('.simulation-modal-import input');
+    const persist=()=>saveCustomSims(customs.filter(item=>!item.unsaved).map(({id,name,category,html})=>({id,name,category,html})));
+    const renderList=()=>{
+      list.innerHTML=simulationGroups.flatMap(([subject,items])=>items.map(([id,name])=>`<button type="button" role="option" class="simulation-modal-choice" data-sim-choice="${esc(id)}" data-subject="${esc(subject)}" aria-selected="${id===activeType}"><strong>${esc(name)}</strong><span>${esc(subject)}</span></button>`)).join('')
+        +customs.map(item=>`<button type="button" role="option" class="simulation-modal-choice" data-sim-choice="custom:${esc(item.id)}" data-subject="${esc(item.category)}" data-mine aria-selected="${'custom:'+item.id===activeType}"><strong>${esc(item.name)}</strong><span>${esc(item.category)} · importado</span></button>`).join('');
+      // No celular a lista vira um seletor só.
+      select.innerHTML=simulationGroups.map(([subject,items])=>`<optgroup label="${esc(subject)}">${items.map(([id,name])=>`<option value="${id}">${esc(name)}</option>`).join('')}</optgroup>`).join('')+(customs.length?`<optgroup label="Importados">${customs.map(item=>`<option value="custom:${esc(item.id)}">${esc(item.name)}</option>`).join('')}</optgroup>`:'');
+      select.value=activeType;
+      for(const choice of list.children)choice.hidden=activeSubject==='mine'?!choice.hasAttribute('data-mine'):activeSubject!=='all'&&choice.dataset.subject!==activeSubject;
+      if(activeSubject==='mine'&&!customs.length)list.innerHTML='<p class="simulation-modal-none">Nenhum experimento importado ainda. Baixe o modelo, peça o experimento a uma IA e importe o arquivo aqui.</p>';
+    };
     const renderStage=(type)=>{
-      activeType=Object.hasOwn(simulationNames,type)?type:'projectile';
-      // O catálogo já foi escolhido no seletor; a lista lateral seria uma segunda lista.
+      const custom=customOf(type);
+      activeType=custom?type:Object.hasOwn(simulationNames,type)?type:'projectile';
+      modalSims.dispose();
+      if(custom){
+        current.textContent=`${custom.category} · ${custom.name} (importado)`;
+        stage.innerHTML=`<div class="simulation-modal-custom">${customSimMarkup(custom)}${canEdit?`<div class="simulation-modal-manage"><label>Nome<input type="text" maxlength="80" value="${esc(custom.name)}" data-sim-rename></label><label>Categoria<select data-sim-category>${subjects.map(subject=>`<option ${subject===custom.category?'selected':''}>${esc(subject)}</option>`).join('')}</select></label>${custom.unsaved?'<button type="button" data-sim-keep>Guardar na minha lista</button>':'<button type="button" data-sim-delete>Excluir da lista</button>'}</div>`:''}</div>`;
+      }else{
+        current.textContent=`${simulationSubjects[activeType]||'Ciências'} · ${simulationNames[activeType]}`;
+        stage.innerHTML=simulationMarkup(activeType);
+        modalSims.mount(stage);
+      }
+      for(const choice of list.querySelectorAll('[data-sim-choice]'))choice.setAttribute('aria-selected',String(choice.dataset.simChoice===activeType));
       if(select.value!==activeType)select.value=activeType;
-      for(const choice of choices)choice.setAttribute('aria-selected',String(choice.dataset.simChoice===activeType));
-      current.textContent=`${simulationSubjects[activeType]||'Ciências'} · ${simulationNames[activeType]}`;
-      stage.innerHTML=simulationMarkup(activeType);
-      modalSims.mount(stage);
     };
     const setFilter=(subject)=>{
       activeSubject=subject;
-      for(const tab of filters)tab.setAttribute('aria-selected',String(tab.dataset.simFilter===activeSubject));
-      for(const choice of choices)choice.hidden=activeSubject!=='all'&&choice.dataset.subject!==activeSubject;
+      for(const tab of dialog.querySelectorAll('[data-sim-filter]'))tab.setAttribute('aria-selected',String(tab.dataset.simFilter===activeSubject));
+      renderList();
+    };
+    const importFile=async file=>{
+      importStatus.textContent='';
+      try{
+        if(file.size>CUSTOM_SIM_MAX*4)throw Error('Arquivo grande demais para um experimento.');
+        const sim=parseExperimentFile(await file.text(),file.name);
+        if(customs.filter(item=>!item.unsaved).length>=40)throw Error('A lista já tem 40 experimentos importados. Exclua algum antes de importar outro.');
+        const item={id:createUuid(),...sim};
+        customs=[item,...customs.filter(other=>other.html!==sim.html)];
+        if(!persist())importStatus.textContent='Importado, mas não coube na memória deste navegador: ele vale só até fechar esta janela.';
+        else importStatus.textContent=`“${sim.name}” importado. Teste ao lado antes de inserir.`;
+        activeSubject='mine';setFilter('mine');renderStage('custom:'+item.id);
+      }catch(error){importStatus.textContent=error.message;}
     };
     dialog.addEventListener('click',event=>{
       const filterBtn=event.target.closest('[data-sim-filter]');
@@ -1047,16 +1087,28 @@ export class SlideDesigner {
       const choiceBtn=event.target.closest('[data-sim-choice]');
       if(choiceBtn){renderStage(choiceBtn.dataset.simChoice);return;}
       if(event.target.closest('[data-sim-cancel]')){dialog.close();return;}
+      if(event.target.closest('[data-sim-import]')){fileInput.click();return;}
+      if(event.target.closest('[data-sim-template]')){
+        const url=URL.createObjectURL(new Blob([experimentTemplate()],{type:'text/html'}));
+        const link=document.createElement('a');link.href=url;link.download='modelo-experimento-storage-lab.html';document.body.append(link);link.click();link.remove();
+        setTimeout(()=>URL.revokeObjectURL(url),2000);
+        importStatus.textContent='Modelo baixado. Envie o arquivo para uma IA com o seu pedido e importe a resposta aqui.';
+        return;
+      }
+      const custom=customOf(activeType);
+      if(custom&&event.target.closest('[data-sim-delete]')){customs=customs.filter(item=>item!==custom);persist();renderList();renderStage('projectile');importStatus.textContent=`“${custom.name}” saiu da sua lista. Slides que já usam continuam funcionando.`;return;}
+      if(custom&&event.target.closest('[data-sim-keep]')){delete custom.unsaved;persist();renderList();renderStage(activeType);return;}
       if(event.target.closest('[data-sim-confirm]')){
-        if(!this.studio.groups.canEdit)return;
+        if(!canEdit)return;
         try{
+          const fields=custom?{simulation:'custom',customSim:{name:custom.name,category:custom.category,html:custom.html}}:{simulation:activeType};
           this.mutate(s=>{
             if(targetId){
               const existing=s.elements.find(item=>item.id===targetId&&item.type==='simulation');
-              if(existing){existing.simulation=activeType;this.selected=existing.id;return;}
+              if(existing){delete existing.customSim;Object.assign(existing,fields);this.selected=existing.id;return;}
             }
             if(s.elements.length>=MAX_CANVAS_ELEMENTS)throw Error(`Use até ${MAX_CANVAS_ELEMENTS} elementos no slide.`);
-            const item=newElement('simulation',{x:53,y:12,w:42,h:76,simulation:activeType});
+            const item=newElement('simulation',{x:53,y:12,w:42,h:76,...fields});
             s.elements.push(item);
             this.selected=item.id;
           });
@@ -1064,9 +1116,22 @@ export class SlideDesigner {
         }catch(error){this.studio.callbacks.toast(error.message);}
       }
     });
+    // Renomear e trocar de categoria valem na hora, sem recarregar o experimento.
+    dialog.addEventListener('input',event=>{
+      const custom=customOf(activeType);if(!custom)return;
+      if(event.target.matches('[data-sim-rename]')){custom.name=event.target.value.replace(/[<>]/g,'').trim().slice(0,80)||'Experimento importado';}
+      else if(event.target.matches('[data-sim-category]')){custom.category=event.target.value;}
+      else return;
+      persist();renderList();
+      current.textContent=`${custom.category} · ${custom.name} (importado)`;
+      const head=stage.querySelector('.custom-sim header');
+      if(head){head.querySelector('strong').textContent=custom.name;head.querySelector('span').textContent=custom.category.toUpperCase();}
+    });
     select.addEventListener('change',()=>renderStage(select.value));
+    fileInput?.addEventListener('change',()=>{const file=fileInput.files[0];fileInput.value='';if(file)importFile(file);});
     dialog.addEventListener('close',()=>{modalSims.dispose();dialog.remove();},{once:true});
     document.body.append(dialog);
+    renderList();
     renderStage(activeType);
     dialog.showModal();
   }
