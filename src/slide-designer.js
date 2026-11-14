@@ -1,3 +1,5 @@
+import {loadCustomSims,saveCustomSims,parseExperimentFile,customSimMarkup,experimentTemplate,experimentName,experimentSubject,isCustomExperiment,CUSTOM_SIM_MAX} from './custom-sim.js';
+import {videoSource,videoMarkup} from './video-embed.js';
 import { createUuid } from './uuid.js';
 import { pickShape } from './shapes.js';
 import { studioIcon } from './studio-icons.js';
@@ -12,7 +14,7 @@ import {slideStylePicker,localLayouts} from './slide-style-picker.js';
 import { canvasMarkup, CanvasModels, esc } from './canvas-view.js';
 import { importModelFiles } from './model-files.js';
 import { storePages, fillAssetImages, fillAssetAudio } from './assets.js';
-import { searchImageChoices, importImageChoice } from './storage-ai-image-search.js';
+import { searchImageChoices, importImageChoice, verifyTransparentChoice } from './storage-ai-image-search.js';
 const copy = value => JSON.parse(JSON.stringify(value));
 const btn = (action, text, extra = '') => `<button type="button" data-designer-action="${action}" ${extra}>${text}</button>`;
 function snapAxis(position,size,pixels,bypass,targets=[]) {
@@ -345,7 +347,7 @@ export class SlideDesigner {
       </div>
       <button type="button" class="mobile-inspector-open" data-designer-action="mobile-inspector-open" aria-controls="designer-inspector" aria-expanded="false">${studioIcon('settings')}<span>Ajustes</span></button>
       ${btn('undo', '↶', `class="desktop-history" aria-label="Desfazer" ${h.undo.length ? '' : 'disabled'}`)}${btn('redo', '↷', `class="desktop-history" aria-label="Refazer" ${h.redo.length ? '' : 'disabled'}`)}
-      <span></span>${btn('add-text', studioIcon('text')+'<span>Texto</span>')}${btn('image', studioIcon('image')+'<span>Imagem</span>')}${btn('shape', studioIcon('shape')+'<span>Forma</span>')}<details class="designer-insert-more"><summary><span class="desktop-insert-label">Inserir mais</span><span class="mobile-action-label">${studioIcon('more')}<span>Mais</span></span></summary><div><div class="mobile-history">
+      <span></span>${btn('add-text', studioIcon('text')+'<span>Texto</span>')}${btn('image', studioIcon('image')+'<span>Imagem</span>')}${btn('shape', studioIcon('shape')+'<span>Forma</span>')}${btn('video', studioIcon('video')+'<span>Vídeo</span>')}<details class="designer-insert-more"><summary><span class="desktop-insert-label">Inserir mais</span><span class="mobile-action-label">${studioIcon('more')}<span>Mais</span></span></summary><div><div class="mobile-history">
         ${btn('undo', '↶ Desfazer', h.undo.length ? '' : 'disabled')}${btn('redo', '↷ Refazer', h.redo.length ? '' : 'disabled')}
         ${btn('mobile-layers','Camadas', 'aria-controls="designer-layers" aria-expanded="false"')}
       </div>${btn('icon', '⊞ Ícones de objetos')}${btn('model', '◇ Modelo 3D')}${btn('simulation','⚗ Simulação')}${btn('browse-images',studioIcon('search')+' Buscar imagens')}</div></details>
@@ -357,7 +359,7 @@ export class SlideDesigner {
     const slide = this.display();
     if(this.selected!==null&&!slide.elements.some(e => e.id === this.selected)) this.selected = (slide.elements.find(e=>!e.locked)||slide.elements[0])?.id || '';
     const unavailable=[...new Set((slide.importWarnings||[]).map(w=>/^Fonte indisponível neste dispositivo: (.+)\.$/.exec(w)?.[1]).filter(Boolean))];
-    return `<div class="slide-designer">${slide.importWarnings?.length?`<details class="pptx-compatibility"><summary>Compatibilidade do PPTX · ${slide.importWarnings.length} observações</summary><ul>${slide.importWarnings.map(w=>'<li>'+esc(w)+'</li>').join('')}</ul>${unavailable.map(font=>`<div class="pptx-font-replace"><span>“${esc(font)}” não existe aqui. Trocar por:</span><select data-missing-font="${esc(font)}">${['Arial','Verdana','Georgia','Trebuchet MS','Times New Roman'].map(name=>`<option value="${name}">${name}</option>`).join('')}</select>${btn('replace-font','Aplicar fonte',`data-source-font="${esc(font)}"`)}</div>`).join('')}</details>`:''}${showTools?this.toolbarMarkup():''}<div class="designer-workspace ${fieldsOnly ? 'fields-only' : ''}">${fieldsOnly ? '' : `<div class="designer-stage-wrap"><div class="designer-stage" style="--slide-aspect:${slide.sourceType&&slide.pageWidth&&slide.pageHeight?slide.pageWidth/slide.pageHeight:16/9}">${canvasMarkup(slide, { editing: true, selected: this.selected, interacting: this.interacting })}</div><div class="designer-layer-list" id="designer-layers" aria-label="Camadas do slide">${slide.elements.map((e, i) => `<span class="designer-layer-row" data-layer-row="${esc(e.id)}">${btn('select', (i + 1) + ' · ' + esc(e.type === 'text' ? e.text.slice(0, 25) || 'Texto' : e.type === 'model' ? 'Modelo 3D' : e.type === 'shape' ? 'Forma' : e.type === 'simulation' ? simulationNames[e.simulation] || 'Simulação' : 'Imagem'), `data-id="${e.id}" aria-pressed="${e.id === this.selected}"`)}${this.studio.groups.canEdit ? `<span class="layer-grip" data-layer-grip="${esc(e.id)}" title="Arraste para mover a camada" aria-hidden="true">&#8942;</span>` : ''}</span>`).join('')}</div></div>`}
+    return `<div class="slide-designer">${slide.importWarnings?.length?`<details class="pptx-compatibility"><summary>Compatibilidade do PPTX · ${slide.importWarnings.length} observações</summary><ul>${slide.importWarnings.map(w=>'<li>'+esc(w)+'</li>').join('')}</ul>${unavailable.map(font=>`<div class="pptx-font-replace"><span>“${esc(font)}” não existe aqui. Trocar por:</span><select data-missing-font="${esc(font)}">${['Arial','Verdana','Georgia','Trebuchet MS','Times New Roman'].map(name=>`<option value="${name}">${name}</option>`).join('')}</select>${btn('replace-font','Aplicar fonte',`data-source-font="${esc(font)}"`)}</div>`).join('')}</details>`:''}${showTools?this.toolbarMarkup():''}<div class="designer-workspace ${fieldsOnly ? 'fields-only' : ''}">${fieldsOnly ? '' : `<div class="designer-stage-wrap"><div class="designer-stage" style="--slide-aspect:${slide.sourceType&&slide.pageWidth&&slide.pageHeight?slide.pageWidth/slide.pageHeight:16/9}">${canvasMarkup(slide, { editing: true, selected: this.selected, interacting: this.interacting })}</div><div class="designer-layer-list" id="designer-layers" aria-label="Camadas do slide">${slide.elements.map((e, i) => `<span class="designer-layer-row" data-layer-row="${esc(e.id)}">${btn('select', (i + 1) + ' · ' + esc(e.type === 'text' ? e.text.slice(0, 25) || 'Texto' : e.type === 'model' ? 'Modelo 3D' : e.type === 'shape' ? 'Forma' : e.type === 'simulation' ? experimentName(e) : e.type === 'video' ? 'Vídeo' : 'Imagem'), `data-id="${e.id}" aria-pressed="${e.id === this.selected}"`)}${this.studio.groups.canEdit ? `<span class="layer-grip" data-layer-grip="${esc(e.id)}" title="Arraste para mover a camada" aria-hidden="true">&#8942;</span>` : ''}</span>`).join('')}</div></div>`}
       <aside class="designer-inspector" id="designer-inspector" data-mobile-panel="${this.mobilePanel||''}">${this.inspectorContent()}</aside></div></div>`;
   }
   inspectorContent() {
@@ -381,7 +383,7 @@ export class SlideDesigner {
     return `<details class="designer-timeline" ${this.timelineOpen?'open':''}><summary>${studioIcon('animate')} Animações <span>${ordered.length}</span></summary>
       ${ordered.length?`<ol>${ordered.map(({effect,index},position)=>{
         const object=slide.elements.find(element=>element.id===effect.id);
-        const name=object?.type==='text'?object.text.slice(0,44):object?.imageAlt||({image:'Imagem',shape:'Forma',model:'Modelo 3D',simulation:simulationNames[object?.simulation]||'Simulação'})[object?.type]||'Elemento';
+        const name=object?.type==='text'?object.text.slice(0,44):object?.imageAlt||({image:'Imagem',shape:'Forma',model:'Modelo 3D',video:'Vídeo',simulation:experimentName(object)})[object?.type]||'Elemento';
         return `<li><div><strong>${esc(name)}</strong><small>${effect.group?'Clique '+effect.group:'Ao entrar'} · ${effect.duration} ms</small></div><div class="timeline-actions">
           ${btn('animation-up','↑',`data-effect-index="${index}" aria-label="Mover animação para cima" ${position===0?'disabled':''}`)}
           ${btn('animation-down','↓',`data-effect-index="${index}" aria-label="Mover animação para baixo" ${position===ordered.length-1?'disabled':''}`)}</div></li>`;
@@ -407,7 +409,7 @@ export class SlideDesigner {
     const number = (label, key, value, min, max) => `<label>${label}<input type="number" data-element-field="${key}" value="${value}" min="${min}" max="${max}" step="0.5"></label>`;
     if(this.studio.ai.open)return this.studio.ai.inspector(s);
     const layerIdx = e ? s.elements.indexOf(e) : -1;
-    return `${!e ? `${this.settingsMarkup(s)}${this.animationOrder(s)}` : `<div class="designer-selected-heading"><strong>${{ text: 'Caixa de texto', image: 'Imagem', model: 'Modelo 3D', shape: 'Forma',simulation:'Simulação' }[e.type]}</strong><span class="inspector-layer-badge">Camada ${layerIdx + 1}/${s.elements.length}</span></div><div class="designer-arrange" aria-label="Organizar elemento">${[
+    return `${!e ? `${this.settingsMarkup(s)}${this.animationOrder(s)}` : `<div class="designer-selected-heading"><strong>${{ text: 'Caixa de texto', image: 'Imagem', model: 'Modelo 3D', shape: 'Forma',simulation:'Simulação',video:'Vídeo' }[e.type]}</strong><span class="inspector-layer-badge">Camada ${layerIdx + 1}/${s.elements.length}</span></div><div class="designer-arrange" aria-label="Organizar elemento">${[
   ['duplicate', 'duplicate', 'Duplicar elemento'],
   ['forward', 'forward', 'Trazer à frente'],
   ['animation'],
@@ -427,7 +429,8 @@ export class SlideDesigner {
       <div class="designer-position-grid">${number('Deslocamento X (%)','imageX',e.imageX||0,'','')}${number('Deslocamento Y (%)','imageY',e.imageY||0,'','')}</div>
       <label>Descrição da imagem<input data-element-field="imageAlt" value="${esc(e.imageAlt)}"></label>${e.imageSource||e.imageLicense?`<p class="designer-image-credit"><strong>Créditos</strong> ${esc([e.imageCredit,e.imageLicense].filter(Boolean).join(' · '))}${e.imageSource?`<a href="${esc(e.imageSource)}" target="_blank" rel="noopener noreferrer">Ver origem</a>`:''}</p>`:''}` : ''}
       ${e.type === 'model' ? `<label>Modelo<select data-element-field="model" aria-label="Modelo do elemento">${[['ssd', 'SSD SATA'], ['hdd', 'HDD'], ['nvme', 'SSD NVMe'], ['custom', e.customModel?.name || 'Meu modelo enviado']].map(([v, label]) => `<option value="${v}" ${e.model === v ? 'selected' : ''}>${esc(label)}</option>`).join('')}</select></label><label>Nome do modelo<input data-element-field="modelLabel" maxlength="120" value="${esc(e.modelLabel||'')}" placeholder="${esc(e.model==='custom'?e.customModel?.name||'Modelo 3D':'Nome da peça selecionada')}"></label><label>Descrição do modelo<textarea data-element-field="modelDescription" maxlength="500" placeholder="Descrição ao explorar o modelo">${esc(e.modelDescription||'')}</textarea></label><label class="model-details-toggle"><input type="checkbox" data-element-field="modelDetailsHidden" ${e.modelDetailsHidden?'checked':''}> Mostrar somente o modelo 3D</label><div class="designer-model-actions">${btn('replace-model', '↑ Enviar GLB / GLTF / OBJ')}${btn('interact', this.interacting === e.id ? 'Voltar à edição' : 'Explorar o modelo')}</div>` : ''}
-      ${e.type==='simulation'?`<label>Disciplina: ${esc(simulationSubjects[e.simulation]||'Ciências')}<select data-element-field="simulation" aria-label="Tipo de simulação">${simulationGroups.map(([subject,items])=>`<optgroup label="${esc(subject)}">${items.map(([id,name])=>`<option value="${id}" ${e.simulation===id?'selected':''}>${esc(name)}</option>`).join('')}</optgroup>`).join('')}</select></label><div class="designer-simulation-actions">${btn('interact',this.interacting===e.id?'Voltar à edição':'Experimentar no slide')}${btn('preview-simulation','Abrir laboratório')}</div>`:''}${e.type === 'shape' ? `<div class="designer-type-settings"><label>Cor da forma<input type="color" data-element-field="background" value="${e.background}"></label><label>Cor da borda<input type="color" data-element-field="borderColor" value="${e.borderColor||'#ffffff'}"></label></div>
+      ${e.type==='video'?`<p class="designer-video-note">${esc(videoSource(e.video)?.label||'Sem vídeo')} · o vídeo toca na apresentação; aqui aparece só a capa.</p><div class="designer-simulation-actions">${btn('change-video','Trocar link do vídeo')}</div>`:''}
+      ${e.type==='simulation'?`<label>Disciplina: ${esc(experimentSubject(e))}<select data-element-field="simulation" aria-label="Tipo de simulação">${isCustomExperiment(e)?`<option value="custom" selected>Importado · ${esc(e.customSim.name)}</option>`:''}${simulationGroups.map(([subject,items])=>`<optgroup label="${esc(subject)}">${items.map(([id,name])=>`<option value="${id}" ${e.simulation===id?'selected':''}>${esc(name)}</option>`).join('')}</optgroup>`).join('')}</select></label><div class="designer-simulation-actions">${btn('interact',this.interacting===e.id?'Voltar à edição':'Experimentar no slide')}${btn('preview-simulation','Abrir laboratório')}</div>`:''}${e.type === 'shape' ? `<div class="designer-type-settings"><label>Cor da forma<input type="color" data-element-field="background" value="${e.background}"></label><label>Cor da borda<input type="color" data-element-field="borderColor" value="${e.borderColor||'#ffffff'}"></label></div>
       <div class="designer-type-settings">${number('Largura da borda','borderWidth',e.borderWidth||0,0,40)}${!['ellipse','icon'].includes(e.shapeType)?number('Curvatura','cornerRadius',e.cornerRadius??5,0,100):''}</div>` : ''}
       <span class="inspector-section-label">Posição e tamanho</span>
       <div class="designer-position-grid">${number('Posição X (%)', 'x', e.x, -1000, 1000)}${number('Posição Y (%)', 'y', e.y, -1000, 1000)}${number('Largura (%)', 'w', e.w, e.type==='image'?.1:5, 1000)}${number('Altura (%)', 'h', e.h, e.type==='image'?.1:5, 1000)}</div>
@@ -561,7 +564,7 @@ export class SlideDesigner {
     else if (el) {
       el[key] = key==='modelDetailsHidden' ? target.checked
         : ['x', 'y', 'w', 'h', 'fontSize','borderWidth','cornerRadius','imageX','imageY'].includes(key) ? Number(target.value) : target.value;
-      if(key==='simulation'){this.studio.markDirty();this.studio.callbacks.render();return;}
+      if(key==='simulation'){delete el.customSim;this.studio.markDirty();this.studio.callbacks.render();return;}
       if(key==='borderWidth'||key==='cornerRadius')el[key]=Math.max(0,Math.min(key==='borderWidth'?40:100,el[key]));
       if (key === 'fontSize') el.fontSize = Math.max(1, Math.min(512, el.fontSize));
       if (['w', 'h'].includes(key)) el[key] = Math.max(el.type === 'image' ? .1 : 5, Math.min(1000, el[key]));
@@ -688,10 +691,12 @@ export class SlideDesigner {
       return;
     }
     if(action.startsWith('setting-')){const tab=action.slice(8);this.settingTab=this.settingTab===tab?'':tab;this.refreshSelection();return;}
+    if(action==='video'){if(this.studio.groups.canEdit)this.openVideoDialog(null);return;}
+    if(action==='change-video'){if(e?.type==='video')this.openVideoDialog(e.id);return;}
     if(action==='browse-images'){this.openImageSearch(null);return;}
     if(action==='search-image'){this.openImageSearch(e?.type==='image'?e.id:null);return;}
     if(action==='simulation'){if(!this.studio.groups.canEdit)return;button?.closest?.('details')?.removeAttribute('open');this.openSimulationModal('projectile',null);return;}
-    if(action==='preview-simulation'){if(e?.type==='simulation')this.openSimulationModal(e.simulation,e.id);return;}
+    if(action==='preview-simulation'){if(e?.type==='simulation')this.openSimulationModal(e.simulation,e.id,isCustomExperiment(e)?e.customSim:null);return;}
     if(action==='crop-image'){this.ensure();this.imageEditing=this.imageEditing===e.id?'':e.id;this.refreshSelection();return;}
     if(['image-plus','image-minus','image-reset'].includes(action)){
       this.mutate(s=>{const image=s.elements.find(item=>item.id===e?.id);if(!image)return;if(action==='image-reset'){image.imageZoom=1;image.imageX=image.imageY=0;}else image.imageZoom=imageZoomValue((image.imageZoom||1)*(action==='image-plus'?1.25:.8));}, true);return;
@@ -819,83 +824,193 @@ export class SlideDesigner {
   }
   openImageSearch(targetId){
     document.querySelector('#storage-image-search')?.remove();
-    const dialog=document.createElement('dialog');dialog.id='storage-image-search';dialog.className='storage-image-search';
+    const dialog=document.createElement('dialog');dialog.id='storage-image-search';dialog.className='image-finder';dialog.setAttribute('aria-labelledby','image-finder-title');
     const accent=getComputedStyle(this.studio.root.querySelector('.designer-inspector')||this.studio.root).getPropertyValue('--studio-accent').trim();
-    if(accent)dialog.style.setProperty('--search-accent',accent);
-    dialog.innerHTML=`<form method="dialog" class="image-search-head"><strong>Buscar imagens</strong><button aria-label="Fechar">×</button></form>
-      <p class="image-search-intro">Encontre a imagem certa para sua aula <span>Bing Imagens</span></p>
-      <form class="image-search-form"><input name="query" type="search" aria-label="Buscar imagens" placeholder="Ex.: Hello Kitty PNG" required autofocus><button type="submit">Pesquisar</button></form>
-      <label class="image-search-filter"><input type="checkbox" name="transparent"> Só com fundo transparente (PNG recortado)</label>
-      <p class="image-search-status" role="status">Pesquise pelo assunto, personagem ou objeto.</p><div class="image-search-results"></div>`;
-    document.body.append(dialog);dialog.showModal();dialog.addEventListener('close',()=>dialog.remove());
-    const form=dialog.querySelector('.image-search-form'),results=dialog.querySelector('.image-search-results'),status=dialog.querySelector('.image-search-status');
-    // Rolagem sem fim: quando o Bing para de trazer novidades para a busca
-    // exata, a galeria continua com variações do mesmo assunto.
-    const variants=term=>[term,...['imagens','fotos','ilustração','desenho','hd','wallpaper','arte','exemplos','ideias'].map(extra=>term+' '+extra)];
-    const more=document.createElement('p');more.className='image-search-more';more.setAttribute('role','status');
+    if(accent)dialog.style.setProperty('--finder-accent',accent);
+    const ideas=['cachorro','sistema solar','célula animal','mapa do Brasil','vulcão','computador'];
+    dialog.innerHTML=`<header class="image-finder-head"><div><h2 id="image-finder-title">Buscar imagens</h2><p>${targetId?'A imagem escolhida substitui a que está selecionada.':'Clique em uma imagem para colocá-la no slide.'}</p></div><button type="button" data-finder-close aria-label="Fechar busca de imagens">×</button></header>
+      <form class="image-finder-form" role="search"><span aria-hidden="true">${studioIcon('search')}</span><input name="query" type="search" aria-label="O que você procura?" placeholder="O que você procura? Ex.: cachorro" autocomplete="off" required><button type="submit">Buscar</button></form>
+      <div class="image-finder-modes" role="radiogroup" aria-label="Tipo de imagem">
+        <button type="button" role="radio" aria-checked="true" data-finder-mode="all">Todas as imagens</button>
+        <button type="button" role="radio" aria-checked="false" data-finder-mode="alpha"><i aria-hidden="true"></i>Só fundo transparente</button>
+      </div>
+      <p class="image-finder-status" role="status"></p>
+      <div class="image-finder-scroll">
+        <div class="image-finder-empty" data-finder-empty><strong>Digite o assunto e aperte Buscar</strong><span>Ou comece por uma destas ideias:</span><div>${ideas.map(idea=>`<button type="button" data-finder-idea="${esc(idea)}">${esc(idea)}</button>`).join('')}</div></div>
+        <div class="image-finder-grid" data-finder-grid></div>
+        <p class="image-finder-more" data-finder-more></p>
+      </div>`;
+    document.body.append(dialog);dialog.showModal();
+    const form=dialog.querySelector('.image-finder-form'),input=form.elements.query,scroller=dialog.querySelector('.image-finder-scroll'),grid=dialog.querySelector('[data-finder-grid]'),status=dialog.querySelector('.image-finder-status'),empty=dialog.querySelector('[data-finder-empty]'),more=dialog.querySelector('[data-finder-more]');
+    const urls=[];
+    // Quando a busca exata acaba, a galeria segue com variações do mesmo assunto.
+    const variants=(term,alpha)=>alpha?[term+' png',term,term+' sem fundo',term+' recortado',term+' clipart png',term+' ícone png']:[term,...['imagens','fotos','ilustração','desenho','hd','arte','exemplos'].map(extra=>term+' '+extra)];
     const seen=new Set();
-    let searchTerm='',searchAlpha=false,loading=false,ended=false,queries=[],queryIndex=0,page=0,dry=0,failures=0,token=0;
-    const nearEnd=()=>results.scrollHeight-results.scrollTop-results.clientHeight<420;
-    const addChoice=choice=>{
-      const key=choice.original||choice.url;if(seen.has(key))return false;seen.add(key);
-      const button=document.createElement('button');button.type='button';button.className='image-search-choice';if(choice.transparent)button.dataset.transparent='true';
-      const img=document.createElement('img');img.src=choice.thumbnail;img.alt=choice.title;img.loading='lazy';img.onerror=()=>button.remove();
-      const title=document.createElement('span');title.className='image-search-title';title.textContent=choice.title;
-      const credit=document.createElement('span');credit.className='image-search-credit';credit.textContent=[choice.catalog,choice.license,choice.author].filter(Boolean).join(' · ');
-      button.append(img,title,credit);if(choice.source)button.title='Abrir a origem: '+choice.source;
-      button.addEventListener('click',async()=>{button.disabled=true;try{const image=await importImageChoice(choice);const [assetId]=await storePages([image.data]);this.mutate(slide=>{let item=slide.elements.find(value=>value.id===targetId&&value.type==='image');if(!item){item=newElement('image');slide.elements.push(item);}item.assetId=assetId;item.image='';item.imageAlt=image.alt;item.imageSource=image.source;item.imageLicense=[image.license,image.author].filter(Boolean).join(' · ');item.imageCredit=image.catalog||'';this.selected=item.id;});dialog.close();}catch(error){this.studio.callbacks.toast(error.message);button.disabled=false;}});results.insertBefore(button,more);return true;
+    let term='',alpha=false,loading=false,ended=false,queries=[],queryIndex=0,page=0,dry=0,failures=0,token=0,shown=0,checking=0,checked=0;
+    const nearEnd=()=>scroller.scrollHeight-scroller.scrollTop-scroller.clientHeight<480;
+    const skeleton=count=>{for(let i=0;i<count;i++){const cell=document.createElement('div');cell.className='image-finder-skeleton';cell.setAttribute('aria-hidden','true');grid.append(cell);}};
+    const clearSkeleton=()=>grid.querySelectorAll('.image-finder-skeleton').forEach(cell=>cell.remove());
+    const showEmpty=(title,text,withIdeas=false)=>{empty.hidden=false;empty.querySelector('strong').textContent=title;empty.querySelector('span').textContent=text;empty.querySelector('div').hidden=!withIdeas;};
+    const report=()=>{
+      if(!term){status.textContent='';return;}
+      if(alpha)status.textContent=shown?`${shown} ${shown===1?'imagem':'imagens'} com fundo transparente conferido${checking?' · conferindo mais…':''}`:checking||loading?`Conferindo quais imagens têm fundo transparente de verdade… (${checked} analisadas)`:'';
+      else status.textContent=shown?`${shown} ${shown===1?'imagem':'imagens'} para “${term}”`:loading?'Buscando imagens…':'';
+    };
+    const insert=async(choice,button)=>{
+      button.disabled=true;button.dataset.busy='true';
+      try{
+        const image=await importImageChoice(choice);const [assetId]=await storePages([image.data]);
+        this.mutate(slide=>{let item=slide.elements.find(value=>value.id===targetId&&value.type==='image');if(!item){item=newElement('image');slide.elements.push(item);}item.assetId=assetId;item.image='';item.imageAlt=image.alt;item.imageSource=image.source;item.imageLicense=[image.license,image.author].filter(Boolean).join(' · ');item.imageCredit=image.catalog||'';this.selected=item.id;});
+        dialog.close();
+      }catch(error){this.studio.callbacks.toast(error.message);button.disabled=false;delete button.dataset.busy;}
+    };
+    const addCard=(choice,run)=>{
+      if(run!==token)return;
+      const button=document.createElement('button');button.type='button';button.className='image-finder-card';
+      const img=document.createElement('img');img.alt=choice.title;img.loading='lazy';img.decoding='async';
+      if(choice.blob){const url=URL.createObjectURL(choice.blob);urls.push(url);img.src=url;button.dataset.transparent='true';}
+      else img.src=choice.thumbnail;
+      img.onerror=()=>{if(button.isConnected){button.remove();shown--;report();}};
+      const title=document.createElement('span');title.className='image-finder-title';title.textContent=choice.title;
+      let host='';try{host=new URL(choice.source||choice.original||choice.url).hostname.replace(/^www\./,'');}catch{/* sem origem */}
+      const origin=document.createElement('span');origin.className='image-finder-origin';origin.textContent=[host,choice.license].filter(Boolean).join(' · ');
+      button.append(img);
+      if(choice.blob){const badge=document.createElement('span');badge.className='image-finder-badge';badge.textContent='✓ Fundo transparente';button.append(badge);}
+      button.append(title,origin);
+      button.setAttribute('aria-label',`Inserir imagem: ${choice.title}${choice.blob?' (fundo transparente)':''}`);
+      button.addEventListener('click',()=>insert(choice,button));
+      const firstSkeleton=grid.querySelector('.image-finder-skeleton');
+      if(firstSkeleton)grid.insertBefore(button,firstSkeleton);else grid.append(button);
+      shown++;empty.hidden=true;report();
+    };
+    // Fundo transparente: cada imagem só aparece depois de conferida no arquivo original.
+    const verifyAll=async(choices,run)=>{
+      const queue=[...choices];
+      const worker=async()=>{
+        while(queue.length&&run===token&&dialog.open){
+          const choice=queue.shift();checking++;report();
+          const blob=await verifyTransparentChoice(choice);
+          checking--;checked++;
+          if(blob)addCard({...choice,blob,transparent:true},run);
+          if(run===token)report();
+        }
+      };
+      await Promise.all(Array.from({length:4},worker));
     };
     const loadMore=async()=>{
-      if(loading||ended||!searchTerm||!dialog.open)return;
+      if(loading||ended||!term||!dialog.open)return;
       loading=true;const run=token;
-      more.textContent='Carregando mais imagens…';if(!seen.size)status.textContent='Buscando imagens…';
+      more.textContent='';skeleton(shown?4:8);report();
       try{
-        // Busca até a tela encher de novo; páginas repetidas não contam.
+        // Continua até encher a tela; enquanto não houver nenhuma imagem, não para.
         let burst=0;
-        while(run===token&&dialog.open&&!ended&&nearEnd()&&burst++<5){
+        while(run===token&&dialog.open&&!ended&&(nearEnd()||!shown)&&burst++<(shown?4:12)){
           let choices;
-          try{choices=await searchImageChoices(queries[queryIndex],++page,{transparent:searchAlpha});failures=0;}
-          catch(error){
+          try{choices=await searchImageChoices(queries[queryIndex],++page,{transparent:alpha});failures=0;}
+          catch{
             page--;
             if(run!==token)return;
-            if(++failures<3){await new Promise(resolve=>setTimeout(resolve,900*failures));continue;}
-            failures=0;
-            if(!seen.size)status.textContent='A busca falhou. Confira a conexão e tente de novo.';
-            more.innerHTML='';const retry=document.createElement('button');retry.type='button';retry.textContent='Tentar carregar mais';retry.addEventListener('click',loadMore);more.append('Não deu para carregar mais agora. ',retry);
+            if(++failures<3){burst--;await new Promise(resolve=>setTimeout(resolve,900*failures));continue;}
+            failures=0;clearSkeleton();
+            if(!shown)showEmpty('Não consegui falar com o buscador','Confira a internet e tente de novo.');
+            more.replaceChildren();const retry=document.createElement('button');retry.type='button';retry.textContent='Tentar de novo';retry.addEventListener('click',loadMore);more.append(retry);
             return;
           }
           if(run!==token)return;
-          const added=choices.filter(addChoice).length;
-          if(seen.size)status.textContent='';
-          dry=added?0:dry+1;
-          // Duas páginas seguidas sem nada novo: essa busca acabou, vai para a próxima variação.
-          if(dry>=2||page>=80){queryIndex++;page=0;dry=0;if(queryIndex>=queries.length)ended=true;}
+          const fresh=choices.filter(choice=>{const key=choice.original||choice.url;if(seen.has(key))return false;seen.add(key);return true;});
+          if(alpha)await verifyAll(fresh,run);else for(const choice of fresh)addCard(choice,run);
+          if(run!==token)return;
+          dry=fresh.length?0:dry+1;
+          // Duas páginas seguidas sem novidade: passa para a próxima variação.
+          if(dry>=2||page>=80||alpha&&page>=4){queryIndex++;page=0;dry=0;if(queryIndex>=queries.length)ended=true;}
         }
         if(run!==token)return;
-        if(ended){
-          more.textContent=seen.size?'Essas são todas as imagens que o Bing tem para esta busca.':'';
-          if(!seen.size)status.textContent='Nenhuma imagem encontrada no Bing. Tente outras palavras.';
-        }else more.textContent='Role para ver mais imagens';
-      }finally{if(run===token)loading=false;}
+        clearSkeleton();
+        if(!shown){
+          ended=true;
+          if(alpha)showEmpty('Nenhuma imagem com fundo transparente','Analisei '+checked+' imagens e nenhuma tinha o fundo recortado. Tente outra palavra ou busque em “Todas as imagens”.');
+          else showEmpty('Nada encontrado para “'+term+'”','Tente outra palavra, no singular ou em inglês.',true);
+        }else more.textContent=ended?'Você viu todas as imagens desta busca.':'Role para carregar mais';
+      }finally{if(run===token){loading=false;clearSkeleton();report();}}
     };
     const startSearch=()=>{
-      const term=String(new FormData(form).get('query')||'').trim();if(!term)return;
-      token++;loading=false;ended=false;searchTerm=term;searchAlpha=dialog.querySelector('[name=transparent]').checked;
-      queries=variants(term);queryIndex=0;page=0;dry=0;failures=0;seen.clear();
-      results.replaceChildren(more);results.scrollTop=0;
+      const value=input.value.trim();if(!value)return;
+      token++;loading=false;ended=false;term=value;
+      queries=variants(term,alpha);queryIndex=0;page=0;dry=0;failures=0;shown=0;checking=0;checked=0;seen.clear();
+      for(const url of urls.splice(0))URL.revokeObjectURL(url);
+      grid.replaceChildren();more.textContent='';empty.hidden=true;scroller.scrollTop=0;
       loadMore();
     };
-    results.addEventListener('scroll',()=>{if(nearEnd())loadMore();},{passive:true});
-    // Telas altas: a primeira leva pode não criar rolagem; o observador garante a próxima.
-    if('IntersectionObserver' in window){const watcher=new IntersectionObserver(entries=>{if(entries.some(entry=>entry.isIntersecting))loadMore();},{root:results,rootMargin:'400px'});watcher.observe(more);dialog.addEventListener('close',()=>watcher.disconnect());}
-    dialog.addEventListener('close',()=>{token++;});
-    dialog.querySelector('[name=transparent]').addEventListener('change',()=>{if(form.elements.query.value.trim())startSearch();});
+    scroller.addEventListener('scroll',()=>{if(nearEnd())loadMore();},{passive:true});
+    dialog.addEventListener('click',event=>{
+      if(event.target.closest('[data-finder-close]')){dialog.close();return;}
+      const idea=event.target.closest('[data-finder-idea]');
+      if(idea){input.value=idea.dataset.finderIdea;startSearch();return;}
+      const mode=event.target.closest('[data-finder-mode]');
+      if(mode){
+        alpha=mode.dataset.finderMode==='alpha';
+        for(const option of dialog.querySelectorAll('[data-finder-mode]'))option.setAttribute('aria-checked',String(option===mode));
+        dialog.dataset.mode=mode.dataset.finderMode;
+        if(input.value.trim())startSearch();
+      }
+    });
+    dialog.addEventListener('close',()=>{token++;for(const url of urls.splice(0))URL.revokeObjectURL(url);dialog.remove();});
     form.addEventListener('submit',event=>{event.preventDefault();startSearch();});
+    input.focus();
   }
-  openSimulationModal(initialType='projectile',targetId=null){
+  openVideoDialog(targetId=null){
+    document.querySelector('#slide-video-dialog')?.remove();
+    const current=targetId?this.display().elements.find(item=>item.id===targetId)?.video||'':'';
+    const dialog=document.createElement('dialog');
+    dialog.id='slide-video-dialog';dialog.className='video-dialog';dialog.setAttribute('aria-labelledby','slide-video-title');
+    dialog.innerHTML=`<form method="dialog" novalidate><header><h2 id="slide-video-title">${targetId?'Trocar vídeo':'Inserir vídeo'}</h2><button type="button" data-video-close aria-label="Fechar">×</button></header>
+      <label for="slide-video-url">Link do vídeo</label>
+      <input id="slide-video-url" type="url" inputmode="url" autocomplete="off" placeholder="https://www.youtube.com/watch?v=…" value="${esc(current)}">
+      <p class="video-dialog-hint" data-video-hint>Aceita YouTube, Vimeo ou link direto de arquivo .mp4 / .webm.</p>
+      <div class="video-dialog-preview" data-video-preview hidden></div>
+      <footer><button type="button" class="video-dialog-quiet" data-video-close>Cancelar</button><button type="submit" class="video-dialog-go" disabled>${targetId?'Trocar vídeo':'Inserir no slide'}</button></footer></form>`;
+    const input=dialog.querySelector('input'),hint=dialog.querySelector('[data-video-hint]'),preview=dialog.querySelector('[data-video-preview]'),submit=dialog.querySelector('[type=submit]');
+    const check=()=>{
+      const value=input.value.trim(),source=videoSource(value);
+      submit.disabled=!source;
+      hint.dataset.state=source?'ok':value?'error':'';
+      hint.textContent=source?`${source.label} reconhecido.`:value?'Não reconheci esse link. Use um link do YouTube, do Vimeo ou de um arquivo .mp4 / .webm.':'Aceita YouTube, Vimeo ou link direto de arquivo .mp4 / .webm.';
+      preview.hidden=!source;
+      preview.innerHTML=source?videoMarkup({video:value},false):'';
+      return source;
+    };
+    input.addEventListener('input',check);
+    dialog.addEventListener('click',event=>{if(event.target.closest('[data-video-close]'))dialog.close();});
+    dialog.querySelector('form').addEventListener('submit',event=>{
+      event.preventDefault();
+      if(!check())return;
+      const video=input.value.trim().slice(0,600);
+      try{
+        this.mutate(s=>{
+          const existing=targetId&&s.elements.find(item=>item.id===targetId&&item.type==='video');
+          if(existing){existing.video=video;this.selected=existing.id;return;}
+          if(s.elements.length>=MAX_CANVAS_ELEMENTS)throw Error(`Use até ${MAX_CANVAS_ELEMENTS} elementos no slide.`);
+          const item=newElement('video',{x:22,y:18,w:56,h:56,video});
+          s.elements.push(item);this.selected=item.id;
+        });
+        dialog.close();
+      }catch(error){this.studio.callbacks.toast(error.message);}
+    });
+    dialog.addEventListener('close',()=>dialog.remove(),{once:true});
+    document.body.append(dialog);check();dialog.showModal();input.focus();
+  }
+  openSimulationModal(initialType='projectile',targetId=null,initialCustom=null){
     document.querySelector('#simulation-lab-modal')?.remove();
+    // Importados ficam na biblioteca deste navegador; o que já está no slide entra na lista também.
+    let customs=loadCustomSims();
     let activeType=Object.hasOwn(simulationNames,initialType)?initialType:'projectile';
+    if(initialCustom){
+      let match=customs.find(item=>item.html===initialCustom.html);
+      if(!match){match={id:'slide-'+createUuid(),...initialCustom,unsaved:true};customs=[match,...customs];}
+      activeType='custom:'+match.id;
+    }
     let activeSubject='all';
+    const canEdit=this.studio.groups.canEdit;
     const modalSims=new Simulations();
     const dialog=document.createElement('dialog');
     dialog.id='simulation-lab-modal';
@@ -903,37 +1018,68 @@ export class SlideDesigner {
     dialog.setAttribute('aria-labelledby','simulation-modal-title');
     const accent=getComputedStyle(this.studio.root.querySelector('.designer-inspector')||this.studio.root).getPropertyValue('--studio-accent').trim();
     if(accent)dialog.style.setProperty('--sim-accent',accent);
-    const selectMarkup=simulationGroups.map(([subject,items])=>`<optgroup label="${esc(subject)}">${items.map(([id,name])=>`<option value="${id}" ${id===activeType?'selected':''}>${esc(name)}</option>`).join('')}</optgroup>`).join('');
-    const filtersMarkup=[['all','Todas'],...simulationGroups.map(([subject])=>[subject,subject])].map(([key,label])=>`<button type="button" role="tab" class="simulation-modal-filter" data-sim-filter="${esc(key)}" aria-selected="${key===activeSubject}">${esc(label)}</button>`).join('');
-    const listMarkup=simulationGroups.flatMap(([subject,items])=>items.map(([id,name])=>`<button type="button" role="option" class="simulation-modal-choice" data-sim-choice="${esc(id)}" data-subject="${esc(subject)}" aria-selected="${id===activeType}"><strong>${esc(name)}</strong><span>${esc(subject)}</span></button>`)).join('');
-    dialog.innerHTML=`<form method="dialog" class="simulation-modal-head"><div><strong id="simulation-modal-title">Laboratório de simulações</strong><span>Teste os parâmetros ao vivo antes de ${targetId?'aplicar':'inserir'} no slide.</span></div><button type="submit" class="simulation-modal-close" aria-label="Fechar">×</button></form>
+    const subjects=simulationGroups.map(([subject])=>subject);
+    const customOf=type=>type.startsWith('custom:')?customs.find(item=>item.id===type.slice(7)):null;
+    const filtersMarkup=[['all','Todas'],...subjects.map(subject=>[subject,subject]),['mine','Importados']].map(([key,label])=>`<button type="button" role="tab" class="simulation-modal-filter" data-sim-filter="${esc(key)}" aria-selected="${key===activeSubject}">${esc(label)}</button>`).join('');
+    dialog.innerHTML=`<form method="dialog" class="simulation-modal-head"><div><strong id="simulation-modal-title">Laboratório de simulações</strong></div><button type="submit" class="simulation-modal-close" aria-label="Fechar">×</button></form>
       <div class="simulation-modal-body">
         <section class="simulation-modal-stage" aria-live="polite"></section>
         <aside class="simulation-modal-catalog">
-          <label class="simulation-modal-select-wrap">Simulação<select class="simulation-modal-select" aria-label="Tipo de simulação">${selectMarkup}</select></label>
+          <label class="simulation-modal-select-wrap">Experimento<select class="simulation-modal-select" aria-label="Escolher experimento"></select></label>
           <div class="simulation-modal-filters" role="tablist" aria-label="Filtrar por disciplina">${filtersMarkup}</div>
-          <div class="simulation-modal-list" role="listbox" aria-label="Atalhos por disciplina">${listMarkup}</div>
+          <div class="simulation-modal-list" role="listbox" aria-label="Experimentos"></div>
+          ${canEdit?`<div class="simulation-modal-import"><button type="button" data-sim-import>↑ Importar experimento</button><button type="button" data-sim-template>↓ Baixar modelo para IA</button><input type="file" accept=".html,.htm,.txt,text/html,text/plain" hidden><p role="status" data-sim-import-status></p></div>`:''}
         </aside>
       </div>
-      <footer class="simulation-modal-foot"><span class="simulation-modal-current"></span><div class="simulation-modal-actions"><button type="button" class="studio-btn quiet" data-sim-cancel>${this.studio.groups.canEdit?'Cancelar':'Fechar'}</button>${this.studio.groups.canEdit?`<button type="button" class="studio-btn studio-launch" data-sim-confirm>${targetId?'Aplicar no slide':'Inserir no slide'}</button>`:''}</div></footer>`;
-    const select=dialog.querySelector('.simulation-modal-select');
+      <footer class="simulation-modal-foot"><span class="simulation-modal-current"></span><div class="simulation-modal-actions"><button type="button" class="studio-btn quiet" data-sim-cancel>${canEdit?'Cancelar':'Fechar'}</button>${canEdit?`<button type="button" class="studio-btn studio-launch" data-sim-confirm>${targetId?'Aplicar no slide':'Inserir no slide'}</button>`:''}</div></footer>`;
     const stage=dialog.querySelector('.simulation-modal-stage');
     const current=dialog.querySelector('.simulation-modal-current');
-    const choices=[...dialog.querySelectorAll('[data-sim-choice]')];
-    const filters=[...dialog.querySelectorAll('[data-sim-filter]')];
+    const list=dialog.querySelector('.simulation-modal-list');
+    const importStatus=dialog.querySelector('[data-sim-import-status]')||document.createElement('p');
+    const select=dialog.querySelector('.simulation-modal-select');
+    const fileInput=dialog.querySelector('.simulation-modal-import input');
+    const persist=()=>saveCustomSims(customs.filter(item=>!item.unsaved).map(({id,name,category,html})=>({id,name,category,html})));
+    const renderList=()=>{
+      list.innerHTML=simulationGroups.flatMap(([subject,items])=>items.map(([id,name])=>`<button type="button" role="option" class="simulation-modal-choice" data-sim-choice="${esc(id)}" data-subject="${esc(subject)}" aria-selected="${id===activeType}"><strong>${esc(name)}</strong><span>${esc(subject)}</span></button>`)).join('')
+        +customs.map(item=>`<button type="button" role="option" class="simulation-modal-choice" data-sim-choice="custom:${esc(item.id)}" data-subject="${esc(item.category)}" data-mine aria-selected="${'custom:'+item.id===activeType}"><strong>${esc(item.name)}</strong><span>${esc(item.category)} · importado</span></button>`).join('');
+      // No celular a lista vira um seletor só.
+      select.innerHTML=simulationGroups.map(([subject,items])=>`<optgroup label="${esc(subject)}">${items.map(([id,name])=>`<option value="${id}">${esc(name)}</option>`).join('')}</optgroup>`).join('')+(customs.length?`<optgroup label="Importados">${customs.map(item=>`<option value="custom:${esc(item.id)}">${esc(item.name)}</option>`).join('')}</optgroup>`:'');
+      select.value=activeType;
+      for(const choice of list.children)choice.hidden=activeSubject==='mine'?!choice.hasAttribute('data-mine'):activeSubject!=='all'&&choice.dataset.subject!==activeSubject;
+      if(activeSubject==='mine'&&!customs.length)list.innerHTML='<p class="simulation-modal-none">Nenhum experimento importado ainda. Baixe o modelo, peça o experimento a uma IA e importe o arquivo aqui.</p>';
+    };
     const renderStage=(type)=>{
-      activeType=Object.hasOwn(simulationNames,type)?type:'projectile';
-      // O catálogo já foi escolhido no seletor; a lista lateral seria uma segunda lista.
+      const custom=customOf(type);
+      activeType=custom?type:Object.hasOwn(simulationNames,type)?type:'projectile';
+      modalSims.dispose();
+      if(custom){
+        current.textContent=`${custom.category} · ${custom.name} (importado)`;
+        stage.innerHTML=`<div class="simulation-modal-custom">${customSimMarkup(custom)}${canEdit?`<div class="simulation-modal-manage"><label>Nome<input type="text" maxlength="80" value="${esc(custom.name)}" data-sim-rename></label><label>Categoria<select data-sim-category>${subjects.map(subject=>`<option ${subject===custom.category?'selected':''}>${esc(subject)}</option>`).join('')}</select></label>${custom.unsaved?'<button type="button" data-sim-keep>Guardar na minha lista</button>':'<button type="button" data-sim-delete>Excluir da lista</button>'}</div>`:''}</div>`;
+      }else{
+        current.textContent=`${simulationSubjects[activeType]||'Ciências'} · ${simulationNames[activeType]}`;
+        stage.innerHTML=simulationMarkup(activeType);
+        modalSims.mount(stage);
+      }
+      for(const choice of list.querySelectorAll('[data-sim-choice]'))choice.setAttribute('aria-selected',String(choice.dataset.simChoice===activeType));
       if(select.value!==activeType)select.value=activeType;
-      for(const choice of choices)choice.setAttribute('aria-selected',String(choice.dataset.simChoice===activeType));
-      current.textContent=`${simulationSubjects[activeType]||'Ciências'} · ${simulationNames[activeType]}`;
-      stage.innerHTML=simulationMarkup(activeType);
-      modalSims.mount(stage);
     };
     const setFilter=(subject)=>{
       activeSubject=subject;
-      for(const tab of filters)tab.setAttribute('aria-selected',String(tab.dataset.simFilter===activeSubject));
-      for(const choice of choices)choice.hidden=activeSubject!=='all'&&choice.dataset.subject!==activeSubject;
+      for(const tab of dialog.querySelectorAll('[data-sim-filter]'))tab.setAttribute('aria-selected',String(tab.dataset.simFilter===activeSubject));
+      renderList();
+    };
+    const importFile=async file=>{
+      importStatus.textContent='';
+      try{
+        if(file.size>CUSTOM_SIM_MAX*4)throw Error('Arquivo grande demais para um experimento.');
+        const sim=parseExperimentFile(await file.text(),file.name);
+        if(customs.filter(item=>!item.unsaved).length>=40)throw Error('A lista já tem 40 experimentos importados. Exclua algum antes de importar outro.');
+        const item={id:createUuid(),...sim};
+        customs=[item,...customs.filter(other=>other.html!==sim.html)];
+        if(!persist())importStatus.textContent='Importado, mas não coube na memória deste navegador: ele vale só até fechar esta janela.';
+        else importStatus.textContent=`“${sim.name}” importado. Teste ao lado antes de inserir.`;
+        activeSubject='mine';setFilter('mine');renderStage('custom:'+item.id);
+      }catch(error){importStatus.textContent=error.message;}
     };
     dialog.addEventListener('click',event=>{
       const filterBtn=event.target.closest('[data-sim-filter]');
@@ -941,16 +1087,28 @@ export class SlideDesigner {
       const choiceBtn=event.target.closest('[data-sim-choice]');
       if(choiceBtn){renderStage(choiceBtn.dataset.simChoice);return;}
       if(event.target.closest('[data-sim-cancel]')){dialog.close();return;}
+      if(event.target.closest('[data-sim-import]')){fileInput.click();return;}
+      if(event.target.closest('[data-sim-template]')){
+        const url=URL.createObjectURL(new Blob([experimentTemplate()],{type:'text/html'}));
+        const link=document.createElement('a');link.href=url;link.download='modelo-experimento-storage-lab.html';document.body.append(link);link.click();link.remove();
+        setTimeout(()=>URL.revokeObjectURL(url),2000);
+        importStatus.textContent='Modelo baixado. Envie o arquivo para uma IA com o seu pedido e importe a resposta aqui.';
+        return;
+      }
+      const custom=customOf(activeType);
+      if(custom&&event.target.closest('[data-sim-delete]')){customs=customs.filter(item=>item!==custom);persist();renderList();renderStage('projectile');importStatus.textContent=`“${custom.name}” saiu da sua lista. Slides que já usam continuam funcionando.`;return;}
+      if(custom&&event.target.closest('[data-sim-keep]')){delete custom.unsaved;persist();renderList();renderStage(activeType);return;}
       if(event.target.closest('[data-sim-confirm]')){
-        if(!this.studio.groups.canEdit)return;
+        if(!canEdit)return;
         try{
+          const fields=custom?{simulation:'custom',customSim:{name:custom.name,category:custom.category,html:custom.html}}:{simulation:activeType};
           this.mutate(s=>{
             if(targetId){
               const existing=s.elements.find(item=>item.id===targetId&&item.type==='simulation');
-              if(existing){existing.simulation=activeType;this.selected=existing.id;return;}
+              if(existing){delete existing.customSim;Object.assign(existing,fields);this.selected=existing.id;return;}
             }
             if(s.elements.length>=MAX_CANVAS_ELEMENTS)throw Error(`Use até ${MAX_CANVAS_ELEMENTS} elementos no slide.`);
-            const item=newElement('simulation',{x:53,y:12,w:42,h:76,simulation:activeType});
+            const item=newElement('simulation',{x:53,y:12,w:42,h:76,...fields});
             s.elements.push(item);
             this.selected=item.id;
           });
@@ -958,9 +1116,22 @@ export class SlideDesigner {
         }catch(error){this.studio.callbacks.toast(error.message);}
       }
     });
+    // Renomear e trocar de categoria valem na hora, sem recarregar o experimento.
+    dialog.addEventListener('input',event=>{
+      const custom=customOf(activeType);if(!custom)return;
+      if(event.target.matches('[data-sim-rename]')){custom.name=event.target.value.replace(/[<>]/g,'').trim().slice(0,80)||'Experimento importado';}
+      else if(event.target.matches('[data-sim-category]')){custom.category=event.target.value;}
+      else return;
+      persist();renderList();
+      current.textContent=`${custom.category} · ${custom.name} (importado)`;
+      const head=stage.querySelector('.custom-sim header');
+      if(head){head.querySelector('strong').textContent=custom.name;head.querySelector('span').textContent=custom.category.toUpperCase();}
+    });
     select.addEventListener('change',()=>renderStage(select.value));
+    fileInput?.addEventListener('change',()=>{const file=fileInput.files[0];fileInput.value='';if(file)importFile(file);});
     dialog.addEventListener('close',()=>{modalSims.dispose();dialog.remove();},{once:true});
     document.body.append(dialog);
+    renderList();
     renderStage(activeType);
     dialog.showModal();
   }

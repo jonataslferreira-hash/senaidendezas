@@ -26,13 +26,26 @@ export class AccountPresenter{
    this.channel=this.studio.account.client.channel('sl-live:'+owner,{config:{private:true,broadcast:{ack:true},presence:{key:this.device}}})
     .on('presence',{event:'sync'},()=>{if(epoch!==this.epoch)return;this.sessions=Object.values(this.channel.presenceState()).flat().filter(p=>p.role==='presenter'&&p.device!==this.device&&/^\d{6}$/.test(p.code||'')).slice(0,10);this.paint();})
     .on('broadcast',{event:'control'},({payload})=>{if(epoch!==this.epoch||!this.local||payload?.target!==this.device||!commands.has(payload.action))return;this.studio.callbacks.remoteAction?.(payload.action);})
-    .subscribe((state,error)=>{if(epoch!==this.epoch)return;if(state==='SUBSCRIBED'){this.ready=true;this.track();this.status='';}else if(['CHANNEL_ERROR','TIMED_OUT','CLOSED'].includes(state)){this.ready=false;this.status=remoteConnectionMessage(state,error,navigator.onLine);}this.paint();});
-  }catch(error){if(epoch===this.epoch)this.status=remoteConnectionMessage('CHANNEL_ERROR',error,navigator.onLine);}
+    .subscribe((state,error)=>{if(epoch!==this.epoch)return;if(state==='SUBSCRIBED'){this.ready=true;this.failures=0;clearTimeout(this.retryTimer);this.track();this.status='';}else if(['CHANNEL_ERROR','TIMED_OUT','CLOSED'].includes(state)){this.ready=false;this.dropped(state,error,epoch);}this.paint();});
+  }catch(error){if(epoch===this.epoch)this.dropped('CHANNEL_ERROR',error,epoch);}
   finally{if(epoch===this.epoch){this.connecting=false;this.paint();}}
+ }
+ // Quedas do controle remoto são comuns (por exemplo ao sair de uma
+ // apresentação) e se resolvem sozinhas: reconecta em silêncio e só avisa na
+ // tela depois de várias tentativas seguidas sem sucesso.
+ dropped(state,error,epoch){
+  this.failures=(this.failures||0)+1;
+  const message=remoteConnectionMessage(state,error,navigator.onLine);
+  const fatal=/sessão do controle expirou/.test(message);
+  this.status=this.failures>=5||fatal?message:'';
+  clearTimeout(this.retryTimer);
+  if(fatal||!navigator.onLine)return;
+  this.retryTimer=setTimeout(()=>{if(epoch===this.epoch&&!this.ready&&this.owner){const kept=this.failures;this.connect(true).finally(()=>{this.failures=Math.max(this.failures||0,kept);});}},Math.min(30000,1500*2**Math.min(this.failures,5)));
  }
  setPresentation(value){const key=JSON.stringify(value);if(key===this.last)return;this.last=key;this.local=value;this.track();}
  track(){if(!this.channel||!this.ready)return;if(this.local)this.channel.track({...this.local,role:'presenter',device:this.device}).catch(()=>{});else this.channel.untrack().catch(()=>{});}
- retryMarkup(){return this.status&&!this.ready?`<div class="remote-connection-status"><p role="status">${esc(this.status)}</p><button type="button" class="studio-btn quiet" data-remote-action="reconnect">Reconectar controle</button></div>`:'';}
+ // O aviso só interessa a quem está usando o controle neste aparelho.
+ retryMarkup(){return this.status&&!this.ready&&this.open?`<div class="remote-connection-status"><p role="status">${esc(this.status)}</p><button type="button" class="studio-btn quiet" data-remote-action="reconnect">Reconectar controle</button></div>`:'';}
  markup(){return this.retryMarkup()+(this.sessions.length?`<section class="account-live-sessions"><h2>Apresentação em andamento</h2>${this.sessions.map(p=>`<article><div><strong>${esc(p.title)}</strong><small>Slide ${Number(p.slide)+1} de ${Number(p.total)} · sala ${esc(p.code)}</small></div><button class="studio-btn accent" type="button" data-remote-action="open" data-device="${esc(p.device)}">Usar este aparelho como controle</button></article>`).join('')}</section>`:'');}
  roomButton(code){if(!this.ready)return '';const session=this.sessions.find(p=>p.code===code);return session?`<button type="button" class="btn secondary small" data-remote-action="open" data-device="${esc(session.device)}">Controlar slide</button>`:'';}
  dialog(){if(!this.open)return '';const p=this.sessions.find(s=>s.device===this.open),available=Boolean(p&&this.ready);return `<dialog class="group-dialog remote-dialog" aria-label="Controle da apresentação"><button class="group-close" type="button" data-remote-action="close" aria-label="Fechar controle">×</button><h2>${esc(p?.title||'Apresentação desconectada')}</h2><p>${p?'Slide '+(Number(p.slide)+1)+' de '+Number(p.total):'Aguarde o computador reconectar.'}</p>${p?.note?`<details class="remote-notes"><summary>Roteiro</summary><p>${esc(p.note)}</p></details>`:''}<div class="remote-main"><button class="studio-btn quiet" data-remote-action="previous" ${available?'':'disabled'}>← Anterior</button><button class="studio-btn accent" data-remote-action="next-slide" ${available?'':'disabled'}>Próximo →</button></div><div class="remote-extra">${[['quiz','Abrir lobby'],['start-quiz','Iniciar quiz'],['reveal','Revelar resposta'],['next-question','Próxima pergunta'],['poll','Abrir enquete'],['close-poll','Encerrar enquete'],['back-lesson','Voltar aos slides'],['finish','Encerrar atividade']].map(([a,t])=>`<button class="studio-btn quiet" data-remote-action="${a}" ${available?'':'disabled'}>${t}</button>`).join('')}</div><p role="status">${this.ready?esc(this.status):''}</p>${this.retryMarkup()}</dialog>`;}

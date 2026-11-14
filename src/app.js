@@ -101,7 +101,7 @@ function soundButton() {
   return `<button class="icon-btn" data-action="sound" aria-label="${enabled?'Desativar':'Ativar'} áudio" title="Áudio da apresentação">${icon(enabled?'volume':'mute')}</button>`;
 }
 function header() {
-  return `<header class="header">${brand()}<div class="header-right">${state?`${participantCount()}${editorLaunch&&host&&state.phase==='lesson'?'<button class="btn secondary small" data-action="edit-current-slide">Editar slide</button>':''}${!host&&state.me?'<button class="my-room-avatar" data-action="edit-player" aria-label="Editar meu perfil na sala">'+avatarContent(state.me.avatar||selectedAvatar)+'</button>':''}${!host?`<span data-room-controller data-room-code="${esc(state.code)}">${studio.remote.roomButton(state.code)}</span>`:''}<span class="connection ${status==='online'||demo?'connected':''}"><span></span>${readOnlyPresentation&&demo?'Apresentação':demo?'Prévia':status==='online'?'Ao vivo':'Reconectando'}</span>${host||state.me?soundButton():''}`:''}</div></header>`;
+  return `<header class="header">${brand()}<div class="header-right">${state?`${!host&&state.phase==='lesson'?'':participantCount()}${host&&!readOnlyPresentation&&!demo&&state.phase==='lesson'?'<button class="btn secondary small" data-action="edit-current-slide">Editar slide</button>':''}${!host&&state.me&&state.phase!=='lesson'?'<button class="my-room-avatar" data-action="edit-player" aria-label="Editar meu perfil na sala">'+avatarContent(state.me.avatar||selectedAvatar)+'</button>':''}${!host?`<span data-room-controller data-room-code="${esc(state.code)}">${studio.remote.roomButton(state.code)}</span>`:''}<span class="connection ${status==='online'||demo?'connected':''}"><span></span>${readOnlyPresentation&&demo?'Apresentação':demo?'Prévia':status==='online'?'Ao vivo':'Reconectando'}</span>${host||state.me?soundButton():''}`:''}</div></header>`;
 }
 function modelPanel(landing = false) {
   const custom = state && slides[state.slide]?.customModel;
@@ -151,7 +151,7 @@ function slideMedia(slide) {
 }
 function fullscreenButton() {
   const active=Boolean(document.fullscreenElement);
-  const label=active?'Sair da tela cheia':'Apresentar em tela cheia';
+  const label=active?'Sair da tela cheia':host?'Apresentar em tela cheia':'Ampliar slide';
   return `<button class="btn secondary small presentation-icon" data-action="fullscreen" aria-label="${label}" title="${label}">${icon(active?'collapse':'expand')}</button>`;
 }
 function presentationTop(){
@@ -160,15 +160,14 @@ function presentationTop(){
       ${!demo?`<button class="btn secondary small presentation-icon qr-toggle" data-action="toggle-qr" aria-label="QR Code" aria-pressed="${presenterSettings.qrVisible}">${studioIcon('qr')}</button>`:''}</div>
     ${!demo?`<button class="btn secondary small room-code" data-action="share">SALA <strong>${esc(state.code)}</strong></button>`:'<span></span>'}
     <div class="presentation-end">${presentationTools({host,demo,state,settings:presenterSettings,imageText,compact:true})}${readOnlyPresentation&&demo?'<button class="btn secondary small" data-action="connect-public-room">Conectar turma</button>':''}${document.fullscreenElement?soundButton():''}${fullscreenButton()}</div>
-    `:'<span class="following-label"><span class="status-dot"></span> Acompanhando o professor</span>'}<button class="btn secondary small exit-presentation" data-action="leave">↩ Sair</button></div></div>`;
+    `:`<span class="following-label"><span class="status-dot"></span> Acompanhando o professor</span><div class="viewer-tools">${participantCount()}${state.me?'<button class="my-room-avatar" data-action="edit-player" aria-label="Editar meu perfil na sala" title="Editar meu perfil">'+avatarContent(state.me.avatar||selectedAvatar)+'</button>':''}${fullscreenButton()}</div>`}<button class="btn secondary small exit-presentation" data-action="leave">↩ Sair</button></div></div>`;
 }
 function documentLesson(slide) {
   const canvas = slide.kind === 'canvas',mobile=!host&&phoneLayout.matches;
   const audioTrigger = host ? slide.audio?.trigger : '';
   return `${header()}<main class="document-classroom ${mobile?'mobile-companion':''}">${presentationTop()}
     ${status !== 'online' && !demo ? '<div class="connection-banner" role="status">Reconectando à sala. <button class="text-btn" data-action="reconnect">Reconectar</button></div>' : ''}
-    ${mobile?mobileMarkup(slides[state.slide]):`<figure class="document-stage ${canvas ? 'canvas-stage' : ''}" ${!canvas&&audioTrigger==='background'?'data-play-slide-audio="background" tabindex="0" aria-label="Tocar áudio do slide"':''}>${canvas ? canvasMarkup(slide,{audioTrigger,audioHotspots:host}) : `<img ${slide.image?'src="'+esc(slide.image)+'"':slide.assetId?'data-asset-id="'+esc(slide.assetId)+'"':''} alt="${esc(slide.imageAlt || slide.title)}"><figcaption class="sr-only">${esc(slide.title)}</figcaption>`}${focusButton(slides[state.slide])}</figure>`}
-    ${!host&&!mobile ? `<button class="student-expand" data-action="fullscreen">⛶ Ampliar slide</button>` : ''}
+    ${mobile?mobileMarkup(slides[state.slide]):`<figure class="document-stage ${canvas ? 'canvas-stage' : ''}" ${!canvas&&audioTrigger==='background'?'data-play-slide-audio="background" tabindex="0" aria-label="Tocar áudio do slide"':''}>${canvas ? canvasMarkup(slide,{audioTrigger,audioHotspots:host}) : `<img ${slide.image?'src="'+esc(slide.image)+'"':slide.assetId?'data-asset-id="'+esc(slide.assetId)+'"':''} alt="${esc(slide.imageAlt || slide.title)}"><figcaption class="sr-only">${esc(slide.title)}</figcaption>`}${host?'':focusButton(slides[state.slide])}</figure>`}
     ${slide.prompt ? `<section class="document-discussion"><strong>${esc(slide.prompt)}</strong><button class="text-btn" data-action="solution">${solutionOpen ? 'Ocultar' : 'Conferir'} explicação</button>${solutionOpen ? `<p>${esc(slide.answer)}</p>` : ''}</section>` : ''}
     <footer class="document-footer"><div class="document-nav"><span class="slide-counter"><strong>${state.slide + 1}</strong> / ${slides.length}</span>${host ? `${state.totalQuestions?'<button class="text-btn" data-action="quiz">Ir para o quiz</button>':''}<button class="icon-btn bordered" data-action="previous" aria-label="Slide anterior" ${state.slide === 0 && !(state.animationStep>0) ? 'disabled' : ''}>${icon('left')}</button>${state.activity&&state.activity.slideIndices.at(-1)===state.slide&&!pendingPptxBuild()?`<button class="btn primary small" data-action="${state.activity.hasNext?'next-stage':'finish'}">${state.activity.hasNext?'Próxima etapa →':'Encerrar aula'}</button>`:state.slide < slides.length - 1 || pendingPptxBuild() ? `<button class="btn primary small" data-action="next-slide">Próximo ${icon('right')}</button>` : `<button class="btn primary small" data-action="${state.totalQuestions ? 'quiz' : 'finish'}">${state.totalQuestions ? 'Iniciar quiz' : 'Encerrar aula'} ${icon('check')}</button>`}` : '<span class="following-label">Sincronizado com a aula</span>'}</div></footer></main>${shareOpen ? shareDialog() : ''}`;
 }
@@ -186,8 +185,6 @@ function rankingTable(full = false) {
 }
 function quiz(){return quizMarkup(state,{header,host,demo,status,shareDialog,shareOpen});}
 function finished() {
-  if (!state.totalQuestions) return `${header()}<main class="results"><span class="eyebrow purple-text">IDEIAS COMPARTILHADAS</span><h1>Aula <span>concluída.</span></h1><p>${esc(activeLesson.title)}</p><p>${state.ranking.length} participante(s) fizeram parte desta descoberta.</p><div class="results-actions">${host ? '<button class="btn primary" data-action="back-lesson">Voltar à aula</button>' : ''}<button class="btn secondary" data-action="leave">Voltar ao início</button></div></main>`;
-
   return leaderboardMarkup(state,{header,host,offset:timerOffset,final:true});
 }
 
@@ -220,6 +217,9 @@ function render() {
   viewer.el.remove();
   app.dataset.readOnly = String(readOnlyPresentation);
   app.dataset.role = state ? host ? 'presenter' : 'student' : 'studio';
+  // Aula sem quiz não tem tela de encerramento: quem apresenta volta direto
+  // para onde estava e quem assiste volta ao início.
+  if (state?.phase === 'finished' && !state.totalQuestions) { focusView.close(); leave(); return; }
   app.classList.toggle('quiz-party', Boolean(state && state.phase !== 'lesson'));
   const markup = sharedLoading || busy && host && !state ? `${header()}<main class="public-loading"><p role="status">Carregando apresentação…</p></main>` : sharedError ? `${header()}<main class="public-loading"><h1>Apresentação indisponível</h1><p>${esc(sharedError)}</p><button class="btn secondary" data-action="home">Voltar</button></main>` : !state ? studio.markup() : state.phase === 'lesson' ? lesson() : ['lobby', 'countdown'].includes(state.phase) ? lobbyMarkup(state, { host, demo, header, shareDialog, shareOpen }) : state.phase === 'finished' ? finished() : state.phase==='leaderboard'?leaderboardMarkup(state,{header,host,offset:timerOffset}):state.poll ? pollMarkup() : quiz();
   const chatSlots = '[data-chat-slot], [data-social-slot]';
@@ -457,7 +457,7 @@ async function action(name) {
     case 'reveal': control('reveal'); break;
     case 'next-question': control(state.phase==='reveal'?'ranking':'next'); break;
     case 'back-lesson': control('lesson'); break;
-    case 'edit-current-slide': openLiveEditor(); break;
+    case 'edit-current-slide': await editInStudio(); break;
     case 'cancel-edit-slide': editDraft = null; editError = ''; render(); showPresentationControls(); break;
     case 'image-text': imageText = !imageText; syncPresentationMode(); showPresentationControls(); break;
     case 'solution': solutionOpen = !solutionOpen; render(); break;
@@ -563,11 +563,33 @@ function syncPresentationMode() {
   app.classList.toggle('show-image-text', imageText);
   requestAnimationFrame(() => viewer.resize());
 }
-function showPresentationControls() {
+function showPresentationControls(delay = 2200) {
   if (!document.fullscreenElement || state?.phase !== 'lesson') return;
   app.classList.add('presenter-controls-visible');
   clearTimeout(controlsTimer);
-  controlsTimer = setTimeout(() => app.classList.remove('presenter-controls-visible'), 2200);
+  controlsTimer = setTimeout(() => app.classList.remove('presenter-controls-visible'), delay);
+}
+// Toque (celular e tablet): encostar no alto da tela mostra a barra; o toque
+// que a revela não aciona nenhum botão. Tocar fora dela a esconde.
+let controlsRevealedAt = 0;
+document.addEventListener('pointerdown', e => {
+  if (e.pointerType === 'mouse' || !document.fullscreenElement || state?.phase !== 'lesson') return;
+  const visible = app.classList.contains('presenter-controls-visible');
+  if (e.target.closest?.('.document-top') && visible) { showPresentationControls(5000); return; }
+  if (!visible && e.clientY <= Math.max(130, innerHeight * .3)) { controlsRevealedAt = Date.now(); showPresentationControls(5000); }
+  else if (visible) { clearTimeout(controlsTimer); app.classList.remove('presenter-controls-visible'); }
+}, true);
+document.addEventListener('click', e => {
+  if (Date.now() - controlsRevealedAt < 450 && e.target.closest?.('.document-top')) { e.preventDefault(); e.stopPropagation(); }
+}, true);
+// "Editar slide" sai da apresentação e abre o editor de verdade no slide atual.
+async function editInStudio() {
+  if (!host || readOnlyPresentation || state?.phase !== 'lesson') return;
+  const index = state.slide, lessonId = activeLesson?.id, fromEditor = editorLaunch;
+  focusView.close(); leave(false);
+  if (!fromEditor || studio.view !== 'editor' || !studio.draft) await studio.action('edit', { dataset: { id: lessonId } });
+  if (studio.view === 'editor' && studio.draft?.slides?.[index]) { studio.index = index; studio.tab = 'slides'; studio.blockId = ''; studio.designer.selected = ''; }
+  studio.writeRoute(); render();
 }
 function openLiveEditor() {
   if (!host || readOnlyPresentation || state?.phase !== 'lesson') return;

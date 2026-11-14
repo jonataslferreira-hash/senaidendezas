@@ -29,6 +29,7 @@ const paths = {
   qr:'M3 3h6v6H3zm12 0h6v6h-6zM3 15h6v6H3zm12 0h3v3h3v3h-6zm-3-3h2m4 0h3',
   image:'M3 4h18v16H3zm1 13 5-5 4 4 3-3 4 4M9 8h.1',
   search:'M11 3a8 8 0 1 0 0 16 8 8 0 0 0 0-16zm6 14 5 5',
+  video:'M3 8a3 3 0 0 1 3-3h12a3 3 0 0 1 3 3v8a3 3 0 0 1-3 3H6a3 3 0 0 1-3-3zm7 1.2v5.6l5-2.8z',
   crop:'M6 2v16h16M2 6h16v16',
   library: 'M3 5h4v14H3zM10 5h4v14h-4zM17 6l3-1 2 13-3 1z',
   join: 'M13 4h7v16h-7M3 12h12m-4-4 4 4-4 4',

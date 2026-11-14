@@ -1,41 +1,46 @@
+import { labSims } from './sim-lab.js';
+export { labSims, conjugate, conjugationVerbs, conjugationTenses, conjugationPersons, fractionInfo, timezoneInfo, binaryInfo, densityInfo, pythagorasInfo, photosynthesisInfo, warmingInfo } from './sim-lab.js';
+
 export const simulationGroups = [
   ['Física', [
     ['projectile', 'Lançamento de projéteis'],
     ['pendulum', 'Pêndulo'],
     ['circuit', 'Circuito · Lei de Ohm'],
     ['waves', 'Ondas e frequência'],
-    ['lever', 'Alavanca · equilíbrio de torque']
+    ['lever', labSims.lever.name],
+    ['motion', labSims.motion.name]
   ]],
   ['Química', [
     ['neutralization', 'Ácido e base · pH'],
-    ['states', 'Estados da matéria']
+    ['states', labSims.states.name],
+    ['density', labSims.density.name]
   ]],
   ['Biologia', [
-    ['osmosis', 'Osmose celular'],
-    ['ecosystem', 'Crescimento populacional'],
-    ['genetics', 'Genética · cruzamento de Mendel']
+    ['osmosis', labSims.osmosis.name],
+    ['ecosystem', labSims.ecosystem.name],
+    ['genetics', labSims.genetics.name],
+    ['photosynthesis', labSims.photosynthesis.name]
   ]],
   ['Matemática', [
-    ['quadratic', 'Função quadrática'],
+    ['quadratic', labSims.quadratic.name],
     ['trigonometry', 'Ciclo trigonométrico'],
-    ['probability', 'Probabilidade com dados'],
-    ['interest', 'Juros compostos']
+    ['fractions', labSims.fractions.name],
+    ['interest', labSims.interest.name],
+    ['pythagoras', labSims.pythagoras.name]
   ]],
   ['Geografia', [
     ['seasons', 'Estações e inclinação axial'],
-    ['greenhouse', 'Efeito estufa e clima']
-  ]],
-  ['História', [
-    ['timeline', 'Linha do tempo · séculos e períodos']
+    ['greenhouse', labSims.greenhouse.name],
+    ['timezones', labSims.timezones.name]
   ]],
   ['Português', [
-    ['conjugation', 'Conjugação verbal · tempos e pessoas']
+    ['conjugation', labSims.conjugation.name]
   ]],
   ['Artes', [
-    ['colormix', 'Mistura de cores RGB']
+    ['colormix', labSims.colormix.name]
   ]],
   ['Tecnologia', [
-    ['logicgates', 'Portas lógicas digitais']
+    ['binary', labSims.binary.name]
   ]]
 ];
 
@@ -51,7 +56,7 @@ export const simulationIds = Object.keys(simulationNames);
 
 // Experimentos antigos que foram refeitos: slides salvos com o identificador
 // anterior abrem o experimento novo da mesma disciplina.
-export const simulationAliases = { eras: 'timeline', cipher: 'timeline', narrative: 'conjugation', textlab: 'conjugation' };
+export const simulationAliases = { eras: 'timezones', cipher: 'timezones', timeline: 'timezones', narrative: 'conjugation', textlab: 'conjugation', probability: 'fractions', logicgates: 'binary' };
 export const resolveSimulation = type => Object.hasOwn(simulationNames, type) ? type : simulationAliases[type] || 'projectile';
 
 export function projectile(v, angle, g = 9.81) {
@@ -168,70 +173,6 @@ export function narrativeStage(progress = 60, intensity = 3) {
 
 // Cifra de César: cada letra anda `shift` casas no alfabeto. Acentos são
 // removidos antes (o alfabeto romano tinha só as letras básicas).
-// Linha do tempo: converte um ano em século (regra do 6º ano: 1500 ainda é
-// século XV) e no período da divisão tradicional da História.
-const romanPairs = [[1000,'M'],[900,'CM'],[500,'D'],[400,'CD'],[100,'C'],[90,'XC'],[50,'L'],[40,'XL'],[10,'X'],[9,'IX'],[5,'V'],[4,'IV'],[1,'I']];
-export function romanNumeral(value) {
-  let n = Math.max(1, Math.round(value)), out = '';
-  for (const [amount, symbol] of romanPairs) while (n >= amount) { out += symbol; n -= amount; }
-  return out;
-}
-export const timelinePeriods = [
-  { name: 'Pré-História', from: -4000, to: -3500, color: '#94a3b8', mark: 'antes da escrita' },
-  { name: 'Idade Antiga', from: -3500, to: 476, color: '#fbbf24', mark: 'da escrita à queda de Roma' },
-  { name: 'Idade Média', from: 476, to: 1453, color: '#4ade80', mark: 'da queda de Roma à de Constantinopla' },
-  { name: 'Idade Moderna', from: 1453, to: 1789, color: '#38bdf8', mark: 'das navegações à Revolução Francesa' },
-  { name: 'Idade Contemporânea', from: 1789, to: 2030, color: '#c084fc', mark: 'da Revolução Francesa até hoje' }
-];
-const timelineEvents = [
-  [-3500, 'Invenção da escrita'], [-2560, 'Pirâmides de Gizé'], [-753, 'Fundação de Roma'], [-509, 'República Romana'],
-  [476, 'Queda de Roma'], [800, 'Império de Carlos Magno'], [1096, 'Primeira Cruzada'], [1453, 'Queda de Constantinopla'],
-  [1492, 'Colombo chega à América'], [1500, 'Portugueses chegam ao Brasil'], [1789, 'Revolução Francesa'],
-  [1822, 'Independência do Brasil'], [1888, 'Abolição da escravidão'], [1889, 'Proclamação da República'],
-  [1914, 'Primeira Guerra Mundial'], [1939, 'Segunda Guerra Mundial'], [1988, 'Constituição brasileira']
-];
-export function timelineInfo(year = 1500) {
-  let y = Math.max(-4000, Math.min(2025, Math.round(Number(year) || 0)));
-  if (y === 0) y = 1; // não existe ano zero no calendário
-  const bc = y < 0, century = Math.ceil(Math.abs(y) / 100);
-  const period = timelinePeriods.find(item => y < item.to) || timelinePeriods.at(-1);
-  const past = timelineEvents.filter(item => item[0] <= y).at(-1) || null;
-  return {
-    year: y, bc, century, roman: romanNumeral(century),
-    label: bc ? `${-y} a.C.` : `${y}`,
-    centuryLabel: `século ${romanNumeral(century)}${bc ? ' a.C.' : ''}`,
-    period: period.name, mark: period.mark,
-    event: past ? { year: past[0], name: past[1] } : null
-  };
-}
-
-// Conjugação dos verbos regulares no modo indicativo: radical + terminação.
-export const conjugationVerbs = ['cantar', 'estudar', 'vender', 'aprender', 'partir', 'dividir'];
-export const conjugationTenses = {
-  presente: 'Presente', perfeito: 'Pretérito perfeito', imperfeito: 'Pretérito imperfeito',
-  maisqueperfeito: 'Pretérito mais-que-perfeito', futuro: 'Futuro do presente', futuropreterito: 'Futuro do pretérito'
-};
-const conjugationEndings = {
-  ar: { presente: ['o','as','a','amos','ais','am'], perfeito: ['ei','aste','ou','amos','astes','aram'], imperfeito: ['ava','avas','ava','ávamos','áveis','avam'], maisqueperfeito: ['ara','aras','ara','áramos','áreis','aram'] },
-  er: { presente: ['o','es','e','emos','eis','em'], perfeito: ['i','este','eu','emos','estes','eram'], imperfeito: ['ia','ias','ia','íamos','íeis','iam'], maisqueperfeito: ['era','eras','era','êramos','êreis','eram'] },
-  ir: { presente: ['o','es','e','imos','is','em'], perfeito: ['i','iste','iu','imos','istes','iram'], imperfeito: ['ia','ias','ia','íamos','íeis','iam'], maisqueperfeito: ['ira','iras','ira','íramos','íreis','iram'] }
-};
-const futureEndings = { futuro: ['ei','ás','á','emos','eis','ão'], futuropreterito: ['ia','ias','ia','íamos','íeis','iam'] };
-export const conjugationPersons = ['eu', 'tu', 'ele/ela', 'nós', 'vós', 'eles/elas'];
-export function conjugate(verb = 'cantar', tense = 'presente') {
-  const safeVerb = conjugationVerbs.includes(verb) ? verb : 'cantar';
-  const safeTense = Object.hasOwn(conjugationTenses, tense) ? tense : 'presente';
-  const group = safeVerb.slice(-2), future = Object.hasOwn(futureEndings, safeTense);
-  // Nos futuros a terminação entra depois do infinitivo inteiro.
-  const stem = future ? safeVerb : safeVerb.slice(0, -2);
-  const endings = future ? futureEndings[safeTense] : conjugationEndings[group][safeTense];
-  return {
-    verb: safeVerb, tense: safeTense, tenseName: conjugationTenses[safeTense], stem,
-    group: group === 'ar' ? '1ª conjugação (-ar)' : group === 'er' ? '2ª conjugação (-er)' : '3ª conjugação (-ir)',
-    endings, forms: endings.map(ending => stem + ending)
-  };
-}
-
 const hexByte = n => Math.max(0, Math.min(255, Math.round(Number(n) || 0))).toString(16).padStart(2, '0').toUpperCase();
 const linearChannel = c => {
   const s = c / 255;
@@ -321,8 +262,6 @@ const visuals = {
   quadratic: '<svg viewBox="0 0 400 220" aria-label="Gráfico da parábola"><path d="M20 110H380M200 16V204" stroke="currentColor" opacity=".28" stroke-width="1.5"/><path data-parabola fill="none" stroke="#c084fc" stroke-width="3"/><g data-points></g></svg>',
   trigonometry: '<svg viewBox="0 0 400 220" aria-label="Ciclo trigonométrico"><path d="M80 110H320M200 18V202" stroke="currentColor" opacity=".25"/><circle cx="200" cy="110" r="74" fill="none" stroke="currentColor" opacity=".4" stroke-width="2"/><line data-cos x1="200" y1="110" x2="252" y2="110" stroke="#38bdf8" stroke-width="4"/><line data-sin x1="252" y1="110" x2="252" y2="58" stroke="#fb7185" stroke-width="4"/><line data-radius x1="200" y1="110" x2="252" y2="58" stroke="#fde047" stroke-width="3"/><circle data-tip cx="252" cy="58" r="6" fill="#fde047"/></svg>',
   seasons: '<svg viewBox="0 0 400 220" aria-label="Sol e inclinação da Terra"><circle cx="72" cy="110" r="34" fill="#fbbf24"/><g stroke="#fde68a" stroke-width="2" opacity=".7"><line x1="116" y1="74" x2="210" y2="74"/><line x1="120" y1="110" x2="210" y2="110"/><line x1="116" y1="146" x2="210" y2="146"/></g><g data-earth transform="translate(275 110)"><circle r="44" fill="#2563eb"/><path data-shade d="M0-44A44 44 0 0 1 0 44Z" fill="#0f172a" opacity=".68"/><g data-tilt><line x1="-44" y1="0" x2="44" y2="0" stroke="#4ade80" stroke-width="2" stroke-dasharray="4 3"/><line x1="0" y1="-56" x2="0" y2="56" stroke="#f8fafc" stroke-width="2.5"/></g></g></svg>',
-  timeline: '<svg viewBox="0 0 400 220" aria-label="Linha do tempo da História"><text data-time-year x="200" y="42" text-anchor="middle" font-size="30" font-weight="800" fill="currentColor">1500</text><text data-time-century x="200" y="64" text-anchor="middle" font-size="13" font-weight="700" fill="#fde047">século XV</text><g data-time-bands></g><path data-time-marker d="M0 96v44" stroke="#fde047" stroke-width="3" stroke-linecap="round"/><circle data-time-dot cx="0" cy="96" r="6" fill="#fde047"/><text data-time-period x="200" y="170" text-anchor="middle" font-size="14" font-weight="700" fill="currentColor">Idade Moderna</text><text data-time-mark x="200" y="187" text-anchor="middle" font-size="10" fill="currentColor" opacity=".7"></text><text data-time-event x="200" y="208" text-anchor="middle" font-size="10.5" fill="currentColor" opacity=".9"></text></svg>',
-  conjugation: '<svg viewBox="0 0 400 220" aria-label="Tabela de conjugação do verbo"><text data-verb-title x="200" y="26" text-anchor="middle" font-size="13" font-weight="700" fill="currentColor"></text><g data-verb-rows></g><text x="200" y="212" text-anchor="middle" font-size="9.5" fill="currentColor" opacity=".7"><tspan fill="currentColor">radical</tspan> + <tspan fill="#fde047" font-weight="700">terminação</tspan></text></svg>',
   lever: '<svg viewBox="0 0 400 220" aria-label="Alavanca com carga e esforço"><path d="M200 186 170 214h60Z" fill="currentColor" opacity=".55"/><g data-beam><rect x="46" y="172" width="308" height="14" rx="7" fill="#94a3b8"/><rect data-load x="96" y="132" width="46" height="40" rx="6" fill="#fb7185"/><circle data-effort cx="316" cy="150" r="18" fill="#4ade80"/></g><path d="M46 200h308" stroke="currentColor" opacity=".18"/></svg>',
   genetics: '<svg viewBox="0 0 400 220" aria-label="Cruzamento de Mendel"><g data-punnett></g><g data-phenotypes></g></svg>',
   probability: '<svg viewBox="0 0 400 220" aria-label="Probabilidade de dados"><g data-die-sets></g><path d="M36 190H376" stroke="currentColor" opacity=".25"/><g data-bars></g></svg>',
@@ -343,8 +282,6 @@ const controlsFor = {
   quadratic: () => range('a', 'Coeficiente a', -3, 3, 1, .5) + range('b', 'Coeficiente b', -6, 6, -2, .5) + range('c', 'Termo c', -5, 5, -3, .5),
   trigonometry: () => range('angle', 'Ângulo (°)', 0, 360, 45, 1),
   seasons: () => range('month', 'Mês do ano', 1, 12, 12, 1) + range('tilt', 'Inclinação axial (°)', 0, 45, 23.5, .5),
-  timeline: () => range('year', 'Ano (negativo = a.C.)', -4000, 2025, 1500, 5),
-  conjugation: () => selectControl('verb', 'Verbo', conjugationVerbs.map(verb => [verb, verb])) + selectControl('tense', 'Tempo (indicativo)', Object.entries(conjugationTenses)),
   colormix: () => range('r', 'Vermelho (R)', 0, 255, 80, 1) + range('g', 'Verde (G)', 0, 255, 175, 1) + range('b', 'Azul (B)', 0, 255, 235, 1),
   lever: () => range('loadMass', 'Carga (kg)', 0, 60, 20) + range('loadArm', 'Braço da carga (cm)', 10, 120, 60) + range('effortArm', 'Braço do esforço (cm)', 10, 120, 60) + range('effort', 'Força aplicada (kg)', 0, 80, 20),
   genetics: () => selectControl('first', 'Genitor 1', [['AA', 'AA · homozigoto dominante'], ['Aa', 'Aa · heterozigoto'], ['aa', 'aa · homozigoto recessivo']])
@@ -368,8 +305,6 @@ const notes = {
   quadratic: 'f(x) = ax² + bx + c, discriminante Δ e vértice da parábola.',
   trigonometry: 'Círculo de raio unitário: sen²θ + cos²θ = 1.',
   seasons: 'A inclinação do eixo terrestre define a incidência solar nos hemisférios.',
-  timeline: 'O século I vai do ano 1 ao 100. Por isso 1500 ainda é século XV e 1501 já é século XVI.',
-  conjugation: 'Verbos regulares mantêm o radical; só a terminação muda conforme a pessoa e o tempo.',
   colormix: 'Síntese aditiva de luz RGB, cor complementar e contraste WCAG.',
   lever: 'Equilíbrio: carga × braço da carga = esforço × braço do esforço.',
   genetics: '1ª Lei de Mendel: segregação dos alelos na formação dos gametas.',
@@ -379,11 +314,11 @@ const notes = {
   logicgates: 'Álgebra booleana aplicada a circuitos digitais.'
 };
 
-const playable = new Set(['projectile', 'pendulum', 'circuit', 'waves', 'states', 'trigonometry', 'seasons', 'ecosystem', 'timeline']);
+const playable = new Set(['projectile', 'pendulum', 'circuit', 'waves', 'states', 'trigonometry', 'seasons', 'ecosystem']);
 // Animações "de ambiente" começam sozinhas: o experimento já aparece vivo.
 const ambient = new Set(['pendulum', 'circuit', 'waves', 'states']);
 // Nestas a animação conduz um controle; mexer nele recomeça a partir do novo valor.
-const restartOnInput = new Set(['projectile', 'trigonometry', 'seasons', 'ecosystem', 'timeline']);
+const restartOnInput = new Set(['projectile', 'trigonometry', 'seasons', 'ecosystem']);
 // Experiments that use a "desafio" goal: the slide asks for a target value and the
 // student has to tune the sliders until the live output matches it.
 export const simulationChallenges = {
@@ -394,8 +329,6 @@ export const simulationChallenges = {
   genetics: { label: 'Acerte o alvo', prompt: 'Obtenha 100% de descendentes dominantes', test: r => r.dominantRate === 1, hint: 'Um dos genitores precisa ser AA.' },
   probability: { label: 'Acerte o alvo', prompt: 'Use 3 dados e ache a soma mais provável', test: r => r.dice === 3 && (r.target === 10 || r.target === 11), hint: 'Com três dados, 10 e 11 dividem o topo: 27 de 216 combinações cada.' },
   interest: { label: 'Acerte o alvo', prompt: 'Dobre o capital em até 12 meses', test: r => r.amount >= r.principal * 2 && r.months <= 12, hint: 'Taxas maiores que 6% ao mês dobram o capital em 12 meses.' },
-  timeline: { label: 'Desafio', prompt: 'Em que século os portugueses chegaram ao Brasil (1500)? Pare o marcador nesse ano.', test: r => r.year === 1500, hint: 'Século = ano ÷ 100, arredondando para cima. 1500 ÷ 100 = 15.' },
-  conjugation: { label: 'Desafio', prompt: 'Encontre a forma “nós venderemos”', test: r => r.forms[3] === 'venderemos', hint: 'A ação ainda vai acontecer: escolha o verbo vender e um tempo do futuro.' },
   greenhouse: { label: 'Acerte o alvo', prompt: 'Mantenha a temperatura entre 13 °C e 15 °C', test: r => r.temperature >= 13 && r.temperature <= 15, hint: 'Reduza um pouco a retenção de gases.' }
 };
 
@@ -411,8 +344,6 @@ const defaultParams = {
   quadratic: { a: 1, b: -2, c: -3 },
   trigonometry: { angle: 45 },
   seasons: { month: 12, tilt: 23.5 },
-  timeline: { year: 1500 },
-  conjugation: { verb: 'cantar', tense: 'presente' },
   colormix: { r: 80, g: 175, b: 235 },
   lever: { loadMass: 20, loadArm: 60, effortArm: 60, effort: 10 },
   genetics: { first: 'Aa', second: 'Aa' },
@@ -421,6 +352,28 @@ const defaultParams = {
   greenhouse: { energy: 340, absorbed: 70 },
   logicgates: { gate: 'AND', a: 1, b: 0 }
 };
+
+// Experimentos descritos em sim-lab.js entram nas mesmas tabelas do motor.
+const labVisual = sim => `<svg viewBox="0 0 400 220" aria-label="${sim.aria}"><g data-lab-scene></g></svg>`;
+for (const [id, sim] of Object.entries(labSims)) {
+  visuals[id] = labVisual(sim);
+  controlsFor[id] = () => sim.controls.map(([kind, key, label, ...rest]) => kind === 'select' ? selectControl(key, label, rest[0]) : range(key, label, rest[0], rest[1], rest[2], rest[3] ?? 1)).join('');
+  notes[id] = sim.note;
+  defaultParams[id] = Object.fromEntries(sim.controls.map(([kind, key, , ...rest]) => [key, kind === 'select' ? rest[0][0][0] : rest[2]]));
+  simulationChallenges[id] = sim.challenge;
+  if (sim.drive || sim.ambient) playable.add(id);
+  if (sim.ambient) ambient.add(id); else ambient.delete(id);
+  if (sim.drive) restartOnInput.add(id); else restartOnInput.delete(id);
+}
+for (const table of [visuals, controlsFor, notes, defaultParams, simulationChallenges]) for (const old of ['timeline', 'probability', 'logicgates']) delete table[old];
+
+function paintLab(node, p, time = 0) {
+  const sim = labSims[node.dataset.simulation], metrics = sim.compute(p), scene = node.querySelector('[data-lab-scene]');
+  if (scene) scene.innerHTML = sim.draw(p, metrics, time);
+  const result = node.querySelector('.simulation-result');
+  if (result) result.textContent = sim.text(metrics, p);
+  return metrics;
+}
 
 export function simulationMarkup(type = 'projectile', { interactive = true, challenge = true } = {}) {
   const safeType = resolveSimulation(type);
@@ -445,21 +398,6 @@ function readSimulationValues(node) {
     ...Object.fromEntries([...node.querySelectorAll('[data-sim-text]')].map(n => [n.dataset.simText, n.value])),
     ...Object.fromEntries([...node.querySelectorAll('[data-sim-toggle]')].map(n => [n.dataset.simToggle, Number(n.dataset.value)]))
   };
-}
-
-const timelineX = year => 24 + (year + 4000) / 6030 * 352;
-function paintTimeline(node, info) {
-  const bands = node.querySelector('[data-time-bands]');
-  if (bands && !bands.childElementCount) bands.innerHTML = timelinePeriods.map(item => {
-    const x = timelineX(item.from), width = timelineX(item.to) - x;
-    return `<rect x="${x.toFixed(1)}" y="104" width="${width.toFixed(1)}" height="28" fill="${item.color}" opacity=".85"/>`;
-  }).join('') + [-3000, -2000, -1000, 1, 1000, 2000].map(year => `<text x="${timelineX(year).toFixed(1)}" y="147" text-anchor="middle" font-size="8" fill="currentColor" opacity=".6">${year < 0 ? -year + ' a.C.' : year}</text>`).join('');
-  const x = timelineX(info.year).toFixed(1);
-  node.querySelector('[data-time-marker]')?.setAttribute('transform', `translate(${x} 0)`);
-  node.querySelector('[data-time-dot]')?.setAttribute('cx', x);
-  const set = (name, value) => { const el = node.querySelector(`[data-time-${name}]`); if (el) el.textContent = value; };
-  set('year', info.label); set('century', info.centuryLabel); set('period', info.period); set('mark', info.mark);
-  set('event', info.event ? `${info.event.year < 0 ? -info.event.year + ' a.C.' : info.event.year} · ${info.event.name}` : '');
 }
 
 function paintParticles(node, phase, kinetic) {
@@ -526,7 +464,8 @@ function paintSimulationNode(node) {
   if (!resultEl) return;
   let metrics = null;
 
-  if (type === 'projectile') {
+  if (labSims[type]) metrics = paintLab(node, p, node.labTime || 0);
+  else if (type === 'projectile') {
     const result = projectile(p.speed, p.angle, p.gravity);
     metrics = { range: result.range };
     resultEl.textContent = `Alcance ${result.range.toFixed(1)} m · Altura ${result.height.toFixed(1)} m · Voo ${result.time.toFixed(1)} s`;
@@ -647,24 +586,6 @@ function paintSimulationNode(node) {
     const tiltRot = p.tilt * Math.cos(2 * Math.PI * (s.month % 12) / 12);
     node.querySelector('[data-tilt]')?.setAttribute('transform', `rotate(${tiltRot.toFixed(1)})`);
     resultEl.textContent = `${s.monthName} · Sul: ${s.south} · Norte: ${s.north} · Declinação ${s.declination.toFixed(1)}°`;
-  }
-  else if (type === 'timeline') {
-    const info = timelineInfo(p.year);
-    metrics = info;
-    paintTimeline(node, info);
-    resultEl.textContent = `${info.label} · ${info.centuryLabel} · ${info.period}${info.event ? ` · último marco: ${info.event.name}` : ''}`;
-  }
-  else if (type === 'conjugation') {
-    const info = conjugate(p.verb, p.tense);
-    metrics = info;
-    const title = node.querySelector('[data-verb-title]');
-    if (title) title.textContent = `${info.verb.toUpperCase()} · ${info.tenseName}`;
-    const rows = node.querySelector('[data-verb-rows]');
-    if (rows) rows.innerHTML = info.forms.map((form, i) => {
-      const col = i < 3 ? 0 : 1, y = 62 + (i % 3) * 46, x = 26 + col * 184;
-      return `<rect x="${x}" y="${y - 26}" width="168" height="38" rx="10" fill="currentColor" opacity=".07"/><text x="${x + 12}" y="${y - 2}" font-size="11" fill="currentColor" opacity=".65">${conjugationPersons[i]}</text><text x="${x + 156}" y="${y - 1}" text-anchor="end" font-size="16" font-weight="700" fill="currentColor">${info.stem}<tspan fill="#fde047">${info.endings[i]}</tspan></text>`;
-    }).join('');
-    resultEl.textContent = `${info.group} · radical “${info.stem}” · eu ${info.forms[0]}, nós ${info.forms[3]}`;
   }
   else if (type === 'colormix') {
     const c = colorMixInfo(p.r, p.g, p.b);
@@ -869,7 +790,20 @@ export class Simulations {
           const now = performance.now(), p = item.p, started = item.started;
           const seconds = (now - started) / 1000, delta = Math.min(.1, (now - (item.last || now)) / 1000);
           item.last = now;
-          if (type === 'pendulum') {
+          if (labSims[type]) {
+            const sim = labSims[type];
+            node.labTime = (node.labTime || 0) + delta;
+            if (sim.drive) {
+              // A animação conduz um dos controles, em loop, a partir do valor escolhido.
+              const drive = sim.drive, input = node.querySelector(`[data-param="${drive.param}"]`), span = drive.max - drive.min;
+              const raw = drive.min + ((p[drive.param] - drive.min + seconds * drive.speed) % span);
+              const value = Math.min(Number(input?.max ?? drive.max), Math.round(raw / drive.step) * drive.step);
+              if (input) input.value = String(value);
+              const out = node.querySelector(`[data-value="${drive.param}"]`);
+              if (out) out.textContent = String(value);
+              paintLab(node, { ...p, [drive.param]: value }, node.labTime);
+            } else paintLab(node, p, node.labTime);
+          } else if (type === 'pendulum') {
             // Fase acumulada: mudar o comprimento altera o ritmo sem dar salto.
             item.phase = (item.phase || 0) + delta * Math.sqrt(p.gravity / p.length);
             const angle = Math.sin(item.phase) * 24;
@@ -924,19 +858,6 @@ export class Simulations {
               const tiltRot = p.tilt * Math.cos(2 * Math.PI * (s.month % 12) / 12);
               node.querySelector('[data-tilt]')?.setAttribute('transform', `rotate(${tiltRot.toFixed(1)})`);
               node.querySelector('.simulation-result').textContent = `${s.monthName} · Sul: ${s.south} · Norte: ${s.north} · Declinação ${s.declination.toFixed(1)}°`;
-            }
-          } else if (type === 'timeline') {
-            const input = node.querySelector('[data-param="year"]');
-            if (input) {
-              // Percorre a História a partir do ano escolhido e recomeça ao chegar em hoje.
-              const span = 2025 + 4000, year = -4000 + ((p.year + 4000 + seconds * 260) % span);
-              const snapped = Math.round(year / 5) * 5;
-              input.value = String(snapped);
-              const out = node.querySelector('[data-value="year"]');
-              if (out) out.textContent = String(snapped);
-              const info = timelineInfo(snapped);
-              paintTimeline(node, info);
-              node.querySelector('.simulation-result').textContent = `${info.label} · ${info.centuryLabel} · ${info.period}${info.event ? ` · último marco: ${info.event.name}` : ''}`;
             }
           } else if (type === 'ecosystem') {
             const input = node.querySelector('[data-param="time"]');

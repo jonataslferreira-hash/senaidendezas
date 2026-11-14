@@ -79,6 +79,7 @@ async function rasterizeSvg(blob){
 // O arquivo original guarda a transparência e a resolução; a miniatura do
 // buscador entra quando o site de origem não deixa baixar.
 async function fetchChoiceBlob(choice){
+  if(choice.blob)return choice.blob;
   for(const url of [choice.original,choice.url].filter((value,index,list)=>value&&list.indexOf(value)===index)){
     const blob=await fetchImageBlob(url).catch(()=>null);
     if(blob&&blob.type.startsWith('image/')&&blob.size<=6_000_000)return blob;
@@ -388,13 +389,35 @@ export async function searchImageChoices(query,page=1,{transparent=false}={}){
   // do título colocava na frente imagens que só tinham o nome pedido e
   // empurrava para baixo as que o buscador considerava mais certas.
   const worker=await workerJson('/storage-ai/images?source=bing&q='+encodeURIComponent(term)+'&page='+String(page)+'&limit=24'+(wantsAlpha?'&transparent=1':''));
-  if(worker?.items?.length){
-    return worker.items.map(choiceFromWorker)
-      .filter(choice=>choice.thumbnail&&choice.url&&!isDocumentChoice(choice))
-      .map(choice=>({...choice,transparent:choice.transparent||wantsAlpha&&/png|svg|webp/i.test(choice.kind)}));
+  // A transparência só é afirmada depois de conferida no arquivo (verifyTransparentChoice).
+  const usable=payload=>(payload?.items||[]).map(choiceFromWorker)
+    .filter(choice=>choice.thumbnail&&choice.url&&!isDocumentChoice(choice))
+    .map(choice=>({...choice,transparent:false}));
+  const found=usable(worker);
+  if(found.length)return found;
+  // Bing sem resposta na primeira página: os catálogos livres (Commons,
+  // Wikipédia, Openverse) evitam uma galeria vazia.
+  if(page===1){
+    const catalogs=await workerJson('/storage-ai/images?q='+encodeURIComponent(term)+'&page=1&limit=24'+(wantsAlpha?'&transparent=1':''));
+    const extra=usable(catalogs);
+    if(extra.length)return extra;
+    if(catalogs||worker)return [];
   }
   if(worker)return [];
   throw Error('Não foi possível consultar o Bing. Tente novamente em instantes.');
+}
+
+// Baixa o arquivo original e confere pixel a pixel se o fundo é transparente.
+// A miniatura do buscador é JPEG e nunca guarda transparência, então só o
+// original responde. Devolve o arquivo conferido (reaproveitado ao inserir).
+export async function verifyTransparentChoice(choice){
+  if(!choice.original)return null;
+  try{
+    const blob=await fetchImageBlob(choice.original);
+    if(!blob||!blob.type.startsWith('image/')||blob.size>6_000_000||blob.type==='image/jpeg')return null;
+    const prepared=blob.type==='image/svg+xml'?await rasterizeSvg(blob):blob;
+    return await hasTransparentBackground(prepared)?prepared:null;
+  }catch{return null;}
 }
 
 export async function importImageChoice(choice){

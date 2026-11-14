@@ -375,6 +375,9 @@ async function cached(key, loader) {
     if (hit) return await hit.json();
   } catch { /* cache indisponível */ }
   const value = await loader();
+  // Resposta vazia não vai para o cache: uma falha passageira do buscador
+  // deixaria a mesma pesquisa sem resultado por horas.
+  if (Array.isArray(value?.items) && !value.items.length) return value;
   try {
     await caches.default.put(url, new Response(JSON.stringify(value), { headers: { 'Content-Type': 'application/json', 'Cache-Control': 'public, max-age=' + CACHE_TTL_SECONDS } }));
   } catch { /* cache indisponível */ }

@@ -100,7 +100,16 @@ export async function exportSlides(input,format,onProgress=()=>{}){
    }
    if(slide.kind==='document'){const png=await toPng(target,options);pptx.addSlideImage(out,bytes(png),{x:Math.round(dx),y:Math.round(dy),w:Math.round(w*scale),h:Math.round(h*scale),format:'png'});}
    else for(const e of slide.elements){const rect={x:Math.round(dx+e.x/100*w*scale),y:Math.round(dy+e.y/100*h*scale),w:Math.max(1,Math.round(e.w/100*w*scale)),h:Math.max(1,Math.round(e.h/100*h*scale))};let shape;
-    if(e.type==='text'){shape=pptx.addSlideTextBox(out,{...rect,text:e.text,name:e.role==='title'?'Título':'Texto'});pptx.setShapeTextFormat(shape,{font:lesson.customFonts?.find(f=>f.family===e.fontFamily)?.name||e.fontFamily||'Arial',size:e.fontSize*(w/1280)*scale/914400*72,color:e.color,bold:e.bold,italic:e.italic});pptx.setShapeTextMargins(shape,{top:Math.round((e.textPadding?.[0]||0)*w/1280*scale),right:Math.round((e.textPadding?.[1]||0)*w/1280*scale),bottom:Math.round((e.textPadding?.[2]||0)*w/1280*scale),left:Math.round((e.textPadding?.[3]||0)*w/1280*scale)});pptx.setShapeTextAnchor(shape,e.verticalAlign==='center'?'center':e.verticalAlign==='end'?'bottom':'top');for(let i=0;i<pptx.getShapeParagraphElements(shape).length;i++)pptx.setParagraphAlignment(shape,i,e.align||'left');}
+    if(e.type==='text'){
+     // O texto pode passar da caixa no editor (lá ele transborda e continua visível).
+     // PowerPoint e Canva cortam o que sobra, então a caixa exportada cresce até caber tudo.
+     const textNode=[...host.querySelectorAll('[data-object-id]')].find(n=>n.dataset.objectId===e.id),inner=textNode?.querySelector('.canvas-text');
+     if(inner&&textNode.clientHeight){
+      const probe=inner.cloneNode(true);probe.style.cssText+=';position:absolute;visibility:hidden;height:auto;min-height:0;max-height:none;inset:auto;width:'+inner.clientWidth+'px';
+      inner.parentNode.append(probe);const needed=probe.scrollHeight/textNode.clientHeight*rect.h*1.06;probe.remove();
+      if(needed>rect.h){const extra=Math.round(needed-rect.h);if(e.verticalAlign==='center')rect.y-=Math.round(extra/2);else if(e.verticalAlign==='end')rect.y-=extra;rect.h+=extra;}
+     }
+     shape=pptx.addSlideTextBox(out,{...rect,text:e.text,name:e.role==='title'?'Título':'Texto'});pptx.setShapeTextFormat(shape,{font:lesson.customFonts?.find(f=>f.family===e.fontFamily)?.name||e.fontFamily||'Arial',size:e.fontSize*(w/1280)*scale/914400*72,color:e.color,bold:e.bold,italic:e.italic});pptx.setShapeTextMargins(shape,{top:Math.round((e.textPadding?.[0]||0)*w/1280*scale),right:Math.round((e.textPadding?.[1]||0)*w/1280*scale),bottom:Math.round((e.textPadding?.[2]||0)*w/1280*scale),left:Math.round((e.textPadding?.[3]||0)*w/1280*scale)});pptx.setShapeTextAnchor(shape,e.verticalAlign==='center'?'center':e.verticalAlign==='end'?'bottom':'top');for(let i=0;i<pptx.getShapeParagraphElements(shape).length;i++)pptx.setParagraphAlignment(shape,i,e.align||'left');}
     else if(gifs.has(e.id)) shape=pptx.addSlideImage(out,gifs.get(e.id),{...rect,format:'gif',name:'Modelo 3D'});
     else if(e.type==='image'&&e.image){shape=pptx.addSlideImage(out,bytes(await imageElementPng(e,Math.max(1,e.w/100*w),Math.max(1,e.h/100*h))),{...rect,format:'png',name:e.imageAlt||'Imagem'});}
     else{
