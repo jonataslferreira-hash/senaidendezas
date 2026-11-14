@@ -205,13 +205,11 @@ export function splitTransparentQuery(query) {
 
 async function bingSearch(query, limit, page = 1, { transparent = false } = {}) {
   const params = new URLSearchParams({
-    q: query, first: String((page - 1) * limit + 1), count: String(Math.min(35, Math.max(limit, 12))), mmasync: '1', adlt: 'moderate',
-    // Sem o mercado, o Bing responde pelo país do servidor e lê "cachorro" em outro idioma.
-    mkt: 'pt-BR', setlang: 'pt-BR', cc: 'BR'
+    q: query, first: String((page - 1) * limit + 1), count: String(Math.min(35, Math.max(limit, 12))), mmasync: '1', adlt: 'moderate'
   });
   if (transparent) params.set('qft', '+filterui:photo-transparent');
   const response = await fetch('https://www.bing.com/images/async?' + params, {
-    headers: { Accept: 'text/html,application/xhtml+xml', 'User-Agent': BROWSER_USER_AGENT, 'Accept-Language': 'pt-BR,pt;q=0.9,en;q=0.7', Cookie: '_EDGE_CD=m=pt-br&u=pt-br; _EDGE_S=mkt=pt-br&ui=pt-br' },
+    headers: { Accept: 'text/html,application/xhtml+xml', 'User-Agent': BROWSER_USER_AGENT, 'Accept-Language': 'pt-BR,pt;q=0.9,en;q=0.7' },
     signal: AbortSignal.timeout(UPSTREAM_TIMEOUT)
   });
   if (!response.ok) throw Error('bing_' + response.status);
@@ -250,6 +248,85 @@ async function bingSearch(query, limit, page = 1, { transparent = false } = {}) 
     });
   }
   return items;
+}
+
+// DuckDuckGo Imagens, na região Brasil/português: entende "cachorro" como o
+// animal e não depende do país do servidor. Cada resposta traz até 100 imagens;
+// o bloco fica em cache e as páginas da galeria são fatias dele.
+const DUCK_CHUNK = 100;
+async function duckChunk(query, chunk, transparent) {
+  const headers = { Accept: 'text/html,application/json;q=0.9,*/*;q=0.8', 'User-Agent': BROWSER_USER_AGENT, 'Accept-Language': 'pt-BR,pt;q=0.9,en;q=0.6', Referer: 'https://duckduckgo.com/' };
+  const home = await fetch('https://duckduckgo.com/?' + new URLSearchParams({ q: query, iax: 'images', ia: 'images', kl: 'br-pt' }), { headers, signal: AbortSignal.timeout(UPSTREAM_TIMEOUT) });
+  if (!home.ok) throw Error('duck_' + home.status);
+  const vqd = /vqd=["']?([\d-]+)["']?/.exec(await home.text())?.[1];
+  if (!vqd) throw Error('duck_token');
+  const params = new URLSearchParams({ l: 'br-pt', o: 'json', q: query, vqd, f: transparent ? ',,,type:transparent,,' : ',,,,,', p: '1', s: String(chunk * DUCK_CHUNK) });
+  const response = await fetch('https://duckduckgo.com/i.js?' + params, { headers: { ...headers, Accept: 'application/json' }, signal: AbortSignal.timeout(UPSTREAM_TIMEOUT) });
+  if (!response.ok) throw Error('duck_' + response.status);
+  const payload = await response.json();
+  return duckItems(payload?.results, query, transparent);
+}
+export function duckItems(results, query = '', transparent = false) {
+  const items = [];
+  for (const result of Array.isArray(results) ? results : []) {
+    const original = clean(result?.image), thumbnail = clean(result?.thumbnail).replace(/^http:\/\//, 'https://');
+    if (!/^https:\/\//.test(thumbnail)) continue;
+    const title = plainText(result.title || query);
+    if (isDocument({ file: original, title })) continue;
+    const page = clean(result.url);
+    items.push({
+      id: 'duck:' + clip(thumbnail.replace(/^.*[?&]id=/, '').replace(/&.*$/, '') || thumbnail, 80),
+      title: clip(title || query, 200), file: clip(title || query, 200), description: '',
+      thumbnail: bingSized(thumbnail, 480, 360), url: bingSized(thumbnail, 1200, 1200),
+      original: /^https:\/\//.test(original) ? clip(original, 900) : '',
+      transparent,
+      source: /^https:\/\//.test(page) ? clip(page, 600) : '',
+      catalog: 'DuckDuckGo Imagens', author: '', license: '', licenseUrl: '',
+      width: Number(result.width) || 0, height: Number(result.height) || 0,
+      kind: /\.png(?:$|[?#])/i.test(original) ? 'image/png' : /\.svg(?:$|[?#])/i.test(original) ? 'image/svg+xml' : /\.webp(?:$|[?#])/i.test(original) ? 'image/webp' : 'image'
+    });
+  }
+  return items;
+}
+async function duckSearch(query, limit, page = 1, { transparent = false } = {}) {
+  const start = (page - 1) * limit, chunk = Math.floor(start / DUCK_CHUNK), offset = start % DUCK_CHUNK;
+  const key = 'v1-duck-' + encodeURIComponent(query.toLowerCase()) + '-' + chunk + (transparent ? '-png' : '');
+  const { items } = await cached(key, async () => ({ items: await duckChunk(query, chunk, transparent) }));
+  return items.slice(offset, offset + limit);
+}
+// Pixabay (opcional): com a chave gratuita em PIXABAY_KEY, entra como terceira
+// fonte. Entende português (lang=pt) e tem filtro oficial de fundo transparente.
+export function pixabayItems(hits, query = '', transparent = false) {
+  return (Array.isArray(hits) ? hits : []).filter(hit => /^https:\/\//.test(clean(hit?.webformatURL))).map(hit => ({
+    id: 'pixabay:' + hit.id,
+    title: clip(clean(hit.tags) || query, 200), file: clip(clean(hit.tags) || query, 200), description: '',
+    thumbnail: clean(hit.webformatURL), url: clean(hit.largeImageURL || hit.webformatURL),
+    original: clean(hit.largeImageURL || hit.webformatURL), transparent,
+    source: clip(hit.pageURL, 600), catalog: 'Pixabay', author: clip(hit.user, 120),
+    license: 'Licença Pixabay', licenseUrl: 'https://pixabay.com/service/license-summary/',
+    width: Number(hit.imageWidth) || 0, height: Number(hit.imageHeight) || 0,
+    kind: /\.png(?:$|[?#])/i.test(clean(hit.largeImageURL)) ? 'image/png' : 'image'
+  }));
+}
+async function pixabaySearch(key, query, limit, page, transparent) {
+  if (!key) return [];
+  const params = new URLSearchParams({ key, q: query.slice(0, 100), lang: 'pt', safesearch: 'true', per_page: String(Math.max(3, Math.min(limit, 40))), page: String(page) });
+  if (transparent) params.set('colors', 'transparent');
+  const response = await fetch('https://pixabay.com/api/?' + params, { signal: AbortSignal.timeout(UPSTREAM_TIMEOUT) });
+  if (!response.ok) throw Error('pixabay_' + response.status);
+  return pixabayItems((await response.json())?.hits, query, transparent);
+}
+// Junta os buscadores alternando os resultados (DuckDuckGo primeiro) e
+// tirando as imagens repetidas.
+export function mergeEngines(...lists) {
+  const merged = [], seen = new Set();
+  for (let index = 0; index < Math.max(0, ...lists.map(list => list.length)); index++) for (const item of lists.map(list => list[index])) {
+    if (!item) continue;
+    const key = (item.original || item.thumbnail).replace(/^https?:\/\/(?:www\.)?/, '').replace(/[?#].*$/, '').toLowerCase();
+    if (seen.has(key)) continue;
+    seen.add(key); merged.push(item);
+  }
+  return merged;
 }
 
 // Resolve a licença dos arquivos usados nas páginas da Wikipédia em uma única
@@ -386,16 +463,23 @@ async function cached(key, loader) {
   return value;
 }
 
-async function searchImages(query, page, limit, { transparent = false, bingOnly = false } = {}) {
+async function searchImages(query, page, limit, { transparent = false, bingOnly = false, pixabayKey = '' } = {}) {
   const term = clip(query, MAX_QUERY);
-  const key = 'v5-' + (bingOnly ? 'bing-' : '') + encodeURIComponent(term.toLowerCase()) + '-' + page + '-' + limit + (transparent ? '-png' : '');
+  const key = 'v6-' + (bingOnly ? 'bing-' : '') + encodeURIComponent(term.toLowerCase()) + '-' + page + '-' + limit + (transparent ? '-png' : '');
   return cached(key, async () => {
     if (bingOnly) {
       // A ordem é a do próprio Bing: é ela que carrega a relevância. Com o
       // filtro de transparência vazio, a busca normal completa a página.
-      let items = await bingSearch(term, limit, page, { transparent });
-      if (transparent && !items.length && page === 1) items = await bingSearch(term + ' png', limit, page);
-      return {query: term, page, transparent, items, total: page * limit + (items.length ? 1 : 0)};
+      const [duck, bing, pixabay] = await Promise.allSettled([
+        duckSearch(term, limit, page, { transparent }),
+        bingSearch(term, limit, page, { transparent }).then(async found => transparent && !found.length && page === 1 ? bingSearch(term + ' png', limit, page) : found),
+        pixabaySearch(pixabayKey, term, Math.ceil(limit / 2), page, transparent)
+      ]);
+      const fromDuck = duck.status === 'fulfilled' ? duck.value : [], fromBing = bing.status === 'fulfilled' ? bing.value : [];
+      const fromPixabay = pixabay.status === 'fulfilled' ? pixabay.value : [];
+      const items = mergeEngines(fromDuck, fromBing, fromPixabay);
+      // "engines" mostra de onde veio cada página (ajuda a diagnosticar quando um buscador falha).
+      return {query: term, page, transparent, items, engines: { duckduckgo: duck.status === 'fulfilled' ? fromDuck.length : String(duck.reason?.message || 'erro'), bing: bing.status === 'fulfilled' ? fromBing.length : String(bing.reason?.message || 'erro'), pixabay: !pixabayKey ? 'sem chave' : pixabay.status === 'fulfilled' ? fromPixabay.length : String(pixabay.reason?.message || 'erro') }, total: page * limit + (items.length ? 1 : 0)};
     }
     const queryTokens = tokens(term).filter(token => token.length > 1 && !STOP_WORDS.has(token));
     const wantsIcon = queryTokens.some(token => ['logo', 'logotipo', 'logomarca', 'icon', 'icone', 'simbolo', 'symbol'].includes(token));
@@ -513,7 +597,7 @@ export async function handleStorageAIImages(request, env, user, headers) {
   const transparent = !raw && (url.searchParams.get('transparent') === '1' || hinted.transparent);
   if (!query) return json({ error: 'invalid_query', items: [] }, 400);
   try {
-    const result = await searchImages(hinted.subject, page, limit, { transparent, bingOnly: url.searchParams.get('source') === 'bing' });
+    const result = await searchImages(hinted.subject, page, limit, { transparent, bingOnly: url.searchParams.get('source') === 'bing', pixabayKey: clean(env?.PIXABAY_KEY) });
     return json(result, 200, { 'Cache-Control': 'private, max-age=300' });
   } catch {
     return json({ error: 'search_unavailable', items: [] }, 502);

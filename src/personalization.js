@@ -8,10 +8,10 @@ export const themes=[
   ['teal','Turquesa','#369f99'],
   ['indigo','Índigo','#7379ce'],
   // Gradientes: continuam sendo uma única "cor do espaço" para o perfil.
-  ['aurora','Aurora','linear-gradient(135deg,#70dfce 0%,#7ca8ea 53%,#a58add 100%)'],
-  ['candy','Candy','linear-gradient(135deg,#e790b3 0%,#f2a9a2 55%,#ffd0a4 100%)'],
-  ['galaxy','Galáxia','linear-gradient(135deg,#4957a1 0%,#7560b5 54%,#ba77b3 100%)'],
-  ['citrus','Citrino','linear-gradient(135deg,#c0d883 0%,#79c997 52%,#4bbab1 100%)']
+  ['aurora','Aurora','linear-gradient(135deg,#4fe0c4 0%,#6aa6f0 50%,#a877ea 100%)'],
+  ['candy','Candy','linear-gradient(135deg,#f06aa8 0%,#f79a8a 50%,#fbbf6a 100%)'],
+  ['galaxy','Galáxia','linear-gradient(135deg,#3f63d6 0%,#8a5bd0 52%,#e06ac4 100%)'],
+  ['citrus','Citrino','linear-gradient(135deg,#d9e04f 0%,#7fd67a 50%,#3ac7bd 100%)']
 ];
 export const styles=[['classic','Clássico'],['glass','Liquid Glass'],['aero','Frutiger Aero'],['minimal','Minimalista'],['editorial','Office'],['arcade','8-Bit']];
 export const validTheme=value=>themes.some(([id])=>id===value)?value:'violet';

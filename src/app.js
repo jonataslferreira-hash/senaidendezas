@@ -15,7 +15,9 @@ import {FocusView,focusButton} from './focus-view.js';
 import './classroom-display.css';
 import { avatarContent,isPhotoAvatar } from './player-avatar.js';
 import { PptxAnimations } from './pptx-animations.js';
-import { loadPublicPresentation } from './public-presentations.js';
+import { loadPublicPresentation, validPublicCode, resolvePublicCode } from './public-presentations.js';
+// Link de apresentação: ?presentation=<token> (antigo) ou ?p=<código curto>.
+function publicLinkParam() { const query = new URLSearchParams(location.search); return query.get('presentation') || (validPublicCode(query.get('p')) ? query.get('p') : ''); }
 import brandUrl from './assets/brand.svg';
 import { PageMotion } from './motion.js';
 import { avatars } from './content.js';
@@ -33,6 +35,7 @@ let slides = activeLesson.slides;
 import { Classroom } from './network.js';
 import { Room } from './room.js';
 import { HardwareViewer } from './models.js';
+import { teacherControls, captureInteraction, applyInteraction, InteractionBroadcaster } from './live-interaction.js';
 import QRCode from 'qrcode';
 import './style.css';
 import './experience.css';
@@ -70,6 +73,27 @@ const esc = value => String(value ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;
 const app = document.querySelector('#app');
 const viewer = new HardwareViewer({ defer: true });
 const canvasModels = new CanvasModels();
+// Slides em "Só eu controlo": o professor transmite o experimento/modelo 3D e os alunos só acompanham.
+const interactionBroadcaster = new InteractionBroadcaster(payload => { if (host && !demo) classroom?.live?.(payload); });
+let liveInteraction = null, liveInteractionTimers = [];
+function syncInteraction() {
+  const slide = state?.phase === 'lesson' ? slides[state.slide] : null, teacher = teacherControls(slide);
+  const tools = { canvasModels, viewer, slide: slide ? presentationSlide(slide) : null };
+  if (teacher && !host) app.dataset.teacherControls = teacher; else delete app.dataset.teacherControls;
+  if (teacher && host && !demo) interactionBroadcaster.watch(activeLesson.id + ':' + state.slide, () => captureInteraction(app, tools));
+  else interactionBroadcaster.stop();
+  for (const timer of liveInteractionTimers.splice(0)) clearTimeout(timer);
+  if (!teacher || host || liveInteraction?.slide !== state.slide) return;
+  const apply = () => { if (state?.phase === 'lesson' && liveInteraction?.slide === state.slide) applyInteraction(app, liveInteraction.payload, tools); };
+  apply();
+  // Modelos 3D terminam de carregar depois do render: repete para a câmera chegar.
+  liveInteractionTimers = [400, 1500].map(delay => setTimeout(apply, delay));
+}
+function receiveInteraction(message) {
+  if (!message || !Number.isInteger(message.slide)) return;
+  liveInteraction = message;
+  if (!host && state?.phase === 'lesson' && state.slide === message.slide && teacherControls(slides[state.slide])) applyInteraction(app, message.payload, { canvasModels, viewer, slide: presentationSlide(slides[state.slide]) });
+}
 const focusView = new FocusView();
 const pageMotion = new PageMotion();
 const pptxAnimations=new PptxAnimations();const simulations=new Simulations(),gameAudio=new GameAudio(),gameLayout=new GameLayout();
@@ -77,7 +101,7 @@ let classroom, state, host = false, demo = false, busy = false, selectedAvatar =
 let avatarChanged=false,joinNameTouched=false,joinNameDraft='',guestPhotoPending=false;
 let shareOpen = false, solutionOpen = false, lastSlide = -1, localModel = 'ssd', localExploded = true;
 let status = 'offline', statusMessage = '', timerOffset = 0, music = false, audio, musicTimer, audioStep = 0;
-let editorLaunch=false, readOnlyPresentation=false, publicPresentationToken='', sharedLoading=Boolean(new URLSearchParams(location.search).get('presentation')), sharedError='';
+let editorLaunch=false, readOnlyPresentation=false, publicPresentationToken='', sharedLoading=Boolean(publicLinkParam()), sharedError='';
 let clockTimer;
 const trackPlayer = new Audio(); let playingTrack = null;
 trackPlayer.dataset.soundtrack = ''; trackPlayer.hidden = true; document.body.append(trackPlayer);
@@ -274,7 +298,7 @@ function render() {
   const upcoming = state?.phase === 'lesson' ? slides[state.slide + 1] : null;
   canvasModels.preload(upcoming ? presentationSlide(upcoming) : null);
   focusView.sync(state?.phase==='lesson'?slides[state.slide]?.id:'');
-  fillAssetImages(app);simulations.mount(state?.phase==='lesson'?app:null);if(state?.phase==='lesson')loadSlideFonts(slides[state.slide],activeLesson.customFonts);
+  fillAssetImages(app);simulations.mount(state?.phase==='lesson'?app:null);syncInteraction();if(state?.phase==='lesson')loadSlideFonts(slides[state.slide],activeLesson.customFonts);
   if (state && (shareOpen || (host && !demo && presenterSettings.qrVisible && state.phase === 'lesson'))) {
     const url = joinUrl();
     const setQR = src => { if (state && joinUrl() === url) for (const image of document.querySelectorAll('#room-qr, [data-pinned-qr]')) image.src = src; };
@@ -336,6 +360,7 @@ async function connectSession(mode) {
   busy = true; host = mode.host; demo = false; editorLaunch=Boolean(mode.fromEditor);music=true; gameAudio.unlock(); render();
   classroom?.stop?.();
   classroom = new Classroom(receive, connection);
+  classroom.onLive = receiveInteraction; liveInteraction = null;
   try {
     if (host) { await classroom.create(Boolean(mode.resume), mode.lesson, mode.startIndex,editorLaunch);shareOpen=!mode.resume; }
     else {music=true;gameAudio.unlock();await classroom.join(mode.code, mode.name, mode.avatar);}
@@ -544,6 +569,8 @@ app.addEventListener('submit', async e => {
   const form = new FormData(e.target);
   codeDraft = String(form.get('code')).replace(/\D/g, '').slice(0, 6);
   if (codeDraft.length !== 6) { toast('Digite os 6 números da sala.'); return; }
+  // Entrar na sala já abre em tela cheia (precisa acontecer dentro do clique).
+  if (!document.fullscreenElement) document.documentElement.requestFullscreen?.().catch(() => {});
   await connectSession({ host: false, code: codeDraft, name: String(form.get('name')).trim(), avatar: selectedAvatar });
 });
 document.addEventListener('keydown', e => {
@@ -635,12 +662,12 @@ else app.innerHTML='<main class="public-loading"><p role="status">Carregando apr
 document.documentElement.dataset.appReady = 'true';
 async function openPublicPresentation(token) {
   leave(false);sharedLoading=true;render();
-  try{const lesson=await loadPublicPresentation(token);sharedLoading=false;preview(lesson,{readOnly:true,token});}
+  try{if(validPublicCode(token))token=await resolvePublicCode(token);const lesson=await loadPublicPresentation(token);sharedLoading=false;preview(lesson,{readOnly:true,token});}
   catch(error){sharedLoading=false;sharedError=error.message;render();}
 }
 const savedSession = Classroom.resume();
 async function restorePage() {
-  const token=new URLSearchParams(location.search).get('presentation');if(token){await openPublicPresentation(token);return;}
+  const token=publicLinkParam();if(token){await openPublicPresentation(token);return;}
   const page = routeParams().get('page');
   try { if (studio.dirty) studio.save(); }
   catch (error) { studio.writeRoute('editor', studio.draft.id, true); toast(error.message); return; }
@@ -660,7 +687,7 @@ async function restorePage() {
   }
 }
 window.addEventListener('popstate', restorePage);
-if (params.get('presentation')) openPublicPresentation(params.get('presentation'));
+if (publicLinkParam()) openPublicPresentation(publicLinkParam());
 else if (savedSession && (!codeDraft || savedSession.code === codeDraft) && (!params.has('page') || params.get('page') === 'present')) connectSession({ ...savedSession, resume: true });
 else if (['preview', 'present'].includes(params.get('page'))) restorePage();
 

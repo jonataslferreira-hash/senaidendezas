@@ -186,7 +186,8 @@ const imageQueryTranslations=[
   ['leitura','reading'],['arte','art'],['música','music'],['musica','music'],['teatro','theater'],
   ['futebol','football'],['esporte','sport'],['futuro','future'],['inovação','innovation'],
   ['inovacao','innovation'],['empresa','company'],['bandeira','flag'],['mapa','map'],['animal','animal'],
-  ['animais','animals'],['fruta','fruit'],['vegetais','vegetables']
+  ['animais','animals'],['fruta','fruit'],['vegetais','vegetables'],
+  ['cachorro','dog'],['cachorros','dogs'],['cão','dog'],['cao','dog'],['gato','cat'],['gatos','cats'],['pássaro','bird'],['passaro','bird'],['peixe','fish'],['cavalo','horse'],['vaca','cow'],['porco','pig'],['galinha','chicken'],['leão','lion'],['leao','lion'],['tigre','tiger'],['elefante','elephant'],['macaco','monkey'],['urso','bear'],['cobra','snake'],['sapo','frog'],['borboleta','butterfly'],['abelha','bee'],['formiga','ant'],['aranha','spider'],['tartaruga','turtle'],['baleia','whale'],['tubarão','shark'],['tubarao','shark'],['golfinho','dolphin'],['coelho','rabbit'],['rato','mouse'],['onça','jaguar'],['onca','jaguar'],['dinossauro','dinosaur'],['vulcão','volcano'],['vulcao','volcano'],['vulcões','volcanoes'],['montanha','mountain'],['praia','beach'],['deserto','desert'],['chuva','rain'],['nuvem','cloud'],['neve','snow'],['raio','lightning'],['terremoto','earthquake'],['furacão','hurricane'],['furacao','hurricane'],['árvore','tree'],['arvore','tree'],['flor','flower'],['folha','leaf'],['semente','seed'],['maçã','apple'],['banana','banana'],['laranja','orange'],['casa','house'],['cidade','city'],['carro','car'],['avião','airplane'],['aviao','airplane'],['navio','ship'],['trem','train'],['bicicleta','bicycle'],['ônibus','bus'],['onibus','bus'],['foguete','rocket'],['ponte','bridge'],['castelo','castle'],['pirâmide','pyramid'],['piramide','pyramid'],['criança','child'],['crianca','child'],['crianças','children'],['criancas','children'],['família','family'],['familia','family'],['médico','doctor'],['medico','doctor'],['cientista','scientist'],['esqueleto','skeleton'],['olho','eye'],['dente','tooth'],['osso','bone'],['sangue','blood'],['fogo','fire'],['gelo','ice'],['relógio','clock'],['relogio','clock'],['lâmpada','lightbulb'],['lampada','lightbulb'],['telefone','phone'],['celular','smartphone'],['bola','ball'],['lápis','pencil'],['lapis','pencil'],['ímã','magnet'],['microscópio','microscope'],['microscopio','microscope'],['telescópio','telescope'],['telescopio','telescope']
 ];
 const translationPatterns=imageQueryTranslations.map(([portuguese,english])=>({
   english,
@@ -415,7 +416,8 @@ export async function searchImageChoices(query,page=1,{transparent=false,raw=fal
   // Bing sem resposta na primeira página: os catálogos livres (Commons,
   // Wikipédia, Openverse) evitam uma galeria vazia.
   if(page===1&&!raw){
-    const catalogs=await workerJson('/storage-ai/images?q='+encodeURIComponent(term)+'&page=1&limit=24'+(wantsAlpha?'&transparent=1':''));
+    // Os catálogos livres são quase todos em inglês: "cachorro" vai como "dog".
+    const catalogs=await workerJson('/storage-ai/images?q='+encodeURIComponent(expandImageQuery(term)||term)+'&page=1&limit=24'+(wantsAlpha?'&transparent=1':''));
     const extra=usable(catalogs);
     if(extra.length)return extra;
     if(catalogs||worker)return [];
