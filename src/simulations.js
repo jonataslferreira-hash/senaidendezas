@@ -3,7 +3,8 @@ export const simulationGroups = [
     ['projectile', 'Lançamento de projéteis'],
     ['pendulum', 'Pêndulo'],
     ['circuit', 'Circuito · Lei de Ohm'],
-    ['waves', 'Ondas e frequência']
+    ['waves', 'Ondas e frequência'],
+    ['lever', 'Alavanca · equilíbrio de torque']
   ]],
   ['Química', [
     ['neutralization', 'Ácido e base · pH'],
@@ -11,14 +12,18 @@ export const simulationGroups = [
   ]],
   ['Biologia', [
     ['osmosis', 'Osmose celular'],
-    ['ecosystem', 'Crescimento populacional']
+    ['ecosystem', 'Crescimento populacional'],
+    ['genetics', 'Genética · cruzamento de Mendel']
   ]],
   ['Matemática', [
     ['quadratic', 'Função quadrática'],
-    ['trigonometry', 'Ciclo trigonométrico']
+    ['trigonometry', 'Ciclo trigonométrico'],
+    ['probability', 'Probabilidade com dados'],
+    ['interest', 'Juros compostos']
   ]],
   ['Geografia', [
-    ['seasons', 'Estações e inclinação axial']
+    ['seasons', 'Estações e inclinação axial'],
+    ['greenhouse', 'Efeito estufa e clima']
   ]],
   ['História', [
     ['eras', 'Linha do tempo histórica']
@@ -181,7 +186,55 @@ export function evaluateGate(gate = 'AND', a = 1, b = 0) {
   return { gate: g, a: va, b: vb, out };
 }
 
-const range = (key, label, min, max, value, step = 1) => `<label>${label} <output data-value="${key}">${value}</output><input aria-label="${label}" type="range" min="${min}" max="${max}" value="${value}" step="${step}" data-param="${key}"></label>`;
+export function leverBalance(loadArm = 60, loadMass = 20, effortArm = 30, effort = 40) {
+  const la = Math.max(1, Number(loadArm) || 1), lm = Math.max(0, Number(loadMass) || 0);
+  const ea = Math.max(1, Number(effortArm) || 1), ef = Math.max(0, Number(effort) || 0);
+  const loadTorque = lm * la, effortTorque = ef * ea;
+  const required = loadTorque / ea;
+  // A viga tomba para o lado com mais torque; o ângulo mostra o desequilíbrio.
+  const imbalance = (effortTorque - loadTorque) / Math.max(1, loadTorque || 1);
+  const tilt = Math.max(-16, Math.min(16, imbalance * 20));
+  return { loadTorque, effortTorque, required, effort: ef, tilt, balanced: Math.abs(effortTorque - loadTorque) < 1 };
+}
+
+export function mendelCross(first = 'Aa', second = 'Aa') {
+  const pick = (genotype, index) => String(genotype || 'Aa')[index] || 'a';
+  const alleles = [[pick(first, 0), pick(second, 0)], [pick(first, 0), pick(second, 1)], [pick(first, 1), pick(second, 0)], [pick(first, 1), pick(second, 1)]]
+    .map(([a, b]) => (a === 'A' && b === 'A' ? 'AA' : (a === 'A' || b === 'A') ? 'Aa' : 'aa'));
+  const dominant = alleles.filter(item => item !== 'aa').length;
+  const recessive = alleles.length - dominant;
+  return { alleles, dominant, recessive, dominantRate: dominant / alleles.length };
+}
+
+export function diceProbability(dice = 2, target = 7) {
+  const count = Math.max(1, Math.min(3, Math.round(Number(dice) || 1)));
+  const sum = Math.max(count, Math.min(count * 6, Math.round(Number(target) || count)));
+  let hits = 0, total = 0;
+  const roll = (left, acc) => {
+    if (!left) { total++; if (acc === sum) hits++; return; }
+    for (let face = 1; face <= 6; face++) roll(left - 1, acc + face);
+  };
+  roll(count, 0);
+  return { dice: count, target: sum, hits, total, probability: hits / total };
+}
+
+export function compoundInterest(principal = 1000, rate = 1, months = 12) {
+  const p = Math.max(0, Number(principal) || 0), r = Math.max(0, Math.min(100, Number(rate) || 0)) / 100, n = Math.max(0, Math.min(360, Math.round(Number(months) || 0)));
+  const amount = p * (1 + r) ** n;
+  return { principal: p, amount, interest: amount - p, months: n };
+}
+
+export function greenhouseBalance(energy = 340, absorbed = 70) {
+  const incoming = Math.max(0, Number(energy) || 0);
+  const trapped = Math.max(0, Math.min(100, Number(absorbed) || 0)) / 100;
+  const reflected = incoming * (1 - trapped) * .3;
+  // 30% de retenção é a referência do equilíbrio pré-industrial (14 °C).
+  const warming = trapped - .3;
+  const temperature = 14 + warming * 12 + (incoming - 340) / 340 * 3;
+  return { reflected, temperature, warming, seaLevel: 0.2 + Math.max(0, temperature - 14) * 0.45 };
+}
+
+const range = (key, label, min, max, value, step = 1) => `<label>${label} <output data-value="${key}">${value}</output><input aria-label="${label}" type="range" min="${min}" max="${max}" value="${value}" step="${step}" data-param="${key}"><span class="simulation-adj"><button type="button" data-sim-step="${key}" data-step="-1" aria-label="Diminuir ${label}" title="Diminuir">−</button><button type="button" data-sim-step="${key}" data-step="1" aria-label="Aumentar ${label}" title="Aumentar">+</button></span></label>`;
 const selectControl = (key, label, options) => `<label>${label}<select aria-label="${label}" data-sim-select="${key}">${options.map(([v, name]) => `<option value="${v}">${name}</option>`).join('')}</select></label>`;
 
 const visuals = {
@@ -199,6 +252,11 @@ const visuals = {
   eras: '<svg viewBox="0 0 400 220" aria-label="Linha do tempo das eras"><g data-eras-bars></g><line x1="28" y1="138" x2="372" y2="138" stroke="currentColor" opacity=".35" stroke-width="2"/><g data-era-pin><line x1="200" y1="54" x2="200" y2="142" stroke="#fde047" stroke-width="3"/><circle cx="200" cy="50" r="7" fill="#fde047"/></g></svg>',
   narrative: '<svg viewBox="0 0 400 220" aria-label="Pirâmide de Freytag"><path d="M26 184H374" stroke="currentColor" opacity=".25"/><path data-arc fill="none" stroke="#f472b6" stroke-width="3.5" stroke-linejoin="round"/><circle data-story-dot cx="220" cy="55" r="8" fill="#fef08a"/><g font-size="10" fill="currentColor" opacity=".7"><text x="36" y="202">Início</text><text x="218" y="202" text-anchor="middle">Clímax</text><text x="366" y="202" text-anchor="end">Desfecho</text></g></svg>',
   colormix: '<svg viewBox="0 0 400 220" aria-label="Mistura aditiva RGB"><rect x="24" y="24" width="175" height="172" rx="16" fill="#0b0e17" stroke="currentColor" opacity=".35"/><circle data-r cx="92" cy="96" r="42" fill="#ff0000" style="mix-blend-mode:screen"/><circle data-g cx="132" cy="96" r="42" fill="#00ff00" style="mix-blend-mode:screen"/><circle data-b cx="112" cy="132" r="42" fill="#0000ff" style="mix-blend-mode:screen"/><rect data-swatch x="220" y="26" width="154" height="114" rx="14" fill="#50afeb" stroke="#ffffff55" stroke-width="2"/><rect data-comp x="220" y="152" width="154" height="44" rx="10" fill="#eb8c50" stroke="#ffffff40"/><text data-contrast-text x="297" y="90" text-anchor="middle" font-size="22" font-weight="700" fill="#0f172a">Aa</text></svg>',
+  lever: '<svg viewBox="0 0 400 220" aria-label="Alavanca com carga e esforço"><path d="M200 186 170 214h60Z" fill="currentColor" opacity=".55"/><g data-beam><rect x="46" y="172" width="308" height="14" rx="7" fill="#94a3b8"/><rect data-load x="96" y="132" width="46" height="40" rx="6" fill="#fb7185"/><circle data-effort cx="316" cy="150" r="18" fill="#4ade80"/></g><path d="M46 200h308" stroke="currentColor" opacity=".18"/></svg>',
+  genetics: '<svg viewBox="0 0 400 220" aria-label="Cruzamento de Mendel"><g data-punnett></g><g data-phenotypes></g></svg>',
+  probability: '<svg viewBox="0 0 400 220" aria-label="Probabilidade de dados"><g data-die-sets></g><path d="M36 190H376" stroke="currentColor" opacity=".25"/><g data-bars></g></svg>',
+  interest: '<svg viewBox="0 0 400 220" aria-label="Curva de juros compostos"><path d="M36 30V190H376" fill="none" stroke="currentColor" opacity=".3" stroke-width="2"/><path data-growth fill="none" stroke="#a78bfa" stroke-width="3.5"/><path data-linear fill="none" stroke="#64748b" stroke-width="2" stroke-dasharray="6 5"/><circle data-end cx="370" cy="60" r="6" fill="#fde047"/></svg>',
+  greenhouse: '<svg viewBox="0 0 400 220" aria-label="Efeito estufa"><circle cx="58" cy="34" r="20" fill="#fbbf24"/><path d="M58 62v42" stroke="#fbbf24" stroke-width="4"/><path d="M30 70l56 26M86 70 30 96" stroke="#fde68a" stroke-width="2.5" opacity=".8"/><path d="M20 190h360" stroke="currentColor" opacity=".25"/><path d="M120 190a80 80 0 0 1 160 0" fill="#38bdf81a" stroke="#38bdf8" stroke-width="3"/><path data-heat d="M150 176c14-16 34-10 34-26s-20-14-20-28" fill="none" stroke="#fb7185" stroke-width="3" stroke-linecap="round"/><path data-heat2 d="M220 176c14-16 34-10 34-26s-20-14-20-28" fill="none" stroke="#fb7185" stroke-width="3" stroke-linecap="round"/><g data-co2></g></svg>',
   logicgates: '<svg viewBox="0 0 400 220" aria-label="Porta lógica digital"><path data-wire-a d="M40 82H150" stroke="#64748b" stroke-width="5" stroke-linecap="round"/><path data-wire-b d="M40 138H150" stroke="#64748b" stroke-width="5" stroke-linecap="round"/><path data-wire-out d="M250 110H340" stroke="#64748b" stroke-width="5" stroke-linecap="round"/><rect x="150" y="58" width="100" height="104" rx="16" fill="#1e293b" stroke="#94a3b8" stroke-width="3"/><text data-gate-label x="200" y="117" text-anchor="middle" fill="#f8fafc" font-size="22" font-weight="700">AND</text><circle data-led cx="352" cy="110" r="18" fill="#334155" stroke="#94a3b8" stroke-width="3"/></svg>'
 };
 
@@ -217,6 +275,12 @@ const controlsFor = {
   eras: () => range('year', 'Ano histórico', -3000, 2026, 1500, 10),
   narrative: () => range('progress', 'Progresso (%)', 0, 100, 60, 1) + range('intensity', 'Intensidade dramática', 1, 5, 3, .5),
   colormix: () => range('r', 'Vermelho (R)', 0, 255, 80, 1) + range('g', 'Verde (G)', 0, 255, 175, 1) + range('b', 'Azul (B)', 0, 255, 235, 1),
+  lever: () => range('loadMass', 'Carga (kg)', 0, 60, 20) + range('loadArm', 'Braço da carga (cm)', 10, 120, 60) + range('effortArm', 'Braço do esforço (cm)', 10, 120, 60) + range('effort', 'Força aplicada (kg)', 0, 80, 20),
+  genetics: () => selectControl('first', 'Genitor 1', [['AA', 'AA · homozigoto dominante'], ['Aa', 'Aa · heterozigoto'], ['aa', 'aa · homozigoto recessivo']])
+    + selectControl('second', 'Genitor 2', [['AA', 'AA · homozigoto dominante'], ['Aa', 'Aa · heterozigoto'], ['aa', 'aa · homozigoto recessivo']]),
+  probability: () => range('dice', 'Quantidade de dados', 1, 3, 2) + range('target', 'Soma desejada', 1, 18, 7),
+  interest: () => range('principal', 'Capital inicial (R$)', 0, 10000, 1000, 50) + range('rate', 'Juros ao mês (%)', 0, 10, 1, .1) + range('months', 'Meses', 0, 120, 12),
+  greenhouse: () => range('energy', 'Energia solar recebida (W/m²)', 100, 500, 340, 5) + range('absorbed', 'Gases retidos (%)', 0, 100, 70),
   logicgates: () => selectControl('gate', 'Porta lógica', [['AND', 'AND (E)'], ['OR', 'OR (OU)'], ['XOR', 'XOR (OU exclusivo)'], ['NAND', 'NAND'], ['NOR', 'NOR']])
     + '<div class="simulation-toggles"><button type="button" data-sim-toggle="a" data-value="1" aria-pressed="true">Entrada A: 1</button><button type="button" data-sim-toggle="b" data-value="0" aria-pressed="false">Entrada B: 0</button></div>'
 };
@@ -236,10 +300,27 @@ const notes = {
   eras: 'Escala proporcional entre 3000 a.C. e a atualidade.',
   narrative: 'Estrutura clássica de cinco etapas dramáticas.',
   colormix: 'Síntese aditiva de luz RGB, cor complementar e contraste WCAG.',
+  lever: 'Equilíbrio: carga × braço da carga = esforço × braço do esforço.',
+  genetics: '1ª Lei de Mendel: segregação dos alelos na formação dos gametas.',
+  probability: 'Espaço amostral finito: casos favoráveis divididos por casos possíveis.',
+  interest: 'Montante M = C · (1 + i)ⁿ comparado ao crescimento linear.',
+  greenhouse: 'Balanço radiativo simplificado: parte da energia fica retida na atmosfera.',
   logicgates: 'Álgebra booleana aplicada a circuitos digitais.'
 };
 
 const playable = new Set(['projectile', 'pendulum', 'waves', 'states', 'trigonometry', 'seasons', 'ecosystem']);
+// Experiments that use a "desafio" goal: the slide asks for a target value and the
+// student has to tune the sliders until the live output matches it.
+export const simulationChallenges = {
+  projectile: { label: 'Acerte o alvo', prompt: 'Alcance entre 19 m e 20,5 m', test: r => r.range >= 19 && r.range <= 20.5, hint: 'Com 45°, o alcance cresce com o quadrado da velocidade: tente 14 m/s.' },
+  neutralization: { label: 'Acerte o alvo', prompt: 'Deixe o pH entre 6,9 e 7,1', test: r => r.ph >= 6.9 && r.ph <= 7.1, hint: 'Iguale os volumes de ácido e base.' },
+  circuit: { label: 'Acerte o alvo', prompt: 'Corrente de 50 mA (tolerância 2 mA)', test: r => Math.abs(r.current * 1000 - 50) <= 2, hint: 'I = V / R: combine tensão e resistência.' },
+  lever: { label: 'Acerte o alvo', prompt: 'Deixe a alavanca em equilíbrio', test: r => r.balanced, hint: 'Carga × braço da carga deve igualar a força aplicada × braço do esforço.' },
+  genetics: { label: 'Acerte o alvo', prompt: 'Obtenha 100% de descendentes dominantes', test: r => r.dominantRate === 1, hint: 'Um dos genitores precisa ser AA.' },
+  probability: { label: 'Acerte o alvo', prompt: 'Use 3 dados e ache a soma mais provável', test: r => r.dice === 3 && (r.target === 10 || r.target === 11), hint: 'Com três dados, 10 e 11 dividem o topo: 27 de 216 combinações cada.' },
+  interest: { label: 'Acerte o alvo', prompt: 'Dobre o capital em até 12 meses', test: r => r.amount >= r.principal * 2 && r.months <= 12, hint: 'Taxas maiores que 6% ao mês dobram o capital em 12 meses.' },
+  greenhouse: { label: 'Acerte o alvo', prompt: 'Mantenha a temperatura entre 13 °C e 15 °C', test: r => r.temperature >= 13 && r.temperature <= 15, hint: 'Reduza um pouco a retenção de gases.' }
+};
 
 const defaultParams = {
   projectile: { speed: 12, angle: 45, gravity: 9.81 },
@@ -256,10 +337,15 @@ const defaultParams = {
   eras: { year: 1500 },
   narrative: { progress: 60, intensity: 3 },
   colormix: { r: 80, g: 175, b: 235 },
+  lever: { loadMass: 20, loadArm: 60, effortArm: 60, effort: 10 },
+  genetics: { first: 'Aa', second: 'Aa' },
+  probability: { dice: 2, target: 7 },
+  interest: { principal: 1000, rate: 1, months: 12 },
+  greenhouse: { energy: 340, absorbed: 70 },
   logicgates: { gate: 'AND', a: 1, b: 0 }
 };
 
-export function simulationMarkup(type = 'projectile', { interactive = true } = {}) {
+export function simulationMarkup(type = 'projectile', { interactive = true, challenge = true } = {}) {
   const safeType = Object.hasOwn(simulationNames, type) ? type : 'projectile';
   const subject = simulationSubjects[safeType] || 'LAB';
   const visual = visuals[safeType] || visuals.projectile;
@@ -267,7 +353,11 @@ export function simulationMarkup(type = 'projectile', { interactive = true } = {
     return `<section class="simulation-widget simulation-thumbnail" data-simulation="${safeType}"><header><strong>${simulationNames[safeType]}</strong><span>${subject.toUpperCase()}</span></header>${visual}<span class="simulation-result"></span><small>${notes[safeType] || ''}</small></section>`;
   }
   const controls = (controlsFor[safeType] || controlsFor.projectile)();
-  return `<section class="simulation-widget" data-simulation="${safeType}"><header><strong>${simulationNames[safeType]}</strong><span>${subject.toUpperCase()}</span></header>${visual}<div class="simulation-controls">${controls}</div><output class="simulation-result" aria-live="polite"></output>${playable.has(safeType) ? '<button type="button" data-sim-play>▶ Experimentar</button>' : ''}<small>${notes[safeType] || ''}</small></section>`;
+  const challengeInfo = challenge ? simulationChallenges[safeType] : null;
+  const challengeMarkup = challengeInfo
+    ? `<div class="simulation-challenge" data-sim-challenge><span class="simulation-challenge-goal">${challengeInfo.label}: ${challengeInfo.prompt}</span><span class="simulation-challenge-state" role="status">Ajuste os valores…</span><small class="simulation-challenge-hint">${challengeInfo.hint}</small></div>`
+    : '';
+  return `<section class="simulation-widget" data-simulation="${safeType}"><header><strong>${simulationNames[safeType]}</strong><span>${subject.toUpperCase()}</span></header>${visual}<div class="simulation-controls">${controls}</div><output class="simulation-result" aria-live="polite"></output>${challengeMarkup}${playable.has(safeType) ? '<button type="button" data-sim-play>▶ Experimentar</button>' : ''}<small>${notes[safeType] || ''}</small></section>`;
 }
 
 function readSimulationValues(node) {
@@ -322,9 +412,11 @@ function paintSimulationNode(node) {
   }
   const resultEl = node.querySelector('.simulation-result');
   if (!resultEl) return;
+  let metrics = null;
 
   if (type === 'projectile') {
     const result = projectile(p.speed, p.angle, p.gravity);
+    metrics = { range: result.range };
     resultEl.textContent = `Alcance ${result.range.toFixed(1)} m · Altura ${result.height.toFixed(1)} m · Voo ${result.time.toFixed(1)} s`;
     const path = Array.from({ length: 51 }, (_, i) => {
       const t = result.time * i / 50;
@@ -348,11 +440,13 @@ function paintSimulationNode(node) {
   }
   else if (type === 'neutralization') {
     const ph = mixturePH(p.acid, p.base);
+    metrics = { ph };
     resultEl.textContent = `pH ${ph.toFixed(2)} · ${ph < 6.99 ? 'Ácido' : ph > 7.01 ? 'Básico' : 'Neutro'}`;
     node.querySelector('[data-liquid]')?.setAttribute('fill', `hsl(${ph * 19} 65% 60%)`);
   }
   else if (type === 'circuit') {
     const current = p.voltage / p.resistance, power = p.voltage * current;
+    metrics = { current };
     resultEl.textContent = `Corrente ${(current * 1000).toFixed(1)} mA · Potência ${power.toFixed(2)} W`;
     node.querySelector('[data-bulb]')?.setAttribute('opacity', String(.2 + Math.min(.8, power / 4)));
   }
@@ -367,6 +461,7 @@ function paintSimulationNode(node) {
   }
   else if (type === 'osmosis') {
     const os = osmosisState(p.outside, p.inside);
+    metrics = { tonicity: os.tonicity };
     const cell = node.querySelector('[data-cell]');
     cell?.setAttribute('rx', (58 * os.scale).toFixed(1));
     cell?.setAttribute('ry', (44 * os.scale).toFixed(1));
@@ -479,8 +574,91 @@ function paintSimulationNode(node) {
     if (txt) txt.setAttribute('fill', c.contrastBlack >= c.contrastWhite ? '#0f172a' : '#f8fafc');
     resultEl.textContent = `${c.hex} · Compl. ${c.complement} · Contraste ${Math.max(c.contrastBlack, c.contrastWhite).toFixed(1)}:1`;
   }
+  else if (type === 'lever') {
+    const lv = leverBalance(p.loadArm, p.loadMass, p.effortArm, p.effort);
+    metrics = lv;
+    const beam = node.querySelector('[data-beam]');
+    if (beam) beam.setAttribute('transform', `rotate(${lv.tilt.toFixed(1)} 200 179)`);
+    node.querySelector('[data-effort]')?.setAttribute('cx', (46 + Math.min(300, p.effortArm * 2.4)).toFixed(1));
+    node.querySelector('[data-effort]')?.setAttribute('fill', lv.balanced ? '#4ade80' : '#facc15');
+    node.querySelector('[data-load]')?.setAttribute('x', (200 - Math.min(140, p.loadArm * 1.6) - 23).toFixed(1));
+    resultEl.textContent = `Carga ${lv.loadTorque.toFixed(0)} kgf·cm · Esforço ${lv.effortTorque.toFixed(0)} kgf·cm · ${lv.balanced ? 'Equilibrada' : p.effortArm > p.loadArm ? 'Desvantagem' : 'Vantagem mecânica'}`;
+  }
+  else if (type === 'genetics') {
+    const mnd = mendelCross(p.first, p.second);
+    metrics = mnd;
+    const grid = node.querySelector('[data-punnett]');
+    if (grid) {
+      const cells = mnd.alleles.map((allele, i) => {
+        const x = 112 + (i % 2) * 92, y = 74 + Math.floor(i / 2) * 62;
+        const dominant = allele !== 'aa';
+        return `<rect x="${x}" y="${y}" width="88" height="58" rx="9" fill="${dominant ? '#4ade8033' : '#fb718533'}" stroke="${dominant ? '#4ade80' : '#fb7185'}" stroke-width="2"/><text x="${x + 44}" y="${y + 36}" text-anchor="middle" font-size="20" font-weight="700" fill="currentColor">${allele}</text>`;
+      }).join('');
+      grid.innerHTML = `<text x="112" y="56" font-size="14" fill="currentColor" opacity=".75">${p.first}</text><text x="34" y="110" font-size="14" fill="currentColor" opacity=".75">${p.second}</text>${cells}`;
+    }
+    const phenotypes = node.querySelector('[data-phenotypes]');
+    if (phenotypes) {
+      const height = 118 * mnd.dominantRate;
+      phenotypes.innerHTML = `<rect x="316" y="${190 - height}" width="30" height="${Math.max(2, height)}" rx="5" fill="#4ade80"/><text x="331" y="${182 - height}" text-anchor="middle" font-size="11" fill="currentColor">${Math.round(mnd.dominantRate * 100)}%</text>`;
+    }
+    resultEl.textContent = `Dominantes ${mnd.dominant}/4 · Recessivos ${mnd.recessive}/4 · ${Math.round(mnd.dominantRate * 100)}% fenótipo dominante`;
+  }
+  else if (type === 'probability') {
+    const dice = diceProbability(p.dice, p.target);
+    metrics = dice;
+    const sets = node.querySelector('[data-die-sets]');
+    if (sets) sets.innerHTML = Array.from({ length: dice.dice }, (_, i) => `<rect x="${46 + i * 44}" y="26" width="36" height="36" rx="8" fill="currentColor" opacity=".16"/><text x="${64 + i * 44}" y="50" text-anchor="middle" font-size="16" fill="currentColor">🎲</text>`).join('');
+    const bars = node.querySelector('[data-bars]');
+    if (bars) {
+      const min = dice.dice, max = dice.dice * 6, span = max - min;
+      bars.innerHTML = Array.from({ length: span + 1 }, (_, i) => {
+        const sum = min + i, chance = diceProbability(dice.dice, sum).probability;
+        const x = 40 + (i / Math.max(1, span)) * 330, height = chance * 130;
+        const active = sum === dice.target;
+        return `<rect x="${x.toFixed(1)}" y="${(186 - height).toFixed(1)}" width="${Math.max(3, 320 / (span + 1) - 3).toFixed(1)}" height="${Math.max(1, height).toFixed(1)}" rx="3" fill="${active ? '#fde047' : '#38bdf8'}" opacity="${active ? 1 : .55}"/>`;
+      }).join('');
+    }
+    resultEl.textContent = `${dice.hits} de ${dice.total} combinações dão ${dice.target} · P = ${(dice.probability * 100).toFixed(1)}%`;
+  }
+  else if (type === 'interest') {
+    const money = compoundInterest(p.principal, p.rate, p.months);
+    metrics = money;
+    const maxAmount = Math.max(1, compoundInterest(p.principal, p.rate, 120).amount);
+    const path = Array.from({ length: 61 }, (_, i) => {
+      const month = Math.round(i / 60 * p.months);
+      const value = compoundInterest(p.principal, p.rate, month).amount;
+      return `${i ? 'L' : 'M'}${(36 + month / 120 * 334).toFixed(1)} ${(190 - value / maxAmount * 156).toFixed(1)}`;
+    }).join(' ');
+    node.querySelector('[data-growth]')?.setAttribute('d', path);
+    const linear = Array.from({ length: 61 }, (_, i) => {
+      const month = Math.round(i / 60 * p.months);
+      const value = p.principal * (1 + p.rate / 100 * month);
+      return `${i ? 'L' : 'M'}${(36 + month / 120 * 334).toFixed(1)} ${(190 - value / maxAmount * 156).toFixed(1)}`;
+    }).join(' ');
+    node.querySelector('[data-linear]')?.setAttribute('d', linear);
+    const end = node.querySelector('[data-end]');
+    if (end) {
+      end.setAttribute('cx', (36 + p.months / 120 * 334).toFixed(1));
+      end.setAttribute('cy', (190 - money.amount / maxAmount * 156).toFixed(1));
+    }
+    resultEl.textContent = `Montante ${money.amount.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 })} · Juros ${money.interest.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 })}`;
+  }
+  else if (type === 'greenhouse') {
+    const heat = greenhouseBalance(p.energy, p.absorbed);
+    metrics = heat;
+    const tint = Math.max(0, Math.min(1, (heat.temperature - 4) / 26));
+    node.querySelector('[data-heat]')?.setAttribute('opacity', String(.35 + tint * .65));
+    node.querySelector('[data-heat2]')?.setAttribute('opacity', String(.25 + tint * .6));
+    const co2 = node.querySelector('[data-co2]');
+    if (co2) co2.innerHTML = Array.from({ length: Math.round(p.absorbed / 8) }, (_, i) => {
+      const angle = i * 2.39996, r = 40 + (i % 5) * 22;
+      return `<circle cx="${(200 + Math.cos(angle) * r * 1.5).toFixed(1)}" cy="${(150 + Math.sin(angle) * r * .5).toFixed(1)}" r="4" fill="#fca5a5" opacity=".7"/>`;
+    }).join('');
+    resultEl.textContent = `Temperatura média ${heat.temperature.toFixed(1)} °C · Refletido ${heat.reflected.toFixed(0)} W/m² · Nível do mar +${heat.seaLevel.toFixed(1)} m`;
+  }
   else if (type === 'logicgates') {
     const res = evaluateGate(p.gate, p.a, p.b);
+    metrics = { out: res.out };
     const wireColor = v => v ? '#4ade80' : '#64748b';
     node.querySelector('[data-wire-a]')?.setAttribute('stroke', wireColor(res.a));
     node.querySelector('[data-wire-b]')?.setAttribute('stroke', wireColor(res.b));
@@ -489,6 +667,15 @@ function paintSimulationNode(node) {
     if (gateLabel) gateLabel.textContent = res.gate;
     node.querySelector('[data-led]')?.setAttribute('fill', res.out ? '#4ade80' : '#334155');
     resultEl.textContent = `A(${res.a}) ${res.gate} B(${res.b}) = Saída ${res.out}`;
+  }
+
+  const challengeRule = simulationChallenges[type], challengeEl = node.querySelector('[data-sim-challenge]');
+  if (challengeRule && challengeEl) {
+    let solved = false;
+    try { solved = Boolean(metrics && challengeRule.test(metrics)); } catch { solved = false; }
+    challengeEl.toggleAttribute('data-solved', solved);
+    const state = challengeEl.querySelector('.simulation-challenge-state');
+    if (state) state.textContent = solved ? 'Alvo alcançado ✓' : 'Ajuste os valores…';
   }
 }
 
@@ -526,6 +713,17 @@ export class Simulations {
       node.addEventListener('input', update);
       node.addEventListener('change', update);
       node.addEventListener('click', event => {
+        const stepper = event.target.closest('[data-sim-step]');
+        if (stepper) {
+          const field = node.querySelector(`[data-param="${stepper.dataset.simStep}"]`);
+          if (field) {
+            const step = Number(field.step) || 1, direction = Number(stepper.dataset.step) || 1;
+            const next = Math.max(Number(field.min), Math.min(Number(field.max), Number(field.value) + step * direction));
+            field.value = String(Math.round(next * 1000) / 1000);
+            update();
+          }
+          return;
+        }
         const toggle = event.target.closest('[data-sim-toggle]');
         if (toggle) {
           const next = toggle.dataset.value === '1' ? '0' : '1';

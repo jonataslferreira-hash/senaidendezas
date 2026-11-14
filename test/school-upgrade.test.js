@@ -6,7 +6,8 @@ import {newElement,normalizeElements} from '../src/canvas-data.js';
 import {
   projectile,mixturePH,waveProperties,matterState,osmosisState,logisticPopulation,
   quadraticMetrics,trigValues,seasonInfo,historicalEra,narrativeStage,colorMixInfo,evaluateGate,
-  simulationIds,simulationGroups,simulationNames,simulationSubjects,simulationMarkup
+  leverBalance,mendelCross,diceProbability,compoundInterest,greenhouseBalance,
+  simulationIds,simulationGroups,simulationNames,simulationSubjects,simulationMarkup,simulationChallenges
 } from '../src/simulations.js';
 import {canvasMarkup} from '../src/canvas-view.js';
 import {styles} from '../src/personalization.js';
@@ -23,8 +24,8 @@ test('áudio de chat exige associação, limita formato e permite excluir soment
  assert.equal((await call(new Request('https://worker.test'+path,{method:'PUT',headers:{'Content-Type':'audio/webm'},body:new Uint8Array([0x1a,0x45,0xdf,0xa3,0])}))).status,200);assert.equal((await call(new Request('https://worker.test'+path))).status,200);assert.equal((await call(new Request('https://worker.test'+path,{method:'DELETE'}),true,{id:'another'})).status,403);assert.equal((await call(new Request('https://worker.test'+path,{method:'DELETE'}))).status,200);assert.equal(objects.size,0);
  assert.equal((await call(new Request('https://worker.test'+path,{method:'PUT',headers:{'Content-Type':'audio/webm'},body:'<script>'}))).status,415);
 });
-test('catálogo multidisciplinar de 15 simulações cobre cálculos, markup e normalização',()=>{
- assert.equal(simulationIds.length,15);
+test('catálogo multidisciplinar de 20 simulações cobre cálculos, markup e normalização',()=>{
+ assert.equal(simulationIds.length,20);
  const groupedIds=simulationGroups.flatMap(([,items])=>items.map(([id])=>id));
  assert.deepEqual(groupedIds,simulationIds);
  for(const id of simulationIds){
@@ -54,6 +55,38 @@ test('catálogo multidisciplinar de 15 simulações cobre cálculos, markup e no
  assert.equal(colorMixInfo(255,255,0).hex,'#FFFF00');
  assert.equal(evaluateGate('XOR',1,0).out,1);
  assert.equal(evaluateGate('XOR',1,1).out,0);
+ assert.equal(leverBalance(60,20,60,20).balanced,true);
+ assert.equal(leverBalance(60,20,60,10).balanced,false);
+ assert.equal(leverBalance(60,20,60,10).required,20);
+ assert.equal(mendelCross('Aa','Aa').dominantRate,.75);
+ assert.equal(mendelCross('AA','aa').dominantRate,1);
+ assert.deepEqual(Object.assign({},diceProbability(2,7)),{dice:2,target:7,hits:6,total:36,probability:1/6});
+ assert.equal(diceProbability(1,1).probability,1/6);
+ assert.ok(compoundInterest(1000,10,12).amount>2500);
+ assert.equal(compoundInterest(1000,0,12).amount,1000);
+ assert.ok(greenhouseBalance(340,30).temperature<greenhouseBalance(340,80).temperature);
+});
+
+test('desafios das simulações dão um alvo verificável e um markup com estado ao vivo',()=>{
+ for(const [id,rule] of Object.entries(simulationChallenges)){
+  assert.ok(simulationNames[id],'desafio em simulação existente: '+id);
+  assert.ok(rule.prompt.length>8&&rule.hint.length>8,'desafio com instrução em '+id);
+  const markup=simulationMarkup(id);
+  assert.ok(markup.includes('data-sim-challenge'),'painel de desafio em '+id);
+  assert.ok(markup.includes('Alvo alcançado')===false,'estado começa pendente em '+id);
+  assert.ok(markup.includes('Ajuste os valores'),'estado inicial em '+id);
+  // Simulações com sliders ganham passos +/−; as que só têm select não precisam.
+  if(markup.includes('type="range"'))assert.ok(markup.includes('data-sim-step'),'passo +/− nos controles de '+id);
+ }
+ assert.equal(simulationChallenges.projectile.test({range:19.5}),true);
+ assert.equal(simulationChallenges.projectile.test({range:21.5}),false);
+ assert.equal(simulationChallenges.lever.test(leverBalance(60,20,60,20)),true);
+ assert.equal(simulationChallenges.lever.test(leverBalance(60,20,60,10)),false);
+ assert.equal(simulationChallenges.genetics.test(mendelCross('AA','aa')),true);
+ assert.equal(simulationChallenges.probability.test(diceProbability(3,10)),true);
+ assert.equal(simulationChallenges.probability.test(diceProbability(2,7)),false);
+ assert.equal(simulationChallenges.interest.test(compoundInterest(1000,10,12)),true);
+ assert.equal(simulationChallenges.greenhouse.test(greenhouseBalance(340,30)),true);
 });
 test('estilos de interface incluem Office e 8-Bit preservando IDs internos',()=>{
  assert.equal(styles.find(([id])=>id==='editorial')?.[1],'Office');

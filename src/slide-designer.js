@@ -6,7 +6,7 @@ import {FontPicker,fontButton,loadSlideFonts} from './fonts.js';
 import {presentationSlide} from './slide-display.js';
 import { audioEditor } from './audio-editor.js';
 import { optimizeImage } from './image-optimize.js';
-import { MAX_CANVAS_ELEMENTS, canvasFromSlide, newElement, canvasThemes, applyCanvasTheme, slideBackground, normalizeBackground, imageZoomValue } from './canvas-data.js';
+import { MAX_CANVAS_ELEMENTS, canvasFromSlide, newElement, canvasThemes, applyCanvasTheme, slideBackground, normalizeBackground, imageZoomValue, mixHex } from './canvas-data.js';
 import {openLayouts, applyOpenLayout} from './open-slide-layouts.js';
 import {slideStylePicker,localLayouts} from './slide-style-picker.js';
 import { canvasMarkup, CanvasModels, esc } from './canvas-view.js';
@@ -37,6 +37,28 @@ function elementAnimation(slide,element,open){
     ${effect.group?`<label>Ordem do clique<input type="number" min="1" max="100" value="${effect.group}" data-element-animation="group"></label>`:''}
     <label>Duração (ms)<input type="number" min="1" max="30000" step="50" value="${effect.duration}" data-element-animation="duration"></label>`:''}
   </div></details>`;
+}
+// Gradientes com duas cores realmente distintas: antes o fim era a cor de
+// destaque do tema e o resultado ficava quase igual ao fundo sólido.
+export const backgroundGradients = [
+  { name: 'Aurora', hint: 'violeta para turquesa', css: 'linear-gradient(135deg,#5b21b6,#22d3ee)' },
+  { name: 'Pôr do sol', hint: 'laranja para rosa', css: 'linear-gradient(135deg,#f97316,#db2777)' },
+  { name: 'Oceano', hint: 'azul profundo para água', css: 'linear-gradient(135deg,#0c4a6e,#38bdf8)' },
+  { name: 'Floresta', hint: 'verde escuro para limão', css: 'linear-gradient(135deg,#14532d,#a3e635)' },
+  { name: 'Papel', hint: 'creme para lavanda', css: 'linear-gradient(135deg,#fef3c7,#e9d5ff)' },
+  { name: 'Grafite', hint: 'carvão para prata', css: 'linear-gradient(135deg,#111827,#9ca3af)' }
+];
+// Lê as duas cores do preset para que o slide guarde só #rrggbb (formato do editor).
+export function gradientEndpoints(css){
+  const colors=[...String(css).matchAll(/#[0-9a-f]{6}/gi)].map(match=>match[0].toLowerCase());
+  return [colors[0]||'#171324',colors[1]||'#36648a'];
+}
+// Os painéis de estilo do inspetor também mudam a "temperatura" do gradiente:
+// no modo claro o fim precisa ser mais escuro que a base para a transição aparecer.
+export function contrastingGradient(theme, base){
+  const light=parseInt(base.slice(1,3),16)*.299+parseInt(base.slice(3,5),16)*.587+parseInt(base.slice(5,7),16)*.114>145;
+  const accent=theme?.accent||(light?'#3f3a5a':'#cbb6ff');
+  return light?mixHex(base,accent,.62):mixHex(base,'#ffffff',.18);
 }
 export class SlideDesigner {
   constructor(studio) {
@@ -310,7 +332,8 @@ export class SlideDesigner {
       <summary><span class="background-swatch" data-visual-theme="${slide.visualTheme||''}" data-custom-background="${Boolean(fill)}" style="background:${slideBackground(slide)}"></span><span class="setting-label">Fundo</span></summary>
       <label>Preenchimento<select data-background-mode>${modes.map(([value,label])=>`<option value="${value}" ${value===mode?'selected':''}>${label}</option>`).join('')}</select></label>
       <label>${mode==='gradient'?'Cor inicial':'Cor de base'}<input type="color" id="designer-background" value="${slide.background}"></label>
-      ${mode==='gradient'?`<label>Cor final<input type="color" data-background-end value="${fill.end}"></label><label>Ângulo do gradiente<input type="range" data-background-angle min="0" max="360" value="${fill.angle}"></label>`:''}
+      ${mode==='gradient'?`<label>Cor final<input type="color" data-background-end value="${fill.end}"></label><label>Ângulo do gradiente<input type="range" data-background-angle min="0" max="360" value="${fill.angle}"></label>
+      <div class="background-gradients" role="group" aria-label="Gradientes prontos">${backgroundGradients.map((preset,index)=>`<button type="button" class="background-gradient" data-background-gradient="${index}" style="--preset:${preset.css}" aria-label="${preset.name}: ${preset.hint}" title="${preset.name} · ${preset.hint}"><span></span></button>`).join('')}</div>`:''}
     </details>`;
   }
   animationOrder(slide) {
@@ -393,6 +416,12 @@ export class SlideDesigner {
     const node = event.target.closest('.canvas-editing .canvas-object');
     if(!node&&event.target.closest('.designer-stage-wrap')&&!event.target.closest('button,input,select,textarea')){this.selected=null;this.mobilePanel='';this.interacting='';this.imageEditing='';this.refreshSelection();return;}
     if (!node || event.target.closest('[contenteditable]') || event.target.closest('button')) return;
+    // Os controles da simulação respondem na hora, sem exigir o modo "Experimentar":
+    // o arrasto do objeto não pode capturar o ponteiro do slider.
+    if (event.target.closest('.simulation-widget :is(input,select,textarea,label,output)')) {
+      if (this.interacting !== node.dataset.objectId) { this.interacting = node.dataset.objectId; this.refreshSelection(); }
+      return;
+    }
     if(this.imageEditing===node.dataset.objectId){this.cropDown(event,node);return;}
     this.imageEditing='';
     if(event.shiftKey){this.selectObject(node.dataset.objectId,true);event.preventDefault();return;}
@@ -529,8 +558,12 @@ export class SlideDesigner {
       this.backgroundOpen=true;
       this.mutate(s=>{
         const mode=t.value;
-        if(mode==='theme'){delete s.backgroundFill;s.background=canvasThemes[s.visualTheme].background;}
-        else s.backgroundFill=normalizeBackground({mode,end:canvasThemes[s.visualTheme]?.accent||'#36648a',angle:135});
+        if(mode==='theme'){delete s.backgroundFill;s.background=canvasThemes[s.visualTheme]?.background||'#171324';}
+        else {
+          const theme=canvasThemes[s.visualTheme];
+          const base=s.background||theme?.background||'#171324';
+          s.backgroundFill=normalizeBackground({mode,end:theme?.end||contrastingGradient(theme,base),angle:135});
+        }
       });
       return;
     }
@@ -598,6 +631,18 @@ export class SlideDesigner {
       ordered[next].effect={...first,group:second.group,delay:second.delay};
       this.timelineOpen=true;
       this.mutate(slide=>{slide.animations=ordered.map(entry=>entry.effect);});
+      return;
+    }
+    if(action==='background-gradient'){
+      const preset=backgroundGradients[Number(button?.dataset.backgroundGradient)];
+      if(!preset)return;
+      this.backgroundOpen=true;
+      this.mutate(slide=>{
+        const [start,end]=gradientEndpoints(preset.css);
+        slide.background=start;
+        slide.backgroundFill=normalizeBackground({mode:'gradient',end,angle:135});
+        slide.visualTheme='';
+      });
       return;
     }
     if(action.startsWith('setting-')){const tab=action.slice(8);this.settingTab=this.settingTab===tab?'':tab;this.refreshSelection();return;}
@@ -761,12 +806,12 @@ export class SlideDesigner {
     const listMarkup=simulationGroups.flatMap(([subject,items])=>items.map(([id,name])=>`<button type="button" role="option" class="simulation-modal-choice" data-sim-choice="${esc(id)}" data-subject="${esc(subject)}" aria-selected="${id===activeType}"><strong>${esc(name)}</strong><span>${esc(subject)}</span></button>`)).join('');
     dialog.innerHTML=`<form method="dialog" class="simulation-modal-head"><div><strong id="simulation-modal-title">Laboratório de simulações</strong><span>Teste os parâmetros ao vivo antes de ${targetId?'aplicar':'inserir'} no slide.</span></div><button type="submit" class="simulation-modal-close" aria-label="Fechar">×</button></form>
       <div class="simulation-modal-body">
+        <section class="simulation-modal-stage" aria-live="polite"></section>
         <aside class="simulation-modal-catalog">
           <label class="simulation-modal-select-wrap">Simulação<select class="simulation-modal-select" aria-label="Tipo de simulação">${selectMarkup}</select></label>
           <div class="simulation-modal-filters" role="tablist" aria-label="Filtrar por disciplina">${filtersMarkup}</div>
-          <div class="simulation-modal-list" role="listbox" aria-label="Simulações disponíveis">${listMarkup}</div>
+          <div class="simulation-modal-list" role="listbox" aria-label="Atalhos por disciplina">${listMarkup}</div>
         </aside>
-        <section class="simulation-modal-stage" aria-live="polite"></section>
       </div>
       <footer class="simulation-modal-foot"><span class="simulation-modal-current"></span><div class="simulation-modal-actions"><button type="button" class="studio-btn quiet" data-sim-cancel>${this.studio.groups.canEdit?'Cancelar':'Fechar'}</button>${this.studio.groups.canEdit?`<button type="button" class="studio-btn studio-launch" data-sim-confirm>${targetId?'Aplicar no slide':'Inserir no slide'}</button>`:''}</div></footer>`;
     const select=dialog.querySelector('.simulation-modal-select');
@@ -776,7 +821,8 @@ export class SlideDesigner {
     const filters=[...dialog.querySelectorAll('[data-sim-filter]')];
     const renderStage=(type)=>{
       activeType=Object.hasOwn(simulationNames,type)?type:'projectile';
-      select.value=activeType;
+      // O catálogo já foi escolhido no seletor; a lista lateral seria uma segunda lista.
+      if(select.value!==activeType)select.value=activeType;
       for(const choice of choices)choice.setAttribute('aria-selected',String(choice.dataset.simChoice===activeType));
       current.textContent=`${simulationSubjects[activeType]||'Ciências'} · ${simulationNames[activeType]}`;
       stage.innerHTML=simulationMarkup(activeType);
