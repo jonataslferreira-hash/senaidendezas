@@ -100,9 +100,12 @@ export class SlideDesigner {
       const grip = event.target.closest('[data-layer-grip]');
       if (grip) {
         event.preventDefault();
-        this.dragLayer(event, grip);
+        this.dragLayer(event, grip.closest('[data-layer-row]'), true);
         return;
       }
+      // Segurar o próprio nome da camada também arrasta (mouse/caneta).
+      const layerRow = event.target.closest('#designer-layers [data-layer-row]');
+      if (layerRow && event.pointerType !== 'touch') { this.dragLayer(event, layerRow, false); return; }
       this.down(event);
     });
     root.addEventListener('pointermove', e => this.move(e));
@@ -235,34 +238,53 @@ export class SlideDesigner {
     this.studio.markDirty();
     this.studio.callbacks.render();
   }
-  dragLayer(event, grip) {
-    if (!this.studio.groups.canEdit || event.button !== 0) return;
-    const list = grip.closest('#designer-layers');
-    const from = grip.dataset.layerGrip;
+  dragLayer(event, row, immediate) {
+    if (!row || !this.studio.groups.canEdit || event.button !== 0) return;
+    const list = row.closest('#designer-layers');
+    const from = row.dataset.layerRow;
     const original = this.original;
-    grip.setPointerCapture(event.pointerId);
-    grip.classList.add('dragging');
-    const ghost = document.createElement('span');
-    ghost.className = 'layer-drag-preview';
-    ghost.textContent = grip.parentElement.querySelector('button').textContent;
-    document.body.append(ghost);
-    let destination;
+    const startX = event.clientX, startY = event.clientY;
+    let ghost, destination, active = false;
+    const clearTarget = () => { destination?.classList.remove('layer-drop-target', 'layer-drop-before', 'layer-drop-after'); };
+    const start = () => {
+      active = true;
+      row.classList.add('dragging');
+      list.classList.add('layer-dragging');
+      ghost = document.createElement('span');
+      ghost.className = 'layer-drag-preview';
+      ghost.textContent = row.querySelector('button').textContent;
+      document.body.append(ghost);
+    };
     const move = next => {
+      if (!active) {
+        if (Math.hypot(next.clientX - startX, next.clientY - startY) < 6) return;
+        start();
+      }
+      next.preventDefault?.();
       ghost.style.translate = next.clientX + 'px ' + next.clientY + 'px';
-      destination?.classList.remove('layer-drop-target');
+      clearTarget();
       const bounds = list.getBoundingClientRect();
       if (next.clientX < bounds.left + 28) list.scrollLeft -= 12;
       if (next.clientX > bounds.right - 28) list.scrollLeft += 12;
       destination = document.elementFromPoint(next.clientX, next.clientY)?.closest('[data-layer-row]');
-      if (destination?.closest('#designer-layers') === list && destination.dataset.layerRow !== from) destination.classList.add('layer-drop-target');
+      if (destination?.closest('#designer-layers') === list && destination.dataset.layerRow !== from) {
+        const rows = [...list.querySelectorAll('[data-layer-row]')];
+        destination.classList.add('layer-drop-target', rows.indexOf(destination) > rows.indexOf(row) ? 'layer-drop-after' : 'layer-drop-before');
+      } else destination = null;
     };
     const finish = end => {
+      removeEventListener('pointermove', move);
+      removeEventListener('pointerup', finish);
+      removeEventListener('pointercancel', finish);
+      if (!active) return;
       ghost.remove();
-      destination?.classList.remove('layer-drop-target');
-      grip.classList.remove('dragging');
-      grip.removeEventListener('pointermove', move);
-      grip.removeEventListener('pointerup', finish);
-      grip.removeEventListener('pointercancel', finish);
+      clearTarget();
+      row.classList.remove('dragging');
+      list.classList.remove('layer-dragging');
+      // O clique que viria depois de soltar não deve trocar a seleção.
+      const swallow = click => { click.stopPropagation(); click.preventDefault(); };
+      addEventListener('click', swallow, { capture: true, once: true });
+      setTimeout(() => removeEventListener('click', swallow, { capture: true }), 0);
       if (end.type !== 'pointerup' || this.original !== original || !this.studio.groups.canEdit) return;
       const to = document.elementFromPoint(end.clientX, end.clientY)?.closest('[data-layer-row]')?.dataset.layerRow;
       if (!to || from === to) return;
@@ -274,16 +296,16 @@ export class SlideDesigner {
         slide.elements.splice(toIndex, 0, element);
       }, true);
       const nextList = this.studio.root.querySelector('#designer-layers');
+      if (nextList) nextList.scrollLeft = list.scrollLeft;
       if (nextList && list.hasAttribute('data-mobile-open')) {
         nextList.setAttribute('data-mobile-open', '');
-        nextList.scrollLeft = list.scrollLeft;
         this.studio.root.querySelector('[data-designer-action="mobile-layers"]')?.setAttribute('aria-expanded', 'true');
       }
     };
-    move(event);
-    grip.addEventListener('pointermove', move);
-    grip.addEventListener('pointerup', finish);
-    grip.addEventListener('pointercancel', finish);
+    if (immediate) { start(); move(event); }
+    addEventListener('pointermove', move);
+    addEventListener('pointerup', finish);
+    addEventListener('pointercancel', finish);
   }
   historyMarkup() {
     const history = this.history();
@@ -783,12 +805,14 @@ export class SlideDesigner {
     dialog.innerHTML=`<form method="dialog" class="image-search-head"><strong>Buscar imagens</strong><button aria-label="Fechar">×</button></form>
       <p class="image-search-intro">Encontre a imagem certa para sua aula <span>Bing Imagens</span></p>
       <form class="image-search-form"><input name="query" type="search" aria-label="Buscar imagens" placeholder="Ex.: Hello Kitty PNG" required autofocus><button type="submit">Pesquisar</button></form>
+      <label class="image-search-filter"><input type="checkbox" name="transparent"> Só com fundo transparente (PNG recortado)</label>
       <p class="image-search-status" role="status">Pesquise pelo assunto, personagem ou objeto.</p><div class="image-search-results"></div>`;
     document.body.append(dialog);dialog.showModal();dialog.addEventListener('close',()=>dialog.remove());
-    const form=dialog.querySelector('.image-search-form'),results=dialog.querySelector('.image-search-results');const status=dialog.querySelector('.image-search-status');const seen=new Set();let searchPage=0,searchTerm='',loading=false,ended=false;
+    const form=dialog.querySelector('.image-search-form'),results=dialog.querySelector('.image-search-results');const status=dialog.querySelector('.image-search-status');const seen=new Set();let searchPage=0,searchTerm='',searchAlpha=false,loading=false,ended=false;
     const loadNext=()=>{if(dialog.open&&searchPage&&!loading&&!ended&&form.elements.query.value===searchTerm&&results.scrollHeight-results.scrollTop-results.clientHeight<150)form.requestSubmit();};
     results.addEventListener('scroll', loadNext);
-    form.addEventListener('submit',async event=>{event.preventDefault();if(loading)return;const term=new FormData(form).get('query');if(term!==searchTerm){searchTerm=term;searchPage=0;ended=false;seen.clear();results.replaceChildren();}if(ended)return;loading=true;status.textContent='Buscando imagens…';try{const choices=await searchImageChoices(term,++searchPage);status.textContent='';if(!choices.length){ended=true;if(!results.childElementCount)status.textContent='Nenhuma imagem encontrada no Bing. Tente outras palavras.';return;}for(const choice of choices){if(seen.has(choice.source))continue;seen.add(choice.source);const button=document.createElement('button');button.type='button';button.className='image-search-choice';const img=document.createElement('img');img.src=choice.thumbnail;img.alt=choice.title;img.loading='lazy';img.onerror=()=>button.remove();const title=document.createElement('span');title.className='image-search-title';title.textContent=choice.title;const credit=document.createElement('span');credit.className='image-search-credit';credit.textContent=[choice.catalog,choice.license,choice.author].filter(Boolean).join(' · ');button.append(img,title,credit);if(choice.source){button.title='Abrir a origem: '+choice.source;}button.addEventListener('click',async()=>{button.disabled=true;try{const image=await importImageChoice(choice);const [assetId]=await storePages([image.data]);this.mutate(slide=>{let item=slide.elements.find(value=>value.id===targetId&&value.type==='image');if(!item){item=newElement('image');slide.elements.push(item);}item.assetId=assetId;item.image='';item.imageAlt=image.alt;item.imageSource=image.source;item.imageLicense=[image.license,image.author].filter(Boolean).join(' · ');item.imageCredit=image.catalog||'';this.selected=item.id;});dialog.close();}catch(error){this.studio.callbacks.toast(error.message);button.disabled=false;}});results.append(button);}requestAnimationFrame(loadNext);}catch(error){status.textContent='A busca falhou. Clique em Pesquisar para tentar novamente.';searchPage=Math.max(0,searchPage-1);}finally{loading=false;}});
+    dialog.querySelector('[name=transparent]').addEventListener('change',()=>{if(form.elements.query.value.trim())form.requestSubmit();});
+    form.addEventListener('submit',async event=>{event.preventDefault();if(loading)return;const alpha=dialog.querySelector('[name=transparent]').checked;const term=new FormData(form).get('query');if(term!==searchTerm||alpha!==searchAlpha){searchTerm=term;searchAlpha=alpha;searchPage=0;ended=false;seen.clear();results.replaceChildren();}if(ended)return;loading=true;status.textContent='Buscando imagens…';try{const choices=await searchImageChoices(term,++searchPage,{transparent:alpha});status.textContent='';if(!choices.length){ended=true;if(!results.childElementCount)status.textContent='Nenhuma imagem encontrada no Bing. Tente outras palavras.';return;}for(const choice of choices){const key=choice.original||choice.url;if(seen.has(key))continue;seen.add(key);const button=document.createElement('button');button.type='button';button.className='image-search-choice';if(choice.transparent)button.dataset.transparent='true';const img=document.createElement('img');img.src=choice.thumbnail;img.alt=choice.title;img.loading='lazy';img.onerror=()=>button.remove();const title=document.createElement('span');title.className='image-search-title';title.textContent=choice.title;const credit=document.createElement('span');credit.className='image-search-credit';credit.textContent=[choice.catalog,choice.license,choice.author].filter(Boolean).join(' · ');button.append(img,title,credit);if(choice.source){button.title='Abrir a origem: '+choice.source;}button.addEventListener('click',async()=>{button.disabled=true;try{const image=await importImageChoice(choice);const [assetId]=await storePages([image.data]);this.mutate(slide=>{let item=slide.elements.find(value=>value.id===targetId&&value.type==='image');if(!item){item=newElement('image');slide.elements.push(item);}item.assetId=assetId;item.image='';item.imageAlt=image.alt;item.imageSource=image.source;item.imageLicense=[image.license,image.author].filter(Boolean).join(' · ');item.imageCredit=image.catalog||'';this.selected=item.id;});dialog.close();}catch(error){this.studio.callbacks.toast(error.message);button.disabled=false;}});results.append(button);}requestAnimationFrame(loadNext);}catch(error){status.textContent='A busca falhou. Clique em Pesquisar para tentar novamente.';searchPage=Math.max(0,searchPage-1);}finally{loading=false;}});
   }
   openSimulationModal(initialType='projectile',targetId=null){
     document.querySelector('#simulation-lab-modal')?.remove();

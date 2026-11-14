@@ -293,7 +293,7 @@ async function applyEdit(slide,result,target,photos=[]) {
     if(element.type==='image'&&typeof change.imageSearch==='string'&&change.imageSearch.trim()){
       const transparent=change.imageTransparent===true;
       const image=await findSlideImage(normalizeImageQuery(change.imageSearch),{transparent});
-      if(!image)throw Error(transparent?'Não encontrei uma imagem com fundo transparente. Tente descrever o objeto de outro jeito.':'Não encontrei uma imagem livre para substituir a foto. Tente outra descrição.');
+      if(!image)throw Error('Não achei nenhuma imagem de “'+text(change.imageSearch,80)+'”. Diga o que deve aparecer com mais detalhes (ex.: “logo do Windows 11”) ou use Imagem › Buscar para escolher na galeria.');
       delete element.assetId;
       Object.assign(element,{image:image.data,imageAlt:image.alt,imageZoom:1,imageX:0,imageY:0});
       if(transparent&&image.transparent!==false)element.imageBackground='transparent';

@@ -913,18 +913,3 @@ html[data-ui-style=arcade] dialog.simulation-modal {
   box-shadow: 0 0 0 2px color-mix(in srgb, var(--ui-accent), transparent 70%);
 }
 
-/* Entrada em cascata dos objetos do slide: cobre também o que não tem efeito
-   próprio, para a passagem nunca mostrar metade do slide animando. */
-@keyframes object-reveal-in {
-  from { opacity: 0; translate: 0 10px; }
-  to { opacity: 1; translate: 0 0; }
-}
-@media (prefers-reduced-motion: no-preference) {
-  html:not([data-motion=reduced]) .canvas-presenting .canvas-object.object-reveal {
-    animation: object-reveal-in .34s cubic-bezier(.2,.7,.2,1) both;
-    animation-delay: calc(var(--reveal-index, 0) * 45ms);
-  }
-}
-@media (prefers-reduced-motion: reduce) {
-  .canvas-presenting .canvas-object.object-reveal { opacity: 1; }
-}

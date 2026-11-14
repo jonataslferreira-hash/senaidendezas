@@ -107,3 +107,20 @@ test('miniaturas não interativas de simulações e canvas não emitem controles
  }
 });
 
+
+test('experimentos refeitos: cifra de César e raio-X do texto calculam de verdade',async()=>{
+ const {caesarShift,letterFrequency,textMetrics,resolveSimulation}=await import('../src/simulations.js');
+ assert.equal(caesarShift('HAL',1),'IBM');
+ assert.equal(caesarShift('Vim, vi e venci',3),'YLP, YL H YHQFL');
+ assert.equal(caesarShift(caesarShift('AÇÃO',7),-7),'ACAO');
+ assert.equal(letterFrequency('banana').top,'A');
+ const info=textMetrics('A casa é azul. O céu também é azul! E o mar?');
+ assert.equal(info.sentences,3);
+ assert.equal(info.words,12);
+ assert.equal(info.repeated[0][0],'azul');
+ assert.equal(textMetrics('').level,'Sem texto');
+ // Slides antigos com os experimentos removidos abrem o substituto.
+ assert.equal(resolveSimulation('eras'),'cipher');
+ assert.equal(resolveSimulation('narrative'),'textlab');
+ assert.equal(resolveSimulation('nada'),'projectile');
+});

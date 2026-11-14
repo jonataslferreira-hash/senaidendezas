@@ -76,6 +76,21 @@ async function rasterizeSvg(blob){
   }finally{URL.revokeObjectURL(url);}
 }
 
+// O arquivo original guarda a transparência e a resolução; a miniatura do
+// buscador entra quando o site de origem não deixa baixar.
+async function fetchChoiceBlob(choice){
+  for(const url of [choice.original,choice.url].filter((value,index,list)=>value&&list.indexOf(value)===index)){
+    const blob=await fetchImageBlob(url).catch(()=>null);
+    if(blob&&blob.type.startsWith('image/')&&blob.size<=6_000_000)return blob;
+  }
+  return null;
+}
+
+// "hello kitty png", "carro sem fundo": o pedido é por um recorte transparente.
+const transparentHint=/\b(?:png|transparente?s?|transparent|sem\s+fundo|fundo\s+removido|recortad[oa]s?)\b/iu;
+const transparentWords=new RegExp(transparentHint.source,'giu');
+export const wantsTransparentImage=query=>transparentHint.test(String(query||''));
+
 async function fetchImageBlob(url){
   const direct=await fetch(url,{signal:AbortSignal.timeout(15000),credentials:'omit'}).then(response=>response.ok?response.blob():null).catch(()=>null);
   if(direct&&direct.type.startsWith('image/'))return direct;
@@ -114,8 +129,10 @@ function imageCredit(info) {
   return {source,author,license:'CC '+variant.toUpperCase()+' '+match[2],licenseUrl:'https://creativecommons.org/licenses/'+variant+'/'+match[2]+'/'};
 }
 
-export function normalizeImageQuery(query) {
-  return expandImageQuery(String(query||''))
+// translate:false mantém o pedido no idioma original — o Bing entende
+// português; a tradução só ajuda os catálogos que são quase todos em inglês.
+export function normalizeImageQuery(query,{translate=true}={}) {
+  return (translate?expandImageQuery(String(query||'')):String(query||''))
     .replace(/[“”‘’"]/g,'')
     .replace(/\b(?:por favor|poderia|pode|quero|quero que|coloque|colocar|adicione|adicionar|insira|inserir|troque|trocar|substitua|substituir)\b/gi,' ')
     .replace(/\b(?:esta|esse|essa|este|a|o)\s+(?:imagem|foto|figura|ilustração|ilustracao)\s+(?:por|para)\b/gi,' ')
@@ -198,6 +215,8 @@ function choiceFromWorker(item){
     licenseUrl:clean(item.licenseUrl),
     catalog:clean(item.catalog)||'Catálogo livre',
     kind:clean(item.kind),
+    original:/^https:\/\//.test(clean(item.original))?clean(item.original):'',
+    transparent:item.transparent===true,
     width:Number(item.width)||0,
     height:Number(item.height)||0,
     score:Number(item.score)||0
@@ -243,50 +262,55 @@ function relevanceOf(choice,strong,phrases){
 
 export async function findSlideImage(query, { transparent = false, aspectRatio = 1.5 } = {}) {
   if(typeof query!=='string'||!query.trim())return null;
+  transparent=transparent||wantsTransparentImage(query);
   const subject=normalizeImageQuery(query);
+  if(!subject)return null;
   const strong=strongQueryWords(subject);
   const subjectText=subjectWords(subject).join(' ');
   const phrases=strongPhrases.filter(phrase=>(' '+subjectText+' ').includes(' '+phrase+' '));
-  // Sem nenhuma palavra ou expressão forte não há como saber se a imagem tem a
-  // ver: é melhor deixar o slide sem foto do que colocar uma foto de janela de
-  // prédio num slide sobre o Windows.
-  if(!strong.length&&!phrases.length)return null;
   const minimum=strong.length?Math.max(1,Math.ceil(strong.length/2)):1;
   const logo=isLogoQuery(subject);
   const broader=subject.replace(/\b(?:gaming|gamer|transparent|png)\b/gi,'').replace(/\s+/g,' ').trim();
   // Palavras que explicam o pedido ("de", "do", "da") atrapalham a busca: o
-  // produto e o tema ficam clearer quando sobra só o que significa.
+  // produto e o tema ficam mais claros quando sobra só o que significa.
   const meaningful=broader.split(/\s+/).filter(word=>word.length>3&&!imageStopWords.has(word));
   const keywords=meaningful.slice(0,4).join(' ');
   const tail=meaningful.at(-1)||'';
   const searches=[subject,broader,keywords,tail].filter((term,i,terms)=>term&&terms.indexOf(term)===i);
-  const candidates=[];
-  // 1. Worker: resultado único, já ranqueado e com origem e licença.
-  for(const term of searches){
-    const payload=await workerJson('/storage-ai/images?q='+encodeURIComponent(term)+'&page=1&limit=24'+(transparent?'&transparent=1':''));
-    if(payload?.items?.length){
-      for(const item of payload.items){
-        const choice=choiceFromWorker(item);
-        if(choice.thumbnail&&choice.url)candidates.push(choice);
-      }
-      break;
-    }
+
+  const prepare=async(choice,needAlpha)=>{
+    try{
+      const blob=await fetchChoiceBlob(choice);
+      if(!blob)return null;
+      const prepared=blob.type==='image/svg+xml'?await rasterizeSvg(blob):blob;
+      const alpha=await hasTransparentBackground(prepared).catch(()=>false);
+      if(needAlpha&&!alpha)return null;
+      const file=await optimizeImage(new File([prepared],'imagem-livre',{type:prepared.type||'image/png'}),{maxSide:800});
+      if(file.size>1_400_000)return null;
+      const data=await new Promise((resolve,reject)=>{const reader=new FileReader();reader.onload=()=>resolve(reader.result);reader.onerror=reject;reader.readAsDataURL(file);});
+      return {data,alt:choice.title,transparent:alpha,...creditOf(choice)};
+    }catch{return null;}
+  };
+
+  // 1. Buscador (Bing, pelo Worker). A ordem dele já é a de relevância — é o
+  // que faz "windows" virar o sistema operacional e não uma janela de prédio.
+  // Por isso aqui não há filtro por palavras do título: só saem documentos.
+  let web=[];
+  const spoken=normalizeImageQuery(query,{translate:false}).replace(transparentWords,' ').replace(/\s+/g,' ').trim();
+  for(const term of [spoken,subject,broader].filter((value,i,list)=>value&&list.indexOf(value)===i).slice(0,2)){
+    const payload=await workerJson('/storage-ai/images?source=bing&q='+encodeURIComponent(term)+'&page=1&limit=24'+(transparent?'&transparent=1':''));
+    web=(payload?.items||[]).map(choiceFromWorker).filter(choice=>choice.thumbnail&&choice.url&&!isDocumentChoice(choice));
+    if(web.length)break;
   }
-  const usable=()=>candidates
-    .filter(choice=>!isDocumentChoice(choice))
-    .filter(choice=>!logo||isLogoTitle(choice.title+' '+(choice.file||'')))
-    .map(choice=>({choice,relevance:relevanceOf(choice,strong,phrases)}))
-    .filter(item=>item.relevance>=minimum)
-    .sort((a,b)=>{
-      if(b.relevance!==a.relevance)return b.relevance-a.relevance;
-      if(b.choice.score!==a.choice.score)return b.choice.score-a.choice.score;
-      const ratio=choice=>choice.width&&choice.height?Math.abs(Math.log((choice.width/choice.height)/aspectRatio)):0;
-      return ratio(a.choice)-ratio(b.choice);
-    })
-    .slice(0,8);
-  // 2. Catálogos diretos, usados quando o Worker não está disponível ou não
-  // devolveu nada que realmente combine com o pedido.
-  if(!usable().length){
+  if(transparent)for(const choice of web.slice(0,8)){
+    const image=await prepare(choice,true);
+    if(image)return image;
+  }
+
+  // 2. Catálogos livres (Commons). Sem um buscador de verdade por trás, o
+  // título precisa citar o assunto para a imagem ser aceita.
+  const candidates=[];
+  if(!web.length&&(strong.length||phrases.length)){
     const formats=transparent?['filemime:png','filemime:svg']:[logo?'':'filetype:bitmap'];
     for(const term of searches)for(const format of formats){
       const params=new URLSearchParams({
@@ -316,22 +340,27 @@ export async function findSlideImage(query, { transparent = false, aspectRatio =
       }catch{continue;}
     }
   }
-  // A ordem importa: a primeira imagem que serve e combina vira a do slide.
-  for(const {choice} of usable()){
-    try{
-      const blob=await fetchImageBlob(choice.url);
-      if(!blob||!blob.type.startsWith('image/'))continue;
-      if(blob.size>4_000_000)continue;
-      const prepared=blob.type==='image/svg+xml'?await rasterizeSvg(blob):blob;
-      if(transparent&&!await hasTransparentBackground(prepared))continue;
-      const file=await optimizeImage(new File([prepared],'imagem-livre',{type:prepared.type||'image/png'}),{maxSide:800});
-      if(file.size>1_400_000)continue;
-      const data=await new Promise((resolve,reject)=>{const reader=new FileReader();reader.onload=()=>resolve(reader.result);reader.onerror=reject;reader.readAsDataURL(file);});
-      return {data,alt:choice.title,transparent,...creditOf(choice)};
-    }catch{continue;}
+  const catalog=candidates
+    .filter(choice=>!isDocumentChoice(choice))
+    .filter(choice=>!logo||isLogoTitle(choice.title+' '+(choice.file||'')))
+    .map(choice=>({choice,relevance:relevanceOf(choice,strong,phrases)}))
+    .filter(item=>item.relevance>=minimum)
+    .sort((a,b)=>{
+      if(b.relevance!==a.relevance)return b.relevance-a.relevance;
+      const ratio=choice=>choice.width&&choice.height?Math.abs(Math.log((choice.width/choice.height)/aspectRatio)):0;
+      return ratio(a.choice)-ratio(b.choice);
+    })
+    .slice(0,8).map(item=>item.choice);
+  if(transparent)for(const choice of catalog){
+    const image=await prepare(choice,true);
+    if(image)return image;
   }
-  // Uma imagem transparente precisa ter pixels com alfa. Nunca trocamos por
-  // uma imagem opaca nem fingimos transparência.
+  // 3. Nenhum recorte transparente serviu: vale mais entregar a imagem certa
+  // (avisando que o fundo não é transparente) do que não trocar nada.
+  for(const choice of [...web.slice(0,8),...catalog]){
+    const image=await prepare(choice,false);
+    if(image)return image;
+  }
   return null;
 }
 
@@ -350,44 +379,27 @@ export function imageSourceNote(image){
     image.source,image.licenseUrl].filter(Boolean).join('\n');
 }
 
-export async function searchImageChoices(query,page=1){
-  const term=normalizeImageQuery(query);
+export async function searchImageChoices(query,page=1,{transparent=false}={}){
+  const wantsAlpha=transparent||wantsTransparentImage(query);
+  const spoken=normalizeImageQuery(query,{translate:false});
+  const term=spoken.replace(transparentWords,' ').replace(/\s+/g,' ').trim()||spoken;
   if(!term)return [];
-  const words=searchWords;
-  const logo=isLogoQuery(term);
-  const subjects=words(term).filter(word=>word.length>2&&!['logo','logotipo','logomarca','icone','png','svg','foto','imagem'].includes(word));
-  const strong=strongQueryWords(term);
-  const phrases=strongPhrases.filter(phrase=>(' '+subjectWords(term).join(' ')+' ').includes(' '+phrase+' '));
-  // A galeria também precisa descartar PDFs e digitalizações e colocar na
-  // frente as imagens que realmente citam o assunto pedido. Era o mesmo
-  // problema das fotos automáticas, só que na hora de escolher à mão.
-  const relevant=choices=>choices
-    .filter(choice=>!isDocumentChoice(choice))
-    .map((choice,index)=>{
-      const title=words(choice.title);
-      const match=subjects.filter(word=>title.includes(word)).length;
-      const brandAlias=subjects.length===1&&subjects[0]==='chatgpt'&&title.some(word=>/^(?:gpt\d+|openai)$/.test(word));
-      return {choice,index,match:match+(brandAlias ? 0.5 : 0),relevance:relevanceOf(choice,strong,phrases),
-        logo:title.some(word=>['logo','logotipo','icon','icone'].includes(word))};
-    })
-    .filter(item=>!logo||!subjects.length||(item.match>0&&isLogoTitle(item.choice.title)))
-    .sort((a,b)=>b.relevance-a.relevance||b.choice.score-a.choice.score||b.match-a.match||Number(b.logo)-Number(a.logo)||a.index-b.index)
-    .map(item=>item.choice);
-  const worker=await workerJson('/storage-ai/images?source=bing&q='+encodeURIComponent(term)+'&page='+String(page)+'&limit=24');
+  // A galeria mostra os resultados na ordem do Bing. Reordenar pelas palavras
+  // do título colocava na frente imagens que só tinham o nome pedido e
+  // empurrava para baixo as que o buscador considerava mais certas.
+  const worker=await workerJson('/storage-ai/images?source=bing&q='+encodeURIComponent(term)+'&page='+String(page)+'&limit=24'+(wantsAlpha?'&transparent=1':''));
   if(worker?.items?.length){
-    const choices=worker.items.map(choiceFromWorker).filter(choice=>choice.thumbnail&&choice.url&&choice.source);
-    const ranked=relevant(choices);
-    return ranked;
+    return worker.items.map(choiceFromWorker)
+      .filter(choice=>choice.thumbnail&&choice.url&&!isDocumentChoice(choice))
+      .map(choice=>({...choice,transparent:choice.transparent||wantsAlpha&&/png|svg|webp/i.test(choice.kind)}));
   }
   if(worker)return [];
   throw Error('Não foi possível consultar o Bing. Tente novamente em instantes.');
-
 }
 
 export async function importImageChoice(choice){
-  const blob=await fetchImageBlob(choice.url);
-  if(!blob||!blob.type.startsWith('image/'))throw Error('Não consegui carregar esta imagem.');
-  if(blob.size>4_000_000)throw Error('Esta imagem não está disponível para importar.');
+  const blob=await fetchChoiceBlob(choice);
+  if(!blob)throw Error('Não consegui carregar esta imagem. Tente outra da lista.');
   const prepared=blob.type==='image/svg+xml'?await rasterizeSvg(blob):blob;
   const file=await optimizeImage(new File([prepared],'imagem',{type:prepared.type||'image/png'}),{maxSide:1200});
   const data=await new Promise((resolve,reject)=>{const reader=new FileReader();reader.onload=()=>resolve(reader.result);reader.onerror=reject;reader.readAsDataURL(file);});

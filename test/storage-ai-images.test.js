@@ -55,3 +55,12 @@ test('o proxy do arquivo original recusa endereços fora da lista',async()=>{
   assert.equal(response.status,502);
   assert.equal((await response.json()).error,'image_unavailable');
 });
+
+test('pedido por PNG ativa o filtro de transparência e o proxy recusa endereços internos',async()=>{
+ const {splitTransparentQuery,proxyAllowed}=await import('../cloudflare/storage-ai-images-worker.js');
+ assert.deepEqual(splitTransparentQuery('hello kitty png'),{transparent:true,subject:'hello kitty'});
+ assert.deepEqual(splitTransparentQuery('carro sem fundo'),{transparent:true,subject:'carro'});
+ assert.equal(splitTransparentQuery('windows 11').transparent,false);
+ assert.equal(proxyAllowed('https://exemplo.com.br/a.png'),true);
+ for(const url of ['http://exemplo.com/a.png','https://localhost/a.png','https://192.168.0.1/a.png','https://intra.local/a.png','https://site.com:8443/a.png'])assert.equal(proxyAllowed(url),false,url);
+});
