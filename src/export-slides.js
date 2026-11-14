@@ -36,6 +36,29 @@ async function modelGif(viewer) {
   return gif.bytes();
  } finally { group.rotation.y = initial; }
 }
+const loadImage=src=>new Promise((resolve,reject)=>{const image=new Image();image.onload=()=>resolve(image);image.onerror=()=>reject(Error('Uma imagem não abriu para exportar. Envie a imagem como arquivo no editor.'));image.src=src;});
+// Desenha a imagem do slide direto num canvas, com o mesmo enquadramento do
+// editor (ajuste, zoom e deslocamento), em vez de depender da captura do HTML:
+// era essa captura que deixava as imagens em branco no PPTX.
+async function imageElementPng(e,width,height){
+ const image=await loadImage(e.image),ratio=Math.max(1,Math.min(2,2400/Math.max(width,height)));
+ const canvas=document.createElement('canvas');canvas.width=Math.round(width*ratio);canvas.height=Math.round(height*ratio);
+ const ctx=canvas.getContext('2d');ctx.scale(ratio,ratio);
+ if(e.imageBackground&&e.imageBackground!=='transparent'){ctx.fillStyle=e.imageBackground;ctx.fillRect(0,0,width,height);}
+ const iw=image.naturalWidth||width,ih=image.naturalHeight||height,fit=e.imageFit;
+ const base=fit==='fill'?null:fit==='cover'?Math.max(width/iw,height/ih):Math.min(width/iw,height/ih);
+ const dw=base?iw*base:width,dh=base?ih*base:height,zoom=Number(e.imageZoom)||1;
+ ctx.beginPath();ctx.rect(0,0,width,height);ctx.clip();
+ // Mesmo cálculo do CSS: translate(X%,Y%) da caixa e depois scale pelo centro.
+ ctx.translate(width/2+(Number(e.imageX)||0)/100*width,height/2+(Number(e.imageY)||0)/100*height);ctx.scale(zoom,zoom);
+ ctx.imageSmoothingQuality='high';ctx.drawImage(image,-dw/2,-dh/2,dw,dh);
+ return canvas.toDataURL('image/png');
+}
+async function cropPng(url,x,y,width,height){
+ const image=await loadImage(url),canvas=document.createElement('canvas');canvas.width=Math.round(width);canvas.height=Math.round(height);
+ canvas.getContext('2d').drawImage(image,-x,-y);
+ return canvas.toDataURL('image/png');
+}
 export async function exportSlides(input,format,onProgress=()=>{}){
  const lesson=await hydrateLesson(input,true),host=document.createElement('div'),models=new CanvasModels(),simulations=new Simulations();host.className='export-canvas-host';host.setAttribute('aria-hidden','true');host.style.cssText='position:fixed;left:-20000px;top:0;pointer-events:none;z-index:-1;';document.body.append(host);
  const pngOnly=format==='png',pdf=format==='pdf'?await import('pdf-lib'):null,pptx=format==='pptx'?await import('@office-kit/pptx'):null,deck=pdf?await pdf.PDFDocument.create():pptx?.createPresentation(),first=presentationSlide(lesson.slides[0]),ratio=first.pageWidth/first.pageHeight||16/9,deckW=pptx?.inches(13.333333),deckH=deckW/ratio;
@@ -79,7 +102,19 @@ export async function exportSlides(input,format,onProgress=()=>{}){
    else for(const e of slide.elements){const rect={x:Math.round(dx+e.x/100*w*scale),y:Math.round(dy+e.y/100*h*scale),w:Math.max(1,Math.round(e.w/100*w*scale)),h:Math.max(1,Math.round(e.h/100*h*scale))};let shape;
     if(e.type==='text'){shape=pptx.addSlideTextBox(out,{...rect,text:e.text,name:e.role==='title'?'Título':'Texto'});pptx.setShapeTextFormat(shape,{font:lesson.customFonts?.find(f=>f.family===e.fontFamily)?.name||e.fontFamily||'Arial',size:e.fontSize*(w/1280)*scale/914400*72,color:e.color,bold:e.bold,italic:e.italic});pptx.setShapeTextMargins(shape,{top:Math.round((e.textPadding?.[0]||0)*w/1280*scale),right:Math.round((e.textPadding?.[1]||0)*w/1280*scale),bottom:Math.round((e.textPadding?.[2]||0)*w/1280*scale),left:Math.round((e.textPadding?.[3]||0)*w/1280*scale)});pptx.setShapeTextAnchor(shape,e.verticalAlign==='center'?'center':e.verticalAlign==='end'?'bottom':'top');for(let i=0;i<pptx.getShapeParagraphElements(shape).length;i++)pptx.setParagraphAlignment(shape,i,e.align||'left');}
     else if(gifs.has(e.id)) shape=pptx.addSlideImage(out,gifs.get(e.id),{...rect,format:'gif',name:'Modelo 3D'});
-    else{const node=[...host.querySelectorAll('[data-object-id]')].find(n=>n.dataset.objectId===e.id),width=Math.max(1,e.w/100*w),height=Math.max(1,e.h/100*h),png=await toPng(node,{fontEmbedCSS,pixelRatio:1,width,height,preferredFontFormat:'woff2',style:{position:'relative',left:'0',top:'0',width:width+'px',height:height+'px',transform:'none'}});shape=pptx.addSlideImage(out,bytes(png),{...rect,format:'png',name:e.imageAlt||e.type});}
+    else if(e.type==='image'&&e.image){shape=pptx.addSlideImage(out,bytes(await imageElementPng(e,Math.max(1,e.w/100*w),Math.max(1,e.h/100*h))),{...rect,format:'png',name:e.imageAlt||'Imagem'});}
+    else{
+     // Formas e experimentos: fotografa o slide inteiro só com este objeto e
+     // recorta a área dele. Fotografar o objeto solto saía deslocado ou vazio.
+     if(!target.dataset.exportBare){target.dataset.exportBare='true';target.removeAttribute('data-visual-theme');target.style.setProperty('background','none','important');}
+     const node=[...host.querySelectorAll('[data-object-id]')].find(n=>n.dataset.objectId===e.id);
+     if(!node)continue;
+     const previous=node.style.transform;node.style.transform='none';
+     let full;
+     try{full=await toPng(target,{...options,filter:item=>!item.classList?.contains('canvas-object')||item===node});}
+     finally{node.style.transform=previous;}
+     shape=pptx.addSlideImage(out,bytes(await cropPng(full,e.x/100*w,e.y/100*h,Math.max(1,e.w/100*w),Math.max(1,e.h/100*h))),{...rect,format:'png',name:e.imageAlt||e.type});
+    }
     if(e.rotation)pptx.setShapeRotation(shape,e.rotation);map.set(e.id,shape);
    }
    let group=-1;for(const animation of slide.animations||[]){const shape=map.get(animation.id);if(!shape)continue;try{pptx.setShapeAnimation(shape,{effect:animation.effect,start:animation.group>0&&animation.group>group?'click':'withPrevious',durationMs:animation.duration,delayMs:animation.delay});group=animation.group;}catch{/* The visual and editable text still export if an effect is unavailable. */}}
