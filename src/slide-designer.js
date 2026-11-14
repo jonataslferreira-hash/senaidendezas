@@ -1,7 +1,7 @@
 import { createUuid } from './uuid.js';
 import { pickShape } from './shapes.js';
 import { studioIcon } from './studio-icons.js';
-import {Simulations,simulationNames,simulationGroups,simulationSubjects} from './simulations.js';
+import {Simulations,simulationMarkup,simulationNames,simulationGroups,simulationSubjects} from './simulations.js';
 import {FontPicker,fontButton,loadSlideFonts} from './fonts.js';
 import {presentationSlide} from './slide-display.js';
 import { audioEditor } from './audio-editor.js';
@@ -86,7 +86,14 @@ export class SlideDesigner {
     root.addEventListener('pointermove', e => this.move(e));
     root.addEventListener('pointerup', e => this.up(e));
     root.addEventListener('pointercancel', e => this.up(e));
-    root.addEventListener('dblclick', e => { const object = e.target.closest('.canvas-object'); if (object?.dataset.type === 'text') this.editText(object); });
+    root.addEventListener('dblclick', e => {
+      const object = e.target.closest('.canvas-object');
+      if (object?.dataset.type === 'text') this.editText(object);
+      else if (object?.dataset.type === 'simulation') {
+        const element = this.display().elements.find(item => item.id === object.dataset.objectId);
+        if (element) this.openSimulationModal(element.simulation, element.id);
+      }
+    });
     root.addEventListener('input', e => this.input(e));
     root.addEventListener('focusout', e => { if (e.target.matches('.canvas-text[contenteditable]')) { e.target.removeAttribute('contenteditable'); this.lastTap = null; } });
     root.addEventListener('change', e => this.change(e).catch(error => studio.callbacks.toast(error.message)));
@@ -164,9 +171,10 @@ export class SlideDesigner {
     overlay.className='slide-style-preview';
     overlay.setAttribute('aria-hidden','true');
     overlay.inert=true;
-    overlay.innerHTML=canvasMarkup(slide)+'<small>Prévia</small>';
+    overlay.innerHTML=canvasMarkup(slide,{interactive:false})+'<small>Prévia</small>';
     stage.append(overlay);
     fillAssetImages(overlay);
+    this.simulations.mountStatic(overlay);
     this.previewModels.mount(overlay,slide);
   }
   chooseStyle(event){
@@ -355,8 +363,8 @@ export class SlideDesigner {
       <div class="image-crop-controls">${btn('image-minus','−','aria-label="Diminuir zoom da imagem"')}<output>${Math.round((e.imageZoom||1)*1000)/10}%</output>${btn('image-plus','+','aria-label="Aumentar zoom da imagem"')}</div>
       <div class="designer-position-grid">${number('Deslocamento X (%)','imageX',e.imageX||0,'','')}${number('Deslocamento Y (%)','imageY',e.imageY||0,'','')}</div>
       <label>Descrição da imagem<input data-element-field="imageAlt" value="${esc(e.imageAlt)}"></label>${e.imageSource||e.imageLicense?`<p class="designer-image-credit"><strong>Créditos</strong> ${esc([e.imageCredit,e.imageLicense].filter(Boolean).join(' · '))}${e.imageSource?`<a href="${esc(e.imageSource)}" target="_blank" rel="noopener noreferrer">Ver origem</a>`:''}</p>`:''}` : ''}
-      ${e.type === 'model' ? `<label>Modelo<select data-element-field="model" aria-label="Modelo do elemento">${[['ssd', 'SSD SATA'], ['hdd', 'HDD'], ['nvme', 'SSD NVMe'], ['custom', e.customModel?.name || 'Meu modelo enviado']].map(([v, label]) => `<option value="${v}" ${e.model === v ? 'selected' : ''}>${esc(label)}</option>`).join('')}</select></label><label>Nome do modelo<input data-element-field="modelLabel" maxlength="120" value="${esc(e.modelLabel||'')}" placeholder="${esc(e.model==='custom'?e.customModel?.name||'Modelo 3D':'Nome da peça selecionada')}"></label><label>Descrição do modelo<textarea data-element-field="modelDescription" maxlength="500" placeholder="Descrição ao explorar o modelo">${esc(e.modelDescription||'')}</textarea></label><label class="model-details-toggle"><input type="checkbox" data-element-field="modelDetailsHidden" ${e.modelDetailsHidden?'checked':''}> Mostrar somente o modelo 3D</label>${btn('replace-model', '↑ Enviar GLB / GLTF / OBJ')}${btn('interact', this.interacting === e.id ? 'Voltar à edição' : 'Explorar o modelo')}` : ''}
-      ${e.type==='simulation'?`<label>Disciplina: ${esc(simulationSubjects[e.simulation]||'Ciências')}<select data-element-field="simulation" aria-label="Tipo de simulação">${simulationGroups.map(([subject,items])=>`<optgroup label="${esc(subject)}">${items.map(([id,name])=>`<option value="${id}" ${e.simulation===id?'selected':''}>${esc(name)}</option>`).join('')}</optgroup>`).join('')}</select></label>${btn('interact',this.interacting===e.id?'Voltar à edição':'Experimentar simulação')}`:''}${e.type === 'shape' ? `<div class="designer-type-settings"><label>Cor da forma<input type="color" data-element-field="background" value="${e.background}"></label><label>Cor da borda<input type="color" data-element-field="borderColor" value="${e.borderColor||'#ffffff'}"></label></div>
+      ${e.type === 'model' ? `<label>Modelo<select data-element-field="model" aria-label="Modelo do elemento">${[['ssd', 'SSD SATA'], ['hdd', 'HDD'], ['nvme', 'SSD NVMe'], ['custom', e.customModel?.name || 'Meu modelo enviado']].map(([v, label]) => `<option value="${v}" ${e.model === v ? 'selected' : ''}>${esc(label)}</option>`).join('')}</select></label><label>Nome do modelo<input data-element-field="modelLabel" maxlength="120" value="${esc(e.modelLabel||'')}" placeholder="${esc(e.model==='custom'?e.customModel?.name||'Modelo 3D':'Nome da peça selecionada')}"></label><label>Descrição do modelo<textarea data-element-field="modelDescription" maxlength="500" placeholder="Descrição ao explorar o modelo">${esc(e.modelDescription||'')}</textarea></label><label class="model-details-toggle"><input type="checkbox" data-element-field="modelDetailsHidden" ${e.modelDetailsHidden?'checked':''}> Mostrar somente o modelo 3D</label><div class="designer-model-actions">${btn('replace-model', '↑ Enviar GLB / GLTF / OBJ')}${btn('interact', this.interacting === e.id ? 'Voltar à edição' : 'Explorar o modelo')}</div>` : ''}
+      ${e.type==='simulation'?`<label>Disciplina: ${esc(simulationSubjects[e.simulation]||'Ciências')}<select data-element-field="simulation" aria-label="Tipo de simulação">${simulationGroups.map(([subject,items])=>`<optgroup label="${esc(subject)}">${items.map(([id,name])=>`<option value="${id}" ${e.simulation===id?'selected':''}>${esc(name)}</option>`).join('')}</optgroup>`).join('')}</select></label><div class="designer-simulation-actions">${btn('interact',this.interacting===e.id?'Voltar à edição':'Experimentar no slide')}${btn('preview-simulation','Abrir laboratório')}</div>`:''}${e.type === 'shape' ? `<div class="designer-type-settings"><label>Cor da forma<input type="color" data-element-field="background" value="${e.background}"></label><label>Cor da borda<input type="color" data-element-field="borderColor" value="${e.borderColor||'#ffffff'}"></label></div>
       <div class="designer-type-settings">${number('Largura da borda','borderWidth',e.borderWidth||0,0,40)}${!['ellipse','icon'].includes(e.shapeType)?number('Curvatura','cornerRadius',e.cornerRadius??5,0,100):''}</div>` : ''}
       <span class="inspector-section-label">Posição e tamanho</span>
       <div class="designer-position-grid">${number('Posição X (%)', 'x', e.x, -1000, 1000)}${number('Posição Y (%)', 'y', e.y, -1000, 1000)}${number('Largura (%)', 'w', e.w, e.type==='image'?.1:5, 1000)}${number('Altura (%)', 'h', e.h, e.type==='image'?.1:5, 1000)}</div>
@@ -388,7 +396,7 @@ export class SlideDesigner {
     if(this.imageEditing===node.dataset.objectId){this.cropDown(event,node);return;}
     this.imageEditing='';
     if(event.shiftKey){this.selectObject(node.dataset.objectId,true);event.preventDefault();return;}
-    if(this.interacting===node.dataset.objectId)return;
+    if(this.interacting===node.dataset.objectId&&!event.target.closest('[data-resize-handle]'))return;
     this.selectObject(node.dataset.objectId,false,true);
     const el = this.display().elements.find(e => e.id === this.selected);
     if (el.locked || this.interacting === el.id) return;
@@ -595,7 +603,8 @@ export class SlideDesigner {
     if(action.startsWith('setting-')){const tab=action.slice(8);this.settingTab=this.settingTab===tab?'':tab;this.refreshSelection();return;}
     if(action==='browse-images'){this.openImageSearch(null);return;}
     if(action==='search-image'){this.openImageSearch(e?.type==='image'?e.id:null);return;}
-    if(action==='simulation'){this.mutate(s=>{const e=newElement('simulation',{x:53,y:12,w:42,h:76});s.elements.push(e);this.selected=e.id;});return;}
+    if(action==='simulation'){if(!this.studio.groups.canEdit)return;button?.closest?.('details')?.removeAttribute('open');this.openSimulationModal('projectile',null);return;}
+    if(action==='preview-simulation'){if(e?.type==='simulation')this.openSimulationModal(e.simulation,e.id);return;}
     if(action==='crop-image'){this.ensure();this.imageEditing=this.imageEditing===e.id?'':e.id;this.refreshSelection();return;}
     if(['image-plus','image-minus','image-reset'].includes(action)){
       this.mutate(s=>{const image=s.elements.find(item=>item.id===e?.id);if(!image)return;if(action==='image-reset'){image.imageZoom=1;image.imageX=image.imageY=0;}else image.imageZoom=imageZoomValue((image.imageZoom||1)*(action==='image-plus'?1.25:.8));}, true);return;
@@ -735,6 +744,77 @@ export class SlideDesigner {
     const loadNext=()=>{if(dialog.open&&searchPage&&!loading&&!ended&&form.elements.query.value===searchTerm&&results.scrollHeight-results.scrollTop-results.clientHeight<150)form.requestSubmit();};
     results.addEventListener('scroll', loadNext);
     form.addEventListener('submit',async event=>{event.preventDefault();if(loading)return;const term=new FormData(form).get('query');if(term!==searchTerm){searchTerm=term;searchPage=0;ended=false;seen.clear();results.replaceChildren();}if(ended)return;loading=true;status.textContent='Buscando imagens…';try{const choices=await searchImageChoices(term,++searchPage);status.textContent='';if(!choices.length){ended=true;if(!results.childElementCount)status.textContent='Nenhuma imagem encontrada no Bing. Tente outras palavras.';return;}for(const choice of choices){if(seen.has(choice.source))continue;seen.add(choice.source);const button=document.createElement('button');button.type='button';button.className='image-search-choice';const img=document.createElement('img');img.src=choice.thumbnail;img.alt=choice.title;img.loading='lazy';img.onerror=()=>button.remove();const title=document.createElement('span');title.className='image-search-title';title.textContent=choice.title;const credit=document.createElement('span');credit.className='image-search-credit';credit.textContent=[choice.catalog,choice.license,choice.author].filter(Boolean).join(' · ');button.append(img,title,credit);if(choice.source){button.title='Abrir a origem: '+choice.source;}button.addEventListener('click',async()=>{button.disabled=true;try{const image=await importImageChoice(choice);const [assetId]=await storePages([image.data]);this.mutate(slide=>{let item=slide.elements.find(value=>value.id===targetId&&value.type==='image');if(!item){item=newElement('image');slide.elements.push(item);}item.assetId=assetId;item.image='';item.imageAlt=image.alt;item.imageSource=image.source;item.imageLicense=[image.license,image.author].filter(Boolean).join(' · ');item.imageCredit=image.catalog||'';this.selected=item.id;});dialog.close();}catch(error){this.studio.callbacks.toast(error.message);button.disabled=false;}});results.append(button);}requestAnimationFrame(loadNext);}catch(error){status.textContent='A busca falhou. Clique em Pesquisar para tentar novamente.';searchPage=Math.max(0,searchPage-1);}finally{loading=false;}});
+  }
+  openSimulationModal(initialType='projectile',targetId=null){
+    document.querySelector('#simulation-lab-modal')?.remove();
+    let activeType=Object.hasOwn(simulationNames,initialType)?initialType:'projectile';
+    let activeSubject='all';
+    const modalSims=new Simulations();
+    const dialog=document.createElement('dialog');
+    dialog.id='simulation-lab-modal';
+    dialog.className='simulation-modal';
+    dialog.setAttribute('aria-labelledby','simulation-modal-title');
+    const accent=getComputedStyle(this.studio.root.querySelector('.designer-inspector')||this.studio.root).getPropertyValue('--studio-accent').trim();
+    if(accent)dialog.style.setProperty('--sim-accent',accent);
+    const selectMarkup=simulationGroups.map(([subject,items])=>`<optgroup label="${esc(subject)}">${items.map(([id,name])=>`<option value="${id}" ${id===activeType?'selected':''}>${esc(name)}</option>`).join('')}</optgroup>`).join('');
+    const filtersMarkup=[['all','Todas'],...simulationGroups.map(([subject])=>[subject,subject])].map(([key,label])=>`<button type="button" role="tab" class="simulation-modal-filter" data-sim-filter="${esc(key)}" aria-selected="${key===activeSubject}">${esc(label)}</button>`).join('');
+    const listMarkup=simulationGroups.flatMap(([subject,items])=>items.map(([id,name])=>`<button type="button" role="option" class="simulation-modal-choice" data-sim-choice="${esc(id)}" data-subject="${esc(subject)}" aria-selected="${id===activeType}"><strong>${esc(name)}</strong><span>${esc(subject)}</span></button>`)).join('');
+    dialog.innerHTML=`<form method="dialog" class="simulation-modal-head"><div><strong id="simulation-modal-title">Laboratório de simulações</strong><span>Teste os parâmetros ao vivo antes de ${targetId?'aplicar':'inserir'} no slide.</span></div><button type="submit" class="simulation-modal-close" aria-label="Fechar">×</button></form>
+      <div class="simulation-modal-body">
+        <aside class="simulation-modal-catalog">
+          <label class="simulation-modal-select-wrap">Simulação<select class="simulation-modal-select" aria-label="Tipo de simulação">${selectMarkup}</select></label>
+          <div class="simulation-modal-filters" role="tablist" aria-label="Filtrar por disciplina">${filtersMarkup}</div>
+          <div class="simulation-modal-list" role="listbox" aria-label="Simulações disponíveis">${listMarkup}</div>
+        </aside>
+        <section class="simulation-modal-stage" aria-live="polite"></section>
+      </div>
+      <footer class="simulation-modal-foot"><span class="simulation-modal-current"></span><div class="simulation-modal-actions"><button type="button" class="studio-btn quiet" data-sim-cancel>${this.studio.groups.canEdit?'Cancelar':'Fechar'}</button>${this.studio.groups.canEdit?`<button type="button" class="studio-btn studio-launch" data-sim-confirm>${targetId?'Aplicar no slide':'Inserir no slide'}</button>`:''}</div></footer>`;
+    const select=dialog.querySelector('.simulation-modal-select');
+    const stage=dialog.querySelector('.simulation-modal-stage');
+    const current=dialog.querySelector('.simulation-modal-current');
+    const choices=[...dialog.querySelectorAll('[data-sim-choice]')];
+    const filters=[...dialog.querySelectorAll('[data-sim-filter]')];
+    const renderStage=(type)=>{
+      activeType=Object.hasOwn(simulationNames,type)?type:'projectile';
+      select.value=activeType;
+      for(const choice of choices)choice.setAttribute('aria-selected',String(choice.dataset.simChoice===activeType));
+      current.textContent=`${simulationSubjects[activeType]||'Ciências'} · ${simulationNames[activeType]}`;
+      stage.innerHTML=simulationMarkup(activeType);
+      modalSims.mount(stage);
+    };
+    const setFilter=(subject)=>{
+      activeSubject=subject;
+      for(const tab of filters)tab.setAttribute('aria-selected',String(tab.dataset.simFilter===activeSubject));
+      for(const choice of choices)choice.hidden=activeSubject!=='all'&&choice.dataset.subject!==activeSubject;
+    };
+    dialog.addEventListener('click',event=>{
+      const filterBtn=event.target.closest('[data-sim-filter]');
+      if(filterBtn){setFilter(filterBtn.dataset.simFilter);return;}
+      const choiceBtn=event.target.closest('[data-sim-choice]');
+      if(choiceBtn){renderStage(choiceBtn.dataset.simChoice);return;}
+      if(event.target.closest('[data-sim-cancel]')){dialog.close();return;}
+      if(event.target.closest('[data-sim-confirm]')){
+        if(!this.studio.groups.canEdit)return;
+        try{
+          this.mutate(s=>{
+            if(targetId){
+              const existing=s.elements.find(item=>item.id===targetId&&item.type==='simulation');
+              if(existing){existing.simulation=activeType;this.selected=existing.id;return;}
+            }
+            if(s.elements.length>=MAX_CANVAS_ELEMENTS)throw Error(`Use até ${MAX_CANVAS_ELEMENTS} elementos no slide.`);
+            const item=newElement('simulation',{x:53,y:12,w:42,h:76,simulation:activeType});
+            s.elements.push(item);
+            this.selected=item.id;
+          });
+          if(dialog.open)dialog.close();
+        }catch(error){this.studio.callbacks.toast(error.message);}
+      }
+    });
+    select.addEventListener('change',()=>renderStage(select.value));
+    dialog.addEventListener('close',()=>{modalSims.dispose();dialog.remove();},{once:true});
+    document.body.append(dialog);
+    renderStage(activeType);
+    dialog.showModal();
   }
   cropDown(event,node){
     event.preventDefault();this.selected=node.dataset.objectId;this.ensure();

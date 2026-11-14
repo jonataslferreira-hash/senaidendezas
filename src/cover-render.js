@@ -2,6 +2,7 @@ import { canvasMarkup } from './canvas-view.js';
 import { presentationSlide } from './slide-display.js';
 import { hydrateLesson } from './assets.js';
 import { encodeCover } from './lesson-cover.js';
+import { Simulations } from './simulations.js';
 
 export async function thumbnailFor(lesson) {
   if(lesson.thumbnail)return lesson.thumbnail;
@@ -11,7 +12,9 @@ export async function thumbnailFor(lesson) {
   const [hydrated]=(await hydrateLesson({slides:[{...slide,customModel:null}]})).slides;
   const stage=document.createElement('div');
   stage.style.cssText='position:fixed;left:-2000px;top:0;width:480px;height:270px;overflow:hidden;background:#161321';
-  stage.innerHTML=hydrated.kind==='document'?'':canvasMarkup(presentationSlide(hydrated));
+  stage.innerHTML=hydrated.kind==='document'?'':canvasMarkup(presentationSlide(hydrated),{interactive:false});
+  const simulations=new Simulations();
+  simulations.mountStatic(stage);
   if(hydrated.kind==='document'){
     const image=new Image();
     image.src=hydrated.image;
@@ -23,5 +26,5 @@ export async function thumbnailFor(lesson) {
     await Promise.all([...stage.querySelectorAll('img')].map(img=>img.decode().catch(()=>img.remove())));
     const {toCanvas}=await import('html-to-image');
     return encodeCover(await toCanvas(stage,{width:480,height:270,pixelRatio:1,fontEmbedCSS:''}));
-  }finally{stage.remove();}
+  }finally{simulations.dispose();stage.remove();}
 }
