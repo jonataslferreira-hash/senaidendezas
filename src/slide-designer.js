@@ -6,7 +6,7 @@ import {FontPicker,fontButton,loadSlideFonts} from './fonts.js';
 import {presentationSlide} from './slide-display.js';
 import { audioEditor } from './audio-editor.js';
 import { optimizeImage } from './image-optimize.js';
-import { MAX_CANVAS_ELEMENTS, canvasFromSlide, newElement, canvasThemes, applyCanvasTheme, slideBackground, normalizeBackground, imageZoomValue, mixHex } from './canvas-data.js';
+import { MAX_CANVAS_ELEMENTS, canvasFromSlide, newElement, canvasThemes, applyCanvasTheme, slideBackground, normalizeBackground, imageZoomValue } from './canvas-data.js';
 import {openLayouts, applyOpenLayout} from './open-slide-layouts.js';
 import {slideStylePicker,localLayouts} from './slide-style-picker.js';
 import { canvasMarkup, CanvasModels, esc } from './canvas-view.js';
@@ -53,12 +53,30 @@ export function gradientEndpoints(css){
   const colors=[...String(css).matchAll(/#[0-9a-f]{6}/gi)].map(match=>match[0].toLowerCase());
   return [colors[0]||'#171324',colors[1]||'#36648a'];
 }
-// Os painéis de estilo do inspetor também mudam a "temperatura" do gradiente:
-// no modo claro o fim precisa ser mais escuro que a base para a transição aparecer.
+// Distância perceptiva simples entre duas cores (0 = iguais, ~441 = preto/branco).
+export function colorDistance(a,b){
+  const part=(hex,at)=>parseInt(hex.slice(at,at+2),16);
+  return Math.hypot(part(a,1)-part(b,1),part(a,3)-part(b,3),part(a,5)-part(b,5));
+}
+// Cor final do gradiente escolhida para ser claramente outra cor: gira o matiz
+// e desloca a luminosidade, em vez de só clarear um pouco a base (o que deixava
+// o gradiente com cara de cor única).
 export function contrastingGradient(theme, base){
-  const light=parseInt(base.slice(1,3),16)*.299+parseInt(base.slice(3,5),16)*.587+parseInt(base.slice(5,7),16)*.114>145;
-  const accent=theme?.accent||(light?'#3f3a5a':'#cbb6ff');
-  return light?mixHex(base,accent,.62):mixHex(base,'#ffffff',.18);
+  const r=parseInt(base.slice(1,3),16)/255,g=parseInt(base.slice(3,5),16)/255,b=parseInt(base.slice(5,7),16)/255;
+  const max=Math.max(r,g,b),min=Math.min(r,g,b),l=(max+min)/2,d=max-min;
+  let h=0,sat=0;
+  if(d){
+    sat=d/(1-Math.abs(2*l-1));
+    h=max===r?((g-b)/d+6)%6:max===g?(b-r)/d+2:(r-g)/d+4;
+    h*=60;
+  }
+  const accent=theme?.accent;
+  if(accent&&colorDistance(accent,base)>150)return accent.toLowerCase();
+  const hue=(h+(d?70:265))%360, s2=Math.max(.55,Math.min(.85,sat||.6));
+  const l2=l<.5?Math.min(.68,l+.36):Math.max(.34,l-.36);
+  const c=(1-Math.abs(2*l2-1))*s2,x=c*(1-Math.abs(hue/60%2-1)),m=l2-c/2;
+  const [r2,g2,b2]=hue<60?[c,x,0]:hue<120?[x,c,0]:hue<180?[0,c,x]:hue<240?[0,x,c]:hue<300?[x,0,c]:[c,0,x];
+  return '#'+[r2,g2,b2].map(v=>Math.round((v+m)*255).toString(16).padStart(2,'0')).join('');
 }
 export class SlideDesigner {
   constructor(studio) {
@@ -584,7 +602,9 @@ export class SlideDesigner {
         else {
           const theme=canvasThemes[s.visualTheme];
           const base=s.background||theme?.background||'#171324';
-          s.backgroundFill=normalizeBackground({mode,end:theme?.end||contrastingGradient(theme,base),angle:135});
+          // A cor final do tema só serve se for bem diferente da base; senão calculamos uma.
+          const end=theme?.end&&colorDistance(theme.end,base)>120?theme.end:contrastingGradient(theme,base);
+          s.backgroundFill=normalizeBackground({mode,end,angle:135});
         }
       });
       return;
@@ -808,11 +828,69 @@ export class SlideDesigner {
       <label class="image-search-filter"><input type="checkbox" name="transparent"> Só com fundo transparente (PNG recortado)</label>
       <p class="image-search-status" role="status">Pesquise pelo assunto, personagem ou objeto.</p><div class="image-search-results"></div>`;
     document.body.append(dialog);dialog.showModal();dialog.addEventListener('close',()=>dialog.remove());
-    const form=dialog.querySelector('.image-search-form'),results=dialog.querySelector('.image-search-results');const status=dialog.querySelector('.image-search-status');const seen=new Set();let searchPage=0,searchTerm='',searchAlpha=false,loading=false,ended=false;
-    const loadNext=()=>{if(dialog.open&&searchPage&&!loading&&!ended&&form.elements.query.value===searchTerm&&results.scrollHeight-results.scrollTop-results.clientHeight<150)form.requestSubmit();};
-    results.addEventListener('scroll', loadNext);
-    dialog.querySelector('[name=transparent]').addEventListener('change',()=>{if(form.elements.query.value.trim())form.requestSubmit();});
-    form.addEventListener('submit',async event=>{event.preventDefault();if(loading)return;const alpha=dialog.querySelector('[name=transparent]').checked;const term=new FormData(form).get('query');if(term!==searchTerm||alpha!==searchAlpha){searchTerm=term;searchAlpha=alpha;searchPage=0;ended=false;seen.clear();results.replaceChildren();}if(ended)return;loading=true;status.textContent='Buscando imagens…';try{const choices=await searchImageChoices(term,++searchPage,{transparent:alpha});status.textContent='';if(!choices.length){ended=true;if(!results.childElementCount)status.textContent='Nenhuma imagem encontrada no Bing. Tente outras palavras.';return;}for(const choice of choices){const key=choice.original||choice.url;if(seen.has(key))continue;seen.add(key);const button=document.createElement('button');button.type='button';button.className='image-search-choice';if(choice.transparent)button.dataset.transparent='true';const img=document.createElement('img');img.src=choice.thumbnail;img.alt=choice.title;img.loading='lazy';img.onerror=()=>button.remove();const title=document.createElement('span');title.className='image-search-title';title.textContent=choice.title;const credit=document.createElement('span');credit.className='image-search-credit';credit.textContent=[choice.catalog,choice.license,choice.author].filter(Boolean).join(' · ');button.append(img,title,credit);if(choice.source){button.title='Abrir a origem: '+choice.source;}button.addEventListener('click',async()=>{button.disabled=true;try{const image=await importImageChoice(choice);const [assetId]=await storePages([image.data]);this.mutate(slide=>{let item=slide.elements.find(value=>value.id===targetId&&value.type==='image');if(!item){item=newElement('image');slide.elements.push(item);}item.assetId=assetId;item.image='';item.imageAlt=image.alt;item.imageSource=image.source;item.imageLicense=[image.license,image.author].filter(Boolean).join(' · ');item.imageCredit=image.catalog||'';this.selected=item.id;});dialog.close();}catch(error){this.studio.callbacks.toast(error.message);button.disabled=false;}});results.append(button);}requestAnimationFrame(loadNext);}catch(error){status.textContent='A busca falhou. Clique em Pesquisar para tentar novamente.';searchPage=Math.max(0,searchPage-1);}finally{loading=false;}});
+    const form=dialog.querySelector('.image-search-form'),results=dialog.querySelector('.image-search-results'),status=dialog.querySelector('.image-search-status');
+    // Rolagem sem fim: quando o Bing para de trazer novidades para a busca
+    // exata, a galeria continua com variações do mesmo assunto.
+    const variants=term=>[term,...['imagens','fotos','ilustração','desenho','hd','wallpaper','arte','exemplos','ideias'].map(extra=>term+' '+extra)];
+    const more=document.createElement('p');more.className='image-search-more';more.setAttribute('role','status');
+    const seen=new Set();
+    let searchTerm='',searchAlpha=false,loading=false,ended=false,queries=[],queryIndex=0,page=0,dry=0,failures=0,token=0;
+    const nearEnd=()=>results.scrollHeight-results.scrollTop-results.clientHeight<420;
+    const addChoice=choice=>{
+      const key=choice.original||choice.url;if(seen.has(key))return false;seen.add(key);
+      const button=document.createElement('button');button.type='button';button.className='image-search-choice';if(choice.transparent)button.dataset.transparent='true';
+      const img=document.createElement('img');img.src=choice.thumbnail;img.alt=choice.title;img.loading='lazy';img.onerror=()=>button.remove();
+      const title=document.createElement('span');title.className='image-search-title';title.textContent=choice.title;
+      const credit=document.createElement('span');credit.className='image-search-credit';credit.textContent=[choice.catalog,choice.license,choice.author].filter(Boolean).join(' · ');
+      button.append(img,title,credit);if(choice.source)button.title='Abrir a origem: '+choice.source;
+      button.addEventListener('click',async()=>{button.disabled=true;try{const image=await importImageChoice(choice);const [assetId]=await storePages([image.data]);this.mutate(slide=>{let item=slide.elements.find(value=>value.id===targetId&&value.type==='image');if(!item){item=newElement('image');slide.elements.push(item);}item.assetId=assetId;item.image='';item.imageAlt=image.alt;item.imageSource=image.source;item.imageLicense=[image.license,image.author].filter(Boolean).join(' · ');item.imageCredit=image.catalog||'';this.selected=item.id;});dialog.close();}catch(error){this.studio.callbacks.toast(error.message);button.disabled=false;}});results.insertBefore(button,more);return true;
+    };
+    const loadMore=async()=>{
+      if(loading||ended||!searchTerm||!dialog.open)return;
+      loading=true;const run=token;
+      more.textContent='Carregando mais imagens…';if(!seen.size)status.textContent='Buscando imagens…';
+      try{
+        // Busca até a tela encher de novo; páginas repetidas não contam.
+        let burst=0;
+        while(run===token&&dialog.open&&!ended&&nearEnd()&&burst++<5){
+          let choices;
+          try{choices=await searchImageChoices(queries[queryIndex],++page,{transparent:searchAlpha});failures=0;}
+          catch(error){
+            page--;
+            if(run!==token)return;
+            if(++failures<3){await new Promise(resolve=>setTimeout(resolve,900*failures));continue;}
+            failures=0;
+            if(!seen.size)status.textContent='A busca falhou. Confira a conexão e tente de novo.';
+            more.innerHTML='';const retry=document.createElement('button');retry.type='button';retry.textContent='Tentar carregar mais';retry.addEventListener('click',loadMore);more.append('Não deu para carregar mais agora. ',retry);
+            return;
+          }
+          if(run!==token)return;
+          const added=choices.filter(addChoice).length;
+          if(seen.size)status.textContent='';
+          dry=added?0:dry+1;
+          // Duas páginas seguidas sem nada novo: essa busca acabou, vai para a próxima variação.
+          if(dry>=2||page>=80){queryIndex++;page=0;dry=0;if(queryIndex>=queries.length)ended=true;}
+        }
+        if(run!==token)return;
+        if(ended){
+          more.textContent=seen.size?'Essas são todas as imagens que o Bing tem para esta busca.':'';
+          if(!seen.size)status.textContent='Nenhuma imagem encontrada no Bing. Tente outras palavras.';
+        }else more.textContent='Role para ver mais imagens';
+      }finally{if(run===token)loading=false;}
+    };
+    const startSearch=()=>{
+      const term=String(new FormData(form).get('query')||'').trim();if(!term)return;
+      token++;loading=false;ended=false;searchTerm=term;searchAlpha=dialog.querySelector('[name=transparent]').checked;
+      queries=variants(term);queryIndex=0;page=0;dry=0;failures=0;seen.clear();
+      results.replaceChildren(more);results.scrollTop=0;
+      loadMore();
+    };
+    results.addEventListener('scroll',()=>{if(nearEnd())loadMore();},{passive:true});
+    // Telas altas: a primeira leva pode não criar rolagem; o observador garante a próxima.
+    if('IntersectionObserver' in window){const watcher=new IntersectionObserver(entries=>{if(entries.some(entry=>entry.isIntersecting))loadMore();},{root:results,rootMargin:'400px'});watcher.observe(more);dialog.addEventListener('close',()=>watcher.disconnect());}
+    dialog.addEventListener('close',()=>{token++;});
+    dialog.querySelector('[name=transparent]').addEventListener('change',()=>{if(form.elements.query.value.trim())startSearch();});
+    form.addEventListener('submit',event=>{event.preventDefault();startSearch();});
   }
   openSimulationModal(initialType='projectile',targetId=null){
     document.querySelector('#simulation-lab-modal')?.remove();

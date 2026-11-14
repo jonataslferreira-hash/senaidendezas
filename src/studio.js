@@ -275,24 +275,19 @@ export class Studio {
     try{if(!live.current()||this.groups.live!==live)throw Error('A aula compartilhada mudou. Tente novamente.');this.library.save(lesson);}catch(error){await removePageAssets(ids).catch(()=>{});throw error;}
   }
   async saveEditor() {
-    if(!this.groups.canEdit||!this.needsSave())return;
-    if(this.hasCloudCopy())return this.cloudAction('cloud-save',{});
+    if(!this.groups.canEdit||!this.dirty)return;
     await this.saveLocalEditor();
-    this.callbacks.toast(this.groups.live?'Aula salva no grupo e no dispositivo.':'Aula salva neste dispositivo.');
+    this.callbacks.toast(this.groups.live?'Aula salva no grupo e no dispositivo.':this.hasCloudCopy()?'Aula salva neste dispositivo. Use “Nuvem” para atualizar a cópia online.':'Aula salva neste dispositivo.');
     this.callbacks.render();
   }
   editorSaveControls() {
+    // Dois botões sempre à vista: salvar aqui e salvar na nuvem. Sem menu.
     const linked=this.hasCloudCopy(), canEdit=this.groups.canEdit, disabled=!canEdit||this.cloudBusy?'disabled':'';
-    const needsSave=this.needsSave();
-    const label=this.cloudBusy?'Salvando…':needsSave?'Salvar':'Salvo';
-    return `<div class="editor-save-controls">${button('save',studioIcon(linked?'cloud':'download')+label,'quiet '+(needsSave?'':'is-saved'),
-      `aria-label="Salvar aula" title="${linked?'Salvar no dispositivo e na nuvem':'Salvar no dispositivo'}" ${disabled||(!needsSave?'disabled':'')}`)}
-      ${cloudConfigured&&!linked?button('cloud-save',studioIcon('cloud')+'<span class="mobile-action-label">Enviar à nuvem</span>','quiet editor-icon',
-      `aria-label="Salvar na nuvem" title="Salvar na nuvem" ${disabled}`):''}</div>
-      <details class="editor-more editor-save-menu"><summary aria-label="Onde salvar" title="Escolher onde salvar">${studioIcon('chevron')}</summary><div>
-      ${button('save-local',studioIcon('download')+'Salvar neste dispositivo','quiet',canEdit?'':'disabled')}
-      ${cloudConfigured?button('cloud-save',studioIcon('cloud')+'Salvar na nuvem','quiet',disabled):''}
-      ${button('export-draft',studioIcon('download')+'Baixar arquivo da aula (.json)','quiet')}</div></details>`;
+    const dirty=this.dirty;
+    const label=this.cloudBusy?'Salvando…':dirty?'Salvar':'Salvo';
+    return `<div class="editor-save-controls">${cloudConfigured?button('cloud-save',studioIcon('cloud')+'<span>Nuvem</span>','quiet editor-cloud-save '+(linked&&!this.needsSave()?'is-saved':''),
+      `aria-label="Salvar na nuvem" title="${linked?'Enviar esta versão para a nuvem':'Guardar uma cópia na nuvem'}" ${disabled}`):''}${button('save',studioIcon('download')+label,'quiet '+(dirty?'':'is-saved'),
+      `aria-label="Salvar neste dispositivo" title="Salvar neste dispositivo" ${disabled||(!dirty?'disabled':'')}`)}</div>`;
   }
   needsSave() {
     if(this.dirty)return true;
@@ -301,13 +296,13 @@ export class Studio {
   }
   paintSaveButton() {
     for(const button of this.root.querySelectorAll('.editor-save-controls [data-studio-action=save]')){
-    const needsSave=this.needsSave();
-    button.classList.toggle('is-saved',!needsSave);
-    button.disabled=!this.groups.canEdit||this.cloudBusy||!needsSave;
-    const label=this.cloudBusy?'Salvando…':needsSave?'Salvar':'Salvo';
-    const cloud=String(this.hasCloudCopy());
-    if(button.textContent!==label||button.dataset.cloud!==cloud){button.dataset.cloud=cloud;button.innerHTML=studioIcon(cloud==='true'?'cloud':'download')+label;}
+      const dirty=this.dirty;
+      button.classList.toggle('is-saved',!dirty);
+      button.disabled=!this.groups.canEdit||this.cloudBusy||!dirty;
+      const label=this.cloudBusy?'Salvando…':dirty?'Salvar':'Salvo';
+      if(button.textContent!==label)button.innerHTML=studioIcon('download')+label;
     }
+    for(const button of this.root.querySelectorAll('.editor-save-controls [data-studio-action=cloud-save]'))button.classList.toggle('is-saved',this.hasCloudCopy()&&!this.needsSave());
   }
   async cloudAction(action, target) {
     if (this.cloudBusy) return;
@@ -446,7 +441,7 @@ export class Studio {
   }
   editor() {
     const l = this.draft;
-    return this.shell(`<main class="studio-editor ${this.metaExpanded ? 'expanded-meta' : ''}">${this.groups.editorMarkup()}<div class="editor-heading"><div class="editor-heading-main">${button('library', studioIcon('chevron'), 'quiet editor-back editor-icon', 'aria-label="Voltar" title="Voltar"')}<div class="editor-title-block"><strong class="editor-title">${esc(l.title)}</strong><span class="editor-heading-meta">${this.groups.live?`<span class="editor-group-presence" data-collab-status>${this.groups.statusMarkup()}</span>`:`<span class="editor-heading-hint">${l.slides.length} ${l.slides.length===1?'slide':'slides'} · ${l.questions.length} ${l.questions.length===1?'pergunta':'perguntas'}</span>`}</span></div></div><div class="editor-context">${this.editorMusic.headerMarkup()}<span data-account-profile>${this.account.profile()}</span></div></div><div class="editor-command-row"><button type="button" class="studio-btn mobile-activity-list" data-studio-action="list-activities">${studioIcon('sequence')}<span>Roteiro da aula</span></button><div class="mobile-editor-history">${this.tab==='slides'&&this.visualMode&&this.currentBlock()?.type!=='poll'?this.designer.historyMarkup():''}</div><div class="mobile-primary-actions">${this.editorSaveControls()}${this.tab==='slides'&&this.visualMode&&this.currentBlock()?.type!=='poll'?`<button type="button" class="studio-btn editor-icon ai-tool" data-storage-ai="toggle" aria-label="storageAI" title="storageAI" aria-pressed="${Boolean(this.ai.open)}" ${this.groups.canEdit?'':'disabled'}>${studioIcon('sparkle')}</button>`:''}${button('present-draft','▷','accent studio-launch','aria-label="Apresentar" title="Apresentar" '+(this.launching?'disabled':''))}</div><div class="editor-tabs" role="tablist" aria-label="Conteúdo da aula">${activityTabs(l,this.tab,this.currentBlock()?.id,this.groups.canEdit)}</div><button type="button" class="studio-btn quiet mobile-editor-actions" data-studio-action="mobile-actions" aria-expanded="false" aria-controls="editor-actions" aria-label="Opções da aula" title="Opções da aula">···</button><div class="editor-top-actions" id="editor-actions"><div class="mobile-actions-heading"><strong>Opções da aula</strong><button type="button" class="studio-btn" data-studio-action="close-mobile-actions" aria-label="Fechar opções">×</button></div><details class="editor-more"><summary aria-label="Mais opções da aula">${studioIcon('more')}<span class="mobile-action-label">Projeto</span></summary><div>${button('rename-draft','Renomear','quiet','aria-label="Editar título e descrição"')}${button('export-draft','Baixar JSON','quiet')}</div></details>${this.tab === 'slides'&&this.currentBlock()?.type!=='poll' ? button('toggle-visual', studioIcon('fields') + '<span>' + (this.visualMode ? 'Campos' : 'Editor visual') + '</span>', 'quiet') : ''}<details class="editor-more editor-download"><summary aria-label="Baixar apresentação" title="Baixar apresentação">${studioIcon('download')}<span class="mobile-action-label">Baixar</span></summary><div>${button('export-pdf','Baixar PDF','quiet')}${button('export-pptx','Baixar PPTX','quiet')}${this.tab==='slides'?button('export-png','Baixar PNG deste slide','quiet'):''}</div></details>${this.editorSaveControls()}${this.tab==='slides'&&this.visualMode&&this.currentBlock()?.type!=='poll'?`<button type="button" class="studio-btn editor-icon ai-tool" data-storage-ai="toggle" aria-label="Storage AI" title="Storage AI" aria-pressed="${Boolean(this.ai.open)}" ${this.groups.canEdit?'':'disabled'}>${studioIcon('sparkle')}<span class="mobile-action-label">storageAI</span></button>`:''}<details class="editor-more editor-sharing"><summary aria-label="Compartilhar e colaborar" title="Compartilhar e colaborar">${studioIcon('share')}<span class="mobile-action-label">Compartilhar</span></summary><div><button type="button" class="studio-btn quiet" data-group-action="share">${studioIcon('collaborate')} Colaborar</button><button type="button" class="studio-btn quiet" data-chat-action="open">${studioIcon('chat')} Chat</button>${button('share-presentation','Compartilhar','quiet')}</div></details>${button('present-draft', 'Apresentar ↗', 'accent studio-launch', this.launching ? 'disabled' : '')}</div></div><div class="editor-workspace ${this.visualMode && this.tab === 'slides' ? 'visual-workspace' : ''}"><aside class="editor-outline" data-outline-lesson="${esc(l.id)}"><div class="outline-heading"><span>${this.currentBlock()?.type==='poll'?'ENQUETES':this.tab === 'slides' ? 'SEQUÊNCIA DA AULA' : 'PERGUNTAS'}</span></div><div class="outline-actions">${this.itemActions(this.tab==='slides'?'slide':'question',this.tab==='slides'?this.index:this.questionIndex,this.tab==='slides'?l.slides.length:l.questions.length)}${button(this.tab === 'slides' ? 'add-slide' : 'add-question', '+', 'outline-add', `aria-label="${this.tab === 'slides' ? 'Adicionar slide' : 'Adicionar pergunta'}"`)}</div><div class="outline-items">${this.visibleItems().map(({item,index:i}) => `<button class="outline-item ${i === (this.tab === 'slides' ? this.index : this.questionIndex) ? 'active' : ''}" data-studio-action="${this.tab === 'slides' ? 'select-slide' : 'select-question'}" data-index="${i}">${this.tab==='slides'?this.slideThumbnail(item):''}<span>${String(i + 1).padStart(2, '0')}</span><div><strong ${i === (this.tab === 'slides' ? this.index : this.questionIndex) ? 'data-current-label' : ''}>${esc((this.tab === 'slides' ? item.title : item.text) || 'Sem título')}</strong><small>${this.tab === 'slides' ? kindLabel(item.kind) : esc(item.difficulty) + ' · ' + item.seconds + ' s'}</small></div>${this.tab==='slides'&&this.groups.live?`<span class="collaborator-avatars outline-presence" data-slide-presence="${esc(item.id)}"></span>`:''}</button>`).join('')}</div></aside><section class="editor-form-area">${this.tab==='quiz'?gameSettingsMarkup(l,this.gameSettingsOpen):!this.visualMode&&l.slides[this.index].kind!=='canvas'?audioEditor(l.slides[this.index].audio,'slide'):''}${this.tab === 'slides' ? this.currentBlock()?.type==='poll'?this.pollBlockEditor():(this.visualMode ? this.itemToolbar('slide', this.index, l.slides.length) + this.mobileSlidePreviews() + this.designer.markup(false,false) : this.slideEditor()) + (this.visualMode?'':this.slideActivities()) : this.quizEditor()}</section><aside class="editor-preview-area"><span class="studio-kicker">UM OLHAR DA TURMA</span><div id="editor-mini-preview">${this.previewMarkup()}</div></aside></div></main>`);
+    return this.shell(`<main class="studio-editor ${this.metaExpanded ? 'expanded-meta' : ''}">${this.groups.editorMarkup()}<div class="editor-heading"><div class="editor-heading-main">${button('library', studioIcon('chevron'), 'quiet editor-back editor-icon', 'aria-label="Voltar" title="Voltar"')}<div class="editor-title-block"><strong class="editor-title">${esc(l.title)}</strong><span class="editor-heading-meta">${this.groups.live?`<span class="editor-group-presence" data-collab-status>${this.groups.statusMarkup()}</span>`:`<span class="editor-heading-hint">${l.slides.length} ${l.slides.length===1?'slide':'slides'} · ${l.questions.length} ${l.questions.length===1?'pergunta':'perguntas'}</span>`}</span></div></div><div class="editor-context">${this.editorMusic.headerMarkup()}<span data-account-profile>${this.account.profile()}</span></div></div><div class="editor-command-row"><button type="button" class="studio-btn mobile-activity-list" data-studio-action="list-activities">${studioIcon('sequence')}<span>Roteiro da aula</span></button><div class="mobile-editor-history">${this.tab==='slides'&&this.visualMode&&this.currentBlock()?.type!=='poll'?this.designer.historyMarkup():''}</div><div class="mobile-primary-actions">${this.editorSaveControls()}${this.tab==='slides'&&this.visualMode&&this.currentBlock()?.type!=='poll'?`<button type="button" class="studio-btn editor-icon ai-tool" data-storage-ai="toggle" aria-label="storageAI" title="storageAI" aria-pressed="${Boolean(this.ai.open)}" ${this.groups.canEdit?'':'disabled'}>${studioIcon('sparkle')}</button>`:''}${button('present-draft','▷','accent studio-launch','aria-label="Apresentar" title="Apresentar" '+(this.launching?'disabled':''))}</div><div class="editor-tabs" role="tablist" aria-label="Conteúdo da aula">${activityTabs(l,this.tab,this.currentBlock()?.id,this.groups.canEdit)}</div><button type="button" class="studio-btn quiet mobile-editor-actions" data-studio-action="mobile-actions" aria-expanded="false" aria-controls="editor-actions" aria-label="Opções da aula" title="Opções da aula">···</button><div class="editor-top-actions" id="editor-actions"><div class="mobile-actions-heading"><strong>Opções da aula</strong><button type="button" class="studio-btn" data-studio-action="close-mobile-actions" aria-label="Fechar opções">×</button></div>${button('present-draft', 'Apresentar ↗', 'accent studio-launch', this.launching ? 'disabled' : '')}${this.editorSaveControls()}${this.tab==='slides'&&this.visualMode&&this.currentBlock()?.type!=='poll'?`<button type="button" class="studio-btn editor-icon ai-tool" data-storage-ai="toggle" aria-label="Storage AI" title="Storage AI" aria-pressed="${Boolean(this.ai.open)}" ${this.groups.canEdit?'':'disabled'}>${studioIcon('sparkle')}<span class="mobile-action-label">storageAI</span></button>`:''}<details class="editor-more editor-sharing"><summary aria-label="Compartilhar e colaborar" title="Compartilhar e colaborar">${studioIcon('share')}<span class="mobile-action-label">Compartilhar</span></summary><div><button type="button" class="studio-btn quiet" data-group-action="share">${studioIcon('collaborate')} Colaborar</button><button type="button" class="studio-btn quiet" data-chat-action="open">${studioIcon('chat')} Chat</button>${button('share-presentation','Compartilhar','quiet')}</div></details><details class="editor-more editor-download"><summary aria-label="Baixar apresentação" title="Baixar apresentação">${studioIcon('download')}<span class="mobile-action-label">Baixar</span></summary><div>${button('export-pdf','Baixar PDF','quiet')}${button('export-pptx','Baixar PPTX','quiet')}${this.tab==='slides'?button('export-png','Baixar PNG deste slide','quiet'):''}</div></details>${this.tab === 'slides'&&this.currentBlock()?.type!=='poll' ? button('toggle-visual', studioIcon('fields') + '<span>' + (this.visualMode ? 'Campos' : 'Editor visual') + '</span>', 'quiet') : ''}<details class="editor-more"><summary aria-label="Mais opções da aula">${studioIcon('more')}<span class="mobile-action-label">Projeto</span></summary><div>${button('rename-draft','Renomear','quiet','aria-label="Editar título e descrição"')}${button('export-draft','Baixar JSON','quiet')}</div></details></div></div><div class="editor-workspace ${this.visualMode && this.tab === 'slides' ? 'visual-workspace' : ''}"><aside class="editor-outline" data-outline-lesson="${esc(l.id)}"><div class="outline-heading"><span>${this.currentBlock()?.type==='poll'?'ENQUETES':this.tab === 'slides' ? 'SEQUÊNCIA DA AULA' : 'PERGUNTAS'}</span></div><div class="outline-actions">${this.itemActions(this.tab==='slides'?'slide':'question',this.tab==='slides'?this.index:this.questionIndex,this.tab==='slides'?l.slides.length:l.questions.length)}${button(this.tab === 'slides' ? 'add-slide' : 'add-question', '+', 'outline-add', `aria-label="${this.tab === 'slides' ? 'Adicionar slide' : 'Adicionar pergunta'}"`)}</div><div class="outline-items">${this.visibleItems().map(({item,index:i}) => `<button class="outline-item ${i === (this.tab === 'slides' ? this.index : this.questionIndex) ? 'active' : ''}" data-studio-action="${this.tab === 'slides' ? 'select-slide' : 'select-question'}" data-index="${i}">${this.tab==='slides'?this.slideThumbnail(item):''}<span>${String(i + 1).padStart(2, '0')}</span><div><strong ${i === (this.tab === 'slides' ? this.index : this.questionIndex) ? 'data-current-label' : ''}>${esc((this.tab === 'slides' ? item.title : item.text) || 'Sem título')}</strong><small>${this.tab === 'slides' ? kindLabel(item.kind) : esc(item.difficulty) + ' · ' + item.seconds + ' s'}</small></div>${this.tab==='slides'&&this.groups.live?`<span class="collaborator-avatars outline-presence" data-slide-presence="${esc(item.id)}"></span>`:''}</button>`).join('')}</div></aside><section class="editor-form-area">${this.tab==='quiz'?gameSettingsMarkup(l,this.gameSettingsOpen):!this.visualMode&&l.slides[this.index].kind!=='canvas'?audioEditor(l.slides[this.index].audio,'slide'):''}${this.tab === 'slides' ? this.currentBlock()?.type==='poll'?this.pollBlockEditor():(this.visualMode ? this.itemToolbar('slide', this.index, l.slides.length) + this.mobileSlidePreviews() + this.designer.markup(false,false) : this.slideEditor()) + (this.visualMode?'':this.slideActivities()) : this.quizEditor()}</section><aside class="editor-preview-area"><span class="studio-kicker">UM OLHAR DA TURMA</span><div id="editor-mini-preview">${this.previewMarkup()}</div></aside></div></main>`);
   }
   slideActivities() {
     const s = this.draft.slides[this.index], poll = s.poll || { text: '', options: ['Concordo', 'Ainda tenho dúvidas'] };
@@ -555,6 +550,9 @@ export class Studio {
         ${form.thumbnail?`<img class="lesson-cover-preview" src="${esc(form.thumbnail)}" alt="Prévia da capa">${button('clear-cover','Remover capa','link')}`:''}
         <div>${button('cancel-dialog','Cancelar','quiet')}${button(creating?'confirm-new':'confirm-cover',creating?'Criar aula':'Salvar capa','accent')}</div>
       </section></div>`;
+    }
+    if(this.dialog.type==='leave'){
+      return `<div class="modal-backdrop"><section class="studio-dialog leave-dialog" role="alertdialog" aria-modal="true" aria-labelledby="studio-dialog-title"><h2 id="studio-dialog-title">Sair sem salvar?</h2><p>Esta aula tem alterações que ainda não foram salvas. Quer mesmo sair?</p><div>${button('cancel-dialog','Continuar editando','quiet')}${button('leave-discard','Sair sem salvar','danger')}${button('leave-save','Salvar e sair','accent')}</div></section></div>`;
     }
     if(this.dialog.type==='cloud-delete'){
       if(this.dialog.uid!==this.account.user?.id)return '';
@@ -770,6 +768,11 @@ export class Studio {
     const id = target.dataset.id;
     const lookup = () => this.library.lessons.find(l => l.id === id);
     if (['library', 'join','shared','storage-ai'].includes(action)) {
+      // Sair com mudanças pendentes pede confirmação em vez de decidir sozinho.
+      if (this.view==='editor'&&this.dirty&&!this.groups.live&&this.groups.canEdit&&!this.leaveDecided) {
+        this.dialog={type:'leave',target:action};this.callbacks.render();return;
+      }
+      this.leaveDecided=false;
       if (this.groups.live) await this.groups.stop();
       if (this.dirty) this.save();
       if(action==='storage-ai'&&this.view!=='storage-ai')this.ai.freshPending=true;
@@ -829,18 +832,18 @@ export class Studio {
     else if (action === 'restore-demo') { const l = this.library.restoreDemo(); this.open(l.id); }
     else if (action === 'edit') {if(await this.groups.openForLesson(id))return;this.open(id);}
     else if (action === 'save') { await this.saveEditor(); return; }
-    else if (action === 'save-local') {
-      // Salvar no dispositivo continua disponível mesmo quando a aula já tem cópia na nuvem.
-      if(!this.groups.canEdit)return;
-      for(const menu of this.root.querySelectorAll('details.editor-save-menu'))menu.open=false;
-      await this.saveLocalEditor();
-      this.callbacks.toast(this.hasCloudCopy()?'Aula salva neste dispositivo. A cópia da nuvem não foi alterada.':'Aula salva neste dispositivo.');
-      this.callbacks.render();
-      return;
-    }
     else if (action === 'duplicate') { this.library.duplicate(id); this.callbacks.toast('Cópia adicionada à biblioteca.'); }
     else if (action === 'rename' || action === 'delete') this.dialog = { type: action, id };
     else if (action === 'cancel-dialog') this.dialog = null;
+    else if (action === 'leave-save' || action === 'leave-discard') {
+      const destination=this.dialog?.target||'library';
+      this.dialog=null;
+      if(action==='leave-discard')this.dirty=false;
+      this.leaveDecided=true;
+      await this.action(destination,target);
+      if(action==='leave-save')this.callbacks.toast('Aula salva neste dispositivo.');
+      return;
+    }
     else if (action === 'confirm-delete') {
       const deleted = this.library.lessons.find(l => l.id === this.dialog.id);
       this.library.remove(this.dialog.id); this.dialog = null;
