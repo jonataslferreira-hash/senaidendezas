@@ -255,12 +255,16 @@ test('Cabo de Guerra pré-distribui times no lobby, Relâmpago oculta pular-etap
   const caio = room.join({ name: 'Caio', avatar: '🔥' });
   assert.equal(room.snapshot().game.crews[0].length + room.snapshot().game.crews[1].length, 3, 'participante que entra tarde também já entra em um lado da corda');
 
-  // Durante rodada aberta do Cabo de Guerra, não renderiza botão prematuro de pular etapa; ativa data-wide-options para alternativa longa.
+  // Durante batalha aberta do Cabo de Guerra, telão mostra a batalha sem botão prematuro de pular etapa; aluno recebe 3 perguntas sorteadas com texto e ativa data-wide-options para alternativa longa.
   const hostView = snap => gameMarkup(snap, { host: true, demo: false, header: () => '', now: clock });
+  const studentView = snap => gameMarkup(snap, { host: false, demo: false, header: () => '', now: clock });
   room.control('game', { do: 'next' });
   const tugOpenHtml = hostView(room.snapshot());
   assert.doesNotMatch(tugOpenHtml, /data-action="next-stage"/, 'não polui com botão de pular etapa durante rodada ativa');
-  assert.match(tugOpenHtml, /data-wide-options="true"/, 'ativa expansão lateral quando há alternativa longa');
+  assert.match(tugOpenHtml, /tug-scene/, 'telão do professor exibe a batalha ao vivo em tela cheia');
+  const tugStudentHtml = studentView(room.snapshot(ana.id));
+  assert.match(tugStudentHtml, /data-wide-options="true"/, 'ativa expansão lateral no aparelho do aluno quando há alternativa longa');
+  assert.match(tugStudentHtml, /Pergunta <b>1<\/b> de 3/, 'aluno recebe seu deck individual de 3 perguntas');
 
   // Encerra Cabo de Guerra -> Relâmpago (2 rodadas) -> testa placar intermediário e pódio Top-3!
   room.control('game', { do: 'end' });

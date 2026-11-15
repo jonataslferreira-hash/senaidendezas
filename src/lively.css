@@ -2,8 +2,8 @@
 .studio-shell .experience-demo[data-playing=true] .demo-board{animation:screen-drift 3.8s ease-in-out infinite}
 .studio-shell .experience-demo[data-playing=true] .demo-phone{animation:phone-drift 3.3s ease-in-out infinite;animation-delay:-1.2s}
 .studio-shell .experience-demo[data-playing=true] .phone-robot{animation-duration:4.1s;animation-delay:-2.8s}
-@keyframes screen-drift{0%,100%{translate:0 10px}50%{translate:0 -26px}}
-@keyframes phone-drift{0%,100%{translate:0 14px}50%{translate:0 -32px}}
+@keyframes screen-drift{0%,100%{translate:0 3px}50%{translate:0 -5px}}
+@keyframes phone-drift{0%,100%{translate:0 4px}50%{translate:0 -5px}}
 .experience-feature:has([data-playing]) .experience-copy .living-title{display:inline-grid;grid-template-areas:"word";vertical-align:baseline;line-height:1.15}
 .living-title-size,.living-title-current,.living-title>.sr-only{grid-area:word}
 .living-title-size{visibility:hidden;pointer-events:none}

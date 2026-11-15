@@ -4,7 +4,7 @@ import {lobbyTracks,questionTracks,countdownTracks,resultTrack,podiumTrack,choos
 const createAudio=label=>{const audio=new Audio();audio.preload='metadata';audio.hidden=true;audio.dataset[label]='';document.body.append(audio);return audio;};
 export class GameAudio{
  constructor({audioFactory=createAudio,random=Math.random,now=Date.now,context=null}={}){
-  this.random=random;this.now=now;this.context=context;this.audio=audioFactory('quizSoundtrack');this.five=audioFactory('quizCountdown');this.result=audioFactory('quizResult');this.versions=new WeakMap();this.desired=new WeakMap();this.timers=[];this.cuesPlayed=[];
+  this.random=random;this.now=now;this.context=context;this.audio=audioFactory('quizSoundtrack');this.five=audioFactory('quizCountdown');this.result=audioFactory('quizResult');this.versions=new WeakMap();this.desired=new WeakMap();this.timers=[];this.cuesPlayed=[];this.drumrollTimer=null;this.drumrollMode=null;this.drumrollStep=0;
   this.audio.addEventListener('ended',()=>{
    const inLobby=['lobby','countdown'].includes(this.state?.phase)||(this.state?.phase==='game'&&['ready','teams'].includes(this.state?.game?.state==='ready'?'ready':this.state?.game?.type));
    if(inLobby&&this.selected==='random'&&this.enabled){this.key='';this.sync(...this.current);}
@@ -18,21 +18,52 @@ export class GameAudio{
   for(let i=0;i<length;i++)data[i]=(Math.random()*2-1)*Math.exp(-i/(length*0.35));
   this._noiseBuffer=buf;this._noiseCtx=ctx;return buf;
  }
- playDrumroll(duration=1.5){
-  const ctx=this.context,now=ctx.currentTime,vol=Math.max(.03,Math.min(.22,(this.settings?.volume??.1)*1.4));
-  const buffer=this.noiseBuffer(),hits=Math.max(12,Math.round(duration*18));
+ playDrumrollChunk(duration=0.32,mode='podium',step=0){
+  const ctx=this.context;if(!ctx||ctx.state!=='running')return;
+  const now=ctx.currentTime+0.015,baseVol=Math.max(.03,Math.min(.22,(this.settings?.volume??.1)*1.4));
+  const modeGain=mode==='results'?0.68:mode==='raffle'?1.05:0.92;
+  const vol=baseVol*modeGain,buffer=this.noiseBuffer();
+  const rate=mode==='raffle'?22:mode==='results'?16:20;
+  const hits=Math.max(4,Math.round(duration*rate));
   for(let i=0;i<hits;i++){
-   const progress=i/(hits-1),t=now+progress*duration,amp=vol*(0.22+0.78*progress*progress);
+   const t=now+(i/hits)*duration;
+   const swell=0.65+0.35*Math.sin(((step*hits+i)%24)/24*Math.PI);
+   const accent=((step*hits+i)%4===0)?1.18:0.86;
+   const amp=vol*swell*accent;
    const src=ctx.createBufferSource();src.buffer=buffer;
-   const filter=ctx.createBiquadFilter();filter.type='bandpass';filter.frequency.value=1650+progress*650;filter.Q.value=1.4;
-   const gain=ctx.createGain();gain.gain.setValueAtTime(0.0001,t);gain.gain.linearRampToValueAtTime(amp,t+0.006);gain.gain.exponentialRampToValueAtTime(0.0001,t+0.055);
-   src.connect(filter);filter.connect(gain);gain.connect(ctx.destination);src.start(t);src.stop(t+0.06);
+   const filter=ctx.createBiquadFilter();filter.type='bandpass';
+   filter.frequency.value=(mode==='raffle'?2100:mode==='results'?1450:1750)+((i%3)*190);
+   filter.Q.value=mode==='raffle'?2.0:1.4;
+   const gain=ctx.createGain();gain.gain.setValueAtTime(0.0001,t);gain.gain.linearRampToValueAtTime(amp,t+0.005);gain.gain.exponentialRampToValueAtTime(0.0001,t+0.05);
+   src.connect(filter);filter.connect(gain);gain.connect(ctx.destination);src.start(t);src.stop(t+0.055);
    if(i%2===0){
-    const body=ctx.createOscillator(),bg=ctx.createGain();body.type='triangle';body.frequency.setValueAtTime(185+progress*30,t);body.frequency.exponentialRampToValueAtTime(110,t+0.045);
-    bg.gain.setValueAtTime(0.0001,t);bg.gain.linearRampToValueAtTime(amp*0.45,t+0.005);bg.gain.exponentialRampToValueAtTime(0.0001,t+0.05);
-    body.connect(bg);bg.connect(ctx.destination);body.start(t);body.stop(t+0.055);
+    const body=ctx.createOscillator(),bg=ctx.createGain();
+    body.type=mode==='raffle'?'sine':'triangle';
+    const baseFreq=mode==='raffle'?250+((step+i)%5)*22:mode==='results'?150:185;
+    body.frequency.setValueAtTime(baseFreq,t);body.frequency.exponentialRampToValueAtTime(baseFreq*0.6,t+0.042);
+    bg.gain.setValueAtTime(0.0001,t);bg.gain.linearRampToValueAtTime(amp*(mode==='raffle'?0.34:0.44),t+0.005);bg.gain.exponentialRampToValueAtTime(0.0001,t+0.048);
+    body.connect(bg);bg.connect(ctx.destination);body.start(t);body.stop(t+0.052);
    }
   }
+ }
+ startDrumroll(mode='podium'){
+  if(!this.effects)return;
+  if(this.drumrollTimer&&this.drumrollMode===mode)return;
+  this.stopDrumroll();
+  this.drumrollMode=mode;this.drumrollStep=0;
+  this.cuesPlayed.push('drumroll');
+  if(mode==='raffle')this.cuesPlayed.push('raffle-drumroll');
+  if(mode==='results')this.cuesPlayed.push('suspense');
+  const tick=()=>{try{this.playDrumrollChunk(0.28,mode,this.drumrollStep++);}catch{}};
+  tick();
+  this.drumrollTimer=setInterval(tick,240);
+ }
+ stopDrumroll(){
+  if(this.drumrollTimer){clearInterval(this.drumrollTimer);this.drumrollTimer=null;}
+  this.drumrollMode=null;this.drumrollStep=0;
+ }
+ playDrumroll(duration=1.5){
+  this.playDrumrollChunk(duration,'podium',0);
  }
  playConfetti(){
   const ctx=this.context,now=ctx.currentTime,vol=Math.max(.04,Math.min(.22,(this.settings?.volume??.1)*1.35));
@@ -50,16 +81,16 @@ export class GameAudio{
  }
  cue(name){
   if(!this.effects)return;
+  if(name==='drumroll'){this.startDrumroll('podium');return;}
   this.cuesPlayed.push(name);
   if(!this.context||this.context.state!=='running')return;
-  if(name==='drumroll'){try{this.playDrumroll(1.5);}catch{}return;}
   if(name==='confetti'){try{this.playConfetti();}catch{}return;}
   const tones={answer:[523,659],correct:[523,659,784],wrong:[220,174],countdown:[440,660,880],podium:[294,440,587]};const notes=tones[name];if(!notes)return;
   notes.forEach((f,i)=>{const o=this.context.createOscillator(),g=this.context.createGain(),start=this.context.currentTime+i*.12;o.type=name==='wrong'?'triangle':'sine';o.frequency.value=f;g.gain.setValueAtTime(0,start);g.gain.linearRampToValueAtTime(.05,start+.012);g.gain.exponentialRampToValueAtTime(.001,start+.24);o.connect(g);g.connect(this.context.destination);o.start(start);o.stop(start+.25);});
  }
  pause(player){this.versions.set(player,(this.versions.get(player)||0)+1);this.desired.set(player,false);player.pause();}
  play(player){const version=(this.versions.get(player)||0)+1;this.versions.set(player,version);this.desired.set(player,true);try{return Promise.resolve(player.play()).then(()=>{if(!this.desired.get(player))player.pause();return this.versions.get(player)===version;}).catch(()=>false);}catch{return Promise.resolve(false);}}
- clearTimers(){for(const timer of this.timers)clearTimeout(timer);this.timers=[];clearInterval(this.fade);this.fade=null;}
+ clearTimers(){for(const timer of this.timers)clearTimeout(timer);this.timers=[];clearInterval(this.fade);this.fade=null;this.stopDrumroll();}
  remaining(){return Math.max(0,((this.state?.question?.deadline||0)-this.now()-this.offset)/1000);}
  playResult(){if(!this.enabled||!this.effects||this.resultKey===this.questionKey)return;this.resultKey=this.questionKey;this.suppressedResult=false;if(!this.result.paused&&this.result.src===resultTrack.url)return;this.pause(this.result);this.result.src=resultTrack.url;this.result.loop=false;this.result.playbackRate=1;this.result.volume=this.settings.volume>0?Math.min(.35,Math.max(.2,this.settings.volume*2)):0;this.play(this.result);}
  startTrack(track,key,{loop=true,volume=this.settings.volume,rate=1}={}){if(!track||this.key===key)return;this.pause(this.audio);clearInterval(this.fade);this.fade=null;this.key=key;this.lastTrack=track.id;this.audio.src=track.url;this.audio.loop=loop;this.audio.volume=volume;this.audio.playbackRate=rate;this.audio.preservesPitch=rate===1;this.play(this.audio);}
@@ -80,7 +111,7 @@ export class GameAudio{
  }
  sync(state,lesson,host,music){
   const previousState=this.state;this.current=[state,lesson,host,music];this.state=state;this.settings=validateGameSettings(lesson?.gameSettings);this.enabled=Boolean(host&&music);this.effects=this.settings.effects&&music;if(state!==previousState||this.offset===undefined)this.offset=(state?.serverTime||this.now())-this.now();
-  const phase=state?.phase,gameKey=phase==='game'?':'+(state.game?.id||'')+':'+(state.game?.state||'')+':'+(state.game?.round??''):'',scene=(state?.code||'')+':'+phase+':'+state?.questionIndex+gameKey,changed=scene!==this.scene;
+  const phase=state?.phase,raffleSpin=state?.game?.type==='raffle'?':'+(state.game?.revealAt||0):'',gameKey=phase==='game'?':'+(state.game?.id||'')+':'+(state.game?.state||'')+':'+(state.game?.round??'')+raffleSpin:'',scene=(state?.code||'')+':'+phase+':'+state?.questionIndex+gameKey,changed=scene!==this.scene;
   if(!this.enabled){this.clearTimers();for(const p of [this.audio,this.five,this.result])this.pause(p);this.key='';this.scene=null;return;}
   if(changed){this.clearTimers();this.scene=scene;
    if(!['question','reveal','leaderboard','finished'].includes(phase))this.pause(this.five);
@@ -98,34 +129,62 @@ export class GameAudio{
    }
    if(phase==='leaderboard'){
     this.pause(this.audio);this.key='';
-    this.cue('drumroll');
+    // Suspense contínuo nos resultados da rodada (loopável durante a corrida do placar).
+    this.startDrumroll('results');
+    this.timers.push(setTimeout(()=>{this.stopDrumroll();this.cue('podium');},3100));
    }
    if(phase==='finished'){
     this.pause(this.audio);this.key='';this.finalSkipped=false;const elapsed=Math.max(0,(this.now()+this.offset-(state.resultStartedAt||this.now()))/1000);
-    for(const [delay,fn]of [[.15,()=>this.cue('drumroll')],[2,()=>this.cue('podium')],[4.5,()=>this.cue('podium')],[5.2,()=>this.cue('drumroll')],[7,()=>{this.resultKey='';this.playResult();this.cue('confetti');}],[9,()=>this.startPodium()]])if(delay>elapsed&&!state.podiumRevealed)this.timers.push(setTimeout(fn,(delay-elapsed)*1000));
+    // Rufo de tambor contínuo e loopável enquanto o pódio é revelado; para exatamente ao mostrar o campeão.
+    if(!state.podiumRevealed&&elapsed<7){
+     this.timers.push(setTimeout(()=>this.startDrumroll('podium'),Math.max(0,(.15-elapsed)*1000)));
+    }
+    for(const [delay,fn]of [[2,()=>this.cue('podium')],[4.5,()=>this.cue('podium')],[7,()=>{this.stopDrumroll();this.resultKey='';this.playResult();this.cue('confetti');}],[9,()=>this.startPodium()]])if(delay>elapsed&&!state.podiumRevealed)this.timers.push(setTimeout(fn,(delay-elapsed)*1000));
     if(state.podiumRevealed||elapsed>=9)this.startPodium();
    }
    if(phase==='countdown')this.cue('countdown');
   }
-  if(phase==='finished'){if(state.podiumRevealed&&!this.finalSkipped){for(const timer of this.timers)clearTimeout(timer);this.timers=[];this.finalSkipped=true;if(this.key!=='podium'){this.resultKey='';this.playResult();this.cue('confetti');this.startPodium();}}return;}
+  if(phase==='finished'){if(state.podiumRevealed&&!this.finalSkipped){for(const timer of this.timers)clearTimeout(timer);this.timers=[];this.stopDrumroll();this.finalSkipped=true;if(this.key!=='podium'){this.resultKey='';this.playResult();this.cue('confetti');this.startPodium();}}return;}
   if(phase==='game'){
    const g=state.game,sel=this.settings.questions,custom=lesson?.questionAudio||lesson?.quizAudio;
    if(!g){this.pause(this.audio);this.key='';return;}
+   // Sorteio: novo rufo de tambor loopável dedicado enquanto gira + confete/sino na revelação.
+   if(g.type==='raffle'){
+    if(g.current&&g.revealAt){
+     const remaining=Math.max(0,g.revealAt-(this.now()+this.offset));
+     if(changed){
+      this.pause(this.audio);this.key='';
+      if(remaining>80){
+       this.startDrumroll('raffle');
+       this.timers.push(setTimeout(()=>{this.stopDrumroll();this.questionKey='raffle:'+g.id+':'+g.revealAt;this.resultKey='';this.playResult();this.cue('confetti');},remaining));
+      }else{
+       this.cue('confetti');
+      }
+     }
+     return;
+    }
+    this.playLobbyTrack(lesson,'game-lobby:'+g.id+':'+this.settings.lobby);return;
+   }
    // Salas de espera de jogos ao vivo (Cabo de Guerra, Relâmpago, Sobrevivência, Corrida, Equipes) tocam música de lobby.
    if(g.state==='ready'||g.type==='teams'){
     this.playLobbyTrack(lesson,'game-lobby:'+g.id+':'+this.settings.lobby);return;
    }
    if(g.state==='leaderboard'||g.state==='pull'){
     this.pause(this.audio);this.key='';
-    if(changed)this.cue('drumroll');
+    if(changed)this.startDrumroll(g.state==='pull'?'tug':'results');
     return;
    }
    if(g.state==='done'){
-    if(changed){this.questionKey='game-done:'+g.id;this.resultKey='';this.playResult();this.cue('confetti');this.startPodium();}
+    if(changed){this.stopDrumroll();this.questionKey='game-done:'+g.id;this.resultKey='';this.playResult();this.cue('confetti');this.startPodium();}
+    return;
+   }
+   // Resultados parciais de rodada (Relâmpago, Sobrevivência, Corrida): suspense suave nos resultados.
+   if(g.state==='reveal'){
+    this.pause(this.audio);this.key='';
+    if(changed){this.startDrumroll('results');this.timers.push(setTimeout(()=>this.stopDrumroll(),2400));}
     return;
    }
    if(!['survival','tug','race','flash'].includes(g.type)||g.state!=='open'||sel==='none'||sel==='custom'&&!custom?.data){
-    if((this.key||'').startsWith('game:')&&g?.state==='reveal')this.cue('countdown');
     this.pause(this.audio);this.key='';return;
    }
    const key='game:'+g.id+':'+g.round;if(this.key===key)return;

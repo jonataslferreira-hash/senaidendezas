@@ -16,31 +16,31 @@ export function showcaseMarkup() {
       <div class="showcase-stage-pair">
         <div class="demo-board">
           <div class="demo-board-top">
-            <span class="demo-live-pill"><i></i> AO VIVO · SLIDE <em data-showcase-counter>01 / 03</em></span>
+            <span class="demo-live-pill"><i></i> SLIDE <em data-showcase-counter>01 / 03</em></span>
             <span class="demo-brand">storage<span>lab.</span></span>
           </div>
           <div class="demo-board-viewport" data-showcase-board></div>
           <div class="demo-board-bottom">
-            <span>EDITOR VISUAL · QUIZ · JOGOS · .PPTX</span>
-            <span class="demo-room-tag">SALA <b>SL-42</b></span>
+            <span>SLIDES · QUIZ · JOGOS · .PPTX</span>
+            <span class="demo-room-tag">SALA <b>482 910</b></span>
           </div>
         </div>
         <div class="demo-phone phone-fox" aria-hidden="true">
           <span class="phone-speaker"></span>
-          <div class="phone-topbar"><span>SL-42</span><b>● 24</b></div>
+          <div class="phone-topbar"><span>482 910</span><b>24 online</b></div>
           <div class="phone-slide-mirror" data-phone-mirror>
-            <span class="phone-mirror-kicker">SINCRONIZADO</span>
-            <strong data-phone-title>Memória &amp; Velocidade</strong>
+            <span class="phone-mirror-kicker">EM TELA</span>
+            <strong data-phone-title>Slide 01 · Editor</strong>
             <div class="phone-mini-bars"><i></i><i></i></div>
           </div>
           <div class="phone-student-badge">
-            <span class="demo-avatar">🦊</span>
-            <div><strong>Luna</strong><span class="phone-status" data-phone-status>Acompanhando slide 01</span></div>
+            <span class="demo-avatar">L</span>
+            <div><strong>Lucas</strong><span class="phone-status" data-phone-status>Acompanhando slide 01</span></div>
           </div>
           <div class="phone-mini-options"><span>A</span><span>B</span></div>
         </div>
       </div>
-      <div class="demo-score" aria-hidden="true"><strong>+1.000 pts</strong><span>Resposta certa!</span></div>
+      <div class="demo-score" aria-hidden="true"><strong>+1.000 pts</strong><span>Resposta certa</span></div>
       <nav class="showcase-steps" aria-label="Etapas da demonstração">
         ${['Crie', 'Conecte', 'Interaja'].map((name, i) => `<button type="button" data-showcase-step="${i}" aria-pressed="${i === 0}"><span>0${i + 1}</span>${name}</button>`).join('')}
       </nav>
@@ -51,26 +51,26 @@ export function showcaseMarkup() {
 const stages = [
   () => `<div class="demo-board-stage stage-create">
     <div class="mini-sl-canvas">
-      <div class="mini-sl-toolbar"><span>T</span><span>▧</span><span>◇</span><span class="is-ai">✦ IA</span></div>
+      <div class="mini-sl-toolbar"><span>Texto</span><span>Imagem</span><span>Forma</span><span>3D</span></div>
       <div class="mini-sl-slide">
         <span class="mini-sl-kicker">ARQUITETURA DE COMPUTADORES</span>
-        <h3>Editor visual e catálogo completo.</h3>
+        <h3>Monte slides prontos para projetar.</h3>
         <div class="mini-sl-cards">
           <div><b>HDD</b><small>Disco magnético</small></div>
           <div class="is-accent"><b>SSD NVMe</b><small>Memória flash</small></div>
         </div>
       </div>
     </div>
-    <button type="button" class="demo-device-button" data-showcase-explore aria-label="Explorar camadas da demonstração"><span>Testar destaque do slide ↗</span></button>
+    <button type="button" class="demo-device-button" data-showcase-explore aria-label="Destacar elemento do slide"><span>Destacar bloco do slide</span></button>
   </div>`,
   () => `<div class="demo-board-stage stage-connect">
     <span class="board-eyebrow">SALA AO VIVO</span>
     <h3>Um código. Toda a turma conectada.</h3>
     <div class="mini-room-strip">
-      <div class="mini-room-code"><small>CÓDIGO</small><strong>SL-42</strong></div>
-      <div class="mini-room-roster"><span>🦊</span><span>🤖</span><span>🦉</span><span>🚀</span><em>+20 alunos</em></div>
+      <div class="mini-room-code"><small>CÓDIGO DA SALA</small><strong>482 910</strong></div>
+      <div class="mini-room-roster"><span style="--c:#3b82f6">L</span><span style="--c:#10b981">M</span><span style="--c:#f59e0b">R</span><span style="--c:#ec4899">A</span><em>+20 alunos</em></div>
     </div>
-    <button type="button" data-showcase-step="2" class="demo-connect-button">Experimentar quiz ao vivo ↗</button>
+    <button type="button" data-showcase-step="2" class="demo-connect-button">Ver quiz ao vivo</button>
   </div>`,
   () => `<div class="demo-board-stage stage-play">
     <span class="board-eyebrow">QUIZ EM TEMPO REAL · 15s</span>
@@ -79,12 +79,12 @@ const stages = [
       <button type="button" data-showcase-answer="0"><b>A</b>HDD mecânico</button>
       <button type="button" data-showcase-answer="1"><b>B</b>SSD flash</button>
     </div>
-    <p role="status" data-demo-answer-status>Toque em uma alternativa para testar.</p>
+    <p role="status" data-demo-answer-status>Escolha uma alternativa para testar.</p>
   </div>`
 ];
 
-const phoneTitles = ['Editor visual · Slide 01', 'Sala SL-42 conectada', 'Pergunta 1 · Quiz'];
-const phoneStatuses = ['Acompanhando slide 01', 'Conectada na sala ✓', 'Sua vez de responder!'];
+const phoneTitles = ['Slide 01 · Editor', 'Sala 482 910', 'Pergunta 1 · Quiz'];
+const phoneStatuses = ['Acompanhando slide 01', 'Conectado na sala', 'Sua vez de responder'];
 
 export class Showcase {
   constructor(root) {

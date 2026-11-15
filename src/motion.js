@@ -1,10 +1,11 @@
 import { prefersReducedMotion } from './motion-preference.js';
+const motionBlocked = () => document.documentElement.dataset.motion === 'reduced' || (!document.documentElement.hasAttribute('data-play') && prefersReducedMotion());
 export class PageMotion {
   constructor() { this.lastKey = ''; this.players = new Set(); }
   captureSlide(root, key, transition) {
     const previousKey = this.slideKey;
     this.slideKey = key;
-    if (!key || !previousKey || previousKey === key || transition === 'none' || prefersReducedMotion()) return;
+    if (!key || !previousKey || previousKey === key || transition === 'none' || motionBlocked()) return;
     if (previousKey.slice(0, previousKey.lastIndexOf(':')) !== key.slice(0, key.lastIndexOf(':'))) return;
     const stage = root.querySelector('.document-stage:not(.outgoing-slide), .mobile-lesson-content:not(.outgoing-slide)');
     if (!stage) return;
@@ -35,7 +36,7 @@ export class PageMotion {
       incoming.classList.remove('incoming-slide');
       parent.classList.remove('slide-transition-stack');
     };
-    const fallback = setTimeout(finish, 700);
+    const fallback = setTimeout(finish, 750);
     incoming.addEventListener('animationend', function onEnd(event) {
       if (event.target !== incoming) return;
       incoming.removeEventListener('animationend', onEnd);
@@ -44,7 +45,7 @@ export class PageMotion {
     });
   }
   mount(root, { key, kind, slide = 0 }) {
-    const changed = this.lastKey !== key, reduced = prefersReducedMotion();
+    const changed = this.lastKey !== key, reduced = motionBlocked();
     root.classList.remove('scene-arrive');
     root.dataset.scene = kind;
     if (changed && !reduced) {

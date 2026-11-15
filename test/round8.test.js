@@ -227,19 +227,25 @@ test('etapas interativas: equipes, relâmpago, sobrevivência, desafio, sorteio 
   const variants = validateGame({ type: 'tug', text: 'x', options: ['A', 'B'], rounds: [[1, 2, 3, 4].map(n => ({ text: 'v' + n, options: ['x', 'y'], correct: 0 }))] });
   assert.equal(variants.rounds[0].length, 3, 'no máximo 3 perguntas por rodada');
   assert.throws(() => validateGame({ type: 'tug', text: 'x', options: ['A', 'B'], rounds: [] }), /rodada/);
-  // 3 rodadas; quem é do lado A acerta tudo, o lado B erra tudo.
+  // Cada participante recebe 3 perguntas sorteadas aleatoriamente no próprio aparelho; o lado A acerta tudo, o lado B erra tudo.
   assert.equal(room.snapshot().game.rounds, 3);
   assert.equal(room.snapshot().game.state, 'ready');
   const everyone = room.data.players;
-  for (let round = 0; round < 3; round++) {
-    room.control('game', { do: 'next' });
-    const question = room.snapshot().game.question;
-    assert.equal(room.snapshot(everyone[0].id).game.question.text, '', 'aluno não recebe o texto da pergunta');
-    for (const player of everyone) { const side = room.snapshot(player.id).game.side; room.answer(player.id, { choice: { choice: side === 0 ? question.correct : (question.correct + 1) % question.options.length, round } }); }
-    assert.equal(room.snapshot().game.state, 'reveal');
-  }
   room.control('game', { do: 'next' });
-  assert.equal(room.snapshot().game.state, 'pull');
+  assert.equal(room.snapshot().game.state, 'open');
+  assert.equal(room.snapshot().game.question, null, 'telão exibe a batalha da corda em tela cheia');
+  const firstStudentQ = room.snapshot(everyone[0].id).game.question;
+  assert.ok(firstStudentQ && firstStudentQ.text.length > 0, 'no cabo de guerra o aluno recebe o enunciado completo de sua pergunta sorteada');
+  for (let step = 0; step < 3; step++) {
+    for (const player of everyone) {
+      const snap = room.snapshot(player.id).game;
+      const side = snap.side;
+      const raw = room.data.game.pool[room.data.game.decks[player.id][step]];
+      assert.equal(snap.question.text, raw.text);
+      room.answer(player.id, { choice: { choice: side === 0 ? raw.correct : (raw.correct + 1) % raw.options.length, step } });
+    }
+  }
+  assert.equal(room.snapshot().game.state, 'pull', 'quando todos concluem as 3 perguntas inicia a puxada final');
   assert.equal(room.snapshot().game.winner, 0, 'o lado que acertou mais puxa a corda');
   now += 6000; room.tick();
   assert.equal(room.snapshot().game.state, 'done');
