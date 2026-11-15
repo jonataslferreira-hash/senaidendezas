@@ -14,6 +14,8 @@ export const editorTracks = [
   {id:'mii-gamepad',title:'Mii Maker — Editing a Mii (Gamepad)',artist:'Wii U',cover:wiiU,color:'#9eb9d5',url:'https://lambda.vgmtreasurechest.com/soundtracks/wii-u-system-audio-background-music/qpeaotay/49.%20Mii%20Maker%20-%20Editing%20a%20Mii%20%28Gamepad%29.mp3'}
 ];
 export function musicCover(track){return track.cover||'data:image/svg+xml,'+encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" width="160" height="160"><rect width="160" height="160" rx="24" fill="${track.color}"/><circle cx="111" cy="40" r="49" fill="#ffffff22"/><circle cx="44" cy="126" r="57" fill="#ffffff22"/><text x="80" y="98" text-anchor="middle" fill="#fff" font-family="Georgia" font-size="66">♫</text></svg>`);}
+// Música, playlist ou álbum do Spotify: devolve {type,id} ou null.
+export function spotifyItem(value){try{const u=new URL(value);if(u.protocol!=='https:'||u.hostname!=='open.spotify.com')return null;const match=/^\/(?:intl-[a-z]{2}\/)?(track|playlist|album)\/([a-zA-Z0-9]{22})\/?$/.exec(u.pathname);return match?{type:match[1],id:match[2]}:null;}catch{return null;}}
 export function spotifyTrackId(value){try{const u=new URL(value);if(u.protocol!=='https:'||u.hostname!=='open.spotify.com')return null;return /^\/(?:intl-[a-z]{2}\/)?track\/([a-zA-Z0-9]{22})\/?$/.exec(u.pathname)?.[1]||null;}catch{return null;}}
 
 for(const track of editorTracks)track.duration=durations[track.id]||NaN;

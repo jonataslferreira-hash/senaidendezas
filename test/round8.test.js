@@ -97,3 +97,51 @@ test('busca de GIF pede o filtro de animação', async () => {
   } finally { globalThis.fetch = original; }
   assert.ok(calls.length === 0 || calls.some(url => url.includes('gif=1')));
 });
+
+test('vídeo sincronizado: aluno alcança o professor e não repete comando à toa', async () => {
+  const { videoState, videoCommands } = await import('../src/video-sync.js');
+  const host = { state: 1, time: 30, at: 1000, sent: NaN };
+  const first = videoState(host, 3000, 100000);            // tocando: 32 s quando o relógio marca 100 s
+  assert.deepEqual(first, { s: 1, o: -68 });
+  assert.deepEqual(videoState(host, 3300, 100300), first);  // continua tocando: nada novo para enviar
+  const student = { state: 2, time: 0, at: 0 };
+  assert.deepEqual(videoCommands(student, first, 0, 110000), [['seekTo', [42, true]], ['playVideo', []]]);
+  assert.deepEqual(videoCommands({ state: 1, time: 41.6, at: 0 }, first, 0, 110000), []);
+  assert.deepEqual(videoCommands({ state: 1, time: 50, at: 0 }, { s: 2, t: 50.2 }, 0, 0), [['pauseVideo', []]]);
+  assert.deepEqual(videoState({ state: 2, time: 12.34, at: 0 }, 0, 0), { s: 2, t: 12.3 });
+  const { videoSource } = await import('../src/video-embed.js');
+  assert.match(videoSource('https://youtu.be/dQw4w9WgXcQ').embed, /enablejsapi=1/);
+});
+
+test('Spotify aceita música, playlist e álbum', async () => {
+  const { spotifyItem } = await import('../src/editor-playlist.js');
+  assert.deepEqual(spotifyItem('https://open.spotify.com/playlist/37i9dQZF1DXcBWIGoYBM5M?si=x'), { type: 'playlist', id: '37i9dQZF1DXcBWIGoYBM5M' });
+  assert.equal(spotifyItem('https://open.spotify.com/intl-pt/album/0123456789012345678901').type, 'album');
+  assert.equal(spotifyItem('https://open.spotify.com/track/0123456789012345678901').type, 'track');
+  assert.equal(spotifyItem('https://open.spotify.com/artist/0123456789012345678901'), null);
+  assert.equal(spotifyItem('https://evil.example/playlist/0123456789012345678901'), null);
+});
+
+test('controle remoto: comando repetido só vale uma vez e a sessão tolera falha de sinal', async () => {
+  const { AccountPresenter } = await import('../src/account-presenter.js');
+  const make = device => { const sent = [], actions = []; const item = Object.create(AccountPresenter.prototype); Object.assign(item, { studio: { root: { querySelector: () => null, querySelectorAll: () => [] }, callbacks: { remoteAction: (name, value) => actions.push([name, value]) } }, device, sessions: [], open: '' }); item.send = payload => sent.push({ ...payload, from: device }); return { item, sent, actions }; };
+  const pc = make('pc'), phone = make('phone');
+  pc.item.local = { code: '123456', title: 'Aula', total: 5, slide: 2, phase: 'lesson', sims: [] };
+  pc.item.announce(true);
+  phone.item.receive(pc.sent.at(-1));
+  assert.equal(phone.item.sessions.length, 1);
+  assert.equal(phone.item.sessions[0].slide, 2);
+  const command = { kind: 'control', target: 'pc', action: 'next-slide', id: 'a1', from: 'phone' };
+  pc.item.receive(command); pc.item.receive(command);
+  assert.deepEqual(pc.actions, [['next-slide', undefined]]);
+  assert.equal(pc.sent.filter(message => message.kind === 'ack' && message.id === 'a1').length, 2);
+  pc.item.receive({ kind: 'control', target: 'outro', action: 'next-slide', id: 'a2', from: 'phone' });
+  pc.item.receive({ kind: 'control', target: 'pc', action: 'apagar-tudo', id: 'a3', from: 'phone' });
+  assert.equal(pc.actions.length, 1);
+  phone.item.refresh();
+  assert.equal(phone.item.sessions.length, 1);
+  phone.item.seen.get('pc').last = Date.now() - 60000; phone.item.refresh();
+  assert.equal(phone.item.sessions.length, 0);
+  phone.item.open = 'pc';
+  assert.match(phone.item.dialog(), /Apresentação desconectada/);
+});

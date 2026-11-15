@@ -35,8 +35,9 @@ let slides = activeLesson.slides;
 import { Classroom } from './network.js';
 import { Room } from './room.js';
 import { HardwareViewer } from './models.js';
-import { teacherControls, captureInteraction, applyInteraction, InteractionBroadcaster } from './live-interaction.js';
+import { teacherControls, captureInteraction, applyInteraction, InteractionBroadcaster, describeSims, applySimCommand } from './live-interaction.js';
 import { cleanSimEvents, cleanSimValues } from './custom-sim-bridge.js';
+import { VideoSync } from './video-sync.js';
 import QRCode from 'qrcode';
 import './style.css';
 import './experience.css';
@@ -77,6 +78,8 @@ const canvasModels = new CanvasModels();
 // Slides em "Só eu controlo": o professor transmite o experimento/modelo 3D e os alunos só acompanham.
 const interactionBroadcaster = new InteractionBroadcaster(payload => { if (host && !demo) classroom?.live?.(payload); });
 let liveInteraction = null, liveInteractionTimers = [];
+// Vídeos do YouTube: o relógio do professor chega pelo estado da sala (timerOffset).
+const videoSync = new VideoSync(() => Date.now() + (host ? 0 : timerOffset));
 // Experimentos importados rodam em iframes isolados: a conversa é por mensagens.
 let customSimValues = {}, customSimKey = '';
 const customSimFrames = () => [...app.querySelectorAll('.canvas-presenting .custom-sim iframe')];
@@ -98,6 +101,10 @@ window.addEventListener('message', event => {
     if (events.length && JSON.stringify(events).length < 3200) classroom?.live?.({ replay: { index, events } }, true);
   }
 });
+// O que o controle remoto (celular do professor) precisa saber da apresentação.
+function publishRemote() {
+  studio.remote.setPresentation(state && host && !demo ? { code: state.code, title: activeLesson.title, slide: state.slide, total: slides.length, phase: state.phase, note: state.phase === 'lesson' ? slides[state.slide]?.note?.slice(0, 2000) : '', sims: state.phase === 'lesson' ? describeSims(app) : [] } : null);
+}
 function syncInteraction() {
   const slide = state?.phase === 'lesson' ? slides[state.slide] : null, teacher = teacherControls(slide);
   const simKey = slide ? activeLesson.id + ':' + state.slide : '';
@@ -105,9 +112,13 @@ function syncInteraction() {
   for (const frame of customSimFrames()) tellCustomSim(frame, { storageLab: 'sim-role', role: customSimRole() });
   const tools = { canvasModels, viewer, slide: slide ? presentationSlide(slide) : null };
   if (teacher && !host) app.dataset.teacherControls = teacher; else delete app.dataset.teacherControls;
-  if (teacher && host && !demo) interactionBroadcaster.watch(activeLesson.id + ':' + state.slide, () => ({ ...captureInteraction(app, tools), ...(teacher !== 'models' && Object.keys(customSimValues).length ? { custom: customSimValues } : {}) }));
+  // O vídeo do YouTube acompanha o professor em qualquer slide; o aluno só silencia o dele.
+  videoSync.mount(slide ? app : null, { follow: Boolean(slide && !host) });
+  const hasVideo = videoSync.players.size > 0;
+  if (slide && host && !demo && (teacher || hasVideo)) interactionBroadcaster.watch(activeLesson.id + ':' + state.slide, () => ({ ...(teacher ? captureInteraction(app, tools) : {}), ...(teacher && teacher !== 'models' && Object.keys(customSimValues).length ? { custom: customSimValues } : {}), ...(hasVideo ? { videos: videoSync.capture() } : {}) }));
   else interactionBroadcaster.stop();
   for (const timer of liveInteractionTimers.splice(0)) clearTimeout(timer);
+  if (slide && !host && liveInteraction?.slide === state.slide) videoSync.setTargets(liveInteraction.payload?.videos);
   if (!teacher || host || liveInteraction?.slide !== state.slide) return;
   const apply = () => { if (state?.phase === 'lesson' && liveInteraction?.slide === state.slide) applyInteraction(app, liveInteraction.payload, tools); };
   apply();
@@ -122,6 +133,7 @@ function receiveInteraction(message) {
     return;
   }
   liveInteraction = message;
+  if (!host && state?.phase === 'lesson' && state.slide === message.slide) videoSync.setTargets(message.payload?.videos);
   if (!host && state?.phase === 'lesson' && state.slide === message.slide && teacherControls(slides[state.slide])) applyInteraction(app, message.payload, { canvasModels, viewer, slide: presentationSlide(slides[state.slide]) });
 }
 const focusView = new FocusView();
@@ -142,7 +154,7 @@ phoneLayout.addEventListener('change',()=>{if(state?.phase==='lesson')render();}
 const qrCache = new Map();
 const params = routeParams();
 let codeDraft = (params.get('s') || '').replace(/\D/g, '').slice(0, 6);
-const studio = new Studio(app, { render, toast, joinForm, preview, remoteAction:action, present: (lesson,startIndex,fromEditor) => connectSession({host:true,lesson,startIndex,fromEditor}) });
+const studio = new Studio(app, { render, toast, joinForm, preview, remoteAction:(name,value)=>{if(name!=='sim'){action(name);return;}if(state?.phase==='lesson'&&host&&applySimCommand(app,value))setTimeout(publishRemote,200);}, present: (lesson,startIndex,fromEditor) => connectSession({host:true,lesson,startIndex,fromEditor}) });
 if (codeDraft) studio.view = 'join';
 
 function toast(message) {
@@ -344,7 +356,6 @@ function render() {
   app.dataset.transition = state?.phase === 'lesson' ? slides[state.slide]?.transition || 'slide' : 'slide';
   if(state)app.insertAdjacentHTML('beforeend','<div data-remote-dialog></div>');
   studio.remote.paint();
-  studio.remote.setPresentation(state&&host&&!demo?{code:state.code,title:activeLesson.title,slide:state.slide,total:slides.length,phase:state.phase,note:state.phase==='lesson'?slides[state.slide]?.note?.slice(0,2000):''}:null);
   syncPresentationMode();
   if (editDraft) for (const el of app.querySelectorAll('.header, .classroom, .document-classroom, .presentation-toolbar, .pinned-room-qr')) el.inert = true;
   if (!state && !sharedLoading && !(busy && host)) studio.afterRender();
@@ -361,7 +372,7 @@ function render() {
   const upcoming = state?.phase === 'lesson' ? slides[state.slide + 1] : null;
   canvasModels.preload(upcoming ? presentationSlide(upcoming) : null);
   focusView.sync(state?.phase==='lesson'?slides[state.slide]?.id:'');
-  fillAssetImages(app);simulations.mount(state?.phase==='lesson'?app:null);syncInteraction();if(state?.phase==='lesson')loadSlideFonts(slides[state.slide],activeLesson.customFonts);
+  fillAssetImages(app);simulations.mount(state?.phase==='lesson'?app:null);syncInteraction();publishRemote();if(state?.phase==='lesson')loadSlideFonts(slides[state.slide],activeLesson.customFonts);
   if (state && (shareOpen || (host && !demo && presenterSettings.qrVisible && state.phase === 'lesson'))) {
     const url = joinUrl();
     const setQR = src => { if (state && joinUrl() === url) for (const image of document.querySelectorAll('#room-qr, [data-pinned-qr]')) image.src = src; };

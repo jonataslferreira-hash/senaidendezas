@@ -88,3 +88,36 @@ export class InteractionBroadcaster {
   }
   stop() { clearInterval(this.timer); this.timer = 0; this.last = ''; this.key = ''; }
 }
+
+// ---- Controle remoto: descreve os experimentos do slide para o celular do
+// professor desenhar os mesmos controles, e aplica o que ele mexer por lá.
+const short = (value, max = 60) => String(value ?? '').replace(/\s+/g, ' ').trim().slice(0, max);
+export function describeSims(root) {
+  return widgets(root).slice(0, 4).map(node => ({
+    name: short(node.querySelector('header strong')?.textContent || 'Experimento'),
+    play: short(node.querySelector('[data-sim-play]')?.textContent || '', 24),
+    acts: [...node.querySelectorAll('[data-lab-act]')].slice(0, 12).map((button, a) => ({ a, label: short(button.textContent, 30) })),
+    fields: fieldsOf(node).map((field, i) => {
+      if (field.type === 'hidden') return null;
+      const label = short(field.getAttribute('aria-label') || field.textContent);
+      if (field.dataset.simToggle !== undefined) return { i, k: 'toggle', label: short(field.textContent), value: field.dataset.value || '0' };
+      if (field.tagName === 'SELECT') return { i, k: 'select', label, value: field.value, options: [...field.options].slice(0, 30).map(option => [option.value, short(option.textContent, 40)]) };
+      if (field.type === 'range') return { i, k: 'range', label, value: field.value, min: field.min, max: field.max, step: field.step || '1' };
+      return { i, k: 'text', label, value: short(field.value, 160) };
+    }).filter(Boolean).slice(0, 16)
+  }));
+}
+export function applySimCommand(root, command) {
+  const node = widgets(root)[Number(command?.sim)];
+  if (!node) return false;
+  if (command.play) { node.querySelector('[data-sim-play]')?.click(); return true; }
+  if (Number.isInteger(command.act)) { node.querySelectorAll('[data-lab-act]')[command.act]?.click(); return true; }
+  const field = fieldsOf(node)[Number(command.field)];
+  if (!field || field.type === 'hidden') return false;
+  const value = String(command.value ?? '').slice(0, 160);
+  if (field.dataset.simToggle !== undefined) { if ((field.dataset.value || '0') !== (value === '1' ? '1' : '0')) field.click(); return true; }
+  if (field.tagName === 'SELECT' && ![...field.options].some(option => option.value === value)) return false;
+  field.value = value;
+  field.dispatchEvent(new Event('input', { bubbles: true })); field.dispatchEvent(new Event('change', { bubbles: true }));
+  return true;
+}

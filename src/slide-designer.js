@@ -991,7 +991,9 @@ export class SlideDesigner {
       hint.dataset.state=source?'ok':value?'error':'';
       hint.textContent=source?`${source.label} reconhecido.`:value?'Não reconheci esse link. Use um link do YouTube, do Vimeo ou de um arquivo .mp4 / .webm.':'Aceita YouTube, Vimeo ou link direto de arquivo .mp4 / .webm.';
       preview.hidden=!source;
-      preview.innerHTML=source?videoMarkup({video:value},false):'';
+      // Prévia de verdade: dá para assistir e conferir se é o vídeo certo antes de inserir.
+      const key=source?source.embed:'';
+      if(preview.dataset.source!==key){preview.dataset.source=key;preview.innerHTML=source?videoMarkup({video:value},true):'';}
       return source;
     };
     input.addEventListener('input',check);
