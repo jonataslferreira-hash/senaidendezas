@@ -159,7 +159,7 @@ test('composeAISlide varia layouts sem repetir, rejeita quadros sobrepostos e re
   assert.equal(transparentSlide.elements.filter(el => el.id?.includes('-card-')).length, 0, 'recorte transparente não ganha cartão sólido atrás');
 });
 
-test('Worker v24 expõe novos provedores gratuitos (Mistral e NVIDIA NIM) e faz fallback entre modelos', async t => {
+test('Worker v25 expõe provedores gratuitos, faz fallback e orienta agrupamento inteligente de conteúdo', async t => {
   const user = { id: '11111111-1111-4111-8111-111111111111', email_confirmed_at: '2026-11-01' };
   const auth = { Authorization: 'Bearer test-token-1234567890' };
   const handle = createR2Handler(async () => user);
@@ -169,14 +169,16 @@ test('Worker v24 expõe novos provedores gratuitos (Mistral e NVIDIA NIM) e faz 
     GROQ_API_KEY: 'g', GEMINI_API_KEY: 'm', MISTRAL_API_KEY: 'ms', NVIDIA_API_KEY: 'nv'
   });
   const health = await healthRes.json();
-  assert.equal(health.version, 24);
+  assert.equal(health.version, 25);
   assert.equal(health.mistralConfigured, true);
   assert.equal(health.nvidiaConfigured, true);
 
   const urls = [];
-  t.mock.method(globalThis, 'fetch', async (url) => {
+  let capturedSystem = '';
+  t.mock.method(globalThis, 'fetch', async (url, init) => {
     urls.push(String(url));
     if (String(url).includes('api.mistral.ai')) {
+      try { capturedSystem = JSON.parse(init.body).messages[0].content; } catch {}
       return Response.json({ choices: [{ message: { content: JSON.stringify({ title: 'Energia', slides: [{ title: 'Solar', body: '• Limpa: renovável' }] }) } }] });
     }
     return new Response('rate limit', { status: 429 });
@@ -192,4 +194,119 @@ test('Worker v24 expõe novos provedores gratuitos (Mistral e NVIDIA NIM) e faz 
   assert.ok(urls.some(u => u.includes('api.groq.com')), 'tentou Groq primeiro');
   assert.ok(urls.some(u => u.includes('gemma-4-31b-it')), 'tentou Gemma 4 na mesma chave Gemini');
   assert.ok(urls.some(u => u.includes('api.mistral.ai')), 'caiu para Mistral automaticamente');
+  assert.match(capturedSystem, /agrupe conteúdos relacionados/i, 'prompt orienta agrupar tópicos relacionados sem pular itens nem criar slides extras');
+  assert.doesNotMatch(capturedSystem, /uma única ideia por slide/i, 'removeu restrição rígida de uma única ideia por slide');
 });
+
+test('Cabo de Guerra pré-distribui times no lobby, Relâmpago oculta pular-etapa durante rodadas e placar final destaca equipe campeã', async () => {
+  const { Room } = await import('../src/room.js');
+  const { gameMarkup } = await import('../src/stage-games-view.js');
+  const { leaderboardMarkup, quizMarkup } = await import('../src/game-ui.js');
+  const { newLesson, newSlide, newQuestion } = await import('../src/lessons.js');
+
+  const lesson = newLesson();
+  lesson.slides = [
+    { ...newSlide(), id: 's-teams', title: 'Equipes', game: { type: 'teams', text: 'Formar equipes', count: 2, pick: false } },
+    {
+      ...newSlide(), id: 's-tug', title: 'Cabo de guerra',
+      game: {
+        type: 'tug', text: 'Cabo de guerra', seconds: 15, options: ['Time Sol', 'Time Lua'],
+        rounds: [[
+          { text: 'P1 muito longa para testar largura automática', options: ['Alternativa extremamente detalhada e comprida para verificar expansão lateral', 'Curta'], correct: 0 },
+          { text: 'P2 muito longa para testar largura automática', options: ['Alternativa extremamente detalhada e comprida para verificar expansão lateral', 'Curta'], correct: 0 },
+          { text: 'P3 muito longa para testar largura automática', options: ['Alternativa extremamente detalhada e comprida para verificar expansão lateral', 'Curta'], correct: 0 }
+        ]]
+      }
+    },
+    {
+      ...newSlide(), id: 's-flash', title: 'Relâmpago',
+      game: {
+        type: 'flash', text: 'Desafio Relâmpago', seconds: 10,
+        questions: [
+          { text: 'Q1', options: ['Certo', 'Errado'], correct: 0 },
+          { text: 'Q2', options: ['Certo', 'Errado'], correct: 0 }
+        ]
+      }
+    }
+  ];
+  const q1 = newQuestion();
+  q1.text = 'Pergunta de Quiz';
+  q1.options = ['Uma alternativa de quiz propositalmente muito longa para testar data-wide-options', 'B'];
+  q1.correct = 0;
+  lesson.questions = [q1];
+  lesson.activityBlocks = [
+    { id: 'b-teams', type: 'teams', items: ['s-teams'] },
+    { id: 'b-tug', type: 'tug', items: ['s-tug'] },
+    { id: 'b-flash', type: 'flash', items: ['s-flash'] },
+    { id: 'b-quiz', type: 'quiz', items: [q1.id] }
+  ];
+
+  let clock = 50000;
+  const room = new Room('654321', null, () => clock, lesson);
+  const ana = room.join({ name: 'Ana', avatar: '🚀' });
+  const bia = room.join({ name: 'Bia', avatar: '⚡' });
+
+  // Equipes já formadas; avançar para Cabo de Guerra já pré-distribui jogadores nos dois lados no lobby!
+  room.control('next-stage');
+  const tugReady = room.snapshot();
+  assert.equal(tugReady.game.type, 'tug');
+  assert.equal(tugReady.game.state, 'ready');
+  assert.equal(tugReady.game.crews[0].length + tugReady.game.crews[1].length, 2, 'jogadores online aparecem nos lados da corda já na tela de espera');
+  const caio = room.join({ name: 'Caio', avatar: '🔥' });
+  assert.equal(room.snapshot().game.crews[0].length + room.snapshot().game.crews[1].length, 3, 'participante que entra tarde também já entra em um lado da corda');
+
+  // Durante rodada aberta do Cabo de Guerra, não renderiza botão prematuro de pular etapa; ativa data-wide-options para alternativa longa.
+  const hostView = snap => gameMarkup(snap, { host: true, demo: false, header: () => '', now: clock });
+  room.control('game', { do: 'next' });
+  const tugOpenHtml = hostView(room.snapshot());
+  assert.doesNotMatch(tugOpenHtml, /data-action="next-stage"/, 'não polui com botão de pular etapa durante rodada ativa');
+  assert.match(tugOpenHtml, /data-wide-options="true"/, 'ativa expansão lateral quando há alternativa longa');
+
+  // Encerra Cabo de Guerra -> Relâmpago (2 rodadas) -> testa placar intermediário e pódio Top-3!
+  room.control('game', { do: 'end' });
+  assert.match(hostView(room.snapshot()), /data-action="next-stage"/, 'libera Próxima etapa após encerrar jogo');
+  room.control('next-stage');
+  room.control('game', { do: 'next' });
+  room.answer(ana.id, { choice: { choice: 0, round: 0 } });
+  room.answer(bia.id, { choice: { choice: 1, round: 0 } });
+  room.answer(caio.id, { choice: { choice: 0, round: 0 } });
+  room.control('game', { do: 'next' }); // reveal -> leaderboard
+  const flashBoard = room.snapshot();
+  assert.equal(flashBoard.game.state, 'leaderboard');
+  const flashBoardHtml = hostView(flashBoard);
+  assert.match(flashBoardHtml, /Placar da rodada/);
+  assert.doesNotMatch(flashBoardHtml, /data-action="next-stage"/, 'oculta pular etapa no placar parcial entre rodadas');
+  room.control('game', { do: 'next' }); // leaderboard -> round 1 open
+  room.control('game', { do: 'next' }); // open -> reveal
+  room.control('game', { do: 'next' }); // reveal -> done (pódio final do Relâmpago!)
+  const flashDoneHtml = hostView(room.snapshot());
+  assert.match(flashDoneHtml, /flash-podium/, 'Relâmpago exibe pódio Top-3 no final');
+  assert.match(flashDoneHtml, /data-action="next-stage"/, 'exibe botão de próxima etapa ao concluir Relâmpago');
+
+  const { totalQuestionCount } = await import('../src/lessons.js');
+  assert.equal(totalQuestionCount(lesson), 4, 'totalQuestionCount soma Quiz (1) + Cabo de Guerra (1 rodada) + Relâmpago (2 perguntas)');
+
+  // Avança para o Quiz: pontos das dinâmicas permanecem somados no ranking geral!
+  room.control('next-stage');
+  assert.equal(room.snapshot().phase, 'lobby');
+  room.control('start-quiz');
+  clock += 3500; room.tick();
+  const qSnap = room.snapshot();
+  assert.equal(qSnap.phase, 'question');
+  assert.match(quizMarkup(qSnap, { header: () => '', host: true, demo: false, status: 'online', shareDialog: () => '', shareOpen: false }), /data-wide-options="true"/, 'Quiz ativa expansão lateral para alternativas compridas');
+  room.answer(ana.id, { questionIndex: 0, choice: 0 });
+  room.answer(bia.id, { questionIndex: 0, choice: 1 });
+  room.answer(caio.id, { questionIndex: 0, choice: 0 });
+  room.control('reveal');
+  room.control('next'); // última pergunta -> finished!
+  const finalSnap = room.snapshot();
+  assert.equal(finalSnap.phase, 'finished');
+  assert.equal(finalSnap.hasScoredStages, true);
+  assert.ok(finalSnap.resultStartedAt > 0, 'placar final inicia cronômetro do pódio');
+  const anaFinal = finalSnap.ranking.find(p => p.name === 'Ana');
+  assert.ok(anaFinal.score > 1000, 'pontuação final acumula pontos das dinâmicas + quiz');
+  const finalHtml = leaderboardMarkup({ ...finalSnap, podiumRevealed: true, podiumStep: 4 }, { header: () => '', host: true, final: true, now: clock + 10000 });
+  assert.match(finalHtml, /PLACAR GERAL FINAL/, 'mostra título de placar geral final');
+  assert.match(finalHtml, /final-team-champion/, 'destaca a equipe campeã no resultado geral final');
+});
+

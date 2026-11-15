@@ -1,572 +1,590 @@
-import {canvasThemes} from './canvas-data.js';
-import {canvasMarkup, esc} from './canvas-view.js';
-import {presentationSlide} from './slide-display.js';
+import { canvasMarkup, esc } from './canvas-view.js';
+import { presentationSlide } from './slide-display.js';
+import { canvasThemes } from './canvas-data.js';
 import {
-  deckCoverPreview,
-  deckGalleryTabs,
-  deckPreviewSlides,
   deckTemplates,
+  templateCategories as deckCategories,
+  deckCoverPreview,
+  deckPreviewSlides,
   externalTemplateSites,
   findSimilarDecks,
   getDeckTemplate,
-  openSourceLicenses,
   searchDecks,
-  templateCategories,
+  templateThemeChoices,
   themeVisuals
 } from './slide-templates.js';
-import {studioIcon as icon} from './studio-icons.js';
 import './template-store.css';
 
-const renderSlideCanvas = slide => canvasMarkup(presentationSlide(slide), {interactive: false});
-
-const FAV_KEY = 'storage-lab-template-favorites-v1';
-const PAGE_STEP = 24;
+const FAVORITES_KEY = 'sl-template-favorites-v1';
+const BATCH_SIZE = 24;
 
 function loadFavorites() {
   try {
-    const raw = localStorage.getItem(FAV_KEY);
-    const parsed = JSON.parse(raw || '[]');
-    return new Set(Array.isArray(parsed) ? parsed : []);
+    const raw = JSON.parse(localStorage.getItem(FAVORITES_KEY) || '[]');
+    return new Set(Array.isArray(raw) ? raw.filter(v => typeof v === 'string') : []);
   } catch {
     return new Set();
   }
 }
 
 function saveFavorites(set) {
-  try {
-    localStorage.setItem(FAV_KEY, JSON.stringify([...set]));
-  } catch {}
+  try { localStorage.setItem(FAVORITES_KEY, JSON.stringify([...set])); } catch {}
 }
 
-function licenseStampSub(deck) {
-  if (deck.licenseShort === 'CC0') return 'DOMÍNIO PÚBLICO';
-  if (deck.licenseShort === 'MIT') return 'CÓDIGO ABERTO';
-  if (deck.licenseShort === 'BSD') return 'LICENÇA BSD';
-  if (deck.licenseShort === 'APACHE') return 'APACHE 2.0';
-  if (deck.licenseShort === 'CC-BY') return 'COM ATRIBUIÇÃO';
-  return 'STORAGE LAB';
+function heartIcon(filled = false) {
+  return `<svg viewBox="0 0 24 24" width="18" height="18" fill="${filled ? 'currentColor' : 'none'}" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 20.6C12 20.6 4 15.2 4 9.5a4.6 4.6 0 0 1 8-3.1 4.6 4.6 0 0 1 8 3.1c0 5.7-8 11.1-8 11.1z"/></svg>`;
 }
 
-function quickPaletteOptions(deck) {
-  const base = [
-    deck.theme,
-    'studio-orbit',
-    'paper',
-    'lo-material-blue',
-    'lo-classy-red',
-    'lo-neuron',
-    'opf-forest-green-light',
-    'opf-luxury-dark'
-  ];
-  const unique = [];
-  for (const id of base) {
-    if (canvasThemes[id] && !unique.includes(id)) unique.push(id);
-    if (unique.length >= 7) break;
+function searchIcon() {
+  return `<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.6-3.6"/></svg>`;
+}
+
+function externalIcon() {
+  return `<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 4h6v6M10 14L20 4"/><path d="M19 13v5a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2h5"/></svg>`;
+}
+
+function backIcon() {
+  return `<svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 6l-6 6 6 6"/></svg>`;
+}
+
+function downloadIcon() {
+  return `<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 4v11M7 10l5 5 5-5"/><path d="M5 19h14"/></svg>`;
+}
+
+function renderSlideBox(slide) {
+  return canvasMarkup(presentationSlide(slide), { interactive: false }).replace(/<button\b[\s\S]*?<\/button>/gi, '');
+}
+
+function themeSwatchColor(themeId) {
+  const t = themeVisuals(themeId);
+  return { bg: t.background || '#1e1b4b', accent: t.accent || '#7c5cff' };
+}
+
+function themeChoicesFor(deck) {
+  const seen = new Set();
+  const list = [];
+  const add = (id, label) => {
+    if (!id || seen.has(id) || !canvasThemes[id]) return;
+    seen.add(id);
+    list.push({ id, label: label || canvasThemes[id].label || id });
+  };
+  add(deck.theme, 'Original');
+  for (const choice of templateThemeChoices) {
+    if (list.length >= 9) break;
+    add(choice.id, choice.label);
   }
-  return unique;
+  return list;
 }
 
-export function createTemplateStore(callbacks) {
+function ambientMarkup() {
+  return `<div class="tstore-ambient" aria-hidden="true"><span class="tstore-blob tstore-blob-user"></span><span class="tstore-blob tstore-blob-brand"></span></div>`;
+}
+
+export function createTemplateStore({ render, useDeck, downloadDeckPptx, onRouteChange }) {
   const state = {
-    query: '',
     sourceTab: 'all',
     category: 'all',
     tone: 'all',
-    visibleCount: PAGE_STEP,
+    query: '',
+    visibleCount: BATCH_SIZE,
     detailId: '',
-    detailSlideIndex: 0,
     detailTheme: '',
-    favorites: loadFavorites()
+    detailSlide: 0,
+    favorites: loadFavorites(),
+    busy: ''
   };
 
-  function filteredDecks() {
+  let observer = null;
+  let boundRoot = null;
+  let pointerHandler = null;
+  let rafId = 0;
+
+  function filtered() {
     return searchDecks({
       query: state.query,
-      sourceTab: state.sourceTab,
+      sourceTab: state.sourceTab === 'external' ? 'all' : state.sourceTab,
       category: state.category,
       tone: state.tone,
       favorites: state.favorites
     });
   }
 
-  function deckCardMarkup(deck) {
+  function cardMarkup(deck) {
     const cover = deckCoverPreview(deck);
-    const isFav = state.favorites.has(deck.id);
-    const badgeText = deck.source === 'open-source' ? deck.licenseShort : (deck.quizCount ? '+ Quiz' : deck.categoryLabel);
-    return `<article class="tstore-card" data-store-open="${esc(deck.id)}" tabindex="0" role="button" aria-label="Ver detalhes do modelo ${esc(deck.name)}">
-      <div class="tstore-card-media">
-        ${renderSlideCanvas(cover, {interactive: false, decorative: true})}
-        <span class="tstore-card-badge ${deck.source === 'open-source' ? 'is-oss' : ''}">${esc(badgeText)}</span>
-        <button type="button" class="tstore-card-fav ${isFav ? 'is-fav' : ''}" data-store-fav="${esc(deck.id)}" aria-pressed="${isFav}" aria-label="${isFav ? 'Remover dos salvos' : 'Salvar modelo'}" title="${isFav ? 'Remover dos salvos' : 'Salvar modelo'}">
-          ${icon(isFav ? 'heartFilled' : 'heart')}
-        </button>
+    const fav = state.favorites.has(deck.id);
+    return `<article class="tstore-card" data-deck-id="${esc(deck.id)}">
+      <div class="tstore-card-media" role="button" tabindex="0" data-tstore-action="open-detail" data-deck-id="${esc(deck.id)}" aria-label="Ver detalhes de ${esc(deck.name)}">
+        <div class="tstore-card-canvas" inert aria-hidden="true">${renderSlideBox(cover)}</div>
+        <div class="tstore-card-badges">
+          ${deck.hasQuiz ? '<span class="tstore-pill tstore-pill-quiz">Quiz</span>' : ''}
+          <span class="tstore-pill">${deck.slideCount} slides</span>
+        </div>
+        <button type="button" class="tstore-fav-btn ${fav ? 'is-saved' : ''}" data-tstore-action="toggle-favorite" data-deck-id="${esc(deck.id)}" aria-label="${fav ? 'Remover dos salvos' : 'Salvar apresentação'}" aria-pressed="${fav}">${heartIcon(fav)}</button>
       </div>
-      <div class="tstore-card-body">
-        <strong>${esc(deck.name)}</strong>
-        <p>${esc(deck.author)}</p>
-        <footer>
-          <span>${deck.slideCount} ${deck.slideCount === 1 ? 'slide' : 'slides'}${deck.quizCount ? ` · ${deck.quizCount} perguntas` : ''}</span>
-          <span class="tstore-card-cat">${esc(deck.categoryLabel)}</span>
-        </footer>
+      <div class="tstore-card-body" data-tstore-action="open-detail" data-deck-id="${esc(deck.id)}">
+        <div class="tstore-card-row">
+          <h3>${esc(deck.name)}</h3>
+          <span class="tstore-license">${esc(deck.source === 'native' ? 'Storage Lab' : deck.licenseShort)}</span>
+        </div>
+        <p>${esc(deck.description)}</p>
+        <div class="tstore-card-foot">
+          <span>${esc(deck.categoryLabel)}</span>
+          <span>${deck.tone === 'dark' ? 'Escuro' : 'Claro'}</span>
+        </div>
       </div>
     </article>`;
   }
 
-  function externalDirectoryMarkup() {
-    return `<section class="tstore-external">
-      <div class="tstore-external-lead">
-        <div>
-          <h2>Bibliotecas externas gratuitas</h2>
-          <p>O Storage Lab respeita os termos de uso de cada plataforma e não copia arquivos proprietários. Abra o site oficial, baixe o modelo gratuito em <strong>.pptx</strong> ou <strong>.pdf</strong> e importe aqui para editar slides e rodar quizzes com a turma.</p>
+  function gridSectionMarkup() {
+    if (state.sourceTab === 'external') {
+      return `<div class="tstore-external-panel">
+        <div class="tstore-external-head">
+          <h2>Sites externos gratuitos</h2>
+          <p>Baixe em <strong>.pptx</strong> ou <strong>.pdf</strong> e clique em <strong>Importar PDF / PPTX</strong> na biblioteca para apresentar com quiz e jogos ao vivo.</p>
         </div>
-        <button type="button" class="studio-btn accent" data-studio-action="upload-slides">${icon('upload')} Importar .pptx ou .pdf</button>
-      </div>
-      <div class="tstore-external-grid">
-        ${externalTemplateSites.map(site => `<article class="tstore-ext-card">
-          <div class="tstore-ext-head">
+        <div class="tstore-external-grid">
+          ${externalTemplateSites.map(site => `<article class="tstore-ext-card">
+            <div class="tstore-ext-top">
+              <span class="tstore-ext-cat">${esc(site.category)}</span>
+              <span class="tstore-ext-fmt">${esc(site.formats)}</span>
+            </div>
             <h3>${esc(site.name)}</h3>
-            <span>${esc(site.category)}</span>
-          </div>
-          <p>${esc(site.note)}</p>
-          <small>${esc(site.formats)}</small>
-          <a class="studio-btn quiet" href="${esc(site.url)}" target="_blank" rel="noopener noreferrer">Abrir site oficial ${icon('external')}</a>
-        </article>`).join('')}
-      </div>
-      <div class="tstore-licenses-box">
-        <h3>Créditos e licenças dos modelos abertos integrados</h3>
-        <p>Todos os ${deckTemplates.filter(d => d.source === 'open-source').length} modelos da aba <strong>Comunidade aberta</strong> usam licenças abertas permissivas que autorizam adaptação, uso em sala de aula e exportação em PowerPoint:</p>
-        <ul>
-          ${openSourceLicenses.map(item => `<li>
-            <strong>${esc(item.project)}</strong> (${esc(item.license)}) — ${esc(item.notice)}.
-            <a href="${esc(item.url)}" target="_blank" rel="noopener noreferrer">Repositório</a> ·
-            <a href="${esc(item.licenseUrl)}" target="_blank" rel="noopener noreferrer">Licença</a>
-          </li>`).join('')}
-        </ul>
-      </div>
-    </section>`;
-  }
-
-  function catalogGridMarkup() {
-    if (state.sourceTab === 'external') return externalDirectoryMarkup();
-    const list = filteredDecks();
-    const visible = list.slice(0, state.visibleCount);
-    const remaining = Math.max(0, list.length - visible.length);
-
-    if (!list.length) {
-      return `<div class="tstore-empty">
-        <h3>Nenhum modelo encontrado</h3>
-        <p>${state.sourceTab === 'favorites'
-          ? 'Você ainda não salvou modelos. Clique no coração em qualquer capa ou tela de detalhes para guardar aqui.'
-          : 'Tente outro termo de busca ou limpe os filtros de categoria e tom.'}</p>
-        <button type="button" class="studio-btn quiet" data-store-reset-filters>Limpar filtros</button>
+            <p>${esc(site.note)}</p>
+            <a class="studio-btn quiet tstore-ext-link" href="${esc(site.url)}" target="_blank" rel="noopener noreferrer">Abrir site ↗</a>
+          </article>`).join('')}
+        </div>
       </div>`;
     }
 
-    return `<div class="tstore-grid">${visible.map(deckCardMarkup).join('')}</div>
-      ${remaining > 0 ? `<div class="tstore-more">
-        <button type="button" class="studio-btn quiet" data-store-more>Mostrar mais modelos (${remaining} restantes)</button>
-      </div>` : ''}`;
+    const items = filtered();
+    const visible = items.slice(0, state.visibleCount);
+    const hasMore = items.length > visible.length;
+
+    if (!items.length) {
+      return `<div class="tstore-empty">
+        <h3>${state.sourceTab === 'favorites' ? 'Nenhuma apresentação salva ainda' : 'Nenhuma apresentação encontrada'}</h3>
+        <p>${state.sourceTab === 'favorites'
+          ? 'Toque no coração em qualquer capa para guardar suas favoritas aqui.'
+          : 'Tente limpar a busca ou escolher outra categoria.'}</p>
+        <button type="button" class="studio-btn quiet" data-tstore-action="reset-filters">Mostrar todo o catálogo</button>
+      </div>`;
+    }
+
+    return `<div class="tstore-results-bar">
+        <span data-tstore-count>${items.length} ${items.length === 1 ? 'apresentação' : 'apresentações'}</span>
+        ${state.query || state.category !== 'all' || state.tone !== 'all' || state.sourceTab !== 'all'
+          ? '<button type="button" class="tstore-clear-btn" data-tstore-action="reset-filters">Limpar filtros</button>'
+          : ''}
+      </div>
+      <div class="tstore-grid" data-tstore-grid>${visible.map(cardMarkup).join('')}</div>
+      ${hasMore ? `<div class="tstore-sentinel" data-tstore-sentinel aria-hidden="true"><span class="tstore-loading-dots">Carregando mais apresentações...</span></div>` : ''}`;
   }
 
   function catalogMarkup() {
-    const totalCount = deckTemplates.length;
-    const filteredCount = state.sourceTab === 'external' ? externalTemplateSites.length : filteredDecks().length;
-    const counts = {
-      all: totalCount,
-      native: deckTemplates.filter(d => d.source === 'native').length,
-      'open-source': deckTemplates.filter(d => d.source === 'open-source').length,
-      favorites: state.favorites.size,
-      external: externalTemplateSites.length
-    };
+    const sourceChips = [
+      { id: 'all', label: 'Todos' },
+      { id: 'native', label: 'Storage Lab' },
+      { id: 'open-source', label: 'Comunidade' }
+    ];
+    const favActive = state.sourceTab === 'favorites';
+    const extActive = state.sourceTab === 'external';
 
     return `<section class="tstore-page" data-template-store>
-      <header class="tstore-header">
-        <div>
-          <span class="tstore-eyebrow">CATÁLOGO DE APRESENTAÇÕES</span>
-          <h1>Modelos prontos para editar</h1>
-          <p>Explore ${totalCount} apresentações editáveis — entre modelos próprios do Storage Lab e coleções abertas da comunidade — ou importe arquivos .pptx de sites externos.</p>
-        </div>
-        <div class="tstore-header-actions">
-          <button type="button" class="studio-btn quiet" data-studio-action="upload-slides">${icon('upload')} Importar .pptx</button>
-          <button type="button" class="studio-btn accent" data-store-use="basic">${icon('plus')} Começar do zero</button>
-        </div>
-      </header>
-
-      <div class="tstore-toolbar">
-        <div class="tstore-tabs" role="tablist" aria-label="Origem dos modelos">
-          ${deckGalleryTabs.map(tab => `<button type="button" role="tab" aria-selected="${state.sourceTab === tab.id}" data-store-tab="${tab.id}">
-            ${esc(tab.label)} <span>${counts[tab.id] ?? 0}</span>
-          </button>`).join('')}
-        </div>
-        ${state.sourceTab !== 'external' ? `<div class="tstore-search-row">
-          <label class="tstore-search">
-            ${icon('search')}
-            <input type="search" data-store-search value="${esc(state.query)}" placeholder="Buscar por assunto, cor, estilo ou autor..." aria-label="Buscar modelos">
-          </label>
-          <div class="tstore-tone" role="group" aria-label="Filtrar por fundo">
-            <button type="button" data-store-tone="all" aria-pressed="${state.tone === 'all'}">Todos</button>
-            <button type="button" data-store-tone="light" aria-pressed="${state.tone === 'light'}">Claro</button>
-            <button type="button" data-store-tone="dark" aria-pressed="${state.tone === 'dark'}">Escuro</button>
+      ${ambientMarkup()}
+      <div class="tstore-shell">
+        <header class="tstore-header">
+          <div class="tstore-title-row">
+            <div class="tstore-title-copy">
+              <h1>Catálogo de apresentações</h1>
+            </div>
+            <div class="tstore-header-tools">
+              <label class="tstore-search" aria-label="Buscar apresentações">
+                ${searchIcon()}
+                <input type="search" data-tstore-search value="${esc(state.query)}" placeholder="Buscar por tema, estilo ou área..." autocomplete="off">
+                ${state.query ? '<button type="button" class="tstore-search-clear" data-tstore-action="clear-search" aria-label="Limpar busca">×</button>' : ''}
+              </label>
+              <button type="button" class="tstore-icon-util ${favActive ? 'is-active' : ''}" data-tstore-action="source-tab" data-value="${favActive ? 'all' : 'favorites'}" aria-label="Apresentações salvas (${state.favorites.size})" title="Salvos" aria-pressed="${favActive}">
+                ${heartIcon(favActive)}
+                ${state.favorites.size ? `<span class="tstore-icon-badge">${state.favorites.size}</span>` : ''}
+              </button>
+              <button type="button" class="tstore-icon-util ${extActive ? 'is-active' : ''}" data-tstore-action="source-tab" data-value="${extActive ? 'all' : 'external'}" aria-label="Sites externos gratuitos" title="Sites externos" aria-pressed="${extActive}">
+                ${externalIcon()}
+              </button>
+            </div>
           </div>
-        </div>` : ''}
+
+          <div class="tstore-toolbar">
+            <div class="tstore-tabs" role="tablist" aria-label="Coleção">
+              ${sourceChips.map(tab => `<button type="button" role="tab" class="tstore-tab ${state.sourceTab === tab.id ? 'is-active' : ''}" aria-selected="${state.sourceTab === tab.id}" data-tstore-action="source-tab" data-value="${tab.id}">${esc(tab.label)}</button>`).join('')}
+            </div>
+
+            ${state.sourceTab !== 'external' ? `<div class="tstore-tones" role="group" aria-label="Tom de fundo">
+              ${[['all', 'Todos os tons'], ['light', 'Claros'], ['dark', 'Escuros']].map(([id, label]) =>
+                `<button type="button" class="tstore-tone-btn ${state.tone === id ? 'is-active' : ''}" data-tstore-action="tone" data-value="${id}" aria-pressed="${state.tone === id}">${label}</button>`
+              ).join('')}
+            </div>` : ''}
+          </div>
+
+          ${state.sourceTab !== 'external' ? `<div class="tstore-cats" role="group" aria-label="Categorias">
+            ${deckCategories.map(cat => `<button type="button" class="tstore-cat-chip ${state.category === cat.id ? 'is-active' : ''}" data-tstore-action="category" data-value="${cat.id}" aria-pressed="${state.category === cat.id}">${esc(cat.label)}</button>`).join('')}
+          </div>` : ''}
+        </header>
+
+        <div class="tstore-results" data-tstore-results>${gridSectionMarkup()}</div>
       </div>
-
-      ${state.sourceTab !== 'external' ? `<div class="tstore-categories" role="group" aria-label="Filtrar por categoria">
-        ${templateCategories.map(cat => `<button type="button" data-store-cat="${cat.id}" aria-pressed="${state.category === cat.id}">${esc(cat.label)}</button>`).join('')}
-        <span class="tstore-count" data-store-count>${filteredCount} ${filteredCount === 1 ? 'modelo' : 'modelos'}</span>
-      </div>` : ''}
-
-      <div data-store-results>${catalogGridMarkup()}</div>
     </section>`;
-  }
-
-  function carouselStageMarkup(slides, index) {
-    const total = slides.length;
-    const safeIdx = Math.max(0, Math.min(index, total - 1));
-    const prevIdx = total > 1 ? (safeIdx - 1 + total) % total : -1;
-    const nextIdx = total > 1 ? (safeIdx + 1) % total : -1;
-    const currentSlide = slides[safeIdx];
-
-    return `<div class="eshop-stage-viewport">
-        ${prevIdx >= 0 ? `<button type="button" class="eshop-peek eshop-peek-prev" data-store-slide="${prevIdx}" aria-label="Slide anterior">
-          ${renderSlideCanvas(slides[prevIdx], {interactive: false, decorative: true})}
-        </button>` : '<div class="eshop-peek is-empty" aria-hidden="true"></div>'}
-
-        <div class="eshop-hero-frame" aria-live="polite">
-          ${renderSlideCanvas(currentSlide, {interactive: false, decorative: true})}
-        </div>
-
-        ${nextIdx >= 0 ? `<button type="button" class="eshop-peek eshop-peek-next" data-store-slide="${nextIdx}" aria-label="Próximo slide">
-          ${renderSlideCanvas(slides[nextIdx], {interactive: false, decorative: true})}
-        </button>` : '<div class="eshop-peek is-empty" aria-hidden="true"></div>'}
-      </div>
-      <div class="eshop-carousel-nav">
-        <button type="button" class="eshop-nav-arrow" data-store-slide-step="-1" ${total <= 1 ? 'disabled' : ''} aria-label="Slide anterior">${icon('chevronLeft')}</button>
-        <div class="eshop-dots" role="tablist" aria-label="Slides do modelo">
-          ${slides.map((s, i) => `<button type="button" class="eshop-dot ${i === safeIdx ? 'is-active' : ''}" data-store-slide="${i}" aria-label="Slide ${i + 1}: ${esc(s.title)}" aria-selected="${i === safeIdx}"></button>`).join('')}
-        </div>
-        <button type="button" class="eshop-nav-arrow" data-store-slide-step="1" ${total <= 1 ? 'disabled' : ''} aria-label="Próximo slide">${icon('chevronRight')}</button>
-      </div>
-      <p class="eshop-slide-caption">Slide ${safeIdx + 1} de ${total} — <strong>${esc(currentSlide.title || 'Slide')}</strong></p>`;
   }
 
   function detailMarkup() {
     const deck = getDeckTemplate(state.detailId);
     const activeTheme = canvasThemes[state.detailTheme] ? state.detailTheme : deck.theme;
     const lesson = deckPreviewSlides(deck, activeTheme);
-    const slides = lesson.slides;
-    const safeIdx = Math.max(0, Math.min(state.detailSlideIndex, slides.length - 1));
-    state.detailSlideIndex = safeIdx;
-    const isFav = state.favorites.has(deck.id);
-    const palettes = quickPaletteOptions(deck);
+    const slides = lesson.slides || [];
+    const slideIndex = Math.max(0, Math.min(state.detailSlide, slides.length - 1));
+    const currentSlide = slides[slideIndex] || slides[0];
+    const nextSlide = slides.length > 1 ? slides[(slideIndex + 1) % slides.length] : null;
+    const fav = state.favorites.has(deck.id);
+    const themes = themeChoicesFor(deck);
     const similar = findSimilarDecks(deck, 4);
-    const statusLabel = deck.source === 'open-source'
-      ? `Open Source · ${deck.license}`
-      : 'Grátis · Editável agora';
-    const activeThemeName = themeVisuals(activeTheme).name || activeTheme;
+    const toneLabel = deck.tone === 'dark' ? 'Tema escuro' : 'Tema claro';
 
-    return `<section class="eshop-page" data-template-detail="${esc(deck.id)}">
-      <div class="eshop-topbar">
-        <button type="button" class="eshop-back" data-store-back>${icon('back')} Voltar para o catálogo</button>
-        <span class="eshop-crumb">${esc(deck.collectionLabel)} · ${esc(deck.categoryLabel)}</span>
-      </div>
-
-      <div class="eshop-layout">
-        <div class="eshop-left">
-          <header class="eshop-title-block">
-            <h1>${esc(deck.name)}</h1>
-            <p class="eshop-publisher">${esc(deck.author)}</p>
-          </header>
-
-          <div class="eshop-carousel" data-eshop-stage>
-            ${carouselStageMarkup(slides, safeIdx)}
-          </div>
-
-          <div class="eshop-editorial">
-            <h2>${esc(deck.description)}</h2>
-            <p>Todos os textos, blocos, cores, fontes e imagens deste modelo são 100% editáveis direto no navegador. Você pode apresentar em tela cheia, alternar o tema visual com um clique, rodar quizzes ao vivo com a turma ou exportar para Microsoft PowerPoint (.pptx) e PDF.</p>
-            ${deck.source === 'open-source' ? `<p class="eshop-oss-note">Adaptado da coleção aberta <strong>${esc(deck.collectionLabel)}</strong> (${esc(deck.author)}) sob licença <strong>${esc(deck.license)}</strong>, com atribuição preservada nas notas do slide inicial.</p>` : ''}
-          </div>
-
-          <div class="eshop-outline-section">
-            <div class="eshop-section-head">
-              <h3>Slides incluídos (${slides.length})</h3>
-              <span>Clique em qualquer slide para ver em destaque acima</span>
-            </div>
-            <div class="eshop-thumbs" data-eshop-thumbs>
-              ${slides.map((s, i) => `<button type="button" class="eshop-thumb ${i === safeIdx ? 'is-active' : ''}" data-store-slide="${i}">
-                <span class="eshop-thumb-canvas">${renderSlideCanvas(s, {interactive: false, decorative: true})}</span>
-                <span class="eshop-thumb-meta"><b>${String(i + 1).padStart(2, '0')}</b> ${esc(s.title || `Slide ${i + 1}`)}</span>
-              </button>`).join('')}
-            </div>
-          </div>
-
-          ${lesson.questions?.length ? `<div class="eshop-quiz-box">
-            <h3>Quiz interativo incluído (${lesson.questions.length} perguntas)</h3>
-            <ol>${lesson.questions.map(q => `<li>${esc(q.text)}</li>`).join('')}</ol>
-          </div>` : ''}
+    return `<section class="tstore-page tstore-detail-page" data-template-store data-detail-id="${esc(deck.id)}">
+      ${ambientMarkup()}
+      <div class="tstore-shell eshop-shell">
+        <div class="eshop-topbar">
+          <button type="button" class="eshop-back" data-tstore-action="back-catalog">${backIcon()}<span>Voltar ao catálogo</span></button>
         </div>
 
-        <aside class="eshop-right" aria-label="Informações e ações do modelo">
-          <div class="eshop-panel">
-            <span class="eshop-status-pill ${deck.source === 'open-source' ? 'is-oss' : 'is-native'}">${esc(statusLabel)}</span>
-
-            <div class="eshop-headline-stat">
-              <strong>${slides.length} ${slides.length === 1 ? 'slide' : 'slides'}</strong>
-              <span>Formato 16:9 · ${deck.quizCount ? `${deck.quizCount} perguntas de quiz` : 'Editável e exportável'}</span>
+        <div class="eshop-main">
+          <div class="eshop-gallery">
+            <div class="eshop-hero-stage ${nextSlide ? 'has-peek' : ''}">
+              <div class="eshop-hero-frame">
+                <div class="eshop-hero-canvas" inert aria-hidden="true">${renderSlideBox(currentSlide)}</div>
+                ${slides.length > 1 ? `<button type="button" class="eshop-nav eshop-prev" data-tstore-action="detail-prev" aria-label="Slide anterior">‹</button>
+                  <button type="button" class="eshop-nav eshop-next" data-tstore-action="detail-next" aria-label="Próximo slide">›</button>` : ''}
+                <span class="eshop-slide-counter">${slideIndex + 1} / ${slides.length}</span>
+              </div>
+              ${nextSlide ? `<button type="button" class="eshop-peek" data-tstore-action="detail-next" aria-label="Avançar para o próximo slide">
+                <div class="eshop-peek-canvas" inert aria-hidden="true">${renderSlideBox(nextSlide)}</div>
+              </button>` : ''}
             </div>
 
-            <div class="eshop-cta-stack">
-              <button type="button" class="eshop-btn-primary" data-store-use="${esc(deck.id)}" data-store-theme="${esc(activeTheme)}">
-                ${icon('plus')} Usar este modelo
-              </button>
-              <button type="button" class="eshop-btn-secondary" data-store-download-pptx="${esc(deck.id)}" data-store-theme="${esc(activeTheme)}">
-                ${icon('download')} Baixar em .pptx
-              </button>
+            <div class="eshop-thumbs" role="list" aria-label="Slides desta apresentação">
+              ${slides.map((s, idx) => `<button type="button" class="eshop-thumb ${idx === slideIndex ? 'is-active' : ''}" data-tstore-action="detail-slide" data-index="${idx}" aria-label="Slide ${idx + 1}: ${esc(s.title || 'Slide')}" aria-current="${idx === slideIndex ? 'true' : 'false'}">
+                <div class="eshop-thumb-canvas" inert aria-hidden="true">${renderSlideBox(s)}</div>
+                <span class="eshop-thumb-idx">${String(idx + 1).padStart(2, '0')}</span>
+              </button>`).join('')}
             </div>
 
-            <div class="eshop-info-box">
-              <div class="eshop-palette-block">
-                <div class="eshop-palette-head">
-                  <strong>Testar paleta de cores</strong>
-                  <small data-eshop-theme-name>${esc(activeThemeName)}</small>
-                </div>
-                <div class="eshop-swatches" role="group" aria-label="Testar paleta no preview">
-                  ${palettes.map(tid => {
-                    const tv = themeVisuals(tid);
-                    return `<button type="button" class="eshop-swatch ${tid === activeTheme ? 'is-active' : ''}" data-store-palette="${esc(tid)}" title="${esc(tv.name || tid)}" aria-label="Paleta ${esc(tv.name || tid)}" aria-pressed="${tid === activeTheme}">
-                      <i style="background:${tv.background}"><b style="background:${tv.accent}"></b></i>
-                    </button>`;
+            <div class="eshop-description-block">
+              <h2>Sobre esta apresentação</h2>
+              <p>${esc(deck.description)}</p>
+              <div class="eshop-slide-list">
+                <h3>Roteiro incluído (${slides.length} slides)</h3>
+                <ol>
+                  ${slides.map((s, idx) => `<li><button type="button" class="${idx === slideIndex ? 'is-active' : ''}" data-tstore-action="detail-slide" data-index="${idx}"><span>${String(idx + 1).padStart(2, '0')}</span><strong>${esc(s.title || `Slide ${idx + 1}`)}</strong></button></li>`).join('')}
+                </ol>
+              </div>
+            </div>
+          </div>
+
+          <aside class="eshop-rail">
+            <div class="eshop-rail-card">
+              <div class="eshop-rail-head">
+                <h1>${esc(deck.name)}</h1>
+                <button type="button" class="eshop-rail-fav ${fav ? 'is-saved' : ''}" data-tstore-action="toggle-favorite" data-deck-id="${esc(deck.id)}" aria-label="${fav ? 'Remover dos salvos' : 'Salvar apresentação'}" title="${fav ? 'Remover dos salvos' : 'Salvar'}" aria-pressed="${fav}">
+                  ${heartIcon(fav)}
+                </button>
+              </div>
+              <p class="eshop-rail-sub">${esc(deck.description)}</p>
+
+              <div class="eshop-meta-pills">
+                <span>${esc(deck.categoryLabel)}</span>
+                <span>${slides.length} slides</span>
+                ${deck.hasQuiz ? '<span class="is-accent">Quiz incluso</span>' : ''}
+                <span>${toneLabel}</span>
+              </div>
+
+              <div class="eshop-theme-picker">
+                <span class="eshop-picker-label">Paleta de cores</span>
+                <div class="eshop-swatches" role="radiogroup" aria-label="Escolher paleta de cores">
+                  ${themes.map(th => {
+                    const sw = themeSwatchColor(th.id);
+                    const selected = th.id === activeTheme;
+                    return `<button type="button" class="eshop-swatch ${selected ? 'is-active' : ''}" data-tstore-action="detail-theme" data-theme="${esc(th.id)}" title="${esc(th.label)}" aria-label="Paleta ${esc(th.label)}" aria-checked="${selected}" role="radio" style="--sw-bg:${sw.bg};--sw-ac:${sw.accent}"><i></i></button>`;
                   }).join('')}
                 </div>
               </div>
 
-              <dl class="eshop-specs">
-                <div><dt>Categoria</dt><dd>${esc(deck.categoryLabel)}</dd></div>
-                <div><dt>Tom visual</dt><dd>${deck.tone === 'dark' ? 'Fundo escuro' : 'Fundo claro'}</dd></div>
-                <div><dt>Exportação</dt><dd>PowerPoint (.pptx) e PDF</dd></div>
-                <div><dt>Sala ao vivo</dt><dd>Compatível com Quiz e Jogos</dd></div>
-              </dl>
-
-              ${deck.sourceUrl ? `<div class="eshop-source-links">
-                <a href="${esc(deck.sourceUrl)}" target="_blank" rel="noopener noreferrer">Ver origem oficial ${icon('external')}</a>
-                <a href="${esc(deck.licenseUrl)}" target="_blank" rel="noopener noreferrer">Ler licença ${esc(deck.license)} ${icon('external')}</a>
-              </div>` : ''}
-            </div>
-
-            <div class="eshop-panel-footer">
-              <button type="button" class="eshop-fav-btn ${isFav ? 'is-fav' : ''}" data-store-fav="${esc(deck.id)}" aria-pressed="${isFav}">
-                ${icon(isFav ? 'heartFilled' : 'heart')}
-                <span>${isFav ? 'Salvo nos favoritos' : 'Salvar modelo'}</span>
-              </button>
-
-              <div class="eshop-license-stamp" title="${esc(deck.license)}">
-                <strong>${esc(deck.licenseShort)}</strong>
-                <span>${esc(licenseStampSub(deck))}</span>
+              <div class="eshop-cta-stack">
+                <button type="button" class="eshop-btn-primary" data-tstore-action="use-deck" data-deck-id="${esc(deck.id)}" ${state.busy ? 'disabled' : ''}>
+                  ${state.busy === 'use' ? 'Abrindo no editor...' : 'Usar esta apresentação'}
+                </button>
+                <button type="button" class="eshop-btn-secondary" data-tstore-action="download-pptx" data-deck-id="${esc(deck.id)}" ${state.busy ? 'disabled' : ''}>
+                  ${downloadIcon()}<span>${state.busy === 'pptx' ? 'Gerando PPTX...' : 'Baixar PPTX'}</span>
+                </button>
               </div>
-            </div>
-          </div>
-        </aside>
-      </div>
 
-      ${similar.length ? `<section class="eshop-similar">
-        <div class="eshop-section-head">
-          <h3>Modelos parecidos</h3>
-          <button type="button" class="studio-btn link" data-store-back>Ver todos os ${deckTemplates.length}</button>
+              <dl class="eshop-specs">
+                <div><dt>Origem</dt><dd>${esc(deck.collectionLabel)}</dd></div>
+                <div><dt>Licença</dt><dd>${deck.credit?.licenseUrl ? `<a href="${esc(deck.credit.licenseUrl)}" target="_blank" rel="noopener noreferrer">${esc(deck.license)} ↗</a>` : esc(deck.license)}</dd></div>
+                <div><dt>Autoria</dt><dd>${deck.credit?.sourceUrl ? `<a href="${esc(deck.credit.sourceUrl)}" target="_blank" rel="noopener noreferrer">${esc(deck.author)} ↗</a>` : esc(deck.author)}</dd></div>
+                <div><dt>Formato</dt><dd>16:9 · Editável + PPTX + PDF</dd></div>
+              </dl>
+            </div>
+          </aside>
         </div>
-        <div class="tstore-grid tstore-grid-4">${similar.map(deckCardMarkup).join('')}</div>
-      </section>` : ''}
+
+        ${similar.length ? `<section class="eshop-similar">
+          <h2>Apresentações parecidas</h2>
+          <div class="tstore-grid tstore-grid-similar">${similar.map(cardMarkup).join('')}</div>
+        </section>` : ''}
+      </div>
     </section>`;
   }
 
-  function syncCarouselInPlace(root) {
-    const deck = getDeckTemplate(state.detailId);
-    const activeTheme = canvasThemes[state.detailTheme] ? state.detailTheme : deck.theme;
-    const lesson = deckPreviewSlides(deck, activeTheme);
-    const slides = lesson.slides;
-    const safeIdx = Math.max(0, Math.min(state.detailSlideIndex, slides.length - 1));
-    state.detailSlideIndex = safeIdx;
-
-    const stage = root.querySelector('[data-eshop-stage]');
-    if (stage) stage.innerHTML = carouselStageMarkup(slides, safeIdx);
-    root.querySelectorAll('[data-eshop-thumbs] [data-store-slide]').forEach((btn, idx) => {
-      btn.classList.toggle('is-active', idx === safeIdx);
-    });
+  function disconnectObserver() {
+    observer?.disconnect();
+    observer = null;
   }
 
-  function syncCatalogInPlace(root) {
-    const box = root.querySelector('[data-store-results]');
-    if (box) box.innerHTML = catalogGridMarkup();
-    const countEl = root.querySelector('[data-store-count]');
-    if (countEl) {
-      const n = filteredDecks().length;
-      countEl.textContent = `${n} ${n === 1 ? 'modelo' : 'modelos'}`;
+  function appendNextBatch(root) {
+    if (state.detailId || state.sourceTab === 'external') return;
+    const grid = root?.querySelector('[data-tstore-grid]');
+    if (!grid) return;
+    const items = filtered();
+    if (state.visibleCount >= items.length) {
+      root.querySelector('[data-tstore-sentinel]')?.remove();
+      disconnectObserver();
+      return;
     }
+    const start = state.visibleCount;
+    const end = Math.min(items.length, start + BATCH_SIZE);
+    state.visibleCount = end;
+    const fragment = document.createRange().createContextualFragment(items.slice(start, end).map(cardMarkup).join(''));
+    grid.append(fragment);
+    if (end >= items.length) {
+      root.querySelector('[data-tstore-sentinel]')?.remove();
+      disconnectObserver();
+    }
+  }
+
+  function observeSentinel(root) {
+    disconnectObserver();
+    if (!root || state.detailId || state.sourceTab === 'external') return;
+    const sentinel = root.querySelector('[data-tstore-sentinel]');
+    if (!sentinel || typeof IntersectionObserver === 'undefined') return;
+    observer = new IntersectionObserver(entries => {
+      if (entries.some(entry => entry.isIntersecting)) appendNextBatch(root);
+    }, { rootMargin: '480px 0px' });
+    observer.observe(sentinel);
+  }
+
+  function unbindPointer() {
+    if (boundRoot && pointerHandler) boundRoot.removeEventListener('pointermove', pointerHandler);
+    if (rafId) { cancelAnimationFrame(rafId); rafId = 0; }
+    boundRoot = null;
+    pointerHandler = null;
+  }
+
+  function bindPointer(root) {
+    unbindPointer();
+    const page = root?.querySelector('[data-template-store]');
+    if (!page) return;
+    boundRoot = page;
+    let targetX = 50, targetY = 26;
+    pointerHandler = event => {
+      if (event.pointerType === 'touch') return;
+      const rect = page.getBoundingClientRect();
+      if (!rect.width || !rect.height) return;
+      targetX = Math.max(4, Math.min(96, ((event.clientX - rect.left) / rect.width) * 100));
+      targetY = Math.max(4, Math.min(96, ((event.clientY - rect.top) / rect.height) * 100));
+      if (rafId) return;
+      rafId = requestAnimationFrame(() => {
+        rafId = 0;
+        page.style.setProperty('--mx', `${targetX.toFixed(1)}%`);
+        page.style.setProperty('--my', `${targetY.toFixed(1)}%`);
+      });
+    };
+    page.addEventListener('pointermove', pointerHandler, { passive: true });
+  }
+
+  function updateResultsOnly(root) {
+    const slot = root?.querySelector('[data-tstore-results]');
+    if (slot) {
+      slot.innerHTML = gridSectionMarkup();
+      observeSentinel(root);
+      return true;
+    }
+    return false;
+  }
+
+  function openDetail(deckId) {
+    const deck = getDeckTemplate(deckId);
+    state.detailId = deck.id;
+    state.detailTheme = deck.theme;
+    state.detailSlide = 0;
+    onRouteChange?.();
+    render();
+    window.scrollTo?.({ top: 0, behavior: 'instant' });
+  }
+
+  function openCatalog() {
+    state.detailId = '';
+    state.detailSlide = 0;
+    onRouteChange?.();
+  }
+
+  function handleClick(target, root) {
+    const el = target.closest('[data-tstore-action]');
+    if (!el) return false;
+    const action = el.dataset.tstoreAction;
+
+    if (action === 'source-tab') {
+      state.sourceTab = el.dataset.value || 'all';
+      state.visibleCount = BATCH_SIZE;
+      render();
+      return true;
+    }
+    if (action === 'category') {
+      state.category = el.dataset.value || 'all';
+      state.visibleCount = BATCH_SIZE;
+      render();
+      return true;
+    }
+    if (action === 'tone') {
+      state.tone = el.dataset.value || 'all';
+      state.visibleCount = BATCH_SIZE;
+      render();
+      return true;
+    }
+    if (action === 'clear-search') {
+      state.query = '';
+      state.visibleCount = BATCH_SIZE;
+      render();
+      root.querySelector('[data-tstore-search]')?.focus();
+      return true;
+    }
+    if (action === 'reset-filters') {
+      state.sourceTab = 'all';
+      state.category = 'all';
+      state.tone = 'all';
+      state.query = '';
+      state.visibleCount = BATCH_SIZE;
+      render();
+      return true;
+    }
+    if (action === 'toggle-favorite') {
+      const id = el.dataset.deckId;
+      if (state.favorites.has(id)) state.favorites.delete(id);
+      else state.favorites.add(id);
+      saveFavorites(state.favorites);
+      render();
+      return true;
+    }
+    if (action === 'open-detail') {
+      openDetail(el.dataset.deckId);
+      return true;
+    }
+    if (action === 'back-catalog') {
+      state.detailId = '';
+      state.detailSlide = 0;
+      onRouteChange?.();
+      render();
+      return true;
+    }
+    if (action === 'detail-slide') {
+      state.detailSlide = Number(el.dataset.index) || 0;
+      render();
+      return true;
+    }
+    if (action === 'detail-prev' || action === 'detail-next') {
+      const deck = getDeckTemplate(state.detailId);
+      const total = deckPreviewSlides(deck, state.detailTheme || deck.theme).slides.length;
+      if (total > 1) {
+        state.detailSlide = (state.detailSlide + (action === 'detail-next' ? 1 : -1) + total) % total;
+        render();
+      }
+      return true;
+    }
+    if (action === 'detail-theme') {
+      state.detailTheme = el.dataset.theme || '';
+      render();
+      return true;
+    }
+    if (action === 'use-deck') {
+      const deckId = el.dataset.deckId || state.detailId;
+      const theme = state.detailTheme || undefined;
+      state.busy = 'use';
+      Promise.resolve(useDeck(deckId, theme)).finally(() => {
+        state.busy = '';
+        state.detailId = '';
+      });
+      return true;
+    }
+    if (action === 'download-pptx') {
+      const deckId = el.dataset.deckId || state.detailId;
+      const theme = state.detailTheme || undefined;
+      state.busy = 'pptx';
+      render();
+      Promise.resolve(downloadDeckPptx(deckId, theme)).finally(() => {
+        state.busy = '';
+        render();
+      });
+      return true;
+    }
+    return false;
+  }
+
+  function handleInput(target, root) {
+    if (!target.matches('[data-tstore-search]')) return false;
+    state.query = target.value;
+    state.visibleCount = BATCH_SIZE;
+    if (!updateResultsOnly(root)) render();
+    return true;
+  }
+
+  function handleKeydown(event, root) {
+    if (event.key === 'Enter' && event.target.matches('[data-tstore-action="open-detail"]')) {
+      event.preventDefault();
+      openDetail(event.target.dataset.deckId);
+      return true;
+    }
+    if (!state.detailId) return false;
+    if (event.target.matches('input,textarea,select')) return false;
+    if (event.key === 'ArrowRight') {
+      event.preventDefault();
+      handleClick({ closest: () => ({ dataset: { tstoreAction: 'detail-next' } }) }, root);
+      return true;
+    }
+    if (event.key === 'ArrowLeft') {
+      event.preventDefault();
+      handleClick({ closest: () => ({ dataset: { tstoreAction: 'detail-prev' } }) }, root);
+      return true;
+    }
+    if (event.key === 'Escape') {
+      event.preventDefault();
+      handleClick({ closest: () => ({ dataset: { tstoreAction: 'back-catalog' } }) }, root);
+      return true;
+    }
+    return false;
   }
 
   return {
     state,
-    openCatalog() {
-      state.detailId = '';
-      state.detailSlideIndex = 0;
-      state.detailTheme = '';
+    markup: () => (state.detailId ? detailMarkup() : catalogMarkup()),
+    mount: root => {
+      observeSentinel(root);
+      bindPointer(root);
     },
-    openDetail(deckId) {
-      const deck = getDeckTemplate(deckId);
-      state.detailId = deck.id;
-      state.detailSlideIndex = 0;
-      state.detailTheme = deck.theme;
+    unmount: () => {
+      disconnectObserver();
+      unbindPointer();
     },
-    markup() {
-      return state.detailId ? detailMarkup() : catalogMarkup();
-    },
-    handleClick(target, root) {
-      const favBtn = target.closest('[data-store-fav]');
-      if (favBtn) {
-        const id = favBtn.dataset.storeFav;
-        if (state.favorites.has(id)) state.favorites.delete(id);
-        else state.favorites.add(id);
-        saveFavorites(state.favorites);
-        callbacks.render();
-        return true;
-      }
-
-      const useBtn = target.closest('[data-store-use]');
-      if (useBtn) {
-        callbacks.useDeck(useBtn.dataset.storeUse, useBtn.dataset.storeTheme || '');
-        return true;
-      }
-
-      const dlBtn = target.closest('[data-store-download-pptx]');
-      if (dlBtn) {
-        callbacks.downloadDeckPptx(dlBtn.dataset.storeDownloadPptx, dlBtn.dataset.storeTheme || '');
-        return true;
-      }
-
-      const tabBtn = target.closest('[data-store-tab]');
-      if (tabBtn) {
-        state.sourceTab = tabBtn.dataset.storeTab;
-        state.visibleCount = PAGE_STEP;
-        callbacks.render();
-        return true;
-      }
-
-      const catBtn = target.closest('[data-store-cat]');
-      if (catBtn) {
-        state.category = catBtn.dataset.storeCat;
-        state.visibleCount = PAGE_STEP;
-        callbacks.render();
-        return true;
-      }
-
-      const toneBtn = target.closest('[data-store-tone]');
-      if (toneBtn) {
-        state.tone = toneBtn.dataset.storeTone;
-        state.visibleCount = PAGE_STEP;
-        callbacks.render();
-        return true;
-      }
-
-      if (target.closest('[data-store-more]')) {
-        state.visibleCount += PAGE_STEP;
-        syncCatalogInPlace(root);
-        return true;
-      }
-
-      if (target.closest('[data-store-reset-filters]')) {
-        state.query = '';
-        state.sourceTab = 'all';
-        state.category = 'all';
-        state.tone = 'all';
-        state.visibleCount = PAGE_STEP;
-        callbacks.render();
-        return true;
-      }
-
-      if (target.closest('[data-store-back]')) {
-        state.detailId = '';
-        state.detailSlideIndex = 0;
-        state.detailTheme = '';
-        callbacks.onRouteChange();
-        callbacks.render();
-        window.scrollTo?.({top: 0, behavior: 'instant'});
-        return true;
-      }
-
-      const slideStep = target.closest('[data-store-slide-step]');
-      if (slideStep && state.detailId) {
-        const deck = getDeckTemplate(state.detailId);
-        const total = deckPreviewSlides(deck, state.detailTheme || deck.theme).slides.length;
-        state.detailSlideIndex = (state.detailSlideIndex + Number(slideStep.dataset.storeSlideStep) + total) % total;
-        syncCarouselInPlace(root);
-        return true;
-      }
-
-      const slideBtn = target.closest('[data-store-slide]');
-      if (slideBtn && state.detailId) {
-        state.detailSlideIndex = Number(slideBtn.dataset.storeSlide) || 0;
-        syncCarouselInPlace(root);
-        return true;
-      }
-
-      const palBtn = target.closest('[data-store-palette]');
-      if (palBtn && state.detailId) {
-        state.detailTheme = palBtn.dataset.storePalette;
-        callbacks.render();
-        return true;
-      }
-
-      const openCard = target.closest('[data-store-open]');
-      if (openCard) {
-        this.openDetail(openCard.dataset.storeOpen);
-        callbacks.onRouteChange();
-        callbacks.render();
-        window.scrollTo?.({top: 0, behavior: 'instant'});
-        return true;
-      }
-
-      return false;
-    },
-    handleInput(target, root) {
-      if (target.matches?.('[data-store-search]')) {
-        state.query = target.value;
-        state.visibleCount = PAGE_STEP;
-        syncCatalogInPlace(root);
-        return true;
-      }
-      return false;
-    },
-    handleKeydown(event, root) {
-      if (event.target?.matches?.('input, textarea, select')) return false;
-      if (state.detailId) {
-        if (event.key === 'ArrowRight' || event.key === 'ArrowLeft') {
-          event.preventDefault();
-          const deck = getDeckTemplate(state.detailId);
-          const total = deckPreviewSlides(deck, state.detailTheme || deck.theme).slides.length;
-          const step = event.key === 'ArrowRight' ? 1 : -1;
-          state.detailSlideIndex = (state.detailSlideIndex + step + total) % total;
-          syncCarouselInPlace(root);
-          return true;
-        }
-        if (event.key === 'Escape') {
-          event.preventDefault();
-          state.detailId = '';
-          callbacks.onRouteChange();
-          callbacks.render();
-          return true;
-        }
-      } else if (event.key === 'Enter' || event.key === ' ') {
-        const card = event.target?.closest?.('[data-store-open]');
-        if (card) {
-          event.preventDefault();
-          this.openDetail(card.dataset.storeOpen);
-          callbacks.onRouteChange();
-          callbacks.render();
-          window.scrollTo?.({top: 0, behavior: 'instant'});
-          return true;
-        }
-      }
-      return false;
-    }
+    openDetail,
+    openCatalog,
+    handleClick,
+    handleInput,
+    handleKeydown
   };
 }

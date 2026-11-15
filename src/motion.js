@@ -6,7 +6,7 @@ export class PageMotion {
     this.slideKey = key;
     if (!key || !previousKey || previousKey === key || transition === 'none' || prefersReducedMotion()) return;
     if (previousKey.slice(0, previousKey.lastIndexOf(':')) !== key.slice(0, key.lastIndexOf(':'))) return;
-    const stage = root.querySelector('.document-stage:not(.outgoing-slide)');
+    const stage = root.querySelector('.document-stage:not(.outgoing-slide), .mobile-lesson-content:not(.outgoing-slide)');
     if (!stage) return;
     const snapshot = stage.cloneNode(true);
     snapshot.inert = true;
@@ -22,7 +22,7 @@ export class PageMotion {
   }
   showOutgoingSlide(root, snapshot) {
     if (!snapshot) return;
-    const incoming = root.querySelector('.document-stage');
+    const incoming = root.querySelector('.document-stage, .mobile-lesson-content');
     if (!incoming) return;
     const parent = incoming.parentElement;
     parent.classList.add('slide-transition-stack');
@@ -49,6 +49,8 @@ export class PageMotion {
     root.dataset.scene = kind;
     if (changed && !reduced) {
       root.dataset.slideDirection = slide < (this.lastSlide || 0) ? 'backward' : 'forward';
+      // Force reflow so consecutive slide transitions restart CSS keyframe animations reliably on every client.
+      void root.offsetWidth;
       root.classList.add('scene-arrive');
       clearTimeout(this.timer); this.timer = setTimeout(() => root.classList.remove('scene-arrive'), 1000);
     }

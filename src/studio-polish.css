@@ -334,9 +334,10 @@ html[data-theme][data-ui-style] #app .designer-inspector:has(.slide-activities[o
 @keyframes showcase-light { from{opacity:.45;background-position:0 0} to{opacity:1;background-position:30px 16px} }
 @media(prefers-reduced-motion:reduce){#app .experience-feature::before{animation:none}}
 @media (prefers-reduced-motion:no-preference){
- #app[data-transition=zoom].scene-arrive :is(.document-stage,.slide-panel){animation:storage-slide-zoom .46s ease-out both}
- #app[data-transition=rise].scene-arrive :is(.document-stage,.slide-panel){animation:storage-slide-rise .42s ease-out both}
- #app[data-transition=wipe].scene-arrive :is(.document-stage,.slide-panel){animation:storage-slide-wipe .52s ease-out both}
+ #app[data-transition=zoom].scene-arrive :is(.document-stage,.slide-panel,.mobile-lesson-content){animation:storage-slide-zoom .46s ease-out both}
+ #app[data-transition=rise].scene-arrive :is(.document-stage,.slide-panel,.mobile-lesson-content){animation:storage-slide-rise .42s ease-out both}
+ #app[data-transition=wipe].scene-arrive :is(.document-stage,.slide-panel,.mobile-lesson-content){animation:storage-slide-wipe .52s ease-out both}
+ #app[data-transition=slide].scene-arrive .mobile-lesson-content{animation:slide-appear .45s cubic-bezier(.2,.8,.2,1) both}
 }
 @keyframes storage-slide-zoom{from{opacity:0;scale:.94}to{opacity:1;scale:1}}
 @keyframes storage-slide-rise{from{opacity:0;translate:0 18px}to{opacity:1;translate:0}}

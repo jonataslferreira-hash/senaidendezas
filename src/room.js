@@ -1,6 +1,6 @@
 import { createUuid } from './uuid.js';
 import {activityBlocks} from './activity-blocks.js';
-import {tickGame,isGameType,startGame,gameControl,gameInput,gameSnapshot,teamScores,assignTeam,publicGame,settleTeams} from './stage-games.js';
+import {tickGame,isGameType,startGame,syncGameJoin,gameControl,gameInput,gameSnapshot,teamScores,assignTeam,publicGame,settleTeams} from './stage-games.js';
 import {isPhotoAvatar} from './player-avatar.js';
 import { avatars, defaultQuestions } from './content.js';
 import { demoLesson, validateLesson } from './lessons.js';
@@ -47,13 +47,13 @@ export class Room {
       p = { id: newToken(), token: newToken(), name, avatar: avatars.includes(avatar)||isPhotoAvatar(avatar) ? avatar : avatars[0], score: 0, correct: 0, streak:0, answers: {}, online: true };
       this.data.players.push(p);
     }
-    p.online = true;assignTeam(this,p);
+    p.online = true;assignTeam(this,p);syncGameJoin(this,p);
     return { id: p.id, token: p.token };
   }
   disconnect(id) { const p = this.data.players.find(p => p.id === id); if (p) p.online = false; }
   control(action, value) {
     const d = this.data;
-    if(action==='next-stage'&&this.blocks){const a=this.activity(),next=a.slideIndices[a.slideIndices.indexOf(d.slide)+1];if(a.type==='poll'&&next!==undefined){d.slide=next;d.phase='poll';d.pollId=newToken();d.votes={};}else if(isGameType(a.type)&&next!==undefined){d.slide=next;startGame(this);}else if((d.blockIndex||0)+1<this.blocks.length)this.enterBlock((d.blockIndex||0)+1);else d.phase='finished';
+    if(action==='next-stage'&&this.blocks){const a=this.activity(),next=a.slideIndices[a.slideIndices.indexOf(d.slide)+1];if(a.type==='poll'&&next!==undefined){d.slide=next;d.phase='poll';d.pollId=newToken();d.votes={};}else if(isGameType(a.type)&&next!==undefined){d.slide=next;startGame(this);}else if((d.blockIndex||0)+1<this.blocks.length)this.enterBlock((d.blockIndex||0)+1);else {d.phase='finished';d.resultStartedAt=this.now();d.podiumRevealed=false;d.podiumStep=0;d.victory=Math.floor(Math.random()*4);}
     } else if (action === 'edit-slide' && d.phase === 'lesson' && value?.index === d.slide) {
       const nextSlides = this.slides.map((slide, i) => i === value.index ? { ...value.slide, id: slide.id } : slide);
       const next = validateLesson({ ...this.lesson, slides: nextSlides });
@@ -84,20 +84,26 @@ export class Room {
       Object.assign(d, { phase: 'lobby', questionIndex: -1, startedAt: 0, deadline: 0 });
     } else if (action === 'start-quiz' && d.phase === 'lobby') {
       if (!d.players.some(p => p.online)) throw Error('Espere pelo menos um participante entrar.');
-      for (const p of d.players) { p.score = 0; p.correct = 0;p.streak=0; p.answers = {}; }
+      const currentBlock = this.blocks ? (d.blockIndex || 0) : 0;
+      const keepPriorQuizPoints = Boolean(this.blocks && d.lastQuizBlock !== undefined && d.lastQuizBlock !== currentBlock);
+      for (const p of d.players) {
+        if (keepPriorQuizPoints && p.score > 0) p.bonus = (p.bonus || 0) + p.score;
+        p.score = 0; p.correct = keepPriorQuizPoints ? (p.correct || 0) : 0; p.streak = 0; p.answers = {};
+      }
+      d.lastQuizBlock = currentBlock;
       Object.assign(d, { phase: 'countdown', questionIndex: -1, startedAt: this.now(), deadline: this.now() + 3000 });
     } else if (action === 'reveal' && d.phase === 'question') this.reveal();
     else if (action === 'next' && ['reveal','leaderboard'].includes(d.phase)) {
       if (d.questionIndex + 1 < this.questions.length) this.startQuestion(d.questionIndex + 1);
       else {d.phase = 'finished';d.resultStartedAt=this.now();d.podiumRevealed=false;d.podiumStep=0;d.victory=Math.floor(Math.random()*4);}
-    } else if (action === 'finish' && d.phase === 'lesson') d.phase = 'finished';
+    } else if (action === 'finish' && d.phase === 'lesson') { d.phase = 'finished'; d.resultStartedAt = this.now(); d.podiumRevealed = false; d.podiumStep = 0; d.victory = Math.floor(Math.random() * 4); }
     else if (action === 'lesson' && ['lobby', 'countdown', 'reveal','leaderboard', 'finished', 'poll', 'poll-results', 'game'].includes(d.phase)) {if(this.blocks&&(['quiz','poll'].includes(this.blocks[d.blockIndex||0].type)||isGameType(this.blocks[d.blockIndex||0].type))){if(!['lobby','countdown'].includes(d.phase)&&(d.blockIndex||0)+1<this.blocks.length)this.enterBlock((d.blockIndex||0)+1);else{const first=this.blocks.findIndex(b=>b.type==='slides');if(first>=0)this.enterBlock(first);else d.phase='finished';}}else{d.phase = 'lesson'; d.questionIndex = -1;} }
     else throw Error('Esta ação não está disponível agora.');
   }
   updateProfile(id,{name,avatar}={}){const p=this.data.players.find(p=>p.id===id);if(!p)throw Error('Participante não encontrado.');name=String(name||'').trim().replace(/[\x00-\x1f\x7f]/g,'').slice(0,24);if(!name)throw Error('Digite seu nome.');p.name=name;if(avatars.includes(avatar)||isPhotoAvatar(avatar))p.avatar=avatar;}
   kick(id){const p=this.data.players.find(p=>p.id===id);if(!p)throw Error('Participante não encontrado.');this.data.removedTokens=[...(this.data.removedTokens||[]),p.token].slice(-120);this.data.players=this.data.players.filter(p=>p.id!==id);if(this.data.votes)delete this.data.votes[id];}
   startQuestion(index) {
-    this.data.previousRanking=[...this.data.players].sort((a,b)=>b.score-a.score||b.correct-a.correct||a.name.localeCompare(b.name,'pt-BR')).map(p=>p.id);this.data.previousScores=Object.fromEntries(this.data.players.map(p=>[p.id,p.score]));this.data.previousBonus=Object.fromEntries(this.data.players.map(p=>[p.id,p.bonus||0]));
+    this.data.previousRanking=[...this.data.players].sort((a,b)=>(b.score+(b.bonus||0))-(a.score+(a.bonus||0))||b.correct-a.correct||a.name.localeCompare(b.name,'pt-BR')).map(p=>p.id);this.data.previousScores=Object.fromEntries(this.data.players.map(p=>[p.id,p.score]));this.data.previousBonus=Object.fromEntries(this.data.players.map(p=>[p.id,p.bonus||0]));
     Object.assign(this.data, { questionIndex: index, phase: 'question', startedAt: this.now(), deadline: this.now() + this.questions[index].seconds * 1000 });
   }
   answer(id, { choice, questionIndex } = {}) {
@@ -139,8 +145,10 @@ export class Room {
     const revealed = ['reveal','leaderboard', 'finished'].includes(d.phase);
     // Aluno só recebe os botões (sem o texto da pergunta e das alternativas). Na prévia o texto aparece.
     const bare = Boolean(id) && !this.fullText;
+    const hasScoredStages = this.lesson.questions.length > 0 || this.slides.some(s => s.game && !['teams', 'raffle'].includes(s.game.type));
+    const slideTransition = this.slides[d.slide]?.transition || 'slide';
     return {
-      code: d.code, phase: d.phase,activity:this.activity(),resultStartedAt:d.resultStartedAt||0,podiumRevealed:Boolean(d.podiumRevealed),podiumStep:d.phase==='finished'?(d.resultStartedAt?d.podiumStep||0:4):0,victory:d.victory||0, animationStep:d.animationStep||0, slide: d.slide, model: d.model, exploded: d.exploded,
+      code: d.code, phase: d.phase,activity:this.activity(),resultStartedAt:d.resultStartedAt||0,podiumRevealed:Boolean(d.podiumRevealed),podiumStep:d.phase==='finished'?(d.resultStartedAt?d.podiumStep||0:4):0,victory:d.victory||0, animationStep:d.animationStep||0, slide: d.slide, slideTransition, hasScoredStages, model: d.model, exploded: d.exploded,
       questionIndex: d.questionIndex, totalQuestions: this.questions.length, serverTime: this.now(),
       countdownEndsAt: d.phase === 'countdown' ? d.deadline : 0,
       game: gameSnapshot(this, id, bare), teams: teamScores(this),

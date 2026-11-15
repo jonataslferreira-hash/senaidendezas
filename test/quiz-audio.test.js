@@ -32,11 +32,25 @@ test('contagem de 5 segundos conserva seu próprio resultado e não duplica o ef
 test('revelação antecipada interrompe a contagem e toca o resultado normal',async t=>{
  t.mock.timers.enable({apis:['Date','setTimeout','setInterval'],now:100000});const game=engine(()=>0),state=question(Date.now());game.sync(state,lesson,true,true);t.mock.timers.tick(15500);game.tick();await Promise.resolve();await Promise.resolve();game.sync({...state,phase:'reveal',serverTime:Date.now()},lesson,true,true);assert.equal(game.five.paused,true);assert.equal(game.result.plays,1);game.stop();
 });
-test('pódio só inicia a trilha após as revelações, com fade, slowed e loop; sair cancela tudo',t=>{
- t.mock.timers.enable({apis:['Date','setTimeout','setInterval'],now:100000});const game=engine(),state={code:'123456',phase:'finished',questionIndex:2,serverTime:Date.now(),resultStartedAt:Date.now()};game.sync(state,lesson,true,true);assert.equal(game.audio.plays,0);t.mock.timers.tick(9000);assert.equal(game.audio.src,podiumTrack.url);assert.equal(game.audio.volume,0);assert.equal(game.audio.playbackRate,.85);assert.equal(game.audio.preservesPitch,false);assert.equal(game.audio.loop,true);t.mock.timers.tick(900);assert.ok(game.audio.volume>0&&game.audio.volume<.07);game.sync(state,lesson,true,true);t.mock.timers.tick(1000);assert.ok(Math.abs(game.audio.volume-.07)<1e-9);game.stop();assert.equal(game.audio.paused,true);const count=game.audio.plays;t.mock.timers.tick(20000);assert.equal(game.audio.plays,count);
+test('pódio só inicia a trilha após as revelações, com fade, slowed, volume reforçado e loop; sair cancela tudo',t=>{
+ t.mock.timers.enable({apis:['Date','setTimeout','setInterval'],now:100000});const game=engine(),state={code:'123456',phase:'finished',questionIndex:2,serverTime:Date.now(),resultStartedAt:Date.now()};game.sync(state,lesson,true,true);assert.equal(game.audio.plays,0);t.mock.timers.tick(9000);assert.equal(game.audio.src,podiumTrack.url);assert.equal(game.audio.volume,0);assert.equal(game.audio.playbackRate,.85);assert.equal(game.audio.preservesPitch,false);assert.equal(game.audio.loop,true);assert.ok(game.cuesPlayed.includes('drumroll'),'toca tambor durante o suspense do ranking');assert.ok(game.cuesPlayed.includes('confetti'),'toca confete ao revelar o campeão');t.mock.timers.tick(900);assert.ok(game.audio.volume>0&&game.audio.volume<.14);game.sync(state,lesson,true,true);t.mock.timers.tick(1000);assert.ok(Math.abs(game.audio.volume-.14)<1e-9);game.stop();assert.equal(game.audio.paused,true);const count=game.audio.plays;t.mock.timers.tick(20000);assert.equal(game.audio.plays,count);
 });
 test('revelar todos pula a espera uma vez sem cancelar o fade nas atualizações seguintes',t=>{
- t.mock.timers.enable({apis:['Date','setTimeout','setInterval'],now:100000});const game=engine(),state={code:'123456',phase:'finished',questionIndex:2,serverTime:Date.now(),resultStartedAt:Date.now()};game.sync(state,lesson,true,true);const all={...state,podiumRevealed:true};game.sync(all,lesson,true,true);assert.equal(game.audio.src,podiumTrack.url);assert.equal(game.audio.volume,0);t.mock.timers.tick(500);game.sync(all,lesson,true,true);t.mock.timers.tick(1500);assert.ok(Math.abs(game.audio.volume-.07)<1e-9);assert.equal(game.audio.plays,1);assert.equal(game.result.plays,1);game.stop();
+ t.mock.timers.enable({apis:['Date','setTimeout','setInterval'],now:100000});const game=engine(),state={code:'123456',phase:'finished',questionIndex:2,serverTime:Date.now(),resultStartedAt:Date.now()};game.sync(state,lesson,true,true);const all={...state,podiumRevealed:true};game.sync(all,lesson,true,true);assert.equal(game.audio.src,podiumTrack.url);assert.equal(game.audio.volume,0);t.mock.timers.tick(500);game.sync(all,lesson,true,true);t.mock.timers.tick(1500);assert.ok(Math.abs(game.audio.volume-.14)<1e-9);assert.equal(game.audio.plays,1);assert.equal(game.result.plays,1);assert.ok(game.cuesPlayed.includes('confetti'));game.stop();
+});
+test('salas de espera de jogos ao vivo tocam música de lobby e pódio final dispara confete e loop',t=>{
+ t.mock.timers.enable({apis:['Date','setTimeout','setInterval'],now:100000});
+ const game=engine();
+ const tugLobby={code:'123456',phase:'game',questionIndex:-1,serverTime:Date.now(),game:{id:'g1',type:'tug',state:'ready',round:-1}};
+ game.sync(tugLobby,lesson,true,true);
+ assert.ok(lobbyTracks.some(tr=>tr.url===game.audio.src),'sala de espera do Cabo de Guerra toca música de lobby');
+ assert.equal(game.audio.paused,false);
+ game.sync({...tugLobby,game:{id:'g1',type:'tug',state:'pull',round:0}},lesson,true,true);
+ assert.ok(game.cuesPlayed.includes('drumroll'),'puxada do Cabo de Guerra toca tambor');
+ game.sync({...tugLobby,game:{id:'g1',type:'tug',state:'done',round:0}},lesson,true,true);
+ assert.ok(game.cuesPlayed.includes('confetti'),'vitória do jogo ao vivo dispara confete');
+ assert.equal(game.audio.src,podiumTrack.url,'vitória inicia música loop de vitória');
+ game.stop();
 });
 test('uma reprodução atrasada não reinicia depois de sair nem pausa a faixa nova',async()=>{
  const game=engine(),player=game.audio;let release;player.play=()=>new Promise(resolve=>release=()=>{player.paused=false;resolve();});const old=game.play(player);game.stop();release();await old;assert.equal(player.paused,true);

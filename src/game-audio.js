@@ -3,35 +3,88 @@ import {validateGameSettings} from './game-settings.js';
 import {lobbyTracks,questionTracks,countdownTracks,resultTrack,podiumTrack,chooseTrack,timedTracks} from './quiz-tracks.js';
 const createAudio=label=>{const audio=new Audio();audio.preload='metadata';audio.hidden=true;audio.dataset[label]='';document.body.append(audio);return audio;};
 export class GameAudio{
- constructor({audioFactory=createAudio,random=Math.random,now=Date.now}={}){
-  this.random=random;this.now=now;this.audio=audioFactory('quizSoundtrack');this.five=audioFactory('quizCountdown');this.result=audioFactory('quizResult');this.versions=new WeakMap();this.desired=new WeakMap();this.timers=[];
-  this.audio.addEventListener('ended',()=>{if(['lobby','countdown'].includes(this.state?.phase)&&this.selected==='random'&&this.enabled){this.key='';this.sync(...this.current);}});
+ constructor({audioFactory=createAudio,random=Math.random,now=Date.now,context=null}={}){
+  this.random=random;this.now=now;this.context=context;this.audio=audioFactory('quizSoundtrack');this.five=audioFactory('quizCountdown');this.result=audioFactory('quizResult');this.versions=new WeakMap();this.desired=new WeakMap();this.timers=[];this.cuesPlayed=[];
+  this.audio.addEventListener('ended',()=>{
+   const inLobby=['lobby','countdown'].includes(this.state?.phase)||(this.state?.phase==='game'&&['ready','teams'].includes(this.state?.game?.state==='ready'?'ready':this.state?.game?.type));
+   if(inLobby&&this.selected==='random'&&this.enabled){this.key='';this.sync(...this.current);}
+  });
   this.five.addEventListener('error',()=>{this.fiveActive=false;if(this.state?.phase==='reveal'&&this.suppressedResult)this.playResult();});
  }
  unlock(){try{this.context||=new (window.AudioContext||window.webkitAudioContext)();this.context.resume().catch(()=>{});}catch{}}
+ noiseBuffer(){
+  if(this._noiseBuffer&&this._noiseCtx===this.context)return this._noiseBuffer;
+  const ctx=this.context,length=Math.floor((ctx.sampleRate||44100)*0.12),buf=ctx.createBuffer(1,length,ctx.sampleRate||44100),data=buf.getChannelData(0);
+  for(let i=0;i<length;i++)data[i]=(Math.random()*2-1)*Math.exp(-i/(length*0.35));
+  this._noiseBuffer=buf;this._noiseCtx=ctx;return buf;
+ }
+ playDrumroll(duration=1.5){
+  const ctx=this.context,now=ctx.currentTime,vol=Math.max(.03,Math.min(.22,(this.settings?.volume??.1)*1.4));
+  const buffer=this.noiseBuffer(),hits=Math.max(12,Math.round(duration*18));
+  for(let i=0;i<hits;i++){
+   const progress=i/(hits-1),t=now+progress*duration,amp=vol*(0.22+0.78*progress*progress);
+   const src=ctx.createBufferSource();src.buffer=buffer;
+   const filter=ctx.createBiquadFilter();filter.type='bandpass';filter.frequency.value=1650+progress*650;filter.Q.value=1.4;
+   const gain=ctx.createGain();gain.gain.setValueAtTime(0.0001,t);gain.gain.linearRampToValueAtTime(amp,t+0.006);gain.gain.exponentialRampToValueAtTime(0.0001,t+0.055);
+   src.connect(filter);filter.connect(gain);gain.connect(ctx.destination);src.start(t);src.stop(t+0.06);
+   if(i%2===0){
+    const body=ctx.createOscillator(),bg=ctx.createGain();body.type='triangle';body.frequency.setValueAtTime(185+progress*30,t);body.frequency.exponentialRampToValueAtTime(110,t+0.045);
+    bg.gain.setValueAtTime(0.0001,t);bg.gain.linearRampToValueAtTime(amp*0.45,t+0.005);bg.gain.exponentialRampToValueAtTime(0.0001,t+0.05);
+    body.connect(bg);bg.connect(ctx.destination);body.start(t);body.stop(t+0.055);
+   }
+  }
+ }
+ playConfetti(){
+  const ctx=this.context,now=ctx.currentTime,vol=Math.max(.04,Math.min(.22,(this.settings?.volume??.1)*1.35));
+  // Estouro festivo curto (pop de confete) + acorde brilhante ascendente.
+  const pop=ctx.createBufferSource();pop.buffer=this.noiseBuffer();
+  const hp=ctx.createBiquadFilter();hp.type='highpass';hp.frequency.value=1200;
+  const pg=ctx.createGain();pg.gain.setValueAtTime(0.0001,now);pg.gain.linearRampToValueAtTime(vol*1.2,now+0.008);pg.gain.exponentialRampToValueAtTime(0.0001,now+0.12);
+  pop.connect(hp);hp.connect(pg);pg.connect(ctx.destination);pop.start(now);pop.stop(now+0.13);
+  [523.25,659.25,783.99,1046.5,1318.5].forEach((freq,i)=>{
+   const osc=ctx.createOscillator(),g=ctx.createGain(),t=now+0.04+i*0.055;
+   osc.type=i>2?'sine':'triangle';osc.frequency.setValueAtTime(freq,t);
+   g.gain.setValueAtTime(0.0001,t);g.gain.linearRampToValueAtTime(vol*0.55,t+0.014);g.gain.exponentialRampToValueAtTime(0.0001,t+0.34);
+   osc.connect(g);g.connect(ctx.destination);osc.start(t);osc.stop(t+0.36);
+  });
+ }
  cue(name){
-  if(!this.context||this.context.state!=='running'||!this.effects)return;
+  if(!this.effects)return;
+  this.cuesPlayed.push(name);
+  if(!this.context||this.context.state!=='running')return;
+  if(name==='drumroll'){try{this.playDrumroll(1.5);}catch{}return;}
+  if(name==='confetti'){try{this.playConfetti();}catch{}return;}
   const tones={answer:[523,659],correct:[523,659,784],wrong:[220,174],countdown:[440,660,880],podium:[294,440,587]};const notes=tones[name];if(!notes)return;
-  notes.forEach((f,i)=>{const o=this.context.createOscillator(),g=this.context.createGain(),start=this.context.currentTime+i*.12;o.type=name==='wrong'?'triangle':'sine';o.frequency.value=f;g.gain.setValueAtTime(0,start);g.gain.linearRampToValueAtTime(.04,start+.012);g.gain.exponentialRampToValueAtTime(.001,start+.24);o.connect(g);g.connect(this.context.destination);o.start(start);o.stop(start+.25);});
+  notes.forEach((f,i)=>{const o=this.context.createOscillator(),g=this.context.createGain(),start=this.context.currentTime+i*.12;o.type=name==='wrong'?'triangle':'sine';o.frequency.value=f;g.gain.setValueAtTime(0,start);g.gain.linearRampToValueAtTime(.05,start+.012);g.gain.exponentialRampToValueAtTime(.001,start+.24);o.connect(g);g.connect(this.context.destination);o.start(start);o.stop(start+.25);});
  }
  pause(player){this.versions.set(player,(this.versions.get(player)||0)+1);this.desired.set(player,false);player.pause();}
  play(player){const version=(this.versions.get(player)||0)+1;this.versions.set(player,version);this.desired.set(player,true);try{return Promise.resolve(player.play()).then(()=>{if(!this.desired.get(player))player.pause();return this.versions.get(player)===version;}).catch(()=>false);}catch{return Promise.resolve(false);}}
  clearTimers(){for(const timer of this.timers)clearTimeout(timer);this.timers=[];clearInterval(this.fade);this.fade=null;}
  remaining(){return Math.max(0,((this.state?.question?.deadline||0)-this.now()-this.offset)/1000);}
- playResult(){if(!this.enabled||!this.effects||this.resultKey===this.questionKey)return;this.resultKey=this.questionKey;this.suppressedResult=false;if(!this.result.paused&&this.result.src===resultTrack.url)return;this.pause(this.result);this.result.src=resultTrack.url;this.result.loop=false;this.result.playbackRate=1;this.result.volume=Math.min(.35,Math.max(.18,this.settings.volume*2));this.play(this.result);}
+ playResult(){if(!this.enabled||!this.effects||this.resultKey===this.questionKey)return;this.resultKey=this.questionKey;this.suppressedResult=false;if(!this.result.paused&&this.result.src===resultTrack.url)return;this.pause(this.result);this.result.src=resultTrack.url;this.result.loop=false;this.result.playbackRate=1;this.result.volume=this.settings.volume>0?Math.min(.35,Math.max(.2,this.settings.volume*2)):0;this.play(this.result);}
  startTrack(track,key,{loop=true,volume=this.settings.volume,rate=1}={}){if(!track||this.key===key)return;this.pause(this.audio);clearInterval(this.fade);this.fade=null;this.key=key;this.lastTrack=track.id;this.audio.src=track.url;this.audio.loop=loop;this.audio.volume=volume;this.audio.playbackRate=rate;this.audio.preservesPitch=rate===1;this.play(this.audio);}
  startPodium(){
-  if(!this.enabled||this.state?.phase!=='finished'||this.key==='podium')return;
-  this.startTrack(podiumTrack,'podium',{loop:true,volume:0,rate:.85});const started=this.now(),target=Math.min(.08,this.settings.volume*.7);
+  const activePodium=this.state?.phase==='finished'||(this.state?.phase==='game'&&this.state?.game?.state==='done');
+  if(!this.enabled||!activePodium||this.key==='podium')return;
+  this.startTrack(podiumTrack,'podium',{loop:true,volume:0,rate:.85});
+  const started=this.now(),target=this.settings.volume>0?Math.min(.45,this.settings.volume*1.4):0;
   this.fade=setInterval(()=>{const progress=Math.min(1,(this.now()-started)/1800);this.audio.volume=target*progress;if(progress>=1){clearInterval(this.fade);this.fade=null;}},50);
+ }
+ playLobbyTrack(lesson,key){
+  this.section='lobby';this.selected=this.settings.lobby;
+  const custom=lesson?.lobbyAudio;
+  if(this.selected==='none'||this.selected==='custom'&&!custom?.data){this.pause(this.audio);this.key='';return;}
+  if(this.key===key)return;
+  const track=this.selected==='custom'?{id:'custom-lobby',url:custom.data}:this.selected==='random'?chooseTrack(lobbyTracks,this.lastTrack,this.random):[...lobbyTracks,...questionTracks,...editorTracks].find(t=>t.id===this.selected);
+  this.startTrack(track,key,{loop:this.selected==='custom'?custom.loop!==false:this.selected!=='random',volume:this.settings.volume*(this.selected==='custom'?(custom.volume??1):1)});
  }
  sync(state,lesson,host,music){
   const previousState=this.state;this.current=[state,lesson,host,music];this.state=state;this.settings=validateGameSettings(lesson?.gameSettings);this.enabled=Boolean(host&&music);this.effects=this.settings.effects&&music;if(state!==previousState||this.offset===undefined)this.offset=(state?.serverTime||this.now())-this.now();
-  const phase=state?.phase,scene=(state?.code||'')+':'+phase+':'+state?.questionIndex,changed=scene!==this.scene;
+  const phase=state?.phase,gameKey=phase==='game'?':'+(state.game?.id||'')+':'+(state.game?.state||'')+':'+(state.game?.round??''):'',scene=(state?.code||'')+':'+phase+':'+state?.questionIndex+gameKey,changed=scene!==this.scene;
   if(!this.enabled){this.clearTimers();for(const p of [this.audio,this.five,this.result])this.pause(p);this.key='';this.scene=null;return;}
   if(changed){this.clearTimers();this.scene=scene;
    if(!['question','reveal','leaderboard','finished'].includes(phase))this.pause(this.five);
-   if(!['reveal','leaderboard','finished'].includes(phase))this.pause(this.result);
+   if(!['reveal','leaderboard','finished','game'].includes(phase))this.pause(this.result);
    if(phase==='question'){
     this.questionKey=(state.code||'')+':'+state.questionIndex+':'+state.question.startedAt;this.fiveActive=false;this.fiveAttempted=false;this.suppressedResult=false;this.resultKey='';this.key='';this.pause(this.five);
     this.countdownTrack=this.settings.questions!=='none'&&this.settings.effects&&this.random()<1/3?chooseTrack(countdownTracks,null,this.random):null;
@@ -43,29 +96,50 @@ export class GameAudio{
     if(this.fiveActive&&this.remaining()<.25)this.suppressedResult=true;
     else{this.pause(this.five);this.playResult();}
    }
+   if(phase==='leaderboard'){
+    this.pause(this.audio);this.key='';
+    this.cue('drumroll');
+   }
    if(phase==='finished'){
     this.pause(this.audio);this.key='';this.finalSkipped=false;const elapsed=Math.max(0,(this.now()+this.offset-(state.resultStartedAt||this.now()))/1000);
-    for(const [delay,fn]of [[2,()=>this.cue('podium')],[4.5,()=>this.cue('podium')],[7,()=>{this.resultKey='';this.playResult();}],[9,()=>this.startPodium()]])if(delay>elapsed&&!state.podiumRevealed)this.timers.push(setTimeout(fn,(delay-elapsed)*1000));
+    for(const [delay,fn]of [[.15,()=>this.cue('drumroll')],[2,()=>this.cue('podium')],[4.5,()=>this.cue('podium')],[5.2,()=>this.cue('drumroll')],[7,()=>{this.resultKey='';this.playResult();this.cue('confetti');}],[9,()=>this.startPodium()]])if(delay>elapsed&&!state.podiumRevealed)this.timers.push(setTimeout(fn,(delay-elapsed)*1000));
     if(state.podiumRevealed||elapsed>=9)this.startPodium();
    }
    if(phase==='countdown')this.cue('countdown');
   }
-  if(phase==='finished'){if(state.podiumRevealed&&!this.finalSkipped){for(const timer of this.timers)clearTimeout(timer);this.timers=[];this.finalSkipped=true;if(this.key!=='podium'){this.resultKey='';this.playResult();this.startPodium();}}return;}
-  // Sobrevivência e cabo de guerra usam a mesma música das perguntas do quiz enquanto a pergunta está aberta.
+  if(phase==='finished'){if(state.podiumRevealed&&!this.finalSkipped){for(const timer of this.timers)clearTimeout(timer);this.timers=[];this.finalSkipped=true;if(this.key!=='podium'){this.resultKey='';this.playResult();this.cue('confetti');this.startPodium();}}return;}
   if(phase==='game'){
-   const g=state.game,sel=this.settings.questions,custom=lesson.questionAudio||lesson.quizAudio;
-   if(!g||!['survival','tug','race','flash'].includes(g.type)||g.state!=='open'||sel==='none'||sel==='custom'&&!custom?.data){if((this.key||'').startsWith('game:')&&g?.state==='reveal')this.cue('countdown');this.pause(this.audio);this.key='';return;}
+   const g=state.game,sel=this.settings.questions,custom=lesson?.questionAudio||lesson?.quizAudio;
+   if(!g){this.pause(this.audio);this.key='';return;}
+   // Salas de espera de jogos ao vivo (Cabo de Guerra, Relâmpago, Sobrevivência, Corrida, Equipes) tocam música de lobby.
+   if(g.state==='ready'||g.type==='teams'){
+    this.playLobbyTrack(lesson,'game-lobby:'+g.id+':'+this.settings.lobby);return;
+   }
+   if(g.state==='leaderboard'||g.state==='pull'){
+    this.pause(this.audio);this.key='';
+    if(changed)this.cue('drumroll');
+    return;
+   }
+   if(g.state==='done'){
+    if(changed){this.questionKey='game-done:'+g.id;this.resultKey='';this.playResult();this.cue('confetti');this.startPodium();}
+    return;
+   }
+   if(!['survival','tug','race','flash'].includes(g.type)||g.state!=='open'||sel==='none'||sel==='custom'&&!custom?.data){
+    if((this.key||'').startsWith('game:')&&g?.state==='reveal')this.cue('countdown');
+    this.pause(this.audio);this.key='';return;
+   }
    const key='game:'+g.id+':'+g.round;if(this.key===key)return;
    const track=sel==='custom'?{id:'custom-questions',url:custom.data}:sel==='random'?chooseTrack(timedTracks(g.seconds||15),this.lastTrack,this.random):[...lobbyTracks,...questionTracks,...editorTracks].find(t=>t.id===sel);
    this.startTrack(track,key,{loop:true,volume:this.settings.volume*(sel==='custom'?(custom.volume??1):1)});return;
   }
   if(!['lobby','countdown','question'].includes(phase)){if(phase!=='reveal'){this.pause(this.audio);this.key='';}return;}
-  this.section=phase==='question'?'questions':'lobby';this.selected=this.settings[this.section];const custom=this.section==='lobby'?lesson.lobbyAudio:lesson.questionAudio||lesson.quizAudio;
+  if(phase!=='question'){this.playLobbyTrack(lesson,'lobby:'+this.settings.lobby);return;}
+  this.section='questions';this.selected=this.settings.questions;const custom=lesson?.questionAudio||lesson?.quizAudio;
   if(this.selected==='none'||this.selected==='custom'&&!custom?.data){this.pause(this.audio);return;}
-  const key=this.section+':'+(this.section==='questions'?state.questionIndex+':'+state.question.startedAt:this.selected);if(this.key===key){this.tick();return;}
+  const key='questions:'+state.questionIndex+':'+state.question.startedAt;if(this.key===key){this.tick();return;}
   if(this.fiveActive)return;
-  let track;if(this.selected==='custom')track={id:'custom-'+this.section,url:custom.data};else if(this.selected==='random')track=chooseTrack(this.section==='lobby'?lobbyTracks:timedTracks((state.question.deadline-state.question.startedAt)/1000),this.lastTrack,this.random);else track=[...lobbyTracks,...questionTracks,...editorTracks].find(t=>t.id===this.selected);
-  this.startTrack(track,key,{loop:this.selected==='custom'?custom.loop!==false:this.section==='questions'||this.selected!=='random',volume:this.settings.volume*(this.selected==='custom'?(custom.volume??1):1)});this.tick();
+  let track;if(this.selected==='custom')track={id:'custom-questions',url:custom.data};else if(this.selected==='random')track=chooseTrack(timedTracks((state.question.deadline-state.question.startedAt)/1000),this.lastTrack,this.random);else track=[...lobbyTracks,...questionTracks,...editorTracks].find(t=>t.id===this.selected);
+  this.startTrack(track,key,{loop:this.selected==='custom'?custom.loop!==false:true,volume:this.settings.volume*(this.selected==='custom'?(custom.volume??1):1)});this.tick();
  }
  tick(){
   if(!this.enabled||this.state?.phase!=='question'||!this.countdownTrack||this.fiveAttempted)return;const remaining=this.remaining();if(remaining>5||remaining<=0)return;

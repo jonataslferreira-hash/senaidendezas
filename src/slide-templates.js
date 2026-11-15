@@ -95,20 +95,21 @@ function paletteFor(themeId) {
   const bg = theme.background;
   const end = theme.end || bg;
   const dark = luminance(bg) < 0.38;
-  const surface = dark ? mixHex(bg, '#ffffff', 0.11) : mixHex(bg, '#ffffff', 0.72);
-  const surfaceStrong = dark ? mixHex(bg, theme.accent, 0.24) : mixHex(bg, theme.accent, 0.16);
-  const border = dark ? mixHex(bg, '#ffffff', 0.22) : mixHex(bg, theme.color, 0.16);
+  const surface = dark ? mixHex(bg, '#ffffff', 0.12) : mixHex(bg, '#ffffff', 0.8);
+  const surfaceStrong = dark ? mixHex(bg, theme.accent, 0.28) : mixHex(bg, theme.accent, 0.16);
+  const border = dark ? mixHex(bg, '#ffffff', 0.24) : mixHex(bg, theme.color, 0.18);
   const accent = theme.accent;
+  const accentOnBg = readableOn(bg, accent, '#ffffff', '#141824');
   const ink = readableOn(bg, theme.color);
-  const title = readableOn(bg, dark ? '#ffffff' : theme.accent, '#ffffff', theme.color);
+  const title = readableOn(bg, dark ? '#ffffff' : theme.accent, '#ffffff', '#141824');
   const cardInk = readableOn(surface, theme.color);
-  const cardTitle = readableOn(surface, theme.accent, '#ffffff', cardInk);
+  const cardTitle = readableOn(surface, dark ? '#ffffff' : theme.accent, '#ffffff', cardInk);
   const strongInk = readableOn(surfaceStrong, theme.color);
-  const strongTitle = readableOn(surfaceStrong, theme.accent, '#ffffff', strongInk);
-  const onAccent = readableOn(accent, '#ffffff');
+  const strongTitle = readableOn(surfaceStrong, dark ? '#ffffff' : theme.accent, '#ffffff', strongInk);
+  const onAccent = readableOn(accent, '#ffffff', '#ffffff', '#11141c');
   const tints = (theme.tints?.length ? theme.tints : [accent, mixHex(accent, ink, 0.35), mixHex(accent, end, 0.45)]);
   return {
-    theme, bg, end, dark, surface, surfaceStrong, border, accent,
+    theme, bg, end, dark, surface, surfaceStrong, border, accent, accentOnBg,
     ink, title, cardInk, cardTitle, strongInk, strongTitle, onAccent,
     heading: theme.heading || 'Trebuchet MS',
     body: theme.body || 'Arial',
@@ -116,14 +117,48 @@ function paletteFor(themeId) {
   };
 }
 
-function shape(x, y, w, h, fill, extra = {}) {
+const DECK_CATEGORY_ICONS = {
+  tecnologia: ['chip', 'neural', 'robot', 'server', 'database', 'cloud', 'laptop', 'wifi'],
+  ciencias: ['neural', 'globe', 'lightning', 'rocket', 'bulb', 'battery'],
+  negocios: ['chart', 'globe', 'rocket', 'folder', 'lock', 'gear'],
+  escolar: ['bulb', 'globe', 'laptop', 'pin', 'folder', 'chart'],
+  humanas: ['globe', 'pin', 'folder', 'bulb', 'camera'],
+  academico: ['bulb', 'chart', 'database', 'globe', 'folder'],
+  criativo: ['camera', 'bulb', 'rocket', 'globe', 'lightning'],
+  quiz: ['lightning', 'rocket', 'bulb', 'robot'],
+  minimalista: ['globe', 'chart', 'bulb', 'gear']
+};
+
+function iconForDeck(deck) {
+  const pool = DECK_CATEGORY_ICONS[deck?.category] || DECK_CATEGORY_ICONS.escolar;
+  const seed = String(deck?.id || deck?.name || 'deck').split('').reduce((acc, ch) => acc + ch.charCodeAt(0), 0);
+  return pool[seed % pool.length];
+}
+
+function shape(x, y, w, h, background, extra = {}) {
+  const rawType = extra.shapeType || 'rectangle';
+  const shapeType = rawType === 'rect' ? 'rectangle' : rawType;
+  const borderWidth = Number(extra.borderWidth) || 0;
+  const borderColor = /^#[0-9a-f]{6}$/i.test(extra.borderColor || '') ? extra.borderColor : '#ffffff';
   return newElement('shape', {
-    x, y, w, h, fill,
-    borderColor: extra.borderColor || 'transparent',
-    borderWidth: extra.borderWidth || 0,
+    ...extra,
+    x, y, w, h,
+    background,
+    borderColor,
+    borderWidth,
     cornerRadius: extra.cornerRadius ?? 14,
-    shapeType: extra.shapeType || 'rect',
-    ...extra
+    shapeType
+  });
+}
+
+function iconShape(x, y, w, h, iconName, color, strokeWidth = 6) {
+  return newElement('shape', {
+    x, y, w, h,
+    shapeType: 'icon',
+    iconName: iconName || 'bulb',
+    background: color,
+    borderWidth: strokeWidth,
+    cornerRadius: 0
   });
 }
 
@@ -131,7 +166,7 @@ function text(x, y, w, h, value, extra = {}) {
   return newElement('text', {
     x, y, w, h,
     text: value,
-    fill: extra.fill || 'transparent',
+    background: extra.background || extra.fill || 'transparent',
     color: extra.color,
     fontSize: extra.fontSize || 24,
     bold: Boolean(extra.bold),
@@ -144,13 +179,14 @@ function text(x, y, w, h, value, extra = {}) {
   });
 }
 
-function imageFrame(x, y, w, h, label, p) {
+function imageFrame(x, y, w, h, label, p, iconName = 'camera') {
   return [
     shape(x, y, w, h, p.surfaceStrong, {cornerRadius: 18, borderWidth: 2, borderColor: p.border}),
-    shape(x + w * 0.14, y + h * 0.16, w * 0.22, h * 0.24, mixHex(p.surfaceStrong, p.accent, 0.35), {shapeType: 'ellipse'}),
-    shape(x + w * 0.1, y + h * 0.52, w * 0.8, h * 0.3, mixHex(p.surfaceStrong, p.accent, 0.2), {cornerRadius: 12}),
-    text(x + 3, y + h * 0.57, w - 6, h * 0.24, label, {
-      color: p.strongTitle, fontSize: 16, bold: true, align: 'center', verticalAlign: 'center', fontFamily: p.body
+    shape(x + w * 0.25, y + h * 0.14, w * 0.5, h * 0.44, mixHex(p.surfaceStrong, p.accent, 0.28), {shapeType: 'ellipse'}),
+    iconShape(x + w * 0.36, y + h * 0.22, w * 0.28, h * 0.28, iconName, p.strongTitle, 6),
+    shape(x + w * 0.08, y + h * 0.64, w * 0.84, h * 0.24, p.surface, {cornerRadius: 12, borderWidth: 1, borderColor: p.border}),
+    text(x + w * 0.1, y + h * 0.66, w * 0.8, h * 0.2, label, {
+      color: p.cardTitle, fontSize: 15, bold: true, align: 'center', verticalAlign: 'center', fontFamily: p.body
     })
   ];
 }
@@ -162,6 +198,7 @@ function buildCoverElements(p, c = {}, coverStyle = 'orbit-soft') {
   const title = c.title || 'Título da apresentação';
   const subtitle = c.subtitle || 'Subtítulo curto com objetivo, turma ou contexto do encontro.';
   const footer = c.footer || 'Professor(a) · Disciplina · Turma';
+  const icon = c.iconName || 'bulb';
   const secTint = p.tints[1 % p.tints.length];
   const thirdTint = p.tints[2 % p.tints.length];
 
@@ -169,22 +206,28 @@ function buildCoverElements(p, c = {}, coverStyle = 'orbit-soft') {
     case 'split-left':
       return [
         shape(0, 0, 36, 100, p.accent, {cornerRadius: 0}),
-        shape(5, 15, 11, 1.1, p.onAccent, {cornerRadius: 6}),
-        text(5, 20, 26, 12, tag, {color: p.onAccent, fontSize: 15, bold: true, fontFamily: p.body}),
+        shape(20, 62, 22, 39, mixHex(p.accent, p.onAccent, 0.14), {shapeType: 'ellipse'}),
+        shape(5, 36, 11, 19.5, mixHex(p.accent, p.bg, 0.22), {cornerRadius: 16}),
+        iconShape(7.2, 40, 6.6, 11.5, icon, p.onAccent, 6),
+        shape(5, 13, 11, 1.1, p.onAccent, {cornerRadius: 6}),
+        text(5, 17, 26, 14, tag, {color: p.onAccent, fontSize: 15, bold: true, fontFamily: p.body}),
         text(5, 76, 26, 15, footer, {color: p.onAccent, fontSize: 14, verticalAlign: 'end', fontFamily: p.body}),
-        text(42, 22, 51, 30, title, {role: 'title', color: p.title, fontSize: 46, bold: true, verticalAlign: 'center', fontFamily: p.heading}),
-        shape(42, 55, 13, 1.1, p.accent, {cornerRadius: 6}),
+        text(42, 20, 51, 32, title, {role: 'title', color: p.title, fontSize: 46, bold: true, verticalAlign: 'center', fontFamily: p.heading}),
+        shape(42, 55, 14, 1.2, p.accent, {cornerRadius: 6}),
         text(42, 60, 50, 22, subtitle, {color: p.ink, fontSize: 21, fontFamily: p.body})
       ];
 
     case 'split-right':
       return [
         shape(62, 0, 38, 100, p.accent, {cornerRadius: 0}),
-        shape(68, 16, 26, 68, mixHex(p.accent, p.bg, 0.22), {cornerRadius: 16}),
-        shape(72, 24, 12, 1.6, p.onAccent, {cornerRadius: 6}),
-        shape(72, 48, 18, 26, secTint, {cornerRadius: 12}),
-        shape(7, 13, 28, 7, p.surfaceStrong, {cornerRadius: 14}),
-        text(9, 14, 24, 5, tag, {color: p.strongTitle, fontSize: 13, bold: true, verticalAlign: 'center', fontFamily: p.body}),
+        shape(67, 14, 28, 72, mixHex(p.accent, p.bg, 0.2), {cornerRadius: 20}),
+        shape(73, 24, 16, 28, mixHex(p.accent, p.onAccent, 0.18), {shapeType: 'ellipse'}),
+        iconShape(76.5, 30, 9, 16, icon, p.onAccent, 6),
+        shape(71, 58, 20, 4, secTint, {cornerRadius: 8}),
+        shape(71, 66, 14, 4, thirdTint, {cornerRadius: 8}),
+        shape(71, 74, 18, 4, mixHex(p.accent, p.onAccent, 0.25), {cornerRadius: 8}),
+        shape(7, 13, 30, 7, p.surfaceStrong, {cornerRadius: 14, borderWidth: 1, borderColor: p.border}),
+        text(9, 14, 26, 5, tag, {color: p.strongTitle, fontSize: 13, bold: true, verticalAlign: 'center', fontFamily: p.body}),
         text(7, 25, 50, 30, title, {role: 'title', color: p.title, fontSize: 46, bold: true, verticalAlign: 'center', fontFamily: p.heading}),
         text(7, 57, 49, 20, subtitle, {color: p.ink, fontSize: 20, fontFamily: p.body}),
         text(7, 82, 49, 8, footer, {color: p.ink, fontSize: 14, bold: true, fontFamily: p.body})
@@ -193,61 +236,75 @@ function buildCoverElements(p, c = {}, coverStyle = 'orbit-soft') {
     case 'band-top':
       return [
         shape(0, 0, 100, 48, p.accent, {cornerRadius: 0}),
-        shape(0, 48, 100, 1.5, secTint, {cornerRadius: 0}),
-        text(8, 8, 60, 7, tag, {color: p.onAccent, fontSize: 14, bold: true, fontFamily: p.body}),
-        text(8, 17, 84, 26, title, {role: 'title', color: p.onAccent, fontSize: 48, bold: true, verticalAlign: 'center', fontFamily: p.heading}),
-        text(8, 56, 82, 18, subtitle, {color: p.ink, fontSize: 22, fontFamily: p.body}),
-        shape(8, 79, 56, 9, p.surface, {cornerRadius: 12, borderWidth: 1, borderColor: p.border}),
-        text(10.5, 80.5, 51, 6, footer, {color: p.cardInk, fontSize: 14, bold: true, verticalAlign: 'center', fontFamily: p.body})
+        shape(0, 48, 100, 1.8, secTint, {cornerRadius: 0}),
+        shape(82, 10, 11.5, 20.5, mixHex(p.accent, p.bg, 0.18), {cornerRadius: 16}),
+        iconShape(84.5, 14.5, 6.5, 11.5, icon, p.onAccent, 6),
+        text(8, 8, 68, 7, tag, {color: p.onAccent, fontSize: 14, bold: true, fontFamily: p.body}),
+        text(8, 17, 72, 26, title, {role: 'title', color: p.onAccent, fontSize: 46, bold: true, verticalAlign: 'center', fontFamily: p.heading}),
+        text(8, 55, 82, 19, subtitle, {color: p.ink, fontSize: 22, fontFamily: p.body}),
+        shape(8, 79, 58, 9.5, p.surface, {cornerRadius: 12, borderWidth: 1, borderColor: p.border}),
+        text(10.5, 80.5, 53, 6.5, footer, {color: p.cardInk, fontSize: 14, bold: true, verticalAlign: 'center', fontFamily: p.body})
       ];
 
     case 'swiss-grid':
       return [
-        shape(7, 17, 86, 0.45, p.border, {cornerRadius: 0}),
-        shape(7, 77, 86, 0.45, p.border, {cornerRadius: 0}),
-        shape(76, 17, 0.5, 60, p.border, {cornerRadius: 0}),
-        shape(79, 24, 14, 24, p.accent, {cornerRadius: 10}),
-        text(79, 24, 14, 24, '01', {color: p.onAccent, fontSize: 38, bold: true, align: 'center', verticalAlign: 'center', fontFamily: p.heading}),
-        text(7, 8, 60, 7, tag, {color: p.title, fontSize: 14, bold: true, fontFamily: p.body}),
-        text(7, 23, 66, 30, title, {role: 'title', color: p.title, fontSize: 48, bold: true, verticalAlign: 'center', fontFamily: p.heading}),
-        text(7, 55, 66, 18, subtitle, {color: p.ink, fontSize: 21, fontFamily: p.body}),
+        shape(7, 17, 86, 0.5, p.border, {cornerRadius: 0}),
+        shape(7, 77, 86, 0.5, p.border, {cornerRadius: 0}),
+        shape(75, 17, 0.5, 60, p.border, {cornerRadius: 0}),
+        shape(78.5, 22, 14.5, 24, p.accent, {cornerRadius: 12}),
+        text(78.5, 22, 14.5, 24, '01', {color: p.onAccent, fontSize: 38, bold: true, align: 'center', verticalAlign: 'center', fontFamily: p.heading}),
+        shape(78.5, 50, 14.5, 22, p.surfaceStrong, {cornerRadius: 12, borderWidth: 1, borderColor: p.border}),
+        iconShape(81.5, 54.5, 8.5, 13, icon, p.strongTitle, 6),
+        text(7, 8, 64, 7, tag, {color: p.accentOnBg, fontSize: 14, bold: true, fontFamily: p.body}),
+        text(7, 23, 65, 30, title, {role: 'title', color: p.title, fontSize: 48, bold: true, verticalAlign: 'center', fontFamily: p.heading}),
+        text(7, 55, 65, 18, subtitle, {color: p.ink, fontSize: 21, fontFamily: p.body}),
         text(7, 81, 86, 8, footer, {color: p.ink, fontSize: 15, bold: true, fontFamily: p.body})
       ];
 
     case 'frame-classic':
       return [
-        shape(5, 7, 90, 86, p.surface, {cornerRadius: 14, borderWidth: 3, borderColor: p.accent}),
-        shape(44, 16, 12, 1, p.accent, {cornerRadius: 6}),
-        text(16, 20, 68, 7, tag, {color: p.cardTitle, fontSize: 14, bold: true, align: 'center', fontFamily: p.body}),
-        text(12, 30, 76, 27, title, {role: 'title', color: p.cardTitle, fontSize: 48, bold: true, align: 'center', verticalAlign: 'center', fontFamily: p.heading}),
-        text(16, 59, 68, 16, subtitle, {color: p.cardInk, fontSize: 20, align: 'center', fontFamily: p.body}),
-        text(16, 79, 68, 8, footer, {color: p.cardInk, fontSize: 14, bold: true, align: 'center', fontFamily: p.body})
+        shape(5, 7, 90, 86, p.surface, {cornerRadius: 16, borderWidth: 3, borderColor: p.accent}),
+        shape(8, 12, 5.5, 9.8, p.surfaceStrong, {shapeType: 'diamond'}),
+        shape(86.5, 12, 5.5, 9.8, p.surfaceStrong, {shapeType: 'diamond'}),
+        shape(45.5, 12, 9, 16, p.surfaceStrong, {shapeType: 'ellipse'}),
+        iconShape(47.4, 15.2, 5.2, 9.4, icon, p.strongTitle, 6),
+        text(16, 29, 68, 6.5, tag, {color: p.cardTitle, fontSize: 13, bold: true, align: 'center', fontFamily: p.body}),
+        text(12, 37, 76, 23, title, {role: 'title', color: p.cardTitle, fontSize: 44, bold: true, align: 'center', verticalAlign: 'center', fontFamily: p.heading}),
+        text(16, 62, 68, 14, subtitle, {color: p.cardInk, fontSize: 19, align: 'center', fontFamily: p.body}),
+        text(16, 80, 68, 7.5, footer, {color: p.cardInk, fontSize: 14, bold: true, align: 'center', fontFamily: p.body})
       ];
 
     case 'notebook-cover':
       return [
-        shape(0, 0, 7, 100, p.accent, {cornerRadius: 0}),
+        shape(0, 0, 7.5, 100, p.accent, {cornerRadius: 0}),
+        shape(2.1, 14, 3.2, 5.6, p.onAccent, {shapeType: 'ellipse'}),
+        shape(2.1, 36, 3.2, 5.6, p.onAccent, {shapeType: 'ellipse'}),
+        shape(2.1, 58, 3.2, 5.6, p.onAccent, {shapeType: 'ellipse'}),
+        shape(2.1, 80, 3.2, 5.6, p.onAccent, {shapeType: 'ellipse'}),
         shape(11, 0, 0.5, 100, secTint, {cornerRadius: 0}),
-        shape(11, 52, 83, 0.35, p.border, {cornerRadius: 0}),
-        shape(11, 65, 83, 0.35, p.border, {cornerRadius: 0}),
-        shape(11, 78, 83, 0.35, p.border, {cornerRadius: 0}),
-        shape(15, 11, 30, 7.5, p.surfaceStrong, {cornerRadius: 8}),
-        text(17, 12, 26, 5.5, tag, {color: p.strongTitle, fontSize: 13, bold: true, verticalAlign: 'center', fontFamily: p.body}),
-        text(15, 22, 76, 27, title, {role: 'title', color: p.title, fontSize: 48, bold: true, verticalAlign: 'center', fontFamily: p.heading}),
+        shape(11, 52, 83, 0.4, p.border, {cornerRadius: 0}),
+        shape(11, 65, 83, 0.4, p.border, {cornerRadius: 0}),
+        shape(11, 78, 83, 0.4, p.border, {cornerRadius: 0}),
+        shape(82, 11, 10, 17.8, p.surfaceStrong, {cornerRadius: 14, borderWidth: 1, borderColor: p.border}),
+        iconShape(84.2, 14.8, 5.6, 10, icon, p.strongTitle, 6),
+        shape(15, 11, 32, 7.5, p.surfaceStrong, {cornerRadius: 8, borderWidth: 1, borderColor: p.border}),
+        text(17, 12, 28, 5.5, tag, {color: p.strongTitle, fontSize: 13, bold: true, verticalAlign: 'center', fontFamily: p.body}),
+        text(15, 22, 64, 27, title, {role: 'title', color: p.title, fontSize: 46, bold: true, verticalAlign: 'center', fontFamily: p.heading}),
         text(15, 54, 74, 20, subtitle, {color: p.ink, fontSize: 21, fontFamily: p.body}),
         text(15, 81, 74, 8, footer, {color: p.ink, fontSize: 15, bold: true, fontFamily: p.body})
       ];
 
     case 'bauhaus-blocks':
       return [
-        shape(68, 10, 13, 24, p.accent, {cornerRadius: 10}),
-        shape(83, 10, 11, 24, secTint, {cornerRadius: 10}),
-        shape(68, 37, 26, 26, p.surfaceStrong, {cornerRadius: 14, borderWidth: 1, borderColor: p.border}),
-        shape(68, 66, 13, 22, thirdTint, {shapeType: 'ellipse'}),
-        shape(83, 66, 11, 22, p.accent, {cornerRadius: 10}),
-        shape(7, 14, 10, 1.3, p.accent, {cornerRadius: 8}),
-        text(7, 18, 55, 7, tag, {color: p.title, fontSize: 14, bold: true, fontFamily: p.body}),
-        text(7, 27, 57, 28, title, {role: 'title', color: p.title, fontSize: 46, bold: true, verticalAlign: 'center', fontFamily: p.heading}),
+        shape(67, 10, 13.5, 24, p.accent, {cornerRadius: 12}),
+        shape(82.5, 10, 11.5, 24, secTint, {shapeType: 'triangle'}),
+        shape(67, 37, 27, 26, p.surfaceStrong, {cornerRadius: 16, borderWidth: 1, borderColor: p.border}),
+        iconShape(75, 42.5, 11, 15, icon, p.strongTitle, 6),
+        shape(67, 66, 13.5, 23, thirdTint, {shapeType: 'ellipse'}),
+        shape(82.5, 66, 11.5, 23, p.accent, {shapeType: 'diamond'}),
+        shape(7, 14, 12, 1.4, p.accent, {cornerRadius: 8}),
+        text(7, 18, 55, 7, tag, {color: p.accentOnBg, fontSize: 14, bold: true, fontFamily: p.body}),
+        text(7, 27, 56, 28, title, {role: 'title', color: p.title, fontSize: 46, bold: true, verticalAlign: 'center', fontFamily: p.heading}),
         text(7, 57, 55, 19, subtitle, {color: p.ink, fontSize: 20, fontFamily: p.body}),
         text(7, 81, 55, 8, footer, {color: p.ink, fontSize: 14, bold: true, fontFamily: p.body})
       ];
@@ -256,21 +313,25 @@ function buildCoverElements(p, c = {}, coverStyle = 'orbit-soft') {
       return [
         shape(0, 0, 100, 12, p.surfaceStrong, {cornerRadius: 0}),
         shape(0, 88, 100, 12, p.surfaceStrong, {cornerRadius: 0}),
-        shape(43, 23, 14, 1, p.accent, {cornerRadius: 6}),
+        shape(45.5, 17, 9, 14, p.surface, {cornerRadius: 14, borderWidth: 1, borderColor: p.border}),
+        iconShape(47.4, 19.6, 5.2, 8.8, icon, p.cardTitle, 6),
         text(8, 2.5, 84, 7, tag, {color: p.strongTitle, fontSize: 14, bold: true, align: 'center', verticalAlign: 'center', fontFamily: p.body}),
-        text(10, 28, 80, 27, title, {role: 'title', color: p.title, fontSize: 50, bold: true, align: 'center', verticalAlign: 'center', fontFamily: p.heading}),
-        text(16, 58, 68, 18, subtitle, {color: p.ink, fontSize: 21, align: 'center', fontFamily: p.body}),
+        text(10, 34, 80, 24, title, {role: 'title', color: p.title, fontSize: 48, bold: true, align: 'center', verticalAlign: 'center', fontFamily: p.heading}),
+        text(16, 61, 68, 18, subtitle, {color: p.ink, fontSize: 21, align: 'center', fontFamily: p.body}),
         text(8, 90.5, 84, 7, footer, {color: p.strongInk, fontSize: 14, bold: true, align: 'center', verticalAlign: 'center', fontFamily: p.body})
       ];
 
     case 'blueprint-tech':
       return [
-        shape(7, 13, 86, 74, p.surface, {cornerRadius: 12, borderWidth: 2, borderColor: mixHex(p.surface, p.accent, 0.45)}),
-        shape(7, 13, 86, 10, p.surfaceStrong, {cornerRadius: 8}),
-        text(11, 14.5, 68, 7, tag, {color: p.strongTitle, fontSize: 14, bold: true, verticalAlign: 'center', fontFamily: p.body}),
-        text(11, 28, 78, 26, title, {role: 'title', color: p.cardTitle, fontSize: 46, bold: true, verticalAlign: 'center', fontFamily: p.heading}),
-        text(11, 56, 74, 16, subtitle, {color: p.cardInk, fontSize: 20, fontFamily: p.body}),
-        text(11, 75, 76, 8, footer, {color: p.cardTitle, fontSize: 14, bold: true, fontFamily: p.body})
+        shape(7, 11, 86, 78, p.surface, {cornerRadius: 14, borderWidth: 2, borderColor: mixHex(p.surface, p.accent, 0.5)}),
+        shape(7, 11, 86, 11, p.surfaceStrong, {cornerRadius: 10}),
+        shape(84, 13.8, 3.2, 5.4, p.accent, {shapeType: 'ellipse'}),
+        shape(78.5, 32, 10.5, 18.5, p.surfaceStrong, {cornerRadius: 14, borderWidth: 1, borderColor: p.border}),
+        iconShape(80.8, 36, 5.9, 10.5, icon, p.strongTitle, 6),
+        text(11, 13, 68, 7, tag, {color: p.strongTitle, fontSize: 14, bold: true, verticalAlign: 'center', fontFamily: p.body}),
+        text(11, 27, 65, 28, title, {role: 'title', color: p.cardTitle, fontSize: 45, bold: true, verticalAlign: 'center', fontFamily: p.heading}),
+        text(11, 57, 74, 16, subtitle, {color: p.cardInk, fontSize: 20, fontFamily: p.body}),
+        text(11, 76, 76, 8, footer, {color: p.cardTitle, fontSize: 14, bold: true, fontFamily: p.body})
       ];
 
     case 'ribbon-side':
@@ -278,18 +339,22 @@ function buildCoverElements(p, c = {}, coverStyle = 'orbit-soft') {
         shape(0, 0, 4.5, 100, p.accent, {cornerRadius: 0}),
         shape(4.5, 0, 2.4, 100, secTint, {cornerRadius: 0}),
         shape(6.9, 0, 1.3, 100, thirdTint, {cornerRadius: 0}),
-        text(14, 14, 66, 7, tag, {color: p.title, fontSize: 14, bold: true, fontFamily: p.body}),
-        text(14, 24, 78, 28, title, {role: 'title', color: p.title, fontSize: 48, bold: true, verticalAlign: 'center', fontFamily: p.heading}),
+        shape(81, 14, 11, 19.5, p.surfaceStrong, {cornerRadius: 16, borderWidth: 1, borderColor: p.border}),
+        iconShape(83.5, 18, 6, 11.5, icon, p.strongTitle, 6),
+        text(14, 14, 62, 7, tag, {color: p.accentOnBg, fontSize: 14, bold: true, fontFamily: p.body}),
+        text(14, 24, 66, 28, title, {role: 'title', color: p.title, fontSize: 46, bold: true, verticalAlign: 'center', fontFamily: p.heading}),
         text(14, 55, 74, 18, subtitle, {color: p.ink, fontSize: 21, fontFamily: p.body}),
-        shape(14, 78, 54, 9, p.surface, {cornerRadius: 12, borderWidth: 1, borderColor: p.border}),
-        text(16.5, 79.5, 49, 6, footer, {color: p.cardInk, fontSize: 14, bold: true, verticalAlign: 'center', fontFamily: p.body})
+        shape(14, 78, 56, 9.5, p.surface, {cornerRadius: 12, borderWidth: 1, borderColor: p.border}),
+        text(16.5, 79.5, 51, 6.5, footer, {color: p.cardInk, fontSize: 14, bold: true, verticalAlign: 'center', fontFamily: p.body})
       ];
 
     case 'minimal-type':
       return [
-        text(10, 15, 64, 7, tag, {color: p.title, fontSize: 14, bold: true, fontFamily: p.body}),
-        text(10, 25, 80, 29, title, {role: 'title', color: p.title, fontSize: 52, bold: true, verticalAlign: 'center', fontFamily: p.heading}),
-        shape(10, 57, 18, 0.9, p.accent, {cornerRadius: 4}),
+        shape(80, 14, 10.5, 18.5, p.surfaceStrong, {shapeType: 'ellipse'}),
+        iconShape(82.3, 18, 5.9, 10.5, icon, p.strongTitle, 6),
+        text(10, 15, 64, 7, tag, {color: p.accentOnBg, fontSize: 14, bold: true, fontFamily: p.body}),
+        text(10, 25, 72, 29, title, {role: 'title', color: p.title, fontSize: 50, bold: true, verticalAlign: 'center', fontFamily: p.heading}),
+        shape(10, 57, 18, 1, p.accent, {cornerRadius: 6}),
         text(10, 62, 74, 16, subtitle, {color: p.ink, fontSize: 21, fontFamily: p.body}),
         text(10, 82, 74, 8, footer, {color: p.ink, fontSize: 14, fontFamily: p.body})
       ];
@@ -297,13 +362,15 @@ function buildCoverElements(p, c = {}, coverStyle = 'orbit-soft') {
     case 'orbit-soft':
     default:
       return [
-        shape(70, -14, 42, 62, mixHex(p.bg, p.accent, p.dark ? 0.24 : 0.14), {shapeType: 'ellipse'}),
-        shape(80, 58, 28, 44, mixHex(p.bg, p.accent, p.dark ? 0.16 : 0.09), {shapeType: 'ellipse'}),
-        shape(10, 20, 12, 1.1, p.accent, {cornerRadius: 8}),
-        text(10, 24, 78, 28, title, {role: 'title', color: p.title, fontSize: 52, bold: true, verticalAlign: 'center', fontFamily: p.heading}),
-        text(10, 54, 68, 18, subtitle, {color: p.ink, fontSize: 22, fontFamily: p.body}),
-        shape(10, 78, 56, 9, p.surface, {cornerRadius: 14, borderWidth: 1, borderColor: p.border}),
-        text(12.5, 79.5, 51, 6, footer, {color: p.cardInk, fontSize: 15, bold: true, verticalAlign: 'center', fontFamily: p.body})
+        shape(70, -14, 42, 62, mixHex(p.bg, p.accent, p.dark ? 0.28 : 0.16), {shapeType: 'ellipse'}),
+        shape(80, 58, 28, 44, mixHex(p.bg, secTint, p.dark ? 0.2 : 0.12), {shapeType: 'ellipse'}),
+        shape(79, 16, 11.5, 20.5, p.surface, {cornerRadius: 18, borderWidth: 1, borderColor: p.border}),
+        iconShape(81.5, 20.5, 6.5, 11.5, icon, p.cardTitle, 6),
+        shape(10, 18, 12, 1.2, p.accent, {cornerRadius: 8}),
+        text(10, 22, 66, 28, title, {role: 'title', color: p.title, fontSize: 48, bold: true, verticalAlign: 'center', fontFamily: p.heading}),
+        text(10, 53, 66, 19, subtitle, {color: p.ink, fontSize: 22, fontFamily: p.body}),
+        shape(10, 78, 56, 9.5, p.surface, {cornerRadius: 14, borderWidth: 1, borderColor: p.border}),
+        text(12.5, 79.5, 51, 6.5, footer, {color: p.cardInk, fontSize: 15, bold: true, verticalAlign: 'center', fontFamily: p.body})
       ];
   }
 }
@@ -312,7 +379,7 @@ function headerBar(p, title, kicker) {
   const els = [];
   if (kicker) {
     els.push(text(7, 6.5, 60, 5, kicker.toUpperCase(), {
-      color: p.accent, fontSize: 12, bold: true, fontFamily: p.body
+      color: p.accentOnBg, fontSize: 12, bold: true, fontFamily: p.body
     }));
   }
   els.push(text(7, kicker ? 11.5 : 8, 86, 12, title, {
@@ -643,8 +710,8 @@ export const slideTemplates = [
     build(themeId = 'studio-orbit', c = {}) {
       const p = paletteFor(themeId);
       return [
-        ...imageFrame(6, 12, 42, 76, c.imageLabel || 'Substitua por foto ou gráfico', p),
-        text(53, 14, 40, 6, (c.kicker || 'DESTAQUE VISUAL').toUpperCase(), {color: p.accent, fontSize: 12, bold: true, fontFamily: p.body}),
+        ...imageFrame(6, 12, 42, 76, c.imageLabel || 'Substitua por foto ou gráfico', p, c.iconName || 'camera'),
+        text(53, 14, 40, 6, (c.kicker || 'DESTAQUE VISUAL').toUpperCase(), {color: p.accentOnBg, fontSize: 12, bold: true, fontFamily: p.body}),
         text(53, 21, 41, 18, c.title || 'Título do conceito visual', {role: 'title', color: p.title, fontSize: 34, bold: true, fontFamily: p.heading}),
         shape(53, 41, 12, 1, p.accent, {cornerRadius: 6}),
         text(53, 46, 41, 40, c.body || 'Use a área à esquerda para inserir uma imagem, diagrama ou captura e explique aqui os detalhes importantes.', {
@@ -661,13 +728,13 @@ export const slideTemplates = [
     build(themeId = 'studio-orbit', c = {}) {
       const p = paletteFor(themeId);
       return [
-        text(7, 14, 40, 6, (c.kicker || 'ESTUDO DE EXEMPLO').toUpperCase(), {color: p.accent, fontSize: 12, bold: true, fontFamily: p.body}),
+        text(7, 14, 40, 6, (c.kicker || 'ESTUDO DE EXEMPLO').toUpperCase(), {color: p.accentOnBg, fontSize: 12, bold: true, fontFamily: p.body}),
         text(7, 21, 41, 18, c.title || 'Explicação acompanhada de imagem', {role: 'title', color: p.title, fontSize: 34, bold: true, fontFamily: p.heading}),
         shape(7, 41, 12, 1, p.accent, {cornerRadius: 6}),
         text(7, 46, 41, 40, c.body || 'Organize a teoria em 2 ou 3 frases objetivas enquanto a imagem à direita ilustra o conceito.', {
           color: p.ink, fontSize: 19, fontFamily: p.body
         }),
-        ...imageFrame(52, 12, 42, 76, c.imageLabel || 'Adicione sua imagem aqui', p)
+        ...imageFrame(52, 12, 42, 76, c.imageLabel || 'Adicione sua imagem aqui', p, c.iconName || 'camera')
       ];
     }
   },
@@ -951,6 +1018,7 @@ function buildStandardDeck(deck, opts = {}) {
   const coverSubtitle = options.description?.trim() || deck.coverSubtitle || deck.description;
   const coverSlide = createSlideFromTemplate('cover', theme, {
     coverStyle: deck.coverStyle,
+    iconName: iconForDeck(deck),
     tag: (deck.tag || deck.categoryLabel || 'APRESENTAÇÃO').toUpperCase(),
     title: coverTitle,
     subtitle: coverSubtitle,
@@ -1327,6 +1395,7 @@ export function deckCoverPreview(deckOrId, themeOverride) {
   } else {
     slide = createSlideFromTemplate('cover', theme, {
       coverStyle: deck.coverStyle,
+      iconName: iconForDeck(deck),
       tag: (deck.tag || deck.categoryLabel || 'APRESENTAÇÃO').toUpperCase(),
       title: deck.coverTitle || deck.name,
       subtitle: deck.coverSubtitle || deck.description,
