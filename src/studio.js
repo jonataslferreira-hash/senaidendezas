@@ -534,8 +534,17 @@ export class Studio {
     try { if (s.kind === 'image' && (s.image || s.assetId)) media = assetImage(s); } catch { media = '<p>Adicione uma imagem válida.</p>'; }
     return `<div class="mini-slide"><span>${esc(s.tag || 'SUA AULA')}</span><h3>${esc(s.title || 'Título do slide')}</h3>${media}${s.kind === 'model' ? `<div class="mini-model">◇<small>${s.model === 'custom' ? esc(s.customModel?.name || 'Envie seu modelo') : { ssd: 'SSD SATA', hdd: 'HDD', nvme: 'SSD NVMe' }[s.model]}</small></div>` : ''}<p>${esc(s.intro)}</p><ul>${s.points.map(p => `<li>${esc(p)}</li>`).join('')}</ul>${s.prompt ? `<blockquote>${esc(s.prompt)}</blockquote>` : ''}</div>`;
   }
-  openCoverDialog(lesson) {
-    this.dialog={type:'cover',id:lesson.id,form:{thumbnail:lesson.thumbnail||''}};
+  // O diálogo novo (busca, link, colar) vive em cover-picker.js; aqui só salvamos o resultado.
+  async openCoverDialog(lesson) {
+    if(!lesson)return;
+    try{
+      const {pickLessonCover}=await import('./cover-picker.js');
+      const thumbnail=await pickLessonCover({current:lesson.thumbnail||'',query:lesson.title||'',toast:this.callbacks.toast});
+      if(thumbnail===null)return;
+      this.dialog={type:'cover',id:lesson.id,form:{thumbnail}};
+      await this.action('confirm-cover',{dataset:{}});
+      this.callbacks.toast(thumbnail?'Capa atualizada.':'Capa removida.');
+    }catch(error){this.dialog=null;this.callbacks.toast(error.message||'Não foi possível trocar a capa.');}
   }
   async chooseLessonCover(file) {
     const dialog=this.dialog;

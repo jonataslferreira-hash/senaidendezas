@@ -2,7 +2,8 @@ import {avatarContent} from './player-avatar.js';
 const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 // Bonequinho: cabeça com o ícone do aluno, corpo arredondado, mãos e pés soltos.
 // O movimento é todo de "amassa e estica" (CSS), sem juntas duras.
-export function character(person,index=0){return `<div class="game-character dance-${index%4}" style="--beat-shift:${(index*37)%100}${/^#[0-9a-f]{6}$/i.test(person.color||'')?';--player-color:'+person.color:''}"${person.color?' data-team-color':''}><div class="character-rig buddy"><i class="buddy-shadow"></i><i class="buddy-foot left"></i><i class="buddy-foot right"></i><div class="buddy-top"><i class="buddy-body"></i><i class="buddy-hand left"></i><i class="buddy-hand right"></i><div class="character-head">${avatarContent(person.avatar)}</div></div></div></div>`;}
+// mood: '' (dancinha), 'idle', 'run', 'lose' ou 'win-0'…'win-3' (quatro comemorações).
+export function character(person,index=0,mood=''){return `<div class="game-character dance-${index%4}"${mood?` data-mood="${mood}"`:''} style="--beat-shift:${(index*37)%100}${/^#[0-9a-f]{6}$/i.test(person.color||'')?';--player-color:'+person.color:''}"${person.color?' data-team-color':''}><div class="character-rig buddy"><i class="buddy-shadow"></i><i class="buddy-foot left"></i><i class="buddy-foot right"></i><div class="buddy-top"><i class="buddy-body"></i><i class="buddy-hand left"></i><i class="buddy-hand right"></i><div class="character-head">${avatarContent(person.avatar)}</div></div></div></div>`;}
 // Ranking entre as perguntas: as linhas entram na posição antiga, as barras
 // crescem com os pontos novos e só então cada um desliza para a posição nova.
 const rankColors=['#a78bfa','#34d399','#fbbf24','#60a5fa','#f472b6','#fb923c','#2dd4bf','#c084fc'];
@@ -14,14 +15,19 @@ function rankRace(state,elapsed){
  const before=[...rows].sort((a,b)=>(a.p.previousRank||999)-(b.p.previousRank||999)||a.i-b.i);
  return `<ol class="rank-race" style="--rows:${count};--e:${elapsed.toFixed(2)}">${rows.map(({p,i},slot)=>{
   const from=before.findIndex(row=>row.p.id===p.id),gain=p.score-(p.previousScore||0),moved=p.previousRank?p.previousRank-(i+1):0;
-  return `<li class="rank-row" data-me="${p.id===state.me?.id}" data-first="${i===0&&p.score>0}" style="--from:${from};--to:${slot};--ratio:${(p.score/max).toFixed(4)};--prev:${((p.previousScore||0)/max).toFixed(4)};--c:${p.color||rankColors[i%rankColors.length]};--k:${slot}">
-   <b class="rank-pos">${i+1}</b><span class="rank-head">${avatarContent(p.avatar)}</span>
-   <div class="rank-main"><strong>${esc(p.name)}${p.streak>=2?` <em class="rank-fire">🔥${p.streak}</em>`:''}</strong><div class="rank-bar"><i></i></div></div>
+  const ratio=p.score/max,prev=(p.previousScore||0)/max;
+  return `<li class="rank-row" data-me="${p.id===state.me?.id}" data-first="${i===0&&p.score>0}" data-gain="${gain>0}" data-wide="${ratio>=.5}" style="--from:${from};--to:${slot};--ratio:${ratio.toFixed(4)};--prev:${prev.toFixed(4)};--c:${p.color||rankColors[i%rankColors.length]};--k:${slot}">
+   <b class="rank-pos">${i+1}</b>
+   <div class="rank-lane"><i class="rank-fill"></i><strong class="rank-name">${esc(p.name)}${p.streak>=2?` <em class="rank-fire">🔥${p.streak}</em>`:''}</strong>
+    <div class="rank-runner"><span data-rank-runner data-gain="${gain>0}">${character(p,i,'idle')}</span></div></div>
    <span class="rank-score" data-count data-from="${p.previousScore||0}" data-to="${p.score}">${(p.previousScore||0).toLocaleString('pt-BR')}</span>
    ${gain>0?`<em class="rank-gain">+${gain.toLocaleString('pt-BR')}</em>`:''}${moved?`<small class="rank-move" data-dir="${moved>0?'up':'down'}">${moved>0?'▲':'▼'}${Math.abs(moved)}</small>`:''}</li>`;}).join('')}</ol>`;
 }
 // Números do ranking contando até o valor novo (acompanha o tempo já passado).
 const counted=new WeakSet();
+// Também comanda o boneco: corre de lado enquanto a barra cresce (0,6 s → 1,6 s) e volta a ficar de frente.
+export const RANK_RUN_FROM=600,RANK_RUN_TO=1650;
+export const rankMood=(ms,gained)=>gained&&ms>=RANK_RUN_FROM&&ms<RANK_RUN_TO?'run':gained&&ms>=RANK_RUN_TO&&ms<RANK_RUN_TO+1500?'win-0':'idle';
 export function animateRanking(root,elapsed=0){
  const start=performance.now()-elapsed*1000;
  for(const node of root.querySelectorAll('.rank-race [data-count]')){
@@ -29,6 +35,19 @@ export function animateRanking(root,elapsed=0){
   const from=Number(node.dataset.from)||0,to=Number(node.dataset.to)||0;
   const step=()=>{if(!node.isConnected)return;const t=Math.max(0,Math.min(1,(performance.now()-start-600)/1000)),eased=1-Math.pow(1-t,3);node.textContent=Math.round(from+(to-from)*eased).toLocaleString('pt-BR');if(t<1)requestAnimationFrame(step);};
   step();
+ }
+ for(const node of root.querySelectorAll('.rank-race [data-rank-runner]')){
+  if(counted.has(node))continue;counted.add(node);
+  const body=node.querySelector('.game-character'),gained=node.dataset.gain==='true';
+  if(!body)continue;
+  const paint=()=>{
+   if(!node.isConnected)return;
+   const ms=performance.now()-start,mood=rankMood(ms,gained);
+   if(body.dataset.mood!==mood)body.dataset.mood=mood;
+   const next=ms<RANK_RUN_FROM?RANK_RUN_FROM:ms<RANK_RUN_TO?RANK_RUN_TO:ms<RANK_RUN_TO+1500?RANK_RUN_TO+1500:0;
+   if(gained&&next)setTimeout(paint,next-ms+10);
+  };
+  paint();
  }
 }
 // Resumo no topo do placar da rodada: quem lidera, quem mais subiu e a posição do aluno.
@@ -48,7 +67,7 @@ export function leaderboardMarkup(state,{header,host,offset=0,final=false}){
  const delay=at=>state.podiumRevealed?'-20s':Math.min(0,at-elapsed).toFixed(2)+'s',need=rank=>4-rank,at=rank=>rank===3?2:rank===2?4.5:7;
  const champion=winners[0],victory=victoryNames[(state.victory||0)%4],me=state.ranking.findIndex(p=>p.id===state.me?.id);
  const heading=final?(step>=3&&champion?`<span>RESULTADO FINAL</span><h1 class="champion-title"><em>${esc(champion.name)}</em> venceu!</h1>`:`<span>RESULTADO FINAL</span><h1>${step===0?'Quem conquistou o pódio?':step===1?'E em segundo lugar…':'E quem levou o ouro?'}</h1>`):'<h1>Placar da rodada</h1>';
- const podium=final?`<div class="final-spotlights" aria-hidden="true" data-on="${step>=3}"></div><div class="final-podium" data-step="${step}">${[1,0,2].filter(i=>winners[i]).map(i=>{const p=winners[i],shown=step>=need(i+1);return `<article class="final-contestant place-${i+1}" data-shown="${shown}" style="--reveal-delay:${delay(at(i+1))};--player-color:${p.color||['#ac8ae8','#78baac','#e9b97e'][i]}">${shown?`${character(p,i)}<strong>${esc(p.name)}</strong><span>${p.score.toLocaleString('pt-BR')} pontos</span><small>${p.correct} acertos${p.streak>=2?' · 🔥 '+p.streak+' seguidas':''}</small>`:'<div class="final-mystery" aria-hidden="true">?</div>'}<div class="final-tower"><b>${i===0?'♛':i+1}</b></div></article>`;}).join('')}</div>${step>=3?`<div class="final-confetti" data-victory="${victory}" aria-hidden="true" style="--reveal-delay:${delay(7.3)}">${Array.from({length:30},(_,i)=>`<i style="--n:${i};--x:${(i*37+11)%100};--y:${(i*53+7)%70};--h:${(i*47)%360};--t:${(2.6+(i%7)*.35).toFixed(2)}s;--w:${((i*13)%20)/10}s;--r:${i%2?1:-1}"></i>`).join('')}</div>`:''}`:roundSummary(state)+rankRace(state,elapsed);
+ const podium=final?`<div class="final-spotlights" aria-hidden="true" data-on="${step>=3}"></div><div class="final-podium" data-step="${step}">${[1,0,2].filter(i=>winners[i]).map(i=>{const p=winners[i],shown=step>=need(i+1);return `<article class="final-contestant place-${i+1}" data-shown="${shown}" style="--reveal-delay:${delay(at(i+1))};--player-color:${p.color||['#ac8ae8','#78baac','#e9b97e'][i]}">${shown?`${character(p,i,'win-'+((state.victory||0)+i)%4)}<strong>${esc(p.name)}</strong><span>${p.score.toLocaleString('pt-BR')} pontos</span><small>${p.correct} acertos${p.streak>=2?' · 🔥 '+p.streak+' seguidas':''}</small>`:'<div class="final-mystery" aria-hidden="true">?</div>'}<div class="final-tower"><b>${i===0?'♛':i+1}</b></div></article>`;}).join('')}</div>${step>=3?`<div class="final-confetti" data-victory="${victory}" aria-hidden="true" style="--reveal-delay:${delay(7.3)}">${Array.from({length:30},(_,i)=>`<i style="--n:${i};--x:${(i*37+11)%100};--y:${(i*53+7)%70};--h:${(i*47)%360};--t:${(2.6+(i%7)*.35).toFixed(2)}s;--w:${((i*13)%20)/10}s;--r:${i%2?1:-1}"></i>`).join('')}</div>`:''}`:roundSummary(state)+rankRace(state,elapsed);
  const mine=final&&!host&&me>=0&&step>=4?`<p class="final-mine">Você ficou em <b>${me+1}º lugar</b> com ${state.ranking[me].score.toLocaleString('pt-BR')} pontos</p>`:'';
  return `${header()}<main class="game-results ${final?'grand-finale':'round-results'}"${final?` data-victory="${victory}" data-step="${step}"`:''}><div class="results-heading">${heading}</div>${podium}${mine}<section class="game-results-actions">${host?final?`${step<4?'<button class="btn secondary" data-action="podium-all">Revelar todos</button>':''}<button class="btn primary" data-action="${state.activity?.hasNext?'next-stage':'back-lesson'}">${state.activity?.hasNext?'Próxima etapa →':'Voltar aos slides'}</button>`:'<button class="btn primary" data-action="next-question">Próxima pergunta →</button>':'<p>Aguarde o professor continuar.</p>'}<button class="btn secondary" data-action="leave">Sair</button>${final?'<button class="text-btn" data-action="export">Baixar resultado</button>':''}</section>${!final||step>=4?`<details class="result-standings ${final?'final-standings':''}" style="--reveal-delay:${final?delay(9):'0s'}"><summary>Classificação completa</summary><section class="standings-list">${state.ranking.map((p,i)=>`<div${p.color?` style="--c:${p.color}"`:''}><b>${i+1}</b>${avatarContent(p.avatar)}<strong>${esc(p.name)}</strong><span>${p.score.toLocaleString('pt-BR')} pts</span><small>${p.correct} acertos</small></div>`).join('')}</section></details>`:''}</main>`;
 }

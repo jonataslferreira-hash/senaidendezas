@@ -5,7 +5,7 @@
 //   challenge – Desafio no experimento: acertar uma meta mexendo no experimento
 //   raffle    – Sorteio de aluno
 //   tug       – Cabo de guerra: dois lados respondem 3 perguntas; quem acerta mais puxa a corda
-//   race      – Corrida: cada aluno toca na tela para o seu boneco correr até a chegada
+//   race      – Corrida com obstáculos: passos alternados (esquerda/direita) e pulo na hora certa
 // Cada etapa é um slide com o campo `game`. Aqui ficam as regras (sem tela), para
 // a sala do professor aplicar e os testes conferirem.
 import { createUuid } from './uuid.js';
@@ -20,13 +20,26 @@ export const gameHints = {
   challenge: 'Quem atinge a meta no experimento?',
   raffle: 'Roleta com os nomes de quem está na sala',
   tug: 'Dois lados respondem; quem acerta mais puxa a corda',
-  race: 'Toque na tela para o seu boneco correr até a chegada'
+  race: 'Alterne os pés para correr e pule os obstáculos até a chegada'
 };
 export const teamPalette = [['Azul', '#3b82f6'], ['Laranja', '#f97316'], ['Verde', '#22c55e'], ['Rosa', '#ec4899']];
 export const SURVIVAL_POINTS = 500;
 export const FLASH_POINTS = 500, CHALLENGE_FIRST = 500, CHALLENGE_POINTS = 300, TUG_POINTS = 200;
 export const TUG_ROUNDS = 3, TUG_HIT = 100, TUG_PULL_MS = 5000;
-export const RACE_POINTS = [500, 300, 200], RACE_FINISH = 100, RACE_COUNTDOWN = 3000;
+export const RACE_POINTS = [500, 300, 200], RACE_FINISH = 100, RACE_COUNTDOWN = 3000, RACE_TRIP = 3, RACE_LEAP = 3;
+// Obstáculos da pista, em passos. Quanto maior a pista, mais obstáculos.
+export const raceHurdles = goal => { const n = goal <= 60 ? 2 : goal <= 100 ? 3 : 4; return Array.from({ length: n }, (_, i) => Math.round(goal * (i + 1) / (n + 1))); };
+// Um movimento do corredor: 's' = passo, 'j' = pulo. Vale tanto na sala quanto no celular (resposta imediata).
+// Passo em cima do obstáculo = tropeço (volta alguns passos); pulo na frente do obstáculo = salto para o outro lado.
+export function raceStep(runner, move, goal, hurdles) {
+  const next = hurdles[runner.cleared], near = next !== undefined && runner.pos >= next - 1;
+  if (move === 'j') {
+    if (!near) return 'air';
+    runner.cleared++; runner.pos = Math.min(goal, next + RACE_LEAP - 1); return 'jump';
+  }
+  if (near) { runner.pos = Math.max(runner.cleared ? hurdles[runner.cleared - 1] : 0, runner.pos - RACE_TRIP); return 'trip'; }
+  runner.pos = Math.min(goal, runner.pos + 1); return 'step';
+}
 
 const text = (value, max) => String(value ?? '').replace(/[\u0000-\u0008\u000b-\u001f\u007f]/g, '').slice(0, max);
 const line = (value, max) => text(value, max).replace(/\s+/g, ' ').trim();
@@ -168,7 +181,7 @@ export function startGame(room, random = Math.random) {
     for (let i = pool.length - 1; i > 0; i--) { const j = Math.floor(random() * (i + 1)); [pool[i], pool[j]] = [pool[j], pool[i]]; }
     Object.assign(game, { state: 'ready', sides: {}, order: pool.slice(0, TUG_ROUNDS), round: -1, answers: {}, hits: [0, 0], tries: [0, 0], winner: -1, deadline: 0, pullAt: 0 });
   }
-  else if (config.type === 'race') Object.assign(game, { state: 'ready', progress: {}, last: {}, finished: [], startAt: 0, goal: config.goal });
+  else if (config.type === 'race') Object.assign(game, { state: 'ready', progress: {}, cleared: {}, trips: {}, jumps: {}, last: {}, finished: [], startAt: 0, goal: config.goal });
 }
 
 export function gameControl(room, value, random = Math.random) {
@@ -303,13 +316,23 @@ export function gameInput(room, playerId, payload) {
     return;
   }
   if (game.type === 'race') {
-    const now = room.now(), taps = Math.floor(Number(payload.taps) || 0);
+    const now = room.now(); game.cleared ||= {}; game.trips ||= {}; game.jumps ||= {};
+    // `moves` é a sequência de passos e pulos; `taps` (formato antigo) vale como passos.
+    let moves = typeof payload.moves === 'string' ? payload.moves.replace(/[^sj]/g, '') : 's'.repeat(Math.max(0, Math.min(60, Math.floor(Number(payload.taps) || 0))));
     if (now < game.startAt) throw Error('Espere a largada!');
-    if (taps <= 0 || game.finished.includes(playerId)) return;
-    // Limite de ~12 toques por segundo por aluno.
+    if (!moves || game.finished.includes(playerId)) return;
+    // Limite de ~12 movimentos por segundo por aluno.
     const since = Math.max(200, now - (game.last[playerId] || game.startAt));
     game.last[playerId] = now;
-    game.progress[playerId] = Math.min(game.goal, (game.progress[playerId] || 0) + Math.min(taps, Math.ceil(since / 1000 * 12)));
+    moves = moves.slice(0, Math.ceil(since / 1000 * 12));
+    const runner = { pos: game.progress[playerId] || 0, cleared: game.cleared[playerId] || 0 }, hurdles = raceHurdles(game.goal);
+    for (const move of moves) {
+      const result = raceStep(runner, move, game.goal, hurdles);
+      if (result === 'trip') game.trips[playerId] = now;
+      if (result === 'jump') game.jumps[playerId] = now;
+      if (runner.pos >= game.goal) break;
+    }
+    game.progress[playerId] = runner.pos; game.cleared[playerId] = runner.cleared;
     if (game.progress[playerId] >= game.goal) game.finished.push(playerId);
     if (game.finished.length >= Math.min(3, online(room).length)) finishRace(room);
     return;
@@ -360,13 +383,14 @@ export function gameSnapshot(room, playerId, bare = false) {
   }
   if (game.type === 'raffle') return { ...base, current: who(game.current), drawAt: game.drawAt, draws: game.draws || 0, left: online(room).filter(p => !game.picked.includes(p.id)).length, names: online(room).slice(0, 40).map(p => p.name), me: playerId ? game.current === playerId : false };
   if (game.type === 'race') {
-    const runners = d.players.filter(p => p.online || game.progress[p.id]).map(p => ({ ...who(p.id), p: Math.min(1, (game.progress[p.id] || 0) / game.goal), place: game.finished.indexOf(p.id) + 1 }))
+    const now = room.now(); game.cleared ||= {}; game.trips ||= {}; game.jumps ||= {};
+    const runners = d.players.filter(p => p.online || game.progress[p.id]).map(p => ({ ...who(p.id), p: Math.min(1, (game.progress[p.id] || 0) / game.goal), place: game.finished.indexOf(p.id) + 1, h: game.cleared[p.id] || 0, trip: now - (game.trips[p.id] || -1e9) < 900, air: now - (game.jumps[p.id] || -1e9) < 600 }))
       .sort((a, b) => (a.place || 99) - (b.place || 99) || b.p - a.p);
     const mine = runners.find(r => r.id === playerId), shown = runners.slice(0, 8);
     if (mine && !shown.includes(mine)) shown[7] = mine;
     const rank = id => runners.findIndex(r => r.id === id) + 1, order = d.players.map(p => p.id);
     shown.forEach(r => { r.rank = rank(r.id); }); shown.sort((x, y) => order.indexOf(x.id) - order.indexOf(y.id));
-    return { ...base, goal: game.goal, startAt: game.startAt, runners: shown, total: runners.length, finished: game.finished.length, points: RACE_POINTS, me: mine ? { p: mine.p, place: mine.place, rank: runners.indexOf(mine) + 1 } : null };
+    return { ...base, goal: game.goal, hurdles: raceHurdles(game.goal), startAt: game.startAt, runners: shown, total: runners.length, finished: game.finished.length, points: RACE_POINTS, me: mine ? { p: mine.p, pos: game.progress[playerId] || 0, cleared: mine.h, place: mine.place, rank: runners.indexOf(mine) + 1 } : null };
   }
   const count = side => Object.values(game.sides).filter(v => v === side).length;
   const crew = side => Object.keys(game.sides).filter(id => game.sides[id] === side).slice(0, 5).map(who).filter(Boolean);

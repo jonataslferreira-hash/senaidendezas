@@ -8,6 +8,8 @@ import {studioIcon} from './studio-icons.js';
 import {Simulations,simulationNames} from './simulations.js';
 import {prefersReducedMotion} from './motion-preference.js';
 import {requestedGames,withGameQuestions,takeGameQuestions,addGameStages} from './storage-ai-games.js';
+import {stageIcon} from './stage-games-view.js';
+import {coverFromImage} from './lesson-cover.js';
 import {canvasMarkup,CanvasModels,esc} from './canvas-view.js';
 import {createSlideModel,createSlideSound} from './storage-ai-media.js';
 import {AI_PHOTO_LIMIT,AI_SLIDE_LIMIT,aiPalettes,aiThemes} from './storage-ai-options.js';
@@ -68,16 +70,24 @@ function requestedActivityCount(prompt,pattern,fallback){
   const value=Number(match?.[1]||match?.[2]);
   return Number.isFinite(value)&&value>0?Math.min(30,value):fallback;
 }
+const trayGames=[['teams','Equipes','Divide a turma em times'],['flash','Relâmpago','Quem acerta primeiro leva'],['survival','Sobrevivência','Errou, caiu'],['tug','Cabo de guerra','Dois lados, três perguntas'],['race','Corrida','Corrida no ritmo'],['raffle','Sorteio','Sorteia um aluno']];
+function stepper(name,label,value,min,max,extra=''){
+  return `<div class="ai-step" ${extra}><span>${label}</span><div class="ai-stepper"><button type="button" data-ai-step="-1" data-for="${name}" aria-label="Diminuir ${label}">−</button><input name="${name}" type="number" inputmode="numeric" min="${min}" max="${max}" value="${value}" aria-label="${label}"><button type="button" data-ai-step="1" data-for="${name}" aria-label="Aumentar ${label}">+</button></div></div>`;
+}
 function countTray(session){
   const {quizzes,questions,polls}=activitySettings(session);
-  return `<div class="ai-count-tray"><strong>Montar a aula</strong>
-    <div class="ai-slide-count-row"><label for="ai-slide-count">Slides</label><input id="ai-slide-count" name="count" type="range" min="1" max="${AI_SLIDE_LIMIT}" value="${session?.slideCount||5}"><output>${session?.slideCount||5}</output></div>
-    <fieldset><legend>Atividades</legend>
-      <label>Quizzes <input name="quizzes" type="number" min="0" max="3" value="${quizzes}"></label>
-      <label data-quiz-size ${quizzes?'':'hidden'}>Questões por quiz <input name="questions" type="number" min="1" max="10" value="${questions}"></label>
-      <label>Enquetes <input name="polls" type="number" min="0" max="8" value="${polls}"></label>
-      <small>Com 0, a IA segue o pedido da conversa.</small>
-    </fieldset></div>`;
+  const picked=new Set(session?.games||[]),count=session?.slideCount||5;
+  return `<div class="ai-count-tray" role="group" aria-label="Montar a aula">
+    <header class="ai-tray-head"><strong>Montar a aula</strong><button type="button" class="ai-tray-close" data-ai-action="count" aria-label="Fechar">×</button></header>
+    <section class="ai-tray-block ai-slide-count-row" style="--fill:${((count-1)/(AI_SLIDE_LIMIT-1)*100).toFixed(1)}%"><div class="ai-tray-title"><label for="ai-slide-count">Slides</label><output>${count}</output></div><input id="ai-slide-count" name="count" type="range" min="1" max="${AI_SLIDE_LIMIT}" value="${count}"></section>
+    <section class="ai-tray-block"><div class="ai-tray-title"><span>Atividades</span><small>0 = a IA decide pelo pedido</small></div>
+      ${stepper('quizzes','Quizzes',quizzes,0,3)}
+      ${stepper('questions','Questões por quiz',questions,1,10,'data-quiz-size '+(quizzes?'':'hidden'))}
+      ${stepper('polls','Enquetes',polls,0,8)}
+    </section>
+    <section class="ai-tray-block"><div class="ai-tray-title"><span>Etapas de jogo</span><small data-game-total>${picked.size?picked.size+' escolhida'+(picked.size>1?'s':''):'toque para incluir'}</small></div>
+      <div class="ai-game-chips">${trayGames.map(([type,name,hint],i)=>`<button type="button" class="ai-game-chip" style="--i:${i}" data-ai-game="${type}" aria-pressed="${picked.has(type)}" title="${hint}">${stageIcon(type)}<span>${name}</span></button>`).join('')}</div>
+    </section></div>`;
 }
 const closeIcon='<svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24"><path d="m6 6 12 12M6 18 18 6" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>';
 function typeRipple(input){
@@ -166,7 +176,11 @@ async function buildLesson(result,count,photos,onSlide,activities={},imageDefaul
     body:cleanSlideText(lesson.description,160),images:coverImage?[coverImage]:[],model:null,previous:null});
   const cover={...newSlide(),kind:'canvas',title:lesson.title,background:coverDesign.background,
     backgroundFill:coverDesign.backgroundFill,visualTheme:coverDesign.theme,elements:coverDesign.elements,transition:'slide'};
-  if(coverImage)cover.note=imageSourceNote(coverImage);
+  if(coverImage){
+    cover.note=imageSourceNote(coverImage);
+    // A foto 16:9 do tema vira a capa da aula na biblioteca.
+    lesson.thumbnail=await coverFromImage(coverImage.data).catch(()=>'')||lesson.thumbnail||'';
+  }
   lesson.slides.push(cover);
   await onSlide(cover,lesson.title);
   previous=coverDesign;
@@ -343,6 +357,12 @@ async function applyEdit(slide,result,target,photos=[],onStatus=()=>{}) {
   return count;
 }
 
+function pastedFiles(data){
+  if(!data)return [];
+  const files=[...(data.files||[])];
+  if(!files.length)for(const item of data.items||[])if(item.kind==='file'){const file=item.getAsFile();if(file)files.push(file);}
+  return files;
+}
 function linkedLessonId(session) {
   return session?.lessonId || session?.messages.findLast(message=>message.role==='assistant'&&message.lessonId)?.lessonId;
 }
@@ -372,6 +392,7 @@ export class StorageAI {
     this.editMessages=[];this.editPrompt='';
     studio.root.addEventListener('click',async event=>{
       if(this.attachmentOpen&&!event.target.closest('.ai-add-wrap')){this.attachmentOpen=false;this.studio.root.querySelector('.ai-attachment-menu')?.remove();}
+      if(this.showCount&&!event.target.closest('.ai-count-wrap'))this.closeCount();
       const button=event.target.closest('[data-ai-action]');if(!button)return;
       const action=button.dataset.aiAction;
       if(action==='open-navigation'){
@@ -402,6 +423,7 @@ export class StorageAI {
       if(action==='add-pptx'){this.attachmentOpen=false;this.refreshComposer();studio.root.querySelector('[name="presentation"]')?.click();return;}
       if(action==='pick-presentation'){this.attachmentOpen=false;this.refreshComposer();this.pickPresentation().catch(error=>studio.callbacks.toast(error.message));return;}
       if(action==='clear-photos'&&!this.busy){this.photoFiles=[];this.paintPhotoCount();return;}
+      if(action==='remove-photo'&&!this.busy){this.photoFiles.splice(Number(button.dataset.index),1);this.paintPhotoCount();return;}
       if(action==='count'){this.showCount=!this.showCount;this.refreshComposer();return;}
       if(action==='retry-last'){
         if(this.busy||!this.lastPrompt)return;
@@ -475,7 +497,7 @@ export class StorageAI {
       }
     });
     studio.root.addEventListener('input',event=>{
-      if(event.target.id==='storage-ai-create-prompt')this.draftPrompt=event.target.value;
+      if(event.target.id==='storage-ai-create-prompt'){this.draftPrompt=event.target.value;this.closeCount();}
       else if(event.target.id==='storage-ai-prompt'){
         this.editPrompt=event.target.value;
         // Ao começar a escrever, o painel do que editar recolhe para o chat
@@ -486,8 +508,21 @@ export class StorageAI {
       typeRipple(event.target);
     });
     studio.root.addEventListener('keydown',event=>{
+      if(event.key==='Escape'&&this.showCount){this.closeCount();return;}
       if(event.target.id!=='storage-ai-create-prompt'||event.key!=='Enter'||event.shiftKey||event.isComposing)return;
       event.preventDefault();event.target.form?.requestSubmit();
+    });
+    // Ctrl+V: imagens (print, foto copiada) viram anexos; um .pptx copiado é importado. Texto cola normal.
+    studio.root.addEventListener('paste',event=>{
+      if(studio.view!=='storage-ai'||this.busy||!event.target.closest?.('.storage-ai-page'))return;
+      const files=pastedFiles(event.clipboardData);
+      if(!files.length)return;
+      event.preventDefault();
+      const deck=files.find(file=>/\.pptx$/i.test(file.name));
+      if(deck){this.attachPptx(deck).catch(error=>{if(error.name!=='AbortError')studio.callbacks.toast(error.message);});return;}
+      const images=files.filter(file=>file.type.startsWith('image/'));
+      if(images.length)this.addPhotos(images);
+      else studio.callbacks.toast('Dá para colar imagens ou um arquivo .pptx aqui.');
     });
     studio.root.addEventListener('submit',event=>{
       if(!event.target.matches('#storage-ai-create'))return;
@@ -503,12 +538,7 @@ export class StorageAI {
       if(!event.target.matches('#storage-ai-create [name="photos"]'))return;
       const picked=[...event.target.files];
       event.target.value='';
-      const valid=picked.filter(canAttachPhoto);
-      if(valid.length!==picked.length)studio.callbacks.toast('Use PNG, JPEG ou WebP de até 12 MB por foto.');
-      const room=AI_PHOTO_LIMIT-this.photoFiles.length;
-      if(valid.length>room)studio.callbacks.toast('Você pode usar até '+AI_PHOTO_LIMIT+' fotos nesta apresentação.');
-      this.photoFiles.push(...valid.slice(0,room));
-      this.paintPhotoCount();
+      this.addPhotos(picked);
     });
     studio.root.addEventListener('submit',event=>{
       if(!event.target.matches('#storage-ai-edit'))return;
@@ -554,11 +584,33 @@ export class StorageAI {
     const lessons=[...local,...cloud.filter(item=>!existing.has(item.path)&&!studio.cloudLessonIds(item).some(id=>studio.groups.isShared(id)))];
     const dialog=document.createElement('dialog');
     dialog.className='studio-dialog ai-presentation-picker';
-    dialog.innerHTML=`<form method="dialog"><h2>Adicionar da biblioteca</h2>${lessons.length?
-      `<label>Apresentação <select name="lesson">${lessons.map((lesson,index)=>`<option value="${index}">${esc(lesson.title)}</option>`).join('')}</select></label>`:
-      '<p>Importe um PPTX para começar.</p>'}<div><button class="studio-btn quiet" value="cancel">Fechar</button>${lessons.length?'<button class="studio-btn accent" value="attach">Adicionar</button>':''}</div></form>`;
+    const card=(lesson,index)=>{
+      const cloudOnly=Boolean(lesson.path),slides=lesson.slides?.length;
+      return `<button type="button" class="ai-pick-card" role="option" aria-selected="false" data-index="${index}" data-title="${esc(String(lesson.title||'').toLowerCase())}" style="--i:${Math.min(index,14)}">
+        <span class="ai-pick-art">${lesson.thumbnail?`<img src="${esc(lesson.thumbnail)}" alt="" loading="lazy">`:studioIcon(cloudOnly?'cloud':'library')}</span>
+        <span class="ai-pick-text"><strong>${esc(lesson.title||'Aula sem título')}</strong><small>${cloudOnly?'Na nuvem':slides+' slide'+(slides===1?'':'s')+' · neste aparelho'}</small></span><i class="ai-pick-check" aria-hidden="true">✓</i></button>`;
+    };
+    dialog.innerHTML=`<form method="dialog"><header class="ai-pick-head"><div><h2>Adicionar da biblioteca</h2><p>Escolha a apresentação que a IA vai editar com você.</p></div><button class="ai-pick-close" value="cancel" aria-label="Fechar">×</button></header>${lessons.length?
+      `<label class="ai-pick-search">${studioIcon('search')}<input type="search" placeholder="Buscar por título" aria-label="Buscar apresentação" autocomplete="off"></label>
+      <div class="ai-pick-grid" role="listbox" aria-label="Apresentações">${lessons.map(card).join('')}</div><p class="ai-pick-empty" hidden>Nenhuma apresentação com esse nome.</p><input type="hidden" name="lesson" value="">`:
+      `<div class="ai-pick-none">${studioIcon('library')}<strong>Sua biblioteca está vazia</strong><span>Importe um PPTX pelo botão + para começar.</span></div>`}
+      <div class="ai-pick-actions"><button class="studio-btn quiet" value="cancel">Cancelar</button>${lessons.length?'<button class="studio-btn accent" value="attach" disabled>Adicionar</button>':''}</div></form>`;
+    const grid=dialog.querySelector('.ai-pick-grid'),chosen=dialog.querySelector('[name=lesson]'),confirm=dialog.querySelector('[value=attach]');
+    const choose=item=>{
+      grid.querySelectorAll('.ai-pick-card').forEach(other=>other.setAttribute('aria-selected',String(other===item)));
+      chosen.value=item.dataset.index;confirm.disabled=false;
+    };
+    grid?.addEventListener('click',event=>{const item=event.target.closest('.ai-pick-card');if(item)choose(item);});
+    grid?.addEventListener('dblclick',event=>{const item=event.target.closest('.ai-pick-card');if(item){choose(item);dialog.close('attach');}});
+    dialog.querySelector('.ai-pick-search input')?.addEventListener('input',event=>{
+      const term=event.target.value.trim().toLowerCase();let shown=0;
+      grid.querySelectorAll('.ai-pick-card').forEach(item=>{item.hidden=Boolean(term)&&!item.dataset.title.includes(term);if(!item.hidden)shown++;});
+      dialog.querySelector('.ai-pick-empty').hidden=shown>0;
+    });
+    dialog.addEventListener('click',event=>{if(event.target===dialog)dialog.close('cancel');});
     dialog.addEventListener('close',async()=>{
-      const selected=lessons[Number(dialog.querySelector('select')?.value)];
+      const picked=dialog.querySelector('[name=lesson]')?.value;
+      const selected=picked===''||picked==null?null:lessons[Number(picked)];
       dialog.remove();
       if(dialog.returnValue!=='attach'||!selected||!current()||this.busy)return;
       try{
@@ -716,16 +768,13 @@ export class StorageAI {
     try{localStorage.setItem(this.sessionKey(uid),JSON.stringify(this.sessions));}catch{}
   }
   async loadCloudHistory(uid){
-    const initialChatId=this.activeChatId;
     try{
       const result=await this.historyRequest('GET');
       if(this.studio.account.user?.id!==uid||this.sessionsUser!==uid)return;
       this.mergeSessions(result.sessions,uid);
+      // O histórico chega depois: ele só entra na lista. A conversa aberta (nova ou vazia) continua a mesma.
       const active=this.sessions.find(s=>s.id===this.activeChatId);
-      if(this.activeChatId===initialChatId&&!this.busy&&!this.draftPrompt&&active?.title==='Nova conversa'&&active.messages.length===1){
-        const previous=this.sessions.find(s=>s.messages.some(m=>m.role==='user'));
-        if(previous){this.activeChatId=previous.id;this.messages=previous.messages;}
-      }
+      if(active)this.messages=active.messages;
       if(this.studio.view==='storage-ai')this.renderCreate();
       this.queueCloudSave();
     }catch{if(this.studio.view==='storage-ai')this.studio.callbacks.toast('Histórico disponível neste navegador. A sincronização online está indisponível.');}
@@ -771,6 +820,24 @@ export class StorageAI {
     this.clearAttachments();
   }
   switchChat(id){if(this.busy)return;const session=this.sessions.find(s=>s.id===id);if(!session)return;this.activeChatId=id;this.messages=session.messages;this.draftPrompt='';this.clearAttachments();this.saveSessions();this.renderCreate();}
+  closeCount(){
+    if(!this.showCount)return;
+    this.showCount=false;
+    const tray=this.studio.root.querySelector('.ai-count-tray');
+    this.studio.root.querySelector('[data-ai-action="count"]')?.setAttribute('aria-expanded','false');
+    if(!tray)return;
+    tray.classList.add('is-closing');
+    setTimeout(()=>tray.remove(),150);
+  }
+  addPhotos(picked){
+    const toast=this.studio.callbacks.toast;
+    const valid=picked.filter(canAttachPhoto);
+    if(valid.length!==picked.length)toast('Use PNG, JPEG ou WebP de até 12 MB por foto.');
+    const room=AI_PHOTO_LIMIT-this.photoFiles.length;
+    if(valid.length>room)toast('Você pode usar até '+AI_PHOTO_LIMIT+' fotos nesta apresentação.');
+    this.photoFiles.push(...valid.slice(0,room));
+    this.paintPhotoCount();
+  }
   clearAttachments(){
     this.photoFiles=[];
     const form=this.studio.root.querySelector('#storage-ai-create');
@@ -781,10 +848,19 @@ export class StorageAI {
   }
   paintPhotoCount(){
     const output=this.studio.root.querySelector('[data-ai-photo-count]');
-    const count=this.photoFiles.length;
-    if(output)output.innerHTML=count
-      ?`<span>${count} ${count===1?'foto anexada':'fotos anexadas'}</span> <button type="button" data-ai-action="clear-photos">Remover fotos</button>`
-      :'';
+    this.photoUrls||=new Map();
+    for(const [file,url] of this.photoUrls)if(!this.photoFiles.includes(file)){URL.revokeObjectURL(url);this.photoUrls.delete(file);}
+    if(!output)return;
+    const session=this.sessions?.find(item=>item.id===this.activeChatId),linkedId=linkedLessonId(session);
+    const linked=linkedId&&this.studio.library.lessons.find(lesson=>lesson.id===linkedId);
+    const chips=this.photoFiles.map((file,index)=>{
+      if(!this.photoUrls.has(file))this.photoUrls.set(file,URL.createObjectURL(file));
+      const name=esc(file.name&&file.name!=='image.png'?file.name:'Imagem colada');
+      return `<figure class="ai-attach-chip" style="--i:${index}" title="${name}"><img src="${this.photoUrls.get(file)}" alt="${name}"><button type="button" data-ai-action="remove-photo" data-index="${index}" aria-label="Remover ${name}">×</button></figure>`;
+    }).join('');
+    const deck=linked?`<figure class="ai-attach-chip is-deck" title="${esc(linked.title)}">${linked.thumbnail?`<img src="${esc(linked.thumbnail)}" alt="">`:`<i aria-hidden="true">${studioIcon('library')}</i>`}<figcaption><strong>${esc(linked.title||'Apresentação')}</strong><small>${linked.slides.length} slides · em edição</small></figcaption></figure>`:'';
+    output.innerHTML=deck+chips+(this.photoFiles.length>1?`<button type="button" class="ai-attach-clear" data-ai-action="clear-photos">Remover ${this.photoFiles.length} fotos</button>`:'');
+    output.hidden=!deck&&!chips;
   }
   deleteChat(id){if(this.busy)return;const removed=this.deletedIds();removed.add(id);try{localStorage.setItem(this.deletedKey(),JSON.stringify([...removed].slice(-200)));}catch{}this.sessions=this.sessions.filter(s=>s.id!==id);if(this.activeChatId===id){this.activeChatId='';const next=this.sessions[0];if(next){this.activeChatId=next.id;this.messages=next.messages;}else this.newSession(false);}this.saveSessions();this.renderCreate();}
   renderedMessages(){if(this.messages.length===1&&this.messages[0].role==='assistant'&&this.messages[0].text.startsWith('Oi! Me conte'))return `<div class="ai-welcome"><div class="ai-welcome-mark">${brandMark}</div><h1>storageAI</h1><p>Conte como você imagina a sua aula.</p><div class="ai-welcome-features">${starters.map(({icon,label},index)=>`<button type="button" data-ai-action="starter" data-starter="${index}">${studioIcon(icon)}${label}</button>`).join('')}</div></div>`;return this.messages.map(m=>{
@@ -840,7 +916,7 @@ export class StorageAI {
       <form id="storage-ai-create" class="ai-input-area" ${this.busy?'aria-busy="true"':''}><div class="ai-composer"><i class="ai-ripple" aria-hidden="true"></i>
       <div class="ai-add-wrap"><button type="button" class="ai-add-button" data-ai-action="attachments" aria-label="Adicionar conteúdo" title="Adicionar conteúdo" ${this.busy?'disabled':''}>＋</button>${this.attachmentOpen?`<div class="ai-attachment-menu"><button type="button" data-ai-action="add-photos">${studioIcon('image')} Adicionar imagem</button><button type="button" data-ai-action="add-pptx">${studioIcon('upload')} Importar PPTX</button><button type="button" data-ai-action="pick-presentation">${studioIcon('library')} Adicionar da biblioteca</button></div>`:''}<input type="file" name="photos" accept="image/png,image/jpeg,image/webp" multiple hidden><input type="file" name="presentation" accept=".pptx" hidden></div>
       <textarea id="storage-ai-create-prompt" name="prompt" rows="1" required maxlength="2400" aria-label="Mensagem para Storage AI" placeholder="Peça para criar ou melhorar uma aula…" ${this.busy?'disabled':''}>${esc(this.draftPrompt||'')}</textarea>
-      <span data-ai-photo-count aria-live="polite"></span><div class="ai-count-wrap"><button type="button" class="ai-count-button" data-ai-action="count" aria-label="Quantidade de slides" title="${revising?'Esta conversa edita a apresentação existente':'Quantidade de slides'}" aria-expanded="${this.showCount}" ${this.busy||revising?'disabled':''}>${session?.slideCount||5}</button>${this.showCount&&!revising?countTray(session):''}</div>
+      <span data-ai-photo-count aria-live="polite"></span><div class="ai-count-wrap"><button type="button" class="ai-count-button ${session?.games?.length&&!revising?'has-games':''}" data-ai-action="count" aria-label="Montar a aula: slides, atividades e jogos" title="${revising?'Esta conversa edita a apresentação existente':'Montar a aula'}" aria-expanded="${this.showCount}" ${this.busy||revising?'disabled':''}>${session?.slideCount||5}</button>${this.showCount&&!revising?countTray(session):''}</div>
       <button type="button" class="ai-instant-button ${session?.instant?'is-active':''}" data-ai-action="instant" aria-label="Modo instantâneo" title="Flash ${session?.instant?'ligado':'desligado'}" aria-pressed="${Boolean(session?.instant)}" ${this.busy||revising?'disabled':''}>${flashIcon}</button>
       <button type="submit" class="storage-ai-primary ai-send-button ${this.busy?'is-loading':''}" aria-label="${this.busy?(revising?'Atualizando apresentação':'Gerando apresentação'):'Enviar mensagem'}" title="${this.busy?(revising?'Atualizando apresentação':'Gerando apresentação'):'Enviar mensagem'}" ${this.busy?'disabled':''}>${this.busy?'<span class="ai-spinner" aria-hidden="true"></span>':studioIcon('send')}</button></div><small class="ai-composer-hint">A IA pode errar. Revise o conteúdo antes de apresentar.${this.quotaHint()?' <span class="ai-quota-hint">'+esc(this.quotaHint())+'</span>':''}</small></form></section></main>`;
   }
@@ -881,8 +957,27 @@ export class StorageAI {
       if(target.name!=='count'){updateActivity(target);return;}
       session.slideCount=Number(target.value);
       tray.querySelector('output').value=target.value;
+      target.closest('.ai-slide-count-row')?.style.setProperty('--fill',((target.value-1)/(target.max-1)*100).toFixed(1)+'%');
       dialog.querySelector('.ai-count-button').textContent=target.value;
       this.saveSessions();
+    };
+    tray.onclick=event=>{
+      if(!session)return;
+      const step=event.target.closest('[data-ai-step]'),chip=event.target.closest('[data-ai-game]');
+      if(step){
+        const input=tray.querySelector(`input[name="${step.dataset.for}"]`);
+        input.value=String(Math.max(Number(input.min),Math.min(Number(input.max),(Number(input.value)||0)+Number(step.dataset.aiStep))));
+        updateActivity(input);
+        input.animate?.([{transform:'scale(1.25)'},{transform:'none'}],{duration:220,easing:'ease-out'});
+      }else if(chip){
+        const games=new Set(session.games||[]);
+        if(games.has(chip.dataset.aiGame))games.delete(chip.dataset.aiGame);else games.add(chip.dataset.aiGame);
+        session.games=[...games];
+        chip.setAttribute('aria-pressed',String(games.has(chip.dataset.aiGame)));
+        tray.querySelector('[data-game-total]').textContent=games.size?games.size+' escolhida'+(games.size>1?'s':''):'toque para incluir';
+        dialog.querySelector('.ai-count-button')?.classList.toggle('has-games',games.size>0);
+        this.saveSessions();
+      }
     };
     tray.onchange=({target})=>{
       updateActivity(target);
@@ -1082,7 +1177,7 @@ export class StorageAI {
         }catch{}
       }
       // Dinâmicas pedidas no texto (sobrevivência, cabo de guerra, relâmpago…): pedimos perguntas a mais para elas.
-      const games=requestedGames(prompt),gamePlan=withGameQuestions(activities,games);
+      const games=requestedGames(prompt,session?.games),gamePlan=withGameQuestions(activities,games);
       const result=await this.ask({mode:'create',prompt:generationPrompt,count,activities:gamePlan.request,photos:references,photoCount:images.length,photoSheet},AbortSignal.any([job.controller.signal,AbortSignal.timeout(160000)]));
       result.sources=researchSources;
       const activityNotice=await this.completeActivities(result,gamePlan.request,prompt,job.controller.signal,result.slides);
@@ -1144,7 +1239,7 @@ export class StorageAI {
     // as aulas da IA apareciam sem capa na biblioteca e na nuvem.
     try{
       const {thumbnailFor}=await import('./cover-render.js');
-      const cover=await thumbnailFor(saved);
+      const cover=saved.thumbnail||await thumbnailFor(saved);
       if(cover&&cover!==saved.thumbnail){
         saved.thumbnail=cover;
         this.studio.library.save(saved);

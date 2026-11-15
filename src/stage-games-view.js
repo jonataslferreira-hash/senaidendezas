@@ -83,7 +83,7 @@ function survivalView(state, g, host, player, now) {
     : '<p class="sv-safe">Você continua de pé!</p>';
   const arena = `<div class="sv-arena" style="--scale:${scale}" data-state="${g.state}"><i class="sv-light a"></i><i class="sv-light b"></i>${done && winners.length ? confetti(28) : ''}<div class="sv-crowd">${g.players.map((item, i) => {
     const fell = item.alive ? '' : item.fell === g.round && shown ? 'now' : 'before';
-    return `<figure class="sv-player" data-fell="${fell}" data-locked="${g.state === 'open' && Boolean(item.locked)}" data-me="${player && item.id === state.me?.id}" data-winner="${done && item.alive}" style="--i:${i}">${character(item, i)}<i class="sv-lock" aria-hidden="true">✓</i><i class="sv-ghost" aria-hidden="true">✕</i><i class="sv-tile" aria-hidden="true"></i><figcaption>${esc(item.name)}</figcaption></figure>`;
+    return `<figure class="sv-player" data-fell="${fell}" data-locked="${g.state === 'open' && Boolean(item.locked)}" data-me="${player && item.id === state.me?.id}" data-winner="${done && item.alive}" style="--i:${i}">${character(item, i, done && item.alive ? 'win-' + i % 4 : item.alive && g.state === 'ready' ? 'idle' : '')}<i class="sv-lock" aria-hidden="true">✓</i><i class="sv-ghost" aria-hidden="true">✕</i><i class="sv-tile" aria-hidden="true"></i><figcaption>${esc(item.name)}</figcaption></figure>`;
   }).join('') || '<p class="game-wait">Aguardando participantes…</p>'}</div><i class="sv-floor"></i></div>`;
   return live(hud) + live(timerBar(g, now), 'slim') + live(question) + live(arena, 'arena') + live(status) +
     (host ? live(hostActions(state, [g.state === 'ready' ? ['next', '▶ Começar', 'primary'] : g.state === 'open' ? ['next', 'Revelar agora'] : g.state === 'reveal' ? ['next', 'Próxima pergunta →', 'primary'] : ['restart', '↻ Jogar de novo']])) : '');
@@ -112,7 +112,7 @@ function tugView(state, g, host, player, now) {
   const colors = g.labels.map(label => label.color), names = g.labels.map(label => label.name), crews = g.crews || [[], []];
   const diff = g.score[0] - g.score[1], lean = Math.max(-1, Math.min(1, diff / 100));
   const end = g.winner === 0 ? -20 : g.winner === 1 ? 20 : 0;
-  const team = side => `<div class="tug-team ${side ? 'right' : 'left'}" data-result="${done && g.winner >= 0 ? (g.winner === side ? 'won' : 'lost') : ''}" style="--team:${colors[side]}">${(crews[side].length ? crews[side] : [{ avatar: '', name: '' }]).map((person, i) => `<span class="tug-puller" style="--i:${i}" data-empty="${!crews[side].length}">${character({ ...person, color: colors[side] }, i)}</span>`).join('')}${g.sides[side] > 5 ? `<em>+${g.sides[side] - 5}</em>` : ''}</div>`;
+  const team = side => `<div class="tug-team ${side ? 'right' : 'left'}" data-result="${done && g.winner >= 0 ? (g.winner === side ? 'won' : 'lost') : ''}" style="--team:${colors[side]}">${(crews[side].length ? crews[side] : [{ avatar: '', name: '' }]).map((person, i) => `<span class="tug-puller" style="--i:${i}" data-empty="${!crews[side].length}">${character({ ...person, color: colors[side] }, i, done && g.winner >= 0 ? (g.winner === side ? 'win-' + (i + side) % 4 : 'lose') : '')}</span>`).join('')}${g.sides[side] > 5 ? `<em>+${g.sides[side] - 5}</em>` : ''}</div>`;
   const side = i => `<span style="--team:${colors[i]}" data-mine="${player && g.side === i}"><b>${esc(names[i])}</b><small>${plural(g.sides[i], 'pessoa', 'pessoas')} · ${g.hits[i]} ${g.hits[i] === 1 ? 'acerto' : 'acertos'}</small><strong>${g.score[i]}%</strong></span>`;
   const scene = `<div class="tug-scene" data-state="${g.state}" data-winner="${over ? g.winner : ''}" data-leading="${diff > 0 ? 0 : diff < 0 ? 1 : -1}" style="--shift:${over ? end : (-lean * 8).toFixed(2)}%;--end:${end}%;--pull-delay:${pulling ? (-(Math.max(0, now - g.pullAt) / 1000)).toFixed(2) : 0}s">
     ${done && g.winner >= 0 ? confetti(26) : ''}
@@ -133,20 +133,27 @@ function tugView(state, g, host, player, now) {
     (host ? live(hostActions(state, [g.state === 'ready' ? ['next', '▶ Começar', 'primary'] : g.state === 'open' ? ['next', 'Revelar agora'] : g.state === 'reveal' ? ['next', g.round + 1 < g.rounds ? 'Próxima pergunta →' : 'Puxar a corda!', 'primary'] : done ? ['restart', '↻ Revanche'] : null])) : '');
 }
 
-// Corrida: cada toque na tela é um passo do boneco. Os 3 primeiros levam mais pontos.
+// Corrida com obstáculos: o aluno alterna os pés para correr e pula na hora certa. Os 3 primeiros levam mais pontos.
 function raceView(state, g, host, player, now) {
-  const done = g.state === 'done', open = g.state === 'open', wait = Math.max(0, (g.startAt - now) / 1000), started = open;
+  const done = g.state === 'done', open = g.state === 'open', wait = Math.max(0, (g.startAt - now) / 1000), started = open && wait <= 0;
   const medal = place => place ? `<b class="race-place" data-place="${place}">${place}º</b>` : '';
-  const lanes = g.runners.map((runner, i) => `<div class="race-lane" data-k="${esc(runner.id)}" data-me="${player && runner.id === state.me?.id}" data-place="${runner.place || ''}" data-run="${started && !runner.place}" style="--p:${runner.p.toFixed(3)};--i:${i}"><span class="race-name">${esc(runner.name)}</span><div class="race-road"><div class="race-runner">${character(runner, i)}<span data-t>${medal(runner.place)}</span></div></div></div>`).join('');
-  const signature = g.state + ':' + g.runners.map(runner => runner.id).join(',');
+  const hurdles = g.hurdles || [], gate = (cleared = -1) => hurdles.map((at, i) => `<i class="race-hurdle" data-down="${i < cleared}" style="--at:${(at / g.goal).toFixed(3)}"></i>`).join('');
+  const mood = (runner, i) => runner.place ? 'win-' + (runner.place + i) % 4 : done ? 'lose' : started ? 'run' : 'idle';
+  const lanes = g.runners.map((runner, i) => `<div class="race-lane" data-k="${esc(runner.id)}" data-me="${player && runner.id === state.me?.id}" data-place="${runner.place || ''}" data-run="${started && !runner.place}" data-trip="${Boolean(runner.trip)}" data-air="${Boolean(runner.air)}" data-h="${runner.h || 0}" style="--p:${runner.p.toFixed(3)};--i:${i}"><span class="race-name">${esc(runner.name)}</span><div class="race-road">${gate()}<div class="race-runner">${character(runner, i, mood(runner, i))}<span data-t>${medal(runner.place)}</span></div></div></div>`).join('');
+  const signature = g.state + ':' + started + ':' + g.runners.map(runner => runner.id + (runner.place ? '!' : '')).join(',');
   const count = open && wait > 0 ? `<div class="race-count" style="--wait:${(wait - 3).toFixed(2)}s" aria-hidden="true"><b>3</b><b>2</b><b>1</b><b>JÁ!</b></div>` : '';
   const track = `<div class="race-track" data-state="${g.state}" style="--lanes:${Math.max(1, g.runners.length)};--s:${g.runners.length <= 4 ? .6 : g.runners.length <= 6 ? .46 : .38}">${done && g.finished ? confetti(24) : ''}<i class="race-finish" aria-hidden="true"></i>${lanes || '<p class="game-wait">Aguardando participantes…</p>'}${g.total > g.runners.length ? `<p class="race-more">+${g.total - g.runners.length} correndo</p>` : ''}</div>`;
   const podium = done ? (g.runners.some(runner => runner.place) ? `<p class="game-winner"><b>${esc(g.runners.find(runner => runner.place === 1)?.name || '')}</b> cruzou a linha primeiro! <small>+${g.points[0]} pts</small></p>` : '<p class="game-winner none">Ninguém chegou até o fim.</p>') : '';
   const me = g.me;
-  const mine = !player || !me ? '' : me.place ? `<p class="sv-safe">Você chegou em <b>${me.place}º lugar</b>!</p>` : done ? '<p class="game-wait">A corrida terminou.</p>' : open ? `<p class="game-wait race-rank">Você está em <b>${me.rank}º</b> · ${Math.round(me.p * 100)}% do caminho</p>` : '<p class="game-wait">Fique pronto: quando o professor der a largada, toque sem parar!</p>';
-  const tap = player && me && open && !me.place ? `<button class="tug-tap race-tap" style="--team:${esc(g.runners.find(runner => runner.id === state.me?.id)?.color || '#8b5cf6')}" data-tug-tap><b>CORRER!</b><small>toque sem parar</small></button>` : '';
-  return `<div class="game-live game-race" data-game-live data-soft="${esc(signature)}">${track}</div>` + live(count) + live(podium + mine) + live(tap) +
-    (host ? live(`${g.state === 'ready' ? '<p class="game-note">1º lugar +' + g.points[0] + ' · 2º +' + g.points[1] + ' · 3º +' + g.points[2] + ' pontos</p>' : ''}${hostActions(state, [g.state === 'ready' ? ['next', '▶ Largada!', 'primary'] : open ? ['end', 'Encerrar', 'primary'] : ['restart', '↻ Correr de novo']])}`) : '');
+  const mine = !player || !me ? '' : me.place ? `<p class="sv-safe">Você chegou em <b>${me.place}º lugar</b>!</p>` : done ? '<p class="game-wait">A corrida terminou.</p>' : open ? `<p class="game-wait race-rank">Você está em <b>${me.rank}º</b></p>` : '<p class="game-wait">Fique pronto: alterne <b>ESQ</b> e <b>DIR</b> para correr e aperte <b>PULAR</b> quando o obstáculo chegar.</p>';
+  // O painel não leva a posição do servidor no HTML: o celular anda na hora (app.js) e o servidor só confere.
+  const pad = player && me && open && !me.place ? `<div class="race-pad" data-race-pad data-key="${esc(g.id + ':' + g.startAt)}" data-goal="${g.goal}" data-hurdles="${hurdles.join(',')}" data-start="${g.startAt}" style="--team:${esc(g.runners.find(runner => runner.id === state.me?.id)?.color || '#8b5cf6')}">
+    <div class="race-radar" aria-hidden="true"><i class="race-radar-road"></i><i class="race-radar-me"></i><i class="race-radar-hurdle"></i><i class="race-radar-flag"></i><b class="race-radar-alert">PULE!</b><b class="race-radar-oops">Tropeçou!</b><span class="race-radar-bar"><i></i></span></div>
+    <button type="button" class="race-jump" data-race-move="j"><b>PULAR</b><small>quando o obstáculo chegar</small></button>
+    <div class="race-feet"><button type="button" data-race-move="l"><b>ESQ</b></button><button type="button" data-race-move="r"><b>DIR</b></button></div>
+    <small class="race-help">Alterne os pés. No teclado: ← → e espaço.</small></div>` : '';
+  return `<div class="game-live game-race" data-game-live data-soft="${esc(signature)}">${track}</div>` + live(count) + live(podium + mine) + live(pad) +
+    (host ? live(`${g.state === 'ready' ? '<p class="game-note">Alterne os pés e pule os obstáculos · 1º lugar +' + g.points[0] + ' · 2º +' + g.points[1] + ' · 3º +' + g.points[2] + ' pontos</p>' : ''}${hostActions(state, [g.state === 'ready' ? ['next', '▶ Largada!', 'primary'] : open ? ['end', 'Encerrar', 'primary'] : ['restart', '↻ Correr de novo']])}`) : '');
 }
 
 const views = { teams: teamsView, flash: flashView, survival: survivalView, challenge: challengeView, raffle: raffleView, tug: tugView, race: raceView };

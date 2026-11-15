@@ -92,7 +92,7 @@ const transparentHint=/\b(?:png|transparente?s?|transparent|sem\s+fundo|fundo\s+
 const transparentWords=new RegExp(transparentHint.source,'giu');
 export const wantsTransparentImage=query=>transparentHint.test(String(query||''));
 
-async function fetchImageBlob(url){
+export async function fetchImageBlob(url){
   const direct=await fetch(url,{signal:AbortSignal.timeout(15000),credentials:'omit'}).then(response=>response.ok?response.blob():null).catch(()=>null);
   if(direct&&direct.type.startsWith('image/'))return direct;
   // O proxy do Worker alcança origens que bloqueiam o navegador (Flickr, por

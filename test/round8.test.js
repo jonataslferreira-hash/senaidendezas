@@ -250,7 +250,17 @@ test('rodada 14: escolha de time, pódio guiado pela sala, corrida, textos escon
   room.control('game', { do: 'next' });
   assert.throws(() => room.answer(ana.id, { choice: { taps: 5 } }), /largada/);
   now += 3100;
-  for (let i = 0; i < 40 && room.snapshot().game.state === 'open'; i++) { now += 500; room.answer(ana.id, { choice: { taps: 50 } }); if (i % 2) room.answer(bia.id, { choice: { taps: 6 } }); if (i % 3 === 0) room.answer(caio.id, { choice: { taps: 6 } }); }
+  // Com obstáculos: quem só corre tropeça e fica para trás; quem pula na hora passa.
+  assert.deepEqual(room.snapshot().game.hurdles, [20, 40]);
+  for (let i = 0; i < 12; i++) { now += 500; room.answer(bia.id, { choice: { taps: 6 } }); }
+  assert.ok(room.data.game.progress[bia.id] < 20, 'sem pular ninguém passa do obstáculo');
+  assert.equal(room.snapshot().game.runners.find(r => r.id === bia.id).trip, true);
+  for (let i = 0; i < 80 && room.snapshot().game.state === 'open'; i++) {
+    now += 500;
+    const me = room.snapshot(ana.id).game.me, next = [20, 40][me.cleared], gap = (next ?? 60) - me.pos;
+    room.answer(ana.id, { choice: { moves: next !== undefined && gap <= 1 ? 'j' : 's'.repeat(Math.max(1, Math.min(6, next === undefined ? 6 : gap - 1))) } });
+    if (room.data.game.finished.includes(ana.id)) room.control('game', { do: 'end' });
+  }
   assert.equal(room.snapshot().game.state, 'done');
   assert.equal(room.snapshot(ana.id).game.me.place, 1);
   assert.equal(room.data.players.find(p => p.id === ana.id).bonus, 500);
@@ -280,4 +290,32 @@ test('rodada 14: escolha de time, pódio guiado pela sala, corrida, textos escon
   assert.deepEqual(ai.requestedGames('corrida espacial e trabalho em equipe'), []);
   const plan = ai.withGameQuestions({ quizzes: 1, questions: 5, polls: 0 }, ai.requestedGames('sobrevivência com 6 perguntas e cabo de guerra, uma sobrevivência'));
   assert.equal(plan.quizTotal, 5); assert.ok(plan.request.quizzes * plan.request.questions >= 15);
+});
+
+test('rodada 15: corrida com obstáculos, painel de jogos da IA e boneco do placar', async () => {
+  const { raceHurdles, raceStep } = await import('../src/stage-games.js');
+  assert.deepEqual(raceHurdles(60), [20, 40]); assert.deepEqual(raceHurdles(100), [25, 50, 75]); assert.equal(raceHurdles(150).length, 4);
+  const runner = { pos: 0, cleared: 0 }, hurdles = raceHurdles(60);
+  for (let i = 0; i < 19; i++) assert.equal(raceStep(runner, 's', 60, hurdles), 'step');
+  assert.equal(raceStep({ pos: 5, cleared: 0 }, 'j', 60, hurdles), 'air', 'pular longe do obstáculo não adianta');
+  assert.equal(raceStep(runner, 's', 60, hurdles), 'trip'); assert.equal(runner.pos, 16, 'tropeço volta 3 passos');
+  for (let i = 0; i < 3; i++) raceStep(runner, 's', 60, hurdles);
+  assert.equal(raceStep(runner, 'j', 60, hurdles), 'jump'); assert.equal(runner.pos, 22); assert.equal(runner.cleared, 1);
+  // depois de passar, um tropeço no obstáculo seguinte nunca devolve para antes do anterior
+  const near = { pos: 39, cleared: 1 }; raceStep(near, 's', 60, hurdles); assert.equal(near.pos, 36);
+  const edge = { pos: 21, cleared: 1 }; edge.pos = 39; raceStep(edge, 's', 60, [20, 22]); assert.ok(edge.pos >= 20);
+
+  const { requestedGames } = await import('../src/storage-ai-games.js');
+  assert.deepEqual(requestedGames('aula sobre vulcões', ['race', 'tug']).map(game => game.type), ['tug', 'race']);
+  assert.deepEqual(requestedGames('aula com cabo de guerra', ['tug']).map(game => game.type), ['tug'], 'não duplica');
+  assert.deepEqual(requestedGames('aula sobre vulcões'), []);
+
+  const { rankMood, character } = await import('../src/game-ui.js');
+  assert.equal(rankMood(100, true), 'idle'); assert.equal(rankMood(900, true), 'run'); assert.equal(rankMood(2000, true), 'win-0'); assert.equal(rankMood(5000, true), 'idle');
+  assert.equal(rankMood(900, false), 'idle', 'quem não pontuou não corre');
+  assert.match(character({ avatar: '', name: 'A' }, 0, 'lose'), /data-mood="lose"/);
+  assert.doesNotMatch(character({ avatar: '', name: 'A' }, 0), /data-mood/);
+
+  const { looksLikeImageLink } = await import('../src/cover-picker.js');
+  assert.equal(looksLikeImageLink(' https://site.com/foto.jpg '), true); assert.equal(looksLikeImageLink('javascript:alert(1)'), false); assert.equal(looksLikeImageLink('texto solto'), false);
 });

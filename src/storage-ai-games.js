@@ -14,9 +14,10 @@ const rules = [
 ];
 
 // Quais dinâmicas o pedido cita e quantas perguntas cada uma precisa.
-export function requestedGames(prompt) {
-  const source = String(prompt || '');
-  return rules.filter(([, pattern]) => pattern.test(source)).map(([type, , need]) => {
+// `picked` são as etapas marcadas no painel "Montar a aula".
+export function requestedGames(prompt, picked = []) {
+  const source = String(prompt || ''), chosen = new Set(Array.isArray(picked) ? picked : []);
+  return rules.filter(([type, pattern]) => chosen.has(type) || pattern.test(source)).map(([type, , need]) => {
     if (type !== 'survival') return { type, need };
     const asked = Number(source.match(/sobreviv[eê]ncia\s+(?:com|de)\s+(\d{1,2})/i)?.[1]);
     return { type, need: asked > 0 ? Math.min(10, asked) : need };
