@@ -812,7 +812,7 @@ html[data-theme][data-ui-style][data-appearance] body #app dialog.remote-v2 :is(
 #app .game-options[data-wide-options="true"]:not(.bare) .game-option{min-height:60px;padding:10px 15px;font-size:clamp(13px,1.75vh,18px);line-height:1.26}
 #app .game-option{display:flex;align-items:center;gap:12px;min-height:84px;padding:12px 16px;border-radius:18px;border:2px solid var(--g-line);background:var(--g-card);color:#fff;font-size:clamp(16px,2.4vh,22px);font-weight:650;text-align:left;cursor:pointer;touch-action:manipulation;line-height:1.3}
 #app .game-option b{flex:none;width:38px;height:38px;border-radius:12px;display:grid;place-items:center;background:rgba(255,255,255,.16)}
-#app .game-option span{flex:1;min-width:0;overflow-wrap:anywhere}
+#app .game-option span{flex:1;min-width:0;overflow-wrap:break-word;word-break:normal;hyphens:none}
 #app .game-option small{font-size:14px;opacity:.75}
 #app .game-option i{font-style:normal;font-weight:900;color:#4ade80;font-size:24px}
 #app .game-option:nth-child(1) b{background:#3b82f6}#app .game-option:nth-child(2) b{background:#f97316}#app .game-option:nth-child(3) b{background:#22c55e}#app .game-option:nth-child(4) b{background:#ec4899}
@@ -1220,7 +1220,7 @@ html[data-theme][data-ui-style][data-appearance] body #app button.music-preview{
 html[data-theme][data-ui-style][data-appearance] body #app button.music-preview:hover{background:color-mix(in srgb,var(--ui-accent,#7c3aed),#000 14%);transform:translateY(-1px)}
 html[data-theme][data-ui-style][data-appearance] body #app button.music-preview[aria-pressed=true]{background:#16a34a;box-shadow:0 0 0 3px rgba(22,163,74,.3);animation:music-pulse 1s ease-in-out infinite alternate}
 @keyframes music-pulse{to{box-shadow:0 0 0 6px rgba(22,163,74,.12)}}
-#app .music-now{display:block;min-height:16px;margin-top:5px;font-size:12px;opacity:.75}
+#app details.game-settings .music-now{display:block;min-height:16px;margin-top:5px;font-size:12px;opacity:.75}
 #app .music-volume input{display:block;width:100%;margin-top:8px}
 #app .music-effects{display:flex;align-items:center;gap:8px;font-size:13px;font-weight:600;align-self:center}
 @media(max-width:720px){#app details.game-settings .game-setting-grid{grid-template-columns:1fr}html[data-theme][data-ui-style][data-appearance] body #app details.game-settings{width:calc(100% - 20px)}}
@@ -1727,10 +1727,11 @@ html body dialog.cover-picker .cp-upload{justify-content:center!important}
 html body dialog:is(.ai-presentation-picker,.cover-picker) :is(.ai-pick-head,.cp-head)>div{display:block!important}
 html body dialog:is(.ai-presentation-picker,.cover-picker) input:is([type=search],[type=url]){border:0!important;background:transparent!important;box-shadow:none!important;padding:0!important;margin:0!important;min-height:0!important;width:auto!important;font-weight:500}
 html body dialog.cover-picker .cp-stage-actions{display:flex!important;justify-content:space-between!important}
-/* 40.9 Corrida do saber no telão: opções numa linha só para a pista caber inteira */
+/* 40.9 Corrida do saber no telão: evita quebrar palavras no meio nas opções */
 @media (min-width:761px){
-  #app .game-stage[data-game-type=race] .game-options:not(.bare){grid-template-columns:repeat(auto-fit,minmax(200px,1fr));max-width:1100px;gap:10px}
-  #app .game-stage[data-game-type=race] .game-options:not(.bare) .game-option{min-height:58px}
+  #app .game-stage[data-game-type=race] .game-options:not(.bare){grid-template-columns:repeat(auto-fit,minmax(270px,1fr));max-width:1180px;gap:10px}
+  #app .game-stage[data-game-type=race] .game-options:not(.bare)[data-wide-options="true"]{grid-template-columns:repeat(2,minmax(0,1fr));max-width:1280px}
+  #app .game-stage[data-game-type=race] .game-options:not(.bare) .game-option{min-height:60px}
   #app .game-stage[data-game-type=race]{gap:10px}
   #app .game-stage[data-game-type=race] .race-lane{height:calc(145px*var(--s) + 4px)}
 }
@@ -1906,4 +1907,99 @@ html body dialog.cover-picker .cp-stage-actions{display:flex!important;justify-c
 #app .studio-shell .lesson-card-art{border-radius:13px 13px 0 0}
 #app .studio-shell .studio-btn.accent{box-shadow:none}
 #app .studio-shell .studio-btn.accent:hover{box-shadow:0 4px 12px rgba(20,24,36,.12)}
+
+/* 41. Jogos ao vivo em tela cheia sem caixas, Relâmpago 5 por coluna, Sobrevivência ancorada com passeio livre, Sorteio ampliado e Cabo de Guerra */
+#app .game-stage{max-width:none;width:100%;padding:14px clamp(16px,3.2vw,44px) 26px;justify-content:center}
+#app .game-stage .game-live.game-head{gap:10px}
+#app .game-head-row{display:inline-flex;align-items:center;justify-content:center;gap:10px;flex-wrap:wrap}
+#app .game-eyebrow-meta{font-size:13px;font-weight:700;padding:7px 14px;border-radius:999px;background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.16);color:rgba(255,255,255,.88)}
+
+/* Relâmpago: cabeçalho limpo no pódio final + 1º sempre centralizado + tabela em colunas de 5 linhas */
+#app .flash-done-hero{display:flex;flex-direction:column;align-items:center;gap:6px;margin-bottom:2px}
+#app .flash-hero-bolt{display:grid;place-items:center;width:clamp(64px,9vh,88px);height:clamp(64px,9vh,88px);border-radius:24px;background:radial-gradient(circle at 35% 25%,rgba(253,224,71,.36),rgba(245,158,11,.14) 70%);border:1.5px solid rgba(250,204,21,.45);color:#facc15;font-size:clamp(38px,5.6vh,54px);box-shadow:0 0 38px rgba(250,204,21,.34);animation:flash-bolt-glow 2.2s ease-in-out infinite alternate}
+@keyframes flash-bolt-glow{from{transform:scale(.96);box-shadow:0 0 22px rgba(250,204,21,.28)}to{transform:scale(1.04);box-shadow:0 0 46px rgba(250,204,21,.52)}}
+#app .flash-done-hero h1{margin:0;font-size:clamp(26px,4.6vh,46px);letter-spacing:-.02em}
+#app .flash-podium-wrap{width:min(820px,100%);padding-top:4px}
+#app .flash-podium{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));align-items:end;justify-items:center;gap:clamp(12px,2.4vw,28px);min-height:252px}
+#app .flash-podium-slot{width:100%;max-width:220px}
+#app .flash-podium-slot.place-2{grid-column:1}
+#app .flash-podium-slot.place-1{grid-column:2}
+#app .flash-podium-slot.place-3{grid-column:3}
+#app .flash-ranking-box{width:min(760px,100%);margin:0 auto}
+#app .flash-ranking-box[data-multi="true"]{width:min(1320px,100%)}
+#app .flash-board[data-multi="true"]{display:grid;grid-auto-flow:column;grid-template-rows:repeat(5,minmax(0,auto));grid-auto-columns:minmax(260px,1fr);gap:12px 24px;overflow-x:auto;padding-bottom:6px}
+@media (max-width:680px){
+  #app .flash-board[data-multi="true"]{grid-auto-flow:row;grid-template-rows:none;grid-template-columns:1fr;gap:10px}
+}
+
+/* Sobrevivência: arena sem bordas, largura total da janela, fixa embaixo e personagens maiores passeando */
+#app .game-stage[data-game-type="survival"]{justify-content:flex-start;padding-bottom:0;gap:12px;overflow-x:clip}
+#app .game-stage[data-game-type="survival"] .game-live.game-ask{min-height:0}
+#app .game-stage[data-game-type="survival"] .game-live.game-arena{margin-top:auto;width:100vw;margin-inline:calc(50% - 50vw);padding:0;gap:0}
+#app .game-stage[data-game-type="survival"] .sv-arena{width:100%;border:0;border-radius:0;background:linear-gradient(180deg,transparent 0%,rgba(139,92,246,.14) 36%,rgba(15,23,42,.42) 100%);padding:34px clamp(16px,4vw,56px) 14px;overflow:hidden}
+#app .game-stage[data-game-type="survival"] .sv-crowd{gap:calc(10px + 18px * var(--scale)) calc(14px + 22px * var(--scale));min-height:clamp(210px,31dvh,320px);padding:20px 18px 4px;align-items:flex-end}
+#app .game-stage[data-game-type="survival"] .sv-floor{height:28px;margin:-10px -2% 0;background:radial-gradient(ellipse at 50% 0,rgba(255,255,255,.32),rgba(255,255,255,.04) 72%,transparent 100%)}
+#app .game-stage[data-game-type="survival"] .sv-player{will-change:transform}
+#app .game-stage[data-game-type="survival"] .sv-player[data-fell=""]:not([data-locked="true"]):not([data-winner="true"]){animation:sv-enter .5s cubic-bezier(.2,1.5,.4,1) both,sv-wander var(--roam-t,5s) ease-in-out var(--roam-d,0s) infinite}
+#app .game-stage[data-game-type="survival"] .sv-player[data-fell=""]:not([data-locked="true"]):not([data-winner="true"]) .game-character{animation:sv-stroll .68s ease-in-out infinite alternate;animation-delay:calc(var(--i)*-120ms)}
+#app .game-stage[data-game-type="survival"] .sv-player[data-locked="true"][data-fell=""] .game-character{animation:sv-ready-bounce .55s ease-in-out infinite alternate}
+@keyframes sv-wander{
+  0%,100%{transform:translateX(0)}
+  24%{transform:translateX(var(--roam,32px))}
+  34%{transform:translateX(var(--roam,32px))}
+  72%{transform:translateX(calc(var(--roam,32px) * -0.82))}
+  82%{transform:translateX(calc(var(--roam,32px) * -0.82))}
+}
+@keyframes sv-stroll{
+  0%{transform:translateY(0) rotate(-3deg) scale(1)}
+  50%{transform:translateY(-7%) rotate(0deg) scale(1.03,.98)}
+  100%{transform:translateY(-2%) rotate(3deg) scale(1)}
+}
+@keyframes sv-ready-bounce{
+  from{transform:translateY(0) scale(1.03,.96)}
+  to{transform:translateY(-6%) scale(.98,1.03)}
+}
+
+/* Sorteio: card gigante centralizado em tela cheia, brilho e animação de giro/revelação */
+#app .game-stage[data-game-type="raffle"]{justify-content:center;gap:22px}
+#app .game-stage[data-game-type="raffle"] .game-live.game-raffle{width:100%;padding:8px 0}
+#app .raffle-stage{position:relative;display:grid;place-items:center;width:100%}
+#app .raffle-glow{position:absolute;width:min(760px,84vw);height:min(320px,42vh);border-radius:50%;background:radial-gradient(circle,rgba(167,139,250,.35) 0%,rgba(250,204,21,.16) 45%,transparent 74%);filter:blur(26px);pointer-events:none;transition:transform .5s ease,opacity .5s ease}
+#app .raffle-wheel{position:relative;overflow:hidden;width:min(940px,92vw);min-height:clamp(220px,36dvh,340px);padding:26px clamp(32px,5vw,72px);border-radius:34px;border:2.5px solid rgba(255,255,255,.22);background:linear-gradient(145deg,rgba(255,255,255,.12),rgba(255,255,255,.04));box-shadow:0 24px 70px rgba(0,0,0,.38),inset 0 1px 0 rgba(255,255,255,.24);font-size:clamp(40px,8vw,96px);letter-spacing:-.02em;transition:transform .4s cubic-bezier(.2,1.4,.4,1),border-color .3s,box-shadow .35s}
+#app .raffle-wheel .game-confetti{opacity:0;transition:opacity .35s}
+#app .raffle-wheel[data-done="true"] .game-confetti{opacity:1}
+#app .raffle-ptr{position:absolute;top:50%;transform:translateY(-50%);font-style:normal;font-size:clamp(22px,3vw,36px);color:rgba(255,255,255,.35);pointer-events:none;transition:color .3s,transform .3s}
+#app .raffle-ptr.left{left:clamp(14px,2.5vw,28px)}
+#app .raffle-ptr.right{right:clamp(14px,2.5vw,28px)}
+#app .raffle-wheel[data-done="false"]{border-color:rgba(196,181,253,.72);box-shadow:0 0 0 6px rgba(139,92,246,.22),0 26px 80px rgba(0,0,0,.48);animation:raffle-rumble .14s ease-in-out infinite alternate}
+#app .raffle-wheel[data-done="false"] .raffle-ptr{color:#c4b5fd}
+#app .raffle-wheel[data-done="false"] span.raffle-tick{animation:raffle-slot .09s cubic-bezier(.2,.8,.3,1)}
+#app .raffle-wheel[data-done="true"]{border-color:#facc15;background:linear-gradient(145deg,rgba(250,204,21,.22),rgba(245,158,11,.08));box-shadow:0 0 0 6px rgba(250,204,21,.24),0 28px 90px rgba(250,204,21,.28);animation:raffle-reveal .65s cubic-bezier(.18,1.55,.36,1) both}
+#app .raffle-wheel[data-done="true"]::before{content:'';position:absolute;inset:-40% -20%;background:linear-gradient(110deg,transparent 35%,rgba(255,255,255,.38) 50%,transparent 65%);animation:raffle-sheen .9s ease-out both;pointer-events:none}
+#app .raffle-wheel[data-done="true"] .raffle-ptr{color:#fde047;transform:translateY(-50%) scale(1.22)}
+@keyframes raffle-rumble{from{transform:translateY(-1.5px) scale(1.004)}to{transform:translateY(1.5px) scale(.996)}}
+@keyframes raffle-slot{from{transform:translateY(28%) scale(.94);opacity:.45}to{transform:none;opacity:1}}
+@keyframes raffle-reveal{0%{transform:scale(.88)}55%{transform:scale(1.045)}100%{transform:scale(1)}}
+@keyframes raffle-sheen{from{transform:translateX(-85%)}to{transform:translateX(85%)}}
+
+/* Cabo de Guerra: palco centralizado em tela cheia sem caixas + HUD individual no aparelho do aluno */
+#app .game-stage[data-game-type="tug"]{justify-content:center;gap:18px}
+#app .game-stage[data-game-type="tug"] .tug-scene{border:0;border-radius:0;background:transparent;padding:8px 0 4px;max-width:min(1380px,100%);gap:16px;overflow:visible}
+#app .game-stage[data-game-type="tug"] .tug-names{max-width:min(1120px,100%);width:100%;margin:0 auto}
+#app .game-stage[data-game-type="tug"] .tug-field{height:clamp(210px,38dvh,340px);--s:.94}
+@media (max-height:720px){#app .game-stage[data-game-type="tug"] .tug-field{height:clamp(170px,33dvh,270px);--s:.78}}
+#app .game-stage[data-game-type="tug"] .tug-meter{max-width:min(1040px,100%);width:100%;margin:0 auto;height:14px}
+#app .tug-puller-prog{display:block;margin-top:2px;font-size:11px;font-weight:800;padding:2px 7px;border-radius:999px;background:rgba(15,23,42,.72);border:1px solid rgba(255,255,255,.22);color:#fff;white-space:nowrap}
+#app .tug-team[data-pulling="true"] .tug-puller .game-character{animation:tug-jerk .32s cubic-bezier(.2,1.5,.4,1) 2}
+@keyframes tug-jerk{50%{transform:translateX(-10px) rotate(-6deg)}}
+#app .tug-live-feed{margin:0 auto;padding:8px 18px;border-radius:999px;background:color-mix(in srgb,var(--team,#38bdf8) 24%,rgba(15,23,42,.55));border:1.5px solid color-mix(in srgb,var(--team,#38bdf8) 72%,#fff 28%);color:#fff;font-size:clamp(14px,1.8vh,18px);font-weight:650;animation:game-pop .35s cubic-bezier(.2,1.5,.4,1) both}
+#app .tug-student-hud{display:inline-flex;align-items:center;gap:12px;flex-wrap:wrap;justify-content:center}
+#app .tug-student-hud span{padding:6px 14px;border-radius:999px;background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.18);font-size:14px;font-weight:600;color:rgba(255,255,255,.9)}
+#app .tug-student-hud b{color:#fff}
+#app .tug-feedback{margin:0;padding:8px 16px;border-radius:999px;font-size:14px;font-weight:700;animation:game-pop .3s ease-out both}
+#app .tug-feedback.ok{background:rgba(34,197,94,.22);border:1px solid #4ade80;color:#dcfce7}
+#app .tug-feedback.miss{background:rgba(248,113,113,.2);border:1px solid #f87171;color:#fee2e2}
+
+/* Corrida: palco mais aberto e limpo sem caixa fechada pesada */
+#app .game-stage[data-game-type="race"] .race-track{border:0;background:linear-gradient(180deg,rgba(56,189,248,.12),rgba(34,197,94,.08) 32%,rgba(15,23,42,.38));max-width:min(1320px,100%)}
 

@@ -341,12 +341,16 @@ html[data-theme][data-ui-style] #app .slide-settings-tabs button{min-height:60px
 @media(prefers-reduced-motion:no-preference){
   html:not([data-motion=reduced]) dialog:is(.activity-dialog,.storage-image-search)[open]{animation:editor-dialog-enter .24s cubic-bezier(.2,.7,.2,1) both}
   html:not([data-motion=reduced]) #app :is(.slide-setting-panel,.designer-timeline[open]>ol){animation:editor-dialog-enter .18s ease-out both}
-  html:not([data-motion=reduced]) #app[data-transition=iris].scene-arrive :is(.document-stage,.slide-panel,.mobile-lesson-content){animation:slide-iris-in .55s ease-in-out both}
-  html:not([data-motion=reduced]) #app[data-transition=split].scene-arrive :is(.document-stage,.slide-panel,.mobile-lesson-content){animation:slide-curtain-in .55s ease-in-out both}
-  html:not([data-motion=reduced]) #app[data-transition=flip].scene-arrive :is(.document-stage,.slide-panel,.mobile-lesson-content){animation:slide-flip-in .48s cubic-bezier(.16,.75,.32,1) both;transform-origin:left center}
-  html:not([data-motion=reduced]) #app[data-transition=fade].scene-arrive :is(.document-stage,.slide-panel,.mobile-lesson-content){animation:slide-fade-in .42s ease both}
-  html:not([data-motion=reduced]) #app[data-transition=none].scene-arrive :is(.document-stage,.slide-panel,.mobile-lesson-content){animation:none!important}
 }
+html:not([data-motion=reduced]) #app[data-transition=slide].scene-arrive :is(.document-stage,.slide-panel,.mobile-lesson-content){animation:slide-appear .46s cubic-bezier(.2,.8,.2,1) both}
+html:not([data-motion=reduced]) #app[data-transition=zoom].scene-arrive :is(.document-stage,.slide-panel,.mobile-lesson-content){animation:storage-slide-zoom .46s ease-out both}
+html:not([data-motion=reduced]) #app[data-transition=rise].scene-arrive :is(.document-stage,.slide-panel,.mobile-lesson-content){animation:storage-slide-rise .44s ease-out both}
+html:not([data-motion=reduced]) #app[data-transition=wipe].scene-arrive :is(.document-stage,.slide-panel,.mobile-lesson-content){animation:storage-slide-wipe .52s ease-out both}
+html:not([data-motion=reduced]) #app[data-transition=iris].scene-arrive :is(.document-stage,.slide-panel,.mobile-lesson-content){animation:slide-iris-in .55s ease-in-out both}
+html:not([data-motion=reduced]) #app[data-transition=split].scene-arrive :is(.document-stage,.slide-panel,.mobile-lesson-content){animation:slide-curtain-in .55s ease-in-out both}
+html:not([data-motion=reduced]) #app[data-transition=flip].scene-arrive :is(.document-stage,.slide-panel,.mobile-lesson-content){animation:slide-flip-in .48s cubic-bezier(.16,.75,.32,1) both;transform-origin:left center}
+html:not([data-motion=reduced]) #app[data-transition=fade].scene-arrive :is(.document-stage,.slide-panel,.mobile-lesson-content){animation:slide-fade-in .45s ease both}
+html:not([data-motion=reduced]) #app[data-transition=none].scene-arrive :is(.document-stage,.slide-panel,.mobile-lesson-content){animation:none!important}
 @keyframes slide-fade-in{from{opacity:0}to{opacity:1}}
 @keyframes editor-dialog-enter{from{opacity:0;transform:translateY(10px) scale(.985)}to{opacity:1;transform:none}}
 @keyframes slide-iris-in{from{clip-path:circle(0 at 50% 50%)}to{clip-path:circle(75% at 50% 50%)}}

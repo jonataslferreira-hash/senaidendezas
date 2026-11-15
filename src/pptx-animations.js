@@ -7,7 +7,7 @@ export class PptxAnimations{
   // O quadro do slide é reaproveitado entre os cliques: desfaz o passo anterior antes de aplicar o novo.
   for(const animation of this.running||[])animation.cancel();this.running=[];
   for(const node of this.hidden||[])node.style.opacity=node.dataset.baseOpacity||'';this.hidden=[];
-  const reduced=prefersReducedMotion();
+  const reduced=document.documentElement.dataset.motion==='reduced'||(!document.documentElement.hasAttribute('data-play')&&prefersReducedMotion());
   const hide=(node,value)=>{if(node.dataset.baseOpacity===undefined)node.dataset.baseOpacity=node.style.opacity;node.style.opacity=value;this.hidden.push(node);};
   const objects=new Map([...root.querySelectorAll('.canvas-presenting [data-object-id]')].map(node=>[node.dataset.objectId,node]));
   const elapsed=performance.now()-this.started;

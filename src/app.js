@@ -4,6 +4,7 @@ import {takePhoto} from './camera-photo.js';
 import {GameLayout} from './game-layout.js';
 import {GameAudio} from './game-audio.js';
 import {quizMarkup,leaderboardMarkup,animateRanking} from './game-ui.js';
+import { downloadResultsPng } from './results-png.js';
 import { gameMarkup, keepGame, animateRaffle, teamStrip } from './stage-games-view.js';
 import {Simulations} from './simulations.js';
 import {loadSlideFonts} from './fonts.js';
@@ -197,8 +198,8 @@ const trackPlayer = new Audio(); let playingTrack = null;
 trackPlayer.dataset.soundtrack = ''; trackPlayer.hidden = true; document.body.append(trackPlayer);
 let demoTimer, toastTimer, controlsTimer, editDraft = null, editIndex = -1, editError = '', imageText = false;
 const presenterSettings = loadPresenterSettings();
-// Só celular de verdade recebe a versão em texto: zoom no computador encolhe a largura, mas não muda o tipo de ponteiro.
-const phoneLayout=matchMedia('(max-width: 800px) and (pointer: coarse), (max-width: 800px) and (hover: none)');
+// Só celular na vertical usa o cartão de leitura; ao girar para a horizontal (paisagem) o aluno vê o slide visual como foi desenhado.
+const phoneLayout=matchMedia('(max-width: 800px) and (orientation: portrait) and (pointer: coarse), (max-width: 800px) and (orientation: portrait) and (hover: none)');
 phoneLayout.addEventListener('change',()=>{if(state?.phase==='lesson')render();});
 const qrCache = new Map();
 const params = routeParams();
@@ -350,8 +351,10 @@ function keepLiveSlide(markup, key) {
   return true;
 }
 function render() {
+  // Em sala ao vivo (slides, quiz e jogos) animações e transições definidas na aula sempre tocam, exceto se o usuário escolher "reduzido" no perfil.
+  document.documentElement.toggleAttribute('data-play', Boolean(state));
   const slideMotionKey = state?.phase === 'lesson' ? `${activeLesson.id}:${state.code}:${state.slide}` : '';
-  const activeTransition = slides[state?.slide]?.transition || state?.slideTransition || 'slide';
+  const activeTransition = state?.slideTransition || slides[state?.slide]?.transition || 'slide';
   const outgoingSlide = pageMotion.captureSlide(app, slideMotionKey, activeTransition);
   const previousOutline=app.querySelector('.editor-outline');
   const outlineScroll=previousOutline?.scrollTop;
@@ -409,8 +412,6 @@ function render() {
   if (state?.phase === 'leaderboard') animateRanking(app, Math.max(0, (Date.now() + timerOffset - (state.resultStartedAt || 0)) / 1000));
   if (state?.game?.type === 'raffle') animateRaffle(app, () => Date.now() + timerOffset);
   if(state&&!app.querySelector('[data-remote-dialog]'))app.insertAdjacentHTML('beforeend','<div data-remote-dialog></div>');
-  // Nas telas de jogo os bonecos e o pódio sempre se mexem (a não ser que a pessoa escolha "reduzido" no perfil).
-  document.documentElement.toggleAttribute('data-play', Boolean(state) && state.phase !== 'lesson');
   studio.remote.paint();
   syncPresentationMode();
   if (editDraft) for (const el of app.querySelectorAll('.header, .classroom, .document-classroom, .presentation-toolbar, .pinned-room-qr')) el.inert = true;
@@ -491,8 +492,13 @@ async function connectSession(mode) {
   if (mode.lesson) { activeLesson = mode.lesson; slides = mode.lesson.slides; }
   busy = true; host = mode.host; demo = false; editorLaunch=Boolean(mode.fromEditor);music=true; gameAudio.unlock(); render();
   classroom?.stop?.();
-  classroom = new Classroom(receive, connection);
-  classroom.onLive = receiveInteraction; liveInteraction = null;
+  const session = new Classroom(
+    next => { if (classroom === session) receive(next); },
+    (next, message) => { if (classroom === session) connection(next, message); }
+  );
+  classroom = session;
+  classroom.onLive = msg => { if (classroom === session) receiveInteraction(msg); };
+  liveInteraction = null;
   try {
     if (host) { await classroom.create(Boolean(mode.resume), mode.lesson, mode.startIndex,editorLaunch);shareOpen=!mode.resume; }
     else {music=true;gameAudio.unlock();await classroom.join(mode.code, mode.name, mode.avatar);}
@@ -625,10 +631,8 @@ app.addEventListener('click', event => {
   try { sendGame(JSON.parse(button.dataset.gameSend)); } catch { /* botão inválido */ }
 });
 function exportResults() {
-  const rows = [['Posição', 'Nome', 'Pontos', 'Acertos'], ...state.ranking.map((p, i) => [i + 1, p.name, p.score, p.correct])];
-  const csv = '\uFEFF' + rows.map(row => row.map(value => '"' + String(value).replace(/^[=+@-]/, "'$&").replace(/"/g, '""') + '"').join(';')).join('\r\n');
-  const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' }));
-  const link = document.createElement('a'); link.href = url; link.download = 'storage-lab-resultados.csv'; link.click(); setTimeout(() => URL.revokeObjectURL(url), 1000);
+  if (!state) return;
+  downloadResultsPng(state, activeLesson?.title || 'Resultado da aula');
 }
 async function action(name) {
   switch (name) {

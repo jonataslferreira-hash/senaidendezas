@@ -177,8 +177,17 @@ export class Classroom {
       this.conn.send({ type: 'answer', payload: { choice, questionIndex }, request });
     });
   }
-  // Professor saiu de vez: avisa os alunos para voltarem à tela inicial.
-  end() { if (this.host) for (const conn of this.connections?.values?.() || []) { try { conn.send({ type: 'ended' }); } catch { /* conexão já caiu */ } } }
+  // Professor saiu de vez: bloqueia novos broadcasts e avisa os alunos para voltarem à tela inicial.
+  end() {
+    this.stopped = true;
+    clearInterval(this.timer);
+    if (this.host) {
+      const open = [...(this.connections?.values?.() || [])];
+      this.connections?.clear?.();
+      for (const conn of open) { try { conn.send({ type: 'ended' }); } catch { /* conexão já caiu */ } }
+    }
+    try { sessionStorage.removeItem('sl-mode'); } catch { /* ignore */ }
+  }
   stop() {
     this.stopped = true; clearInterval(this.timer); clearTimeout(this.retry);
     for (const p of this.pending.values()) { clearTimeout(p.timeout); p.reject(Error('Você saiu da sala.')); }

@@ -25,7 +25,7 @@ export const gameHints = {
 export const teamPalette = [['Azul', '#3b82f6'], ['Laranja', '#f97316'], ['Verde', '#22c55e'], ['Rosa', '#ec4899']];
 export const SURVIVAL_POINTS = 500;
 export const FLASH_POINTS = 500, CHALLENGE_FIRST = 500, CHALLENGE_POINTS = 300, TUG_POINTS = 200;
-export const TUG_ROUNDS = 12, TUG_VARIANTS = 3, TUG_HIT = 100, TUG_PULL_MS = 5000;
+export const TUG_ROUNDS = 12, TUG_VARIANTS = 3, TUG_QUESTIONS_PER_PLAYER = 3, TUG_HIT = 100, TUG_PULL_MS = 5000;
 // Relâmpago: acerto vale FLASH_HIT + até FLASH_SPEED pela rapidez; o primeiro a acertar leva mais FLASH_FIRST.
 export const FLASH_HIT = 100, FLASH_SPEED = 100, FLASH_FIRST = 100, FLASH_PAUSE = 2500, FLASH_QUESTIONS = 25;
 export const RACE_POINTS = [500, 300, 200], RACE_FINISH = 100, RACE_STEP = 10, RACE_SPEED = 10, RACE_PAUSE = 3500;
@@ -173,11 +173,13 @@ export function startGame(room, random = Math.random) {
   else if (config.type === 'flash') Object.assign(game, { state: 'ready', round: -1, answers: {}, times: {}, gain: {}, score: {}, wins: {}, fastest: '', deadline: 0 });
   else if (config.type === 'survival') { game.alive = online(room).map(p => p.id); game.fallen = {}; game.round = -1; game.answers = {}; game.deadline = 0; game.state = 'ready'; }
   else if (config.type === 'challenge') { game.solved = []; game.tries = {}; }
-  else if (config.type === 'raffle') { game.picked = []; game.current = ''; game.drawAt = 0; }
+  else if (config.type === 'raffle') { game.picked = []; game.current = ''; game.drawAt = 0; game.revealAt = 0; }
   else if (config.type === 'tug') {
-    // De cada rodada sai uma das perguntas cadastradas, ao acaso.
-    Object.assign(game, { state: 'ready', sides: {}, picks: config.rounds.map(round => Math.floor(random() * round.length) % round.length), round: -1, answers: {}, hits: [0, 0], tries: [0, 0], winner: -1, deadline: 0, pullAt: 0 });
-    for (const p of online(room)) tugSide(room, p);
+    // Cada participante recebe até 3 perguntas sorteadas aleatoriamente para si.
+    const pool = tugPool(config);
+    const perPlayer = Math.min(TUG_QUESTIONS_PER_PLAYER, Math.max(1, pool.length));
+    Object.assign(game, { state: 'ready', sides: {}, pool, perPlayer, decks: {}, progress: {}, playerHits: {}, lastFeedback: {}, lastPull: null, round: -1, answers: {}, hits: [0, 0], tries: [0, 0], winner: -1, deadline: 0, pullAt: 0 });
+    for (const p of online(room)) { tugSide(room, p); dealTugPlayer(game, p.id, random); }
   }
   else if (config.type === 'race') Object.assign(game, { state: 'ready', round: -1, answers: {}, times: {}, dist: {}, gain: {}, spent: {}, order: [], deadline: 0 });
 }
@@ -186,7 +188,10 @@ export function startGame(room, random = Math.random) {
 export function syncGameJoin(room, player) {
   const d = room.data, game = d.game;
   if (d.phase !== 'game' || !game || !player) return;
-  if (game.type === 'tug' && !Object.hasOwn(game.sides, player.id)) tugSide(room, player);
+  if (game.type === 'tug') {
+    if (!Object.hasOwn(game.sides, player.id)) tugSide(room, player);
+    if (!game.decks?.[player.id]) dealTugPlayer(game, player.id);
+  }
   if (game.type === 'survival' && game.state === 'ready' && !game.alive.includes(player.id)) game.alive.push(player.id);
 }
 
@@ -195,19 +200,25 @@ export function gameControl(room, value, random = Math.random) {
   if (d.phase !== 'game' || !game || !config) throw Error('Esta ação não está disponível agora.');
   if (action === 'restart') { startGame(room, random); return; }
   if (action === 'end') {
-    if (game.type === 'tug' && game.state !== 'done') { if (game.state === 'open') revealTug(room); finishTug(room); }
+    if (game.type === 'tug' && game.state !== 'done') { if (game.state === 'open') finalizeTugTries(room); finishTug(room); }
     if (game.type === 'race') { if (game.state === 'open') revealRace(room); finishRace(room); }
     if (game.type === 'teams') settleTeams(room);
     game.state = 'done'; game.resultStartedAt = room.now(); return;
   }
   if (game.type === 'teams' && action === 'shuffle') { d.teamPick = false; formTeams(room, config.count, random); game.state = 'done'; return; }
   if (game.type === 'tug' && action === 'next') {
-    if (game.state === 'open') { revealTug(room); return; }
     if (game.state === 'done' || game.state === 'pull') throw Error('Esta rodada já terminou.');
-    if (game.state === 'ready') { if (!online(room).length) throw Error('Espere pelo menos um participante entrar.'); for (const p of online(room)) tugSide(room, p); }
-    if (game.round + 1 >= config.rounds.length) { finishTug(room); game.state = 'pull'; game.pullAt = room.now(); return; }
-    game.round++; game.answers = {}; game.state = 'open'; game.startedAt = room.now(); game.deadline = room.now() + config.seconds * 1000;
-    return;
+    if (game.state === 'ready') {
+      if (!online(room).length) throw Error('Espere pelo menos um participante entrar.');
+      for (const p of online(room)) { tugSide(room, p); dealTugPlayer(game, p.id, random); }
+      game.round = 0; game.state = 'open'; game.startedAt = room.now();
+      game.deadline = room.now() + Math.max(config.seconds || 15, 15) * Math.max(1, game.perPlayer || TUG_QUESTIONS_PER_PLAYER) * 1000;
+      return;
+    }
+    if (game.state === 'open') {
+      finalizeTugTries(room); finishTug(room); game.state = 'pull'; game.pullAt = room.now();
+      return;
+    }
   }
   if (game.type === 'flash' && action === 'next') {
     if (game.state === 'open') { revealFlash(room); return; }
@@ -237,7 +248,7 @@ export function gameControl(room, value, random = Math.random) {
     if (!pool.length) { game.picked = []; pool = online(room); }
     if (!pool.length) throw Error('Espere pelo menos um participante entrar.');
     const chosen = pool[Math.floor(random() * pool.length)];
-    game.picked.push(chosen.id); game.current = chosen.id; game.drawAt = room.now(); game.draws = (game.draws || 0) + 1;
+    game.picked.push(chosen.id); game.current = chosen.id; game.drawAt = room.now(); game.revealAt = game.drawAt + 2800; game.draws = (game.draws || 0) + 1;
     return;
   }
   throw Error('Esta ação não está disponível agora.');
@@ -258,7 +269,7 @@ export function tickGame(room) {
   const game = room.data.game;
   if (room.data.phase !== 'game' || !game) return;
   if (game.type === 'survival' && game.state === 'open' && room.now() >= game.deadline) revealSurvival(room);
-  if (game.type === 'tug' && game.state === 'open' && room.now() >= game.deadline) revealTug(room);
+  if (game.type === 'tug' && game.state === 'open' && room.now() >= game.deadline) { finalizeTugTries(room); finishTug(room); game.state = 'pull'; game.pullAt = room.now(); }
   if (game.type === 'race' && game.state === 'open' && room.now() >= game.deadline) revealRace(room);
   // A corrida segue sozinha: depois de mostrar a resposta, vem a próxima pergunta (ou o resultado).
   if (game.type === 'race' && game.state === 'reveal' && room.now() >= (game.revealAt || 0) + RACE_PAUSE) advanceRace(room);
@@ -280,8 +291,30 @@ function advanceFlash(room) {
 }
 const flashOrder = game => Object.keys(game.score).sort((a, b) => game.score[b] - game.score[a] || (game.wins[b] || 0) - (game.wins[a] || 0));
 
-// ---- Cabo de guerra: dois lados, uma pergunta sorteada por rodada, vence quem acerta mais.
-const tugQuestion = (config, game) => config.rounds[game.round]?.[game.picks[game.round]];
+// ---- Cabo de guerra: cada participante recebe 3 perguntas sorteadas aleatoriamente para si.
+// No telão a corda reage em tempo real a cada acerto; no fim a corda puxa para o lado com maior aproveitamento.
+function tugPool(config) {
+  const flat = [];
+  for (const round of config?.rounds || []) {
+    for (const q of Array.isArray(round) ? round : []) {
+      if (q && typeof q === 'object' && Array.isArray(q.options) && q.options.length >= 2) flat.push(q);
+    }
+  }
+  return flat;
+}
+function dealTugPlayer(game, playerId, random = Math.random) {
+  if (game.decks[playerId]) return game.decks[playerId];
+  const total = game.pool?.length || 0;
+  const indices = Array.from({ length: total }, (_, i) => i);
+  for (let i = indices.length - 1; i > 0; i--) {
+    const j = Math.floor(random() * (i + 1));
+    [indices[i], indices[j]] = [indices[j], indices[i]];
+  }
+  game.decks[playerId] = indices.slice(0, Math.min(game.perPlayer || TUG_QUESTIONS_PER_PLAYER, total));
+  game.progress[playerId] = 0;
+  game.playerHits[playerId] = 0;
+  return game.decks[playerId];
+}
 // Com times formados, os times 1 e 3 ficam de um lado e os 2 e 4 do outro.
 function tugSide(room, player) {
   const game = room.data.game;
@@ -290,18 +323,18 @@ function tugSide(room, player) {
   return game.sides[player.id] = room.data.teams?.length && Number.isInteger(player.team) ? player.team % 2 : size(0) <= size(1) ? 0 : 1;
 }
 export function tugScore(game) { return [0, 1].map(side => game.tries[side] ? Math.round(game.hits[side] / game.tries[side] * 100) : 0); }
-function revealTug(room) {
-  const d = room.data, game = d.game, config = room.slides[d.slide]?.game;
-  if (!game || game.type !== 'tug' || game.state !== 'open') return;
-  const question = tugQuestion(config, game);
-  // Conta todo mundo do lado (quem não respondeu pesa como erro), assim time grande não leva vantagem.
+// Ao encerrar pelo tempo ou comando do professor, perguntas não respondidas dos jogadores online contam como tentativas perdidas.
+function finalizeTugTries(room) {
+  const d = room.data, game = d.game;
+  if (!game || game.type !== 'tug' || game.finalizedTries) return;
+  game.finalizedTries = true;
   for (const [id, side] of Object.entries(game.sides)) {
     const player = d.players.find(p => p.id === id);
-    if (!player || !player.online && !Object.hasOwn(game.answers, id)) continue;
-    game.tries[side]++;
-    if (game.answers[id] === question.correct) { game.hits[side]++; bonus(player, TUG_HIT); }
+    if (!player || !player.online) continue;
+    const deckLen = game.decks?.[id]?.length || game.perPlayer || 0;
+    const done = game.progress?.[id] || 0;
+    if (deckLen > done) game.tries[side] += (deckLen - done);
   }
-  game.state = 'reveal';
 }
 function finishTug(room) {
   const d = room.data, game = d.game, config = room.slides[d.slide]?.game;
@@ -358,13 +391,28 @@ export function gameInput(room, playerId, payload) {
     player.team = team; return;
   }
   if (game.type === 'tug') {
-    const question = tugQuestion(config, game), choice = payload.choice;
-    tugSide(room, player);
-    if (payload.round !== game.round || room.now() >= game.deadline) throw Error('O tempo desta pergunta acabou.');
-    if (!Number.isInteger(choice) || choice < 0 || choice >= question.options.length) throw Error('Resposta inválida.');
-    if (Object.hasOwn(game.answers, playerId)) throw Error('Você já respondeu.');
-    game.answers[playerId] = choice;
-    if (online(room).every(p => Object.hasOwn(game.answers, p.id))) revealTug(room);
+    const side = tugSide(room, player);
+    const deck = dealTugPlayer(game, playerId);
+    const step = game.progress[playerId] || 0;
+    if (room.now() >= game.deadline) throw Error('O tempo desta pergunta acabou.');
+    if (step >= deck.length) throw Error('Você já concluiu suas perguntas.');
+    const sentStep = payload.step ?? payload.round;
+    if (sentStep !== undefined && sentStep !== step) throw Error('Esta pergunta já avançou.');
+    const question = game.pool[deck[step]], choice = payload.choice;
+    if (!question || !Number.isInteger(choice) || choice < 0 || choice >= question.options.length) throw Error('Resposta inválida.');
+    game.tries[side]++;
+    const right = choice === question.correct;
+    if (right) {
+      game.hits[side]++;
+      game.playerHits[playerId] = (game.playerHits[playerId] || 0) + 1;
+      bonus(player, TUG_HIT);
+      game.lastPull = { side, name: player.name, at: room.now() };
+    }
+    game.lastFeedback[playerId] = { right, choice, correct: question.correct, at: room.now() };
+    game.progress[playerId] = step + 1;
+    if (online(room).every(p => (game.progress[p.id] || 0) >= (game.decks[p.id]?.length || game.perPlayer))) {
+      finishTug(room); game.state = 'pull'; game.pullAt = room.now();
+    }
     return;
   }
   if (game.type === 'race') {
@@ -422,7 +470,7 @@ export function gameSnapshot(room, playerId, bare = false) {
     return { ...base, round: game.round, rounds: config.questions.length, seconds: config.seconds, deadline: game.deadline,
       question: ask(question, { ...(shown || presenter ? { correct: question?.correct } : {}), ...(shown ? { counts: question?.options.map((_, i) => Object.values(game.answers).filter(v => v === i).length) } : {}) }),
       answered: Object.keys(game.answers).length, total: online(room).length, fastest: game.state === 'reveal' ? who(game.fastest) : null, points: [FLASH_HIT, FLASH_HIT + FLASH_SPEED, FLASH_FIRST],
-      board: order.slice(0, 8).map(id => ({ ...who(id), score: game.score[id], gain: game.gain[id] || 0, wins: game.wins[id] || 0 })).filter(item => item.id),
+      board: order.slice(0, 30).map(id => ({ ...who(id), score: game.score[id], gain: game.gain[id] || 0, wins: game.wins[id] || 0 })).filter(item => item.id),
       me: playerId ? { choice: Object.hasOwn(game.answers, playerId) ? game.answers[playerId] : null, gain: shown ? (game.gain[playerId] || 0) : 0, right: shown ? Object.hasOwn(game.gain, playerId) : false, first: shown ? game.fastest === playerId : false, score: game.score[playerId] || 0, rank: order.indexOf(playerId) + 1 } : null };
   }
   if (game.type === 'survival') {
@@ -440,7 +488,7 @@ export function gameSnapshot(room, playerId, bare = false) {
       me: playerId ? { tries: mine?.n || 0, ok: place >= 0, place: place + 1, points: place === 0 ? CHALLENGE_FIRST : CHALLENGE_POINTS } : null,
       ...(done || presenter ? { answer: config.answer.filter(item => !item.skip && item.k !== 'text').map(item => ({ label: item.label, v: item.v })) } : {}) };
   }
-  if (game.type === 'raffle') return { ...base, current: who(game.current), drawAt: game.drawAt, draws: game.draws || 0, left: online(room).filter(p => !game.picked.includes(p.id)).length, names: online(room).slice(0, 40).map(p => p.name), me: playerId ? game.current === playerId : false };
+  if (game.type === 'raffle') return { ...base, current: who(game.current), drawAt: game.drawAt, revealAt: game.revealAt || (game.drawAt ? game.drawAt + 2800 : 0), draws: game.draws || 0, left: online(room).filter(p => !game.picked.includes(p.id)).length, names: online(room).slice(0, 40).map(p => p.name), me: playerId ? game.current === playerId : false };
   if (game.type === 'race') {
     const question = game.round >= 0 ? config.questions[game.round] : null, shown = game.state === 'reveal' || done;
     const track = config.questions.length * (RACE_STEP + RACE_SPEED), order = done ? game.order : raceOrder(game);
@@ -455,12 +503,29 @@ export function gameSnapshot(room, playerId, bare = false) {
       me: mine ? { choice: Object.hasOwn(game.answers, playerId) ? game.answers[playerId] : null, dist: mine.dist, rank: mine.rank, place: mine.place, gain: mine.gain || 0, right: Boolean(mine.right) } : null };
   }
   const count = side => Object.values(game.sides).filter(v => v === side).length;
-  const crew = side => Object.keys(game.sides).filter(id => game.sides[id] === side).slice(0, 5).map(who).filter(Boolean);
-  const question = game.round >= 0 ? tugQuestion(config, game) : null, shown = game.state !== 'open' && game.state !== 'ready';
+  const crew = side => Object.keys(game.sides).filter(id => game.sides[id] === side).slice(0, 5).map(id => {
+    const person = who(id);
+    return person ? { ...person, step: game.progress?.[id] || 0, total: game.decks?.[id]?.length || game.perPlayer || TUG_QUESTIONS_PER_PLAYER, hits: game.playerHits?.[id] || 0 } : null;
+  }).filter(Boolean);
+  const myDeck = playerId ? (game.decks?.[playerId] || []) : [];
+  const myStep = playerId ? (game.progress?.[playerId] || 0) : 0;
+  const myRawQuestion = playerId && game.state === 'open' && myStep < myDeck.length ? game.pool?.[myDeck[myStep]] : null;
+  // No Cabo de Guerra cada aluno recebe suas próprias perguntas sorteadas com enunciado e alternativas completas.
+  const myQuestion = myRawQuestion ? { text: myRawQuestion.text, options: [...myRawQuestion.options], step: myStep, total: myDeck.length } : null;
+  const onlinePlayers = online(room);
+  const completed = onlinePlayers.filter(p => (game.progress?.[p.id] || 0) >= (game.decks?.[p.id]?.length || game.perPlayer || 1)).length;
+  const answeredTotal = onlinePlayers.reduce((sum, p) => sum + (game.progress?.[p.id] || 0), 0);
+  const expectedTotal = onlinePlayers.reduce((sum, p) => sum + (game.decks?.[p.id]?.length || game.perPlayer || 1), 0);
+  const fb = playerId ? game.lastFeedback?.[playerId] : null;
   // Com times formados o lado leva o nome e a cor dos times; sem times, os nomes do editor.
   const label = side => { const list = (d.teams || []).filter((_, i) => i % 2 === side); return list.length ? { name: list.map(team => 'Time ' + team.name).join(' + '), color: list[0].color } : { name: config.options[side], color: teamPalette[side][1] }; };
-  return { ...base, round: game.round, rounds: config.rounds.length, seconds: config.seconds, deadline: game.deadline, tolerance: config.tolerance ?? 10,
-    question: ask(question, { ...(shown || presenter ? { correct: question?.correct } : {}), ...(shown ? { counts: question?.options.map((_, i) => Object.values(game.answers).filter(v => v === i).length) } : {}) }),
-    answered: Object.keys(game.answers).length, total: count(0) + count(1), labels: [label(0), label(1)], score: tugScore(game), hits: game.hits, sides: [count(0), count(1)], crews: [crew(0), crew(1)],
-    winner: ['pull', 'done'].includes(game.state) ? game.winner : -1, pullAt: game.pullAt, pullMs: TUG_PULL_MS, side: playerId && Object.hasOwn(game.sides, playerId) ? game.sides[playerId] : null, choice: playerId && Object.hasOwn(game.answers, playerId) ? game.answers[playerId] : null, points: TUG_POINTS };
+  return { ...base, bare: false, round: myStep, rounds: game.perPlayer || TUG_QUESTIONS_PER_PLAYER, perPlayer: game.perPlayer || TUG_QUESTIONS_PER_PLAYER, seconds: Math.max(config.seconds || 15, 15) * Math.max(1, game.perPlayer || TUG_QUESTIONS_PER_PLAYER), deadline: game.deadline, tolerance: config.tolerance ?? 10,
+    question: myQuestion,
+    answered: completed, total: count(0) + count(1), answeredTotal, expectedTotal, lastPull: game.lastPull || null,
+    labels: [label(0), label(1)], score: tugScore(game), hits: game.hits, tries: game.tries, sides: [count(0), count(1)], crews: [crew(0), crew(1)],
+    winner: ['pull', 'done'].includes(game.state) ? game.winner : -1, pullAt: game.pullAt, pullMs: TUG_PULL_MS,
+    side: playerId && Object.hasOwn(game.sides, playerId) ? game.sides[playerId] : null,
+    choice: null,
+    me: playerId ? { side: Object.hasOwn(game.sides, playerId) ? game.sides[playerId] : null, step: myStep, total: myDeck.length, done: myStep >= myDeck.length && myDeck.length > 0, hits: game.playerHits?.[playerId] || 0, lastRight: fb ? fb.right : null, lastAt: fb?.at || 0 } : null,
+    points: TUG_POINTS };
 }

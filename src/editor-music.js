@@ -55,29 +55,71 @@ export class EditorMusic {
     return choices[Math.floor(Math.random()*choices.length)]??0;
   }
   headerMarkup(){return `<div data-editor-music>${this.markup()}</div>`;}
-  markup(){const t=this.track;return `<div class="editor-music" data-playing="${this.playing}" style="--record-color:${esc(t.color||'#a59acb')}"><button type="button" class="music-cover-button" data-music-action="open" aria-label="Abrir músicas do editor"><span class="music-record"></span><img src="${esc(musicCover(t))}" alt="Capa de ${esc(t.title)}"></button><button type="button" class="music-info" data-music-action="open"><strong>${esc(t.title)}</strong><span>${esc(t.artist||'Spotify')} <small data-music-time>${time(this.position)} / ${time(this.duration)}</small></span></button><div class="music-controls"><button type="button" data-music-action="previous" aria-label="Música anterior">${musicIcon('previous')}</button><button type="button" data-music-action="toggle" data-music-play aria-label="${this.playing?'Pausar música':'Tocar música'}">${musicIcon(this.playing?'pause':'play')}</button><button type="button" data-music-action="next" aria-label="Próxima música">${musicIcon('next')}</button></div>${this.open?`<section class="music-panel music-panel-v2" popover="manual" aria-label="Músicas do editor"><header><strong>Músicas</strong><button type="button" data-music-action="open" aria-label="Fechar músicas">×</button></header>
-      <div class="music-now"><img src="${esc(musicCover(t))}" alt=""><div class="music-now-text"><small>Tocando agora</small><strong>${esc(t.title)}</strong><span>${esc(t.artist||'Spotify')}</span></div>
-        <div class="music-now-progress"><span data-music-position>${time(this.position)}</span><div class="music-bar" data-music-seek title="Clique para pular"><i data-music-bar></i></div><span data-music-duration>${time(this.duration)}</span></div>
-        <div class="music-panel-transport"><button type="button" data-music-action="previous" aria-label="Música anterior">${musicIcon('previous')}</button><button type="button" class="music-play-big" data-music-action="toggle" data-music-play aria-label="${this.playing?'Pausar música':'Tocar música'}">${musicIcon(this.playing?'pause':'play')}</button><button type="button" data-music-action="next" aria-label="Próxima música">${musicIcon('next')}</button></div></div>
-      <div class="music-settings">
-      <label class="music-slider" title="Volume">${studioIcon('volume')}<input aria-label="Volume" type="range" min="0" max="1" step=".01" value="${this.audio.volume}" style="--music-volume:${Math.round(this.audio.volume*100)}%" data-music-volume ${t.kind==='spotify'?'disabled':''}><output data-music-volume-value>${Math.round(this.audio.volume*100)}%</output></label>
-      <label class="music-speed" title="Velocidade">${studioIcon('speed')}<select aria-label="Velocidade" data-music-rate ${t.kind==='spotify'?'disabled':''}>${[.75,.85,1].map(n=>`<option value="${n}" ${this.audio.playbackRate===n?'selected':''}>${n.toFixed(2).replace('.',',')}×</option>`).join('')}</select></label></div>
-      ${t.kind==='spotify'?'<p class="music-hint">No Spotify, o volume e a velocidade são ajustados no próprio player.</p>':''}
-      <div class="music-add"><button type="button" class="studio-btn quiet" data-music-action="spotify-form" aria-expanded="${this.spotifyFormOpen}">${studioIcon('spotify')} Adicionar do Spotify</button>
-      <label class="music-upload">${studioIcon('upload')} Enviar música<input type="file" accept="audio/mpeg,audio/wav,audio/ogg,audio/mp4,audio/webm" data-music-upload hidden></label></div>
-      <div class="music-spotify-form" ${this.spotifyFormOpen?'':'hidden'}><label for="music-spotify">Link de uma música, playlist ou álbum do Spotify</label><div><input id="music-spotify" type="url" placeholder="https://open.spotify.com/playlist/…"><button type="button" data-music-action="spotify">Adicionar</button></div></div>
-      <h3 class="music-list-title">Sua lista <small>${this.tracks.length} ${this.tracks.length===1?'item':'itens'}</small></h3>
-      <div class="music-track-list">${this.tracks.map((track,i)=>{const kind=track.kind==='spotify'?(spotifyItem(track.url)?.type==='playlist'?'Playlist':spotifyItem(track.url)?.type==='album'?'Álbum':'Spotify'):track.assetId?'Enviada':'';return `<div class="${i===this.index?'selected':''}"><button type="button" data-music-action="select" data-track="${i}"><img src="${esc(musicCover(track))}" alt=""><span><strong>${esc(track.title)}</strong><small>${esc(track.artist||'Spotify')}</small></span>${kind?`<em>${kind}</em>`:''}${i===this.index?'<b class="music-eq" aria-hidden="true"><i></i><i></i><i></i></b>':''}</button>${track.assetId||track.kind==='spotify'?`<button type="button" data-music-action="remove" data-track="${i}" aria-label="Remover ${esc(track.title)}">×</button>`:''}</div>`;}).join('')}</div><p class="music-message" role="status">${esc(this.message)}</p></section>`:''}</div>`;}
+  markup(){const t=this.track,vol=Math.round(this.audio.volume*100);return `<div class="editor-music" data-playing="${this.playing}" style="--record-color:${esc(t.color||'#a59acb')}"><button type="button" class="music-cover-button" data-music-action="open" aria-label="Abrir músicas do editor"><span class="music-record"></span><img src="${esc(musicCover(t))}" alt="Capa de ${esc(t.title)}"></button><button type="button" class="music-info" data-music-action="open"><strong>${esc(t.title)}</strong><span>${esc(t.artist||'Spotify')} <small data-music-time>${time(this.position)} / ${time(this.duration)}</small></span></button><div class="music-controls"><button type="button" data-music-action="previous" aria-label="Música anterior">${musicIcon('previous')}</button><button type="button" data-music-action="toggle" data-music-play aria-label="${this.playing?'Pausar música':'Tocar música'}">${musicIcon(this.playing?'pause':'play')}</button><button type="button" data-music-action="next" aria-label="Próxima música">${musicIcon('next')}</button></div>${this.open?`<section class="music-panel music-panel-v3" popover="manual" aria-label="Músicas do editor">
+      <header class="mp3-head">
+        <strong>Músicas do editor</strong>
+        <button type="button" class="mp3-close" data-music-action="open" aria-label="Fechar músicas">×</button>
+      </header>
+      <div class="mp3-now">
+        <div class="mp3-now-top">
+          <img class="mp3-cover" src="${esc(musicCover(t))}" alt="">
+          <div class="mp3-meta">
+            <small>Tocando agora</small>
+            <strong>${esc(t.title)}</strong>
+            <span>${esc(t.artist||'Spotify')}</span>
+          </div>
+          <div class="mp3-transport">
+            <button type="button" class="mp3-tbtn" data-music-action="previous" aria-label="Música anterior">${musicIcon('previous')}</button>
+            <button type="button" class="mp3-tbtn mp3-play" data-music-action="toggle" data-music-play aria-label="${this.playing?'Pausar música':'Tocar música'}">${musicIcon(this.playing?'pause':'play')}</button>
+            <button type="button" class="mp3-tbtn" data-music-action="next" aria-label="Próxima música">${musicIcon('next')}</button>
+          </div>
+        </div>
+        <div class="mp3-progress">
+          <span data-music-position>${time(this.position)}</span>
+          <div class="mp3-bar" data-music-seek title="Clique para pular"><i data-music-bar></i></div>
+          <span data-music-duration>${time(this.duration)}</span>
+        </div>
+      </div>
+      <div class="mp3-controls">
+        <label class="mp3-vol" title="Volume">
+          ${studioIcon('volume')}
+          <input aria-label="Volume" type="range" min="0" max="1" step=".01" value="${this.audio.volume}" style="--music-volume:${vol}%" data-music-volume ${t.kind==='spotify'?'disabled':''}>
+          <output data-music-volume-value>${vol}%</output>
+        </label>
+        <label class="mp3-speed" title="Velocidade">
+          ${studioIcon('speed')}
+          <select aria-label="Velocidade" data-music-rate ${t.kind==='spotify'?'disabled':''}>${[.75,.85,1].map(n=>`<option value="${n}" ${this.audio.playbackRate===n?'selected':''}>${n.toFixed(2).replace('.',',')}×</option>`).join('')}</select>
+        </label>
+      </div>
+      ${t.kind==='spotify'?'<p class="mp3-hint">No Spotify, volume e velocidade são ajustados no próprio player.</p>':''}
+      <div class="mp3-actions">
+        <button type="button" class="mp3-act-btn" data-music-action="spotify-form" aria-expanded="${this.spotifyFormOpen}">${studioIcon('spotify')}<span>Adicionar do Spotify</span></button>
+        <label class="mp3-act-btn">${studioIcon('upload')}<span>Enviar música</span><input type="file" accept="audio/mpeg,audio/wav,audio/ogg,audio/mp4,audio/webm" data-music-upload hidden></label>
+      </div>
+      <div class="mp3-spotify" ${this.spotifyFormOpen?'':'hidden'}>
+        <label for="music-spotify">Link de música, playlist ou álbum do Spotify</label>
+        <div class="mp3-spotify-row"><input id="music-spotify" type="url" placeholder="https://open.spotify.com/playlist/…"><button type="button" data-music-action="spotify">Adicionar</button></div>
+      </div>
+      <div class="mp3-list-head"><h3>Sua lista</h3><small>${this.tracks.length} ${this.tracks.length===1?'faixa':'faixas'}</small></div>
+      <div class="mp3-tracks">${this.tracks.map((track,i)=>{const kind=track.kind==='spotify'?(spotifyItem(track.url)?.type==='playlist'?'Playlist':spotifyItem(track.url)?.type==='album'?'Álbum':'Spotify'):track.assetId?'Enviada':'';return `<div class="mp3-track${i===this.index?' selected':''}"><button type="button" class="mp3-track-pick" data-music-action="select" data-track="${i}"><img src="${esc(musicCover(track))}" alt=""><span class="mp3-track-copy"><strong>${esc(track.title)}</strong><small>${esc(track.artist||'Spotify')}</small></span>${kind?`<em class="mp3-tag">${kind}</em>`:''}${i===this.index?'<b class="music-eq" aria-hidden="true"><i></i><i></i><i></i></b>':''}</button>${track.assetId||track.kind==='spotify'?`<button type="button" class="mp3-track-del" data-music-action="remove" data-track="${i}" aria-label="Remover ${esc(track.title)}">×</button>`:''}</div>`;}).join('')}</div>
+      ${this.message?`<p class="mp3-msg" role="status">${esc(this.message)}</p>`:''}
+    </section>`:''}</div>`;}
   paint(){const slot=this.studio.root.querySelector('[data-editor-music]');if(slot)slot.innerHTML=this.markup();this.mountPanel();this.updateProgress();}
-  // O painel abre logo abaixo do player, centralizado nele, e sempre inteiro dentro da tela
-  // (se faltar espaço ele encolhe e ganha rolagem, em vez de cobrir o editor de qualquer jeito).
+  // O painel abre logo abaixo do player, centralizado nele, e sempre inteiro dentro da tela.
   mountPanel(){
     const panel=this.studio.root.querySelector('.music-panel');if(!panel)return;
-    if(!panel.matches(':popover-open'))panel.showPopover();
-    const anchor=this.studio.root.querySelector('.editor-music').getBoundingClientRect(),gap=10,edge=8;
-    const width=Math.min(panel.offsetWidth||400,innerWidth-edge*2),left=Math.max(edge,Math.min(anchor.left+anchor.width/2-width/2,innerWidth-width-edge));
-    const below=innerHeight-anchor.bottom-gap-edge,top=below>=300?anchor.bottom+gap:Math.max(edge,innerHeight-Math.min(panel.scrollHeight,innerHeight-edge*2)-edge);
-    panel.style.left=Math.round(left)+'px';panel.style.top=Math.round(top)+'px';panel.style.maxHeight=Math.round(innerHeight-top-edge)+'px';
+    if(!panel.matches(':popover-open'))try{panel.showPopover();}catch{}
+    const anchor=this.studio.root.querySelector('.editor-music')?.getBoundingClientRect();
+    if(!anchor)return;
+    const gap=10,edge=10;
+    const width=Math.min(430,innerWidth-edge*2);
+    const left=Math.max(edge,Math.min(anchor.left+anchor.width/2-width/2,innerWidth-width-edge));
+    const below=innerHeight-anchor.bottom-gap-edge;
+    const top=below>=260?anchor.bottom+gap:Math.max(edge,innerHeight-Math.min(560,innerHeight-edge*2)-edge);
+    panel.style.left=Math.round(left)+'px';
+    panel.style.top=Math.round(top)+'px';
+    panel.style.width=Math.round(width)+'px';
+    panel.style.maxHeight=Math.round(Math.min(600,innerHeight-top-edge))+'px';
   }
   updateProgress(){this.mountPanel();const label=time(this.position)+' / '+time(this.duration);const bar=this.studio.root.querySelector('[data-music-bar]');if(bar){bar.style.width=(this.duration>0?Math.min(100,this.position/this.duration*100):0)+'%';const a=this.studio.root.querySelector('[data-music-position]'),b=this.studio.root.querySelector('[data-music-duration]');if(a)a.textContent=time(this.position);if(b)b.textContent=time(this.duration);}for(const el of this.studio.root.querySelectorAll('[data-music-time]'))if(el.textContent!==label)el.textContent=label;const shell=this.studio.root.querySelector('.editor-music');if(shell)shell.dataset.playing=String(this.playing);for(const button of this.studio.root.querySelectorAll('[data-music-play]')){const icon=this.playing?'pause':'play';if(button.dataset.musicIcon===icon)continue;/* Trocar o SVG a cada timeupdate cancelava o clique em andamento. */button.dataset.musicIcon=icon;button.innerHTML=musicIcon(icon);button.setAttribute('aria-label',this.playing?'Pausar música':'Tocar música');}}
   setEditing(value){const entering=value&&!this.editing;this.editing=value;if(!value){this.wantsPlay=false;this.audio.pause();this.selection++;this.stopSpotify();}else if(entering)this.select(this.randomAudioIndex(),true).catch(()=>{});}

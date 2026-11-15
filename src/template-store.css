@@ -10,12 +10,15 @@
 .tstore-page {
   --mx: 52%;
   --my: 24%;
+  --ui-surface: var(--ui-panel, #fff);
+  --ui-bg: var(--ui-base, #f4f5f8);
   position: relative;
   min-height: calc(100vh - 64px);
   width: 100%;
   max-width: 100%;
   overflow-x: clip;
   isolation: isolate;
+  color: var(--ui-ink);
 }
 
 /* Fundo líquido duplo interativo (cor do tema do usuário + roxo Storage Lab) */
@@ -52,9 +55,32 @@
   animation: tstore-float-b 19s ease-in-out infinite alternate;
 }
 
-:root[data-theme="dark"] .tstore-blob,
-body.dark .tstore-blob {
-  opacity: 0.26;
+html[data-appearance="dark"] .tstore-blob,
+:root[data-appearance="dark"] .tstore-blob {
+  opacity: 0.24;
+}
+
+html[data-appearance="dark"] .tstore-card,
+html[data-appearance="dark"] .tstore-ext-card,
+html[data-appearance="dark"] .tstore-empty,
+html[data-appearance="dark"] .eshop-rail-card,
+html[data-appearance="dark"] .eshop-description-block {
+  box-shadow: 0 12px 30px rgba(0, 0, 0, .3);
+}
+
+html[data-appearance="dark"] .tstore-tabs {
+  background: color-mix(in srgb, var(--ui-soft, #242834) 90%, transparent);
+}
+
+html[data-appearance="dark"] .tstore-tab.is-active {
+  background: var(--ui-panel, #313746);
+  color: var(--ui-ink);
+  box-shadow: 0 2px 10px rgba(0, 0, 0, .28);
+}
+
+html[data-appearance="dark"] .tstore-cat-chip.is-active,
+html[data-appearance="dark"] .tstore-icon-util.is-active {
+  color: var(--ui-accent-ink, #141220);
 }
 
 @keyframes tstore-float-a {
@@ -123,7 +149,7 @@ body.dark .tstore-blob {
   height: 44px;
   padding: 0 14px;
   border-radius: 999px;
-  background: color-mix(in srgb, var(--ui-surface, #fff) 86%, transparent);
+  background: color-mix(in srgb, var(--ui-panel, #fff) 86%, transparent);
   backdrop-filter: blur(12px);
   border: 1.5px solid var(--ui-line);
   color: var(--ui-muted);
@@ -166,7 +192,7 @@ body.dark .tstore-blob {
   flex: 0 0 44px;
   border-radius: 50%;
   border: 1.5px solid var(--ui-line);
-  background: color-mix(in srgb, var(--ui-surface, #fff) 88%, transparent);
+  background: color-mix(in srgb, var(--ui-panel, #fff) 88%, transparent);
   backdrop-filter: blur(12px);
   color: var(--ui-ink);
   cursor: pointer;
@@ -216,7 +242,7 @@ body.dark .tstore-blob {
   gap: 4px;
   padding: 4px;
   border-radius: 14px;
-  background: color-mix(in srgb, var(--ui-surface, #fff) 78%, var(--ui-bg, #f4f5f8));
+  background: color-mix(in srgb, var(--ui-panel, #fff) 78%, var(--ui-base, #f4f5f8));
   border: 1px solid var(--ui-line);
   backdrop-filter: blur(10px);
 }
@@ -239,7 +265,7 @@ body.dark .tstore-blob {
 }
 
 .tstore-tab.is-active {
-  background: var(--ui-surface, #fff);
+  background: var(--ui-panel, #fff);
   color: var(--ui-ink);
   box-shadow: 0 2px 8px rgba(0, 0, 0, .07);
 }
@@ -252,7 +278,7 @@ body.dark .tstore-blob {
 
 .tstore-tone-btn {
   border: 1px solid var(--ui-line);
-  background: color-mix(in srgb, var(--ui-surface, #fff) 80%, transparent);
+  background: color-mix(in srgb, var(--ui-panel, #fff) 80%, transparent);
   color: var(--ui-muted);
   font: inherit;
   font-size: 12px;
@@ -266,7 +292,7 @@ body.dark .tstore-blob {
 .tstore-tone-btn.is-active {
   background: var(--ui-ink);
   border-color: var(--ui-ink);
-  color: var(--ui-bg, #fff);
+  color: var(--ui-base, #fff);
 }
 
 .tstore-cats {
@@ -284,7 +310,7 @@ body.dark .tstore-blob {
 .tstore-cat-chip {
   flex: 0 0 auto;
   border: 1px solid var(--ui-line);
-  background: color-mix(in srgb, var(--ui-surface, #fff) 82%, transparent);
+  background: color-mix(in srgb, var(--ui-panel, #fff) 82%, transparent);
   color: var(--ui-ink);
   font: inherit;
   font-size: 13px;
@@ -342,7 +368,7 @@ body.dark .tstore-blob {
   flex-direction: column;
   border-radius: 18px;
   overflow: hidden;
-  background: color-mix(in srgb, var(--ui-surface, #fff) 92%, transparent);
+  background: color-mix(in srgb, var(--ui-panel, #fff) 92%, transparent);
   backdrop-filter: blur(12px);
   border: 1px solid var(--ui-line);
   box-shadow: 0 4px 16px rgba(14, 18, 30, .05);
@@ -513,7 +539,7 @@ body.dark .tstore-blob {
   text-align: center;
   padding: 56px 20px;
   border-radius: 20px;
-  background: color-mix(in srgb, var(--ui-surface, #fff) 86%, transparent);
+  background: color-mix(in srgb, var(--ui-panel, #fff) 86%, transparent);
   border: 1px solid var(--ui-line);
 }
 
@@ -542,7 +568,7 @@ body.dark .tstore-blob {
   gap: 10px;
   padding: 18px;
   border-radius: 18px;
-  background: color-mix(in srgb, var(--ui-surface, #fff) 92%, transparent);
+  background: color-mix(in srgb, var(--ui-panel, #fff) 92%, transparent);
   border: 1px solid var(--ui-line);
 }
 
@@ -576,7 +602,7 @@ body.dark .tstore-blob {
   align-items: center;
   gap: 6px;
   border: 1px solid var(--ui-line);
-  background: color-mix(in srgb, var(--ui-surface, #fff) 86%, transparent);
+  background: color-mix(in srgb, var(--ui-panel, #fff) 86%, transparent);
   backdrop-filter: blur(10px);
   color: var(--ui-ink);
   font: inherit;
@@ -769,7 +795,7 @@ body.dark .tstore-blob {
   margin-top: 8px;
   padding: 20px 22px;
   border-radius: 20px;
-  background: color-mix(in srgb, var(--ui-surface, #fff) 90%, transparent);
+  background: color-mix(in srgb, var(--ui-panel, #fff) 90%, transparent);
   backdrop-filter: blur(12px);
   border: 1px solid var(--ui-line);
 }
@@ -854,7 +880,7 @@ body.dark .tstore-blob {
   gap: 16px;
   padding: 22px;
   border-radius: 22px;
-  background: color-mix(in srgb, var(--ui-surface, #fff) 94%, transparent);
+  background: color-mix(in srgb, var(--ui-panel, #fff) 94%, transparent);
   backdrop-filter: blur(16px);
   border: 1px solid var(--ui-line);
   box-shadow: 0 18px 38px rgba(10, 14, 26, .08);

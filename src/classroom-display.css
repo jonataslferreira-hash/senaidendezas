@@ -42,3 +42,34 @@ html #app .studio-shell button.studio-wordmark::before,html #app .studio-shell b
  .mobile-companion .document-nav{background:var(--ui-panel,#302c3c);color:var(--ui-ink,#eee);border:1px solid var(--ui-line,#ffffff20);padding:12px;border-radius:14px}
  .mobile-companion .document-nav .following-label{font-size:11px;color:var(--ui-muted,#aaa)}.mobile-companion .document-discussion{max-height:none}
 }
+/* Celular na horizontal: exibe o slide visual exatamente como foi montado, preenchendo a tela. */
+@media (max-height: 520px) and (orientation: landscape) {
+ #app[data-role=student] > .header{min-height:44px;height:44px;padding:4px 12px;flex-wrap:nowrap}
+ #app[data-role=student] > .header .brand{font-size:16px}
+ #app[data-role=student] > .header .lab-logo{width:24px;height:24px}
+ #app[data-role=student] > .document-classroom:not(.mobile-companion){
+  height:calc(100dvh - 44px);
+  min-height:0;
+  padding:6px 10px 8px;
+  gap:6px;
+  display:flex;
+  flex-direction:column;
+  overflow:hidden;
+ }
+ #app[data-role=student] > .document-classroom:not(.mobile-companion) .document-top{
+  margin:0;
+  padding:4px 10px;
+  flex:none;
+ }
+ #app[data-role=student] > .document-classroom:not(.mobile-companion) .document-stage{
+  flex:1 1 auto;
+  min-height:0;
+  width:100%;
+  height:100%;
+  margin:0;
+  border-radius:10px;
+ }
+ #app[data-role=student] > .document-classroom:not(.mobile-companion) .document-footer{
+  display:none;
+ }
+}
