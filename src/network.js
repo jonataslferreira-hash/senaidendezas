@@ -91,7 +91,16 @@ export class Classroom {
     for (const [id, conn] of this.connections) if (conn.open) {
       if (!conn.lessonSent) { conn.send({ type: 'lesson', lesson: this.room.publicLesson() }); conn.lessonSent = true; }
       conn.send({ type: 'state', state: this.room.snapshot(id, false) });
+      if (this.lastLive && this.lastLive.slide === this.room.data.slide && conn.liveSent !== this.lastLive) { conn.send(this.lastLive); conn.liveSent = this.lastLive; }
     }
+  }
+  // Estado do experimento/modelo 3D que o professor está controlando no slide atual.
+  live(payload, transient = false) {
+    if (!this.host || this.stopped || !this.room) return;
+    const message = { type: 'live', slide: this.room.data.slide, payload };
+    // Gestos soltos (transient) não são guardados: quem chega depois recebe só o estado.
+    if (!transient) this.lastLive = message;
+    for (const conn of this.connections.values()) if (conn.open && conn.lessonSent) { conn.send(message); if (!transient) conn.liveSent = message; }
   }
   async join(code, name, avatar) {
     this.host = false; this.code = code; this.name = name; this.avatar = avatar;
@@ -124,6 +133,7 @@ export class Classroom {
         else if (msg.type === 'slide-updated' && this.lesson && Number.isInteger(msg.index) && this.lesson.slides[msg.index]) {
           this.lesson = { ...this.lesson, slides: this.lesson.slides.map((slide, i) => i === msg.index ? { ...slide, ...msg.slide } : slide) };
         }
+        else if (msg.type === 'live') this.onLive?.(msg);
         else if (msg.type === 'state') {
           this.onState({ ...msg.state, lesson: this.lesson });
           if (!ready) { ready = true; clearTimeout(timeout); resolve(); }

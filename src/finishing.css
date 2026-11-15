@@ -558,3 +558,97 @@ html[data-appearance=dark] .video-dialog-hint[data-state=error]{color:#fca5a5}
 .slide-canvas .simulation-controls .simulation-actions{gap:.4cqw}
 .slide-canvas .simulation-controls .simulation-actions button{min-height:0;padding:.3cqw .7cqw;border-radius:.6cqw;border-width:.12cqw}
 .simulation-widget [data-lab-act]{touch-action:manipulation}
+
+/* 21. Slide em "Só eu controlo": o aluno acompanha, sem mexer no experimento nem no modelo 3D */
+#app:is([data-teacher-controls=teacher],[data-teacher-controls=sims]) .simulation-widget:not(.simulation-thumbnail){pointer-events:none}
+#app:is([data-teacher-controls=teacher],[data-teacher-controls=models]) :is(.canvas-model-slot,.mobile-model-slot,#viewer-slot){pointer-events:none}
+#app:is([data-teacher-controls=teacher],[data-teacher-controls=sims]) .simulation-widget:not(.custom-sim) .simulation-controls{opacity:.72}
+#app[data-teacher-controls] .slide-canvas::after{content:"O professor está controlando";position:absolute;right:1.2cqw;top:1.2cqw;z-index:6;padding:.45cqw 1cqw;border-radius:99px;background:rgba(15,18,28,.72);color:#fff;font:600 max(10px,1.05cqw)/1.2 Inter,system-ui,sans-serif;pointer-events:none}
+.editor-field-hint{margin:6px 0 0;font-size:12px;line-height:1.4;opacity:.72}
+
+/* 22. Tela de exportação: cartões de slide girando em volta do anel de progresso */
+body dialog.export-dialog.export-stage{width:min(430px,calc(100vw - 28px));padding:30px 30px 24px;border:1px solid var(--ui-line,#ffffff22);border-radius:26px;background:var(--ui-panel,#fff);color:var(--ui-ink,#1c1830);text-align:center;overflow:hidden;box-shadow:0 40px 110px rgba(0,0,0,.45);--export-accent:var(--ui-accent,#7c5cf6);--export-progress:0;animation:export-pop .45s cubic-bezier(.2,1.2,.3,1)}
+body dialog.export-stage[data-format=pdf]{--export-second:#f97366}
+body dialog.export-stage[data-format=pptx]{--export-second:#f59e0b}
+body dialog.export-stage[data-format=png]{--export-second:#22c3a6}
+body dialog.export-stage::backdrop{background:rgba(8,7,18,.62);backdrop-filter:blur(8px)}
+.export-stage .export-art{position:relative;width:190px;height:190px;margin:2px auto 16px;display:grid;place-items:center}
+.export-stage .export-glow{position:absolute;inset:8px;border-radius:50%;background:conic-gradient(from 0deg,var(--export-accent),var(--export-second,#22c3a6),var(--export-accent));filter:blur(26px);opacity:.42;animation:export-spin 5s linear infinite}
+.export-stage .export-card{position:absolute;left:50%;top:50%;width:54px;height:38px;margin:-19px 0 0 -27px;border-radius:7px;background:linear-gradient(140deg,#fff,color-mix(in srgb,var(--export-accent) 26%,#fff));box-shadow:0 8px 18px rgba(0,0,0,.28);animation:export-orbit 3.2s cubic-bezier(.5,0,.5,1) infinite}
+.export-stage .export-card::before,.export-stage .export-card::after{content:"";position:absolute;left:7px;height:4px;border-radius:2px;background:color-mix(in srgb,var(--export-accent) 70%,#1c1830)}
+.export-stage .export-card::before{top:8px;width:26px}
+.export-stage .export-card::after{top:17px;width:36px;opacity:.4;box-shadow:0 7px 0 currentColor;color:color-mix(in srgb,var(--export-accent) 30%,transparent)}
+.export-stage .export-card:nth-of-type(2){animation-delay:-1.07s}
+.export-stage .export-card:nth-of-type(3){animation-delay:-2.13s}
+.export-stage .export-ring{position:absolute;width:132px;height:132px;transform:rotate(-90deg)}
+.export-stage .export-ring circle{fill:var(--ui-panel,#fff);stroke:color-mix(in srgb,currentColor 12%,transparent);stroke-width:7}
+.export-stage .export-ring .export-ring-value{fill:none;stroke:var(--export-accent);stroke-linecap:round;stroke-dasharray:100;stroke-dashoffset:calc(100 - var(--export-progress));transition:stroke-dashoffset .5s cubic-bezier(.3,.8,.3,1);filter:drop-shadow(0 0 6px color-mix(in srgb,var(--export-accent) 70%,transparent))}
+.export-stage .export-core{position:relative;display:grid;gap:1px;transition:opacity .25s,transform .25s}
+.export-stage .export-core strong{font-size:30px;line-height:1;letter-spacing:-1px;font-variant-numeric:tabular-nums}
+.export-stage .export-core span{font-size:11px;font-weight:800;letter-spacing:2px;color:var(--export-accent)}
+.export-stage .export-check{position:absolute;width:64px;height:64px;fill:none;stroke:#22c55e;stroke-width:5;stroke-linecap:round;stroke-linejoin:round;stroke-dasharray:44;stroke-dashoffset:44;opacity:0}
+.export-stage .export-spark{position:absolute;left:50%;top:50%;width:8px;height:8px;margin:-4px;border-radius:50%;background:var(--export-second,#22c3a6);opacity:0}
+.export-stage h2{margin:0 0 4px;font-size:23px;letter-spacing:-.4px}
+.export-stage [data-export-status]{margin:0;font-size:14.5px;font-weight:600;opacity:.85;font-variant-numeric:tabular-nums}
+.export-stage .export-bar{height:8px;margin:16px 0 10px;border-radius:99px;background:color-mix(in srgb,currentColor 11%,transparent);overflow:hidden}
+.export-stage .export-bar span{display:block;height:100%;width:calc(var(--export-progress) * 1%);min-width:8px;border-radius:99px;background:linear-gradient(90deg,var(--export-accent),var(--export-second,#22c3a6),var(--export-accent));background-size:200% 100%;transition:width .5s cubic-bezier(.3,.8,.3,1);animation:export-shine 1.6s linear infinite}
+.export-stage .export-tip{margin:0 0 16px;font-size:12px;line-height:1.4;opacity:.62}
+body dialog.export-stage>button{min-height:40px;padding:8px 22px;border:1.5px solid color-mix(in srgb,currentColor 20%,transparent);border-radius:12px;background:none;color:inherit;font:inherit;font-weight:650;cursor:pointer}
+body dialog.export-stage>button:hover{background:color-mix(in srgb,currentColor 9%,transparent)}
+.export-stage[data-done] .export-card{animation:export-collect .5s ease-in forwards}
+.export-stage[data-done] .export-core{opacity:0;transform:scale(.6)}
+.export-stage[data-done] .export-ring .export-ring-value{stroke:#22c55e}
+.export-stage[data-done] .export-check{opacity:1;animation:export-draw .45s .15s ease-out forwards}
+.export-stage[data-done] .export-spark{animation:export-burst .7s .2s ease-out forwards}
+.export-stage .export-spark:nth-of-type(1){--a:0deg}.export-stage .export-spark:nth-of-type(2){--a:60deg}.export-stage .export-spark:nth-of-type(3){--a:120deg}.export-stage .export-spark:nth-of-type(4){--a:180deg}.export-stage .export-spark:nth-of-type(5){--a:240deg}.export-stage .export-spark:nth-of-type(6){--a:300deg}
+@keyframes export-pop{from{opacity:0;transform:translateY(18px) scale(.94)}}
+@keyframes export-spin{to{transform:rotate(360deg)}}
+@keyframes export-shine{to{background-position:-200% 0}}
+@keyframes export-orbit{0%{transform:rotate(0deg) translateX(84px) rotate(0deg) scale(1)}50%{transform:rotate(180deg) translateX(84px) rotate(-180deg) scale(.82)}100%{transform:rotate(360deg) translateX(84px) rotate(-360deg) scale(1)}}
+@keyframes export-collect{to{transform:translateX(0) scale(.1);opacity:0}}
+@keyframes export-draw{to{stroke-dashoffset:0}}
+@keyframes export-burst{0%{opacity:1;transform:rotate(var(--a)) translateX(30px) scale(1)}100%{opacity:0;transform:rotate(var(--a)) translateX(96px) scale(.3)}}
+@media (prefers-reduced-motion:reduce){.export-stage .export-card,.export-stage .export-glow,.export-stage .export-bar span,body dialog.export-stage{animation:none}.export-stage .export-card:nth-of-type(1){transform:translate(-70px,-52px)}.export-stage .export-card:nth-of-type(2){transform:translate(70px,-52px)}.export-stage .export-card:nth-of-type(3){transform:translate(0,74px)}}
+html[data-motion=reduced] .export-stage :is(.export-card,.export-glow,.export-bar span){animation:none}
+
+/* 23. Temas em gradiente: duas cores bem diferentes, para a passagem de uma à outra aparecer */
+html[data-theme=aurora]{--palette-start:168;--palette-end:268}
+html[data-theme=candy]{--palette-start:330;--palette-end:32}
+html[data-theme=galaxy]{--palette-start:222;--palette-end:318}
+html[data-theme=citrus]{--palette-start:70;--palette-end:178}
+html:is([data-theme=aurora],[data-theme=candy],[data-theme=galaxy],[data-theme=citrus],[data-theme=prism],[data-theme=lagoon],[data-theme=ember],[data-theme=nebula])[data-ui-style]:not([data-ui-style=minimal]) #app{
+  --palette-surface:linear-gradient(128deg,hsl(var(--palette-start) 78% 80%) 0%,hsl(calc((var(--palette-start) + var(--palette-end)) / 2) 70% 86%) 50%,hsl(var(--palette-end) 76% 82%) 100%);
+}
+html:is([data-theme=aurora],[data-theme=candy],[data-theme=galaxy],[data-theme=citrus],[data-theme=prism],[data-theme=lagoon],[data-theme=ember],[data-theme=nebula])[data-ui-style][data-appearance=dark]:not([data-ui-style=minimal]) #app{
+  --palette-surface:linear-gradient(128deg,hsl(var(--palette-start) 52% 26%) 0%,hsl(var(--palette-end) 50% 19%) 100%);
+}
+html[data-theme=candy][data-ui-style]:not([data-ui-style=minimal]) #app{--palette-surface:linear-gradient(128deg,hsl(330 78% 80%),hsl(32 86% 80%))}
+html[data-theme=candy][data-ui-style][data-appearance=dark]:not([data-ui-style=minimal]) #app{--palette-surface:linear-gradient(128deg,hsl(330 52% 26%),hsl(32 50% 19%))}
+/* O gradiente também pinta o fundo do espaço de trabalho, não só os destaques. */
+html:is([data-theme=aurora],[data-theme=candy],[data-theme=galaxy],[data-theme=citrus],[data-theme=prism],[data-theme=lagoon],[data-theme=ember],[data-theme=nebula])[data-ui-style]:not([data-ui-style=minimal]) #app .studio-shell{background:var(--palette-surface) fixed!important}
+.profile-swatches .profile-swatch.is-gradient{background-size:100% 100%}
+
+/* 24. Código curto do link de apresentação */
+.publish-dialog .publish-code{display:grid;gap:4px;justify-items:center;margin:4px 0 14px;padding:16px 14px;border-radius:16px;background:color-mix(in srgb,currentColor 7%,transparent);border:1px dashed color-mix(in srgb,currentColor 26%,transparent);text-align:center}
+.publish-dialog .publish-code>span{font-size:11.5px;font-weight:700;letter-spacing:1.4px;text-transform:uppercase;opacity:.7}
+.publish-dialog .publish-code>strong{display:flex;align-items:center;font:800 clamp(30px,8vw,44px)/1.1 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;letter-spacing:.14em;user-select:all}
+.publish-dialog .publish-code>strong i{width:.35em}
+.publish-dialog .publish-code>small{margin-top:6px;font-size:12px;opacity:.72}
+.publish-dialog .publish-code>code{font:600 13.5px/1.35 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;overflow-wrap:anywhere;user-select:all}
+
+/* 25. Busca de GIFs animados */
+.image-finder-modes b{padding:1px 5px;border-radius:5px;background:color-mix(in srgb,currentColor 22%,transparent);font-size:9.5px;font-weight:800;letter-spacing:.5px}
+.image-finder-badge.image-finder-gif{background:#111c;letter-spacing:.6px}
+.image-finder-card[data-playing] .image-finder-gif{background:#e11d48}
+
+/* 26. Gradientes novos (duplas sorteadas e fixas) */
+html[data-theme=prism]{--palette-start:132;--palette-end:216;--personal-hue:132;--personal-secondary:216}
+html[data-theme=lagoon]{--palette-start:269;--palette-end:387;--personal-hue:269;--personal-secondary:27}
+html[data-theme=ember]{--palette-start:359;--palette-end:488;--personal-hue:359;--personal-secondary:128}
+html[data-theme=nebula]{--palette-start:90;--palette-end:224;--personal-hue:90;--personal-secondary:224}
+
+/* 27. QR Code no compartilhamento */
+.publish-dialog .publish-qr{display:grid;justify-items:center;gap:6px;margin:2px 0 14px}
+.publish-dialog .publish-qr[hidden]{display:none}
+.publish-dialog .publish-qr img{width:min(190px,56vw);aspect-ratio:1;border-radius:14px;background:#fff;padding:6px;box-shadow:0 6px 18px rgba(0,0,0,.18)}
+.publish-dialog .publish-qr span{font-size:12.5px;opacity:.72}

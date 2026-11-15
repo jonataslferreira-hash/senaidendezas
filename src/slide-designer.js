@@ -133,6 +133,8 @@ export class SlideDesigner {
     root.addEventListener('pointercancel', e => this.up(e));
     root.addEventListener('dblclick', e => {
       const object = e.target.closest('.canvas-object');
+      // Só no editor: na apresentação, clicar rápido num experimento não abre nada.
+      if (!object?.closest('.canvas-editing')) return;
       if (object?.dataset.type === 'text') this.editText(object);
       else if (object?.dataset.type === 'simulation') {
         const element = this.display().elements.find(item => item.id === object.dataset.objectId);
@@ -833,6 +835,7 @@ export class SlideDesigner {
       <div class="image-finder-modes" role="radiogroup" aria-label="Tipo de imagem">
         <button type="button" role="radio" aria-checked="true" data-finder-mode="all">Todas as imagens</button>
         <button type="button" role="radio" aria-checked="false" data-finder-mode="alpha"><i aria-hidden="true"></i>Só fundo transparente</button>
+        <button type="button" role="radio" aria-checked="false" data-finder-mode="gif"><b aria-hidden="true">GIF</b>GIFs animados</button>
       </div>
       <p class="image-finder-status" role="status"></p>
       <div class="image-finder-scroll">
@@ -845,11 +848,11 @@ export class SlideDesigner {
     const urls=[];
     // Quando a busca exata acaba, a galeria segue com variações do mesmo assunto.
     // No modo transparente alterna o filtro do Bing com buscas comuns por PNG (raw); todas são conferidas.
-    const variants=(term,alpha)=>alpha
+    const variants=(term,alpha)=>gif?[term,...['gif','animado','animação','gif engraçado','loop','gif animado'].map(extra=>term+' '+extra)].map(text=>[text,false]):alpha
       ?[[term,false],[term+' png transparente',true],[term+' png sem fundo',true],[term+' desenho',false],[term+' transparent png',true],[term+' recortado png',true],[term+' ícone',false],[term+' clipart png',true],[term+' ilustração',false],[term+' sticker png',true],[term+' vetor png',true],[term+' logo',false],[term+' render png',true],[term+' cartoon png',true]]
       :[term,...['imagens','fotos','ilustração','desenho','hd','arte','exemplos','wallpaper','close','natureza','infantil','realista','png'].map(extra=>term+' '+extra)].map(text=>[text,false]);
     const seen=new Set();
-    let term='',alpha=false,loading=false,ended=false,queries=[],queryIndex=0,page=0,dry=0,failures=0,token=0,shown=0,checking=0,checked=0,stalled=false;
+    let term='',alpha=false,gif=false,loading=false,ended=false,queries=[],queryIndex=0,page=0,dry=0,failures=0,token=0,shown=0,checking=0,checked=0,stalled=false;
     // Mantém algumas telas de imagens já carregadas abaixo do que a pessoa vê.
     const nearEnd=()=>scroller.scrollHeight-scroller.scrollTop-scroller.clientHeight<Math.max(1600,scroller.clientHeight*3);
     const skeleton=count=>{for(let i=0;i<count;i++){const cell=document.createElement('div');cell.className='image-finder-skeleton';cell.setAttribute('aria-hidden','true');grid.append(cell);}};
@@ -880,6 +883,13 @@ export class SlideDesigner {
       const origin=document.createElement('span');origin.className='image-finder-origin';origin.textContent=[host,choice.license].filter(Boolean).join(' · ');
       button.append(img);
       if(choice.blob){const badge=document.createElement('span');badge.className='image-finder-badge';badge.textContent='✓ Fundo transparente';button.append(badge);}
+      if(choice.gif){
+        const badge=document.createElement('span');badge.className='image-finder-badge image-finder-gif';badge.textContent='GIF';button.append(badge);
+        // A miniatura é parada: o GIF de verdade toca ao passar o mouse ou focar.
+        const play=()=>{if(button.dataset.playing||!choice.original)return;button.dataset.playing='true';const live=new Image();live.onload=()=>{if(button.isConnected&&button.dataset.playing)img.src=choice.original;};live.src=choice.original;};
+        const stop=()=>{if(!button.dataset.playing)return;delete button.dataset.playing;img.src=choice.thumbnail;};
+        button.addEventListener('pointerenter',play);button.addEventListener('focus',play);button.addEventListener('pointerleave',stop);button.addEventListener('blur',stop);
+      }
       button.append(title,origin);
       button.setAttribute('aria-label',`Inserir imagem: ${choice.title}${choice.blob?' (fundo transparente)':''}`);
       button.addEventListener('click',()=>insert(choice,button));
@@ -911,7 +921,7 @@ export class SlideDesigner {
         let burst=0;
         while(run===token&&dialog.open&&!ended&&(nearEnd()||!shown)&&burst++<(shown?12:60)){
           let choices;
-          try{const [text,raw]=queries[queryIndex];choices=await searchImageChoices(text,++page,{transparent:alpha&&!raw,raw});failures=0;}
+          try{const [text,raw]=queries[queryIndex];choices=await searchImageChoices(text,++page,{transparent:alpha&&!raw,raw,gif});failures=0;}
           catch{
             page--;
             if(run!==token)return;
@@ -953,7 +963,7 @@ export class SlideDesigner {
       if(idea){input.value=idea.dataset.finderIdea;startSearch();return;}
       const mode=event.target.closest('[data-finder-mode]');
       if(mode){
-        alpha=mode.dataset.finderMode==='alpha';
+        alpha=mode.dataset.finderMode==='alpha';gif=mode.dataset.finderMode==='gif';
         for(const option of dialog.querySelectorAll('[data-finder-mode]'))option.setAttribute('aria-checked',String(option===mode));
         dialog.dataset.mode=mode.dataset.finderMode;
         if(input.value.trim())startSearch();

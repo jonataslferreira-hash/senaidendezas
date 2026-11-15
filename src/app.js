@@ -15,7 +15,9 @@ import {FocusView,focusButton} from './focus-view.js';
 import './classroom-display.css';
 import { avatarContent,isPhotoAvatar } from './player-avatar.js';
 import { PptxAnimations } from './pptx-animations.js';
-import { loadPublicPresentation } from './public-presentations.js';
+import { loadPublicPresentation, validPublicCode, resolvePublicCode } from './public-presentations.js';
+// Link de apresentação: ?presentation=<token> (antigo) ou ?p=<código curto>.
+function publicLinkParam() { const query = new URLSearchParams(location.search); return query.get('presentation') || (validPublicCode(query.get('p')) ? query.get('p') : ''); }
 import brandUrl from './assets/brand.svg';
 import { PageMotion } from './motion.js';
 import { avatars } from './content.js';
@@ -33,6 +35,8 @@ let slides = activeLesson.slides;
 import { Classroom } from './network.js';
 import { Room } from './room.js';
 import { HardwareViewer } from './models.js';
+import { teacherControls, captureInteraction, applyInteraction, InteractionBroadcaster } from './live-interaction.js';
+import { cleanSimEvents, cleanSimValues } from './custom-sim-bridge.js';
 import QRCode from 'qrcode';
 import './style.css';
 import './experience.css';
@@ -70,6 +74,56 @@ const esc = value => String(value ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;
 const app = document.querySelector('#app');
 const viewer = new HardwareViewer({ defer: true });
 const canvasModels = new CanvasModels();
+// Slides em "Só eu controlo": o professor transmite o experimento/modelo 3D e os alunos só acompanham.
+const interactionBroadcaster = new InteractionBroadcaster(payload => { if (host && !demo) classroom?.live?.(payload); });
+let liveInteraction = null, liveInteractionTimers = [];
+// Experimentos importados rodam em iframes isolados: a conversa é por mensagens.
+let customSimValues = {}, customSimKey = '';
+const customSimFrames = () => [...app.querySelectorAll('.canvas-presenting .custom-sim iframe')];
+const customSimRole = () => { const teacher = state?.phase === 'lesson' ? teacherControls(slides[state.slide]) : ''; return !teacher || teacher === 'models' ? 'off' : host ? (demo ? 'off' : 'send') : 'follow'; };
+const tellCustomSim = (frame, message) => { try { frame?.contentWindow?.postMessage(message, '*'); } catch { /* iframe ainda carregando */ } };
+window.addEventListener('message', event => {
+  const data = event.data;
+  if (!data || typeof data !== 'object' || typeof data.storageLab !== 'string') return;
+  const frames = customSimFrames(), index = frames.findIndex(frame => frame.contentWindow === event.source);
+  if (index < 0) return;
+  const role = customSimRole();
+  if (data.storageLab === 'sim-ready') {
+    tellCustomSim(frames[index], { storageLab: 'sim-role', role });
+    const values = liveInteraction?.slide === state?.slide ? liveInteraction.payload?.custom?.[index] : null;
+    if (role === 'follow' && Array.isArray(values)) tellCustomSim(frames[index], { storageLab: 'sim-state', values: cleanSimValues(values) });
+  } else if (data.storageLab === 'sim-events' && role === 'send') {
+    const events = cleanSimEvents(data.events);
+    customSimValues[index] = cleanSimValues(data.values);
+    if (events.length && JSON.stringify(events).length < 3200) classroom?.live?.({ replay: { index, events } }, true);
+  }
+});
+function syncInteraction() {
+  const slide = state?.phase === 'lesson' ? slides[state.slide] : null, teacher = teacherControls(slide);
+  const simKey = slide ? activeLesson.id + ':' + state.slide : '';
+  if (simKey !== customSimKey) { customSimKey = simKey; customSimValues = {}; }
+  for (const frame of customSimFrames()) tellCustomSim(frame, { storageLab: 'sim-role', role: customSimRole() });
+  const tools = { canvasModels, viewer, slide: slide ? presentationSlide(slide) : null };
+  if (teacher && !host) app.dataset.teacherControls = teacher; else delete app.dataset.teacherControls;
+  if (teacher && host && !demo) interactionBroadcaster.watch(activeLesson.id + ':' + state.slide, () => ({ ...captureInteraction(app, tools), ...(teacher !== 'models' && Object.keys(customSimValues).length ? { custom: customSimValues } : {}) }));
+  else interactionBroadcaster.stop();
+  for (const timer of liveInteractionTimers.splice(0)) clearTimeout(timer);
+  if (!teacher || host || liveInteraction?.slide !== state.slide) return;
+  const apply = () => { if (state?.phase === 'lesson' && liveInteraction?.slide === state.slide) applyInteraction(app, liveInteraction.payload, tools); };
+  apply();
+  // Modelos 3D terminam de carregar depois do render: repete para a câmera chegar.
+  liveInteractionTimers = [400, 1500].map(delay => setTimeout(apply, delay));
+}
+function receiveInteraction(message) {
+  if (!message || !Number.isInteger(message.slide)) return;
+  const replay = message.payload?.replay;
+  if (replay) {
+    if (!host && state?.phase === 'lesson' && state.slide === message.slide && customSimRole() === 'follow') tellCustomSim(customSimFrames()[replay.index], { storageLab: 'sim-replay', events: cleanSimEvents(replay.events) });
+    return;
+  }
+  liveInteraction = message;
+  if (!host && state?.phase === 'lesson' && state.slide === message.slide && teacherControls(slides[state.slide])) applyInteraction(app, message.payload, { canvasModels, viewer, slide: presentationSlide(slides[state.slide]) });
+}
 const focusView = new FocusView();
 const pageMotion = new PageMotion();
 const pptxAnimations=new PptxAnimations();const simulations=new Simulations(),gameAudio=new GameAudio(),gameLayout=new GameLayout();
@@ -77,7 +131,7 @@ let classroom, state, host = false, demo = false, busy = false, selectedAvatar =
 let avatarChanged=false,joinNameTouched=false,joinNameDraft='',guestPhotoPending=false;
 let shareOpen = false, solutionOpen = false, lastSlide = -1, localModel = 'ssd', localExploded = true;
 let status = 'offline', statusMessage = '', timerOffset = 0, music = false, audio, musicTimer, audioStep = 0;
-let editorLaunch=false, readOnlyPresentation=false, publicPresentationToken='', sharedLoading=Boolean(new URLSearchParams(location.search).get('presentation')), sharedError='';
+let editorLaunch=false, readOnlyPresentation=false, publicPresentationToken='', sharedLoading=Boolean(publicLinkParam()), sharedError='';
 let clockTimer;
 const trackPlayer = new Audio(); let playingTrack = null;
 trackPlayer.dataset.soundtrack = ''; trackPlayer.hidden = true; document.body.append(trackPlayer);
@@ -203,6 +257,37 @@ function shareDialog() {
   const url=joinUrl();
   return `<div class="modal-backdrop"><section class="share-modal" role="dialog" aria-modal="true" aria-labelledby="share-title"><button class="icon-btn close-modal" data-action="close-share" aria-label="Fechar convite">${icon('close')}</button><span class="eyebrow purple-text">A AULA FICA MELHOR JUNTO</span><h2 id="share-title">Conecte a turma<span>.</span></h2><p>Aponte a câmera. Escolha um avatar. Entre na aula.</p><div class="qr-wrap"><img id="room-qr" width="230" height="230" alt="QR Code para entrar nesta sala"></div><span class="eyebrow">OU ENTRE COM O CÓDIGO</span><div class="big-code">${esc(state.code.slice(0, 3))}<span> </span>${esc(state.code.slice(3))}</div><div class="share-link"><input readonly aria-label="Link de convite" value="${esc(url)}"><button class="icon-btn" data-action="copy-link" aria-label="Copiar link">${icon('copy')}</button></div>${import.meta.env.DEV&&/^(localhost|127\.0\.0\.1)$/.test(location.hostname)&&!routeParams().has('localSignal')?`<details><summary>Configurar endereço público</summary><label for="public-url">URL publicada no GitHub Pages</label><input id="public-url" type="url" placeholder="https://usuario.github.io/senaidendezas/"><button class="btn secondary small" data-action="save-url">Salvar endereço</button></details>`:''}</section></div>`;
 }
+// Vídeos, experimentos e modelos 3D recomeçariam do zero a cada atualização da
+// tela (clique de animação, aluno entrando…). Enquanto o slide é o mesmo e o
+// conteúdo dele não mudou, o quadro do slide fica onde está e só o resto é trocado.
+const LIVE_SLIDE = '.canvas-frame.canvas-presenting';
+let liveSlide = null;
+function keepLiveSlide(markup, key) {
+  const old = liveSlide?.node;
+  if (!key || liveSlide?.key !== key || !old?.isConnected || app.querySelector(LIVE_SLIDE) !== old || !old.querySelector('iframe,video,audio,[data-simulation],[data-canvas-model]')) return false;
+  const next = document.createElement('template'); next.innerHTML = markup;
+  const fresh = next.content.querySelector(LIVE_SLIDE);
+  if (!fresh || fresh.outerHTML !== liveSlide.html) return false;
+  const chain = (node, top) => { const list = []; for (let item = node; item && item !== top; item = item.parentNode) list.unshift(item); return list; };
+  const oldChain = chain(old, app), newChain = chain(fresh, next.content);
+  if (oldChain.length !== newChain.length || oldChain.some((node, index) => node.tagName !== newChain[index].tagName)) return false;
+  let oldParent = app, newParent = next.content;
+  oldChain.forEach((keep, index) => {
+    const incoming = newChain[index];
+    for (const child of [...oldParent.childNodes]) if (child !== keep) child.remove();
+    let before = true;
+    for (const child of [...newParent.childNodes]) {
+      if (child === incoming) { before = false; continue; }
+      if (before) oldParent.insertBefore(child, keep); else oldParent.append(child);
+    }
+    if (keep !== old) {
+      for (const name of keep.getAttributeNames()) if (!incoming.hasAttribute(name)) keep.removeAttribute(name);
+      for (const name of incoming.getAttributeNames()) if (keep.getAttribute(name) !== incoming.getAttribute(name)) keep.setAttribute(name, incoming.getAttribute(name));
+    }
+    oldParent = keep; newParent = incoming;
+  });
+  return true;
+}
 function render() {
   const slideMotionKey = state?.phase === 'lesson' ? `${activeLesson.id}:${state.code}:${state.slide}` : '';
   const outgoingSlide = pageMotion.captureSlide(app, slideMotionKey, slides[state?.slide]?.transition);
@@ -247,8 +332,10 @@ function render() {
     app.prepend(next.content);
     studio.chat.paint();
     studio.social.paint();
-  } else {
+  } else if (!keepLiveSlide(markup, slideMotionKey)) {
     app.innerHTML = markup;
+    const frame = slideMotionKey ? app.querySelector(LIVE_SLIDE) : null;
+    liveSlide = frame ? { key: slideMotionKey, node: frame, html: frame.outerHTML } : null;
   }
   if (state?.phase === 'lesson') {
     app.insertAdjacentHTML('beforeend', pinnedInvite({ host, demo, state, settings: presenterSettings }));
@@ -274,7 +361,7 @@ function render() {
   const upcoming = state?.phase === 'lesson' ? slides[state.slide + 1] : null;
   canvasModels.preload(upcoming ? presentationSlide(upcoming) : null);
   focusView.sync(state?.phase==='lesson'?slides[state.slide]?.id:'');
-  fillAssetImages(app);simulations.mount(state?.phase==='lesson'?app:null);if(state?.phase==='lesson')loadSlideFonts(slides[state.slide],activeLesson.customFonts);
+  fillAssetImages(app);simulations.mount(state?.phase==='lesson'?app:null);syncInteraction();if(state?.phase==='lesson')loadSlideFonts(slides[state.slide],activeLesson.customFonts);
   if (state && (shareOpen || (host && !demo && presenterSettings.qrVisible && state.phase === 'lesson'))) {
     const url = joinUrl();
     const setQR = src => { if (state && joinUrl() === url) for (const image of document.querySelectorAll('#room-qr, [data-pinned-qr]')) image.src = src; };
@@ -336,6 +423,7 @@ async function connectSession(mode) {
   busy = true; host = mode.host; demo = false; editorLaunch=Boolean(mode.fromEditor);music=true; gameAudio.unlock(); render();
   classroom?.stop?.();
   classroom = new Classroom(receive, connection);
+  classroom.onLive = receiveInteraction; liveInteraction = null;
   try {
     if (host) { await classroom.create(Boolean(mode.resume), mode.lesson, mode.startIndex,editorLaunch);shareOpen=!mode.resume; }
     else {music=true;gameAudio.unlock();await classroom.join(mode.code, mode.name, mode.avatar);}
@@ -544,6 +632,8 @@ app.addEventListener('submit', async e => {
   const form = new FormData(e.target);
   codeDraft = String(form.get('code')).replace(/\D/g, '').slice(0, 6);
   if (codeDraft.length !== 6) { toast('Digite os 6 números da sala.'); return; }
+  // Entrar na sala já abre em tela cheia (precisa acontecer dentro do clique).
+  if (!document.fullscreenElement) document.documentElement.requestFullscreen?.().catch(() => {});
   await connectSession({ host: false, code: codeDraft, name: String(form.get('name')).trim(), avatar: selectedAvatar });
 });
 document.addEventListener('keydown', e => {
@@ -635,12 +725,12 @@ else app.innerHTML='<main class="public-loading"><p role="status">Carregando apr
 document.documentElement.dataset.appReady = 'true';
 async function openPublicPresentation(token) {
   leave(false);sharedLoading=true;render();
-  try{const lesson=await loadPublicPresentation(token);sharedLoading=false;preview(lesson,{readOnly:true,token});}
+  try{if(validPublicCode(token))token=await resolvePublicCode(token);const lesson=await loadPublicPresentation(token);sharedLoading=false;preview(lesson,{readOnly:true,token});}
   catch(error){sharedLoading=false;sharedError=error.message;render();}
 }
 const savedSession = Classroom.resume();
 async function restorePage() {
-  const token=new URLSearchParams(location.search).get('presentation');if(token){await openPublicPresentation(token);return;}
+  const token=publicLinkParam();if(token){await openPublicPresentation(token);return;}
   const page = routeParams().get('page');
   try { if (studio.dirty) studio.save(); }
   catch (error) { studio.writeRoute('editor', studio.draft.id, true); toast(error.message); return; }
@@ -660,7 +750,7 @@ async function restorePage() {
   }
 }
 window.addEventListener('popstate', restorePage);
-if (params.get('presentation')) openPublicPresentation(params.get('presentation'));
+if (publicLinkParam()) openPublicPresentation(publicLinkParam());
 else if (savedSession && (!codeDraft || savedSession.code === codeDraft) && (!params.has('page') || params.get('page') === 'present')) connectSession({ ...savedSession, resume: true });
 else if (['preview', 'present'].includes(params.get('page'))) restorePage();
 

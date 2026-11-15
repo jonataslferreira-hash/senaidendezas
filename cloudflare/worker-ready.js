@@ -915,21 +915,18 @@ function splitTransparentQuery(query) {
   const subject = wanted ? text.replace(TRANSPARENT_HINT, " ").replace(/\b(?:com|de|em)\s+fundo\b/giu, " ").replace(/\s+/g, " ").trim() : text;
   return { transparent: wanted, subject: subject || text };
 }
-async function bingSearch(query, limit, page = 1, { transparent = false } = {}) {
+async function bingSearch(query, limit, page = 1, { transparent = false, gif = false } = {}) {
   const params = new URLSearchParams({
     q: query,
     first: String((page - 1) * limit + 1),
     count: String(Math.min(35, Math.max(limit, 12))),
     mmasync: "1",
-    adlt: "moderate",
-    // Sem o mercado, o Bing responde pelo país do servidor e lê "cachorro" em outro idioma.
-    mkt: "pt-BR",
-    setlang: "pt-BR",
-    cc: "BR"
+    adlt: "moderate"
   });
-  if (transparent) params.set("qft", "+filterui:photo-transparent");
+  if (gif) params.set("qft", "+filterui:photo-animatedgif");
+  else if (transparent) params.set("qft", "+filterui:photo-transparent");
   const response = await fetch("https://www.bing.com/images/async?" + params, {
-    headers: { Accept: "text/html,application/xhtml+xml", "User-Agent": BROWSER_USER_AGENT, "Accept-Language": "pt-BR,pt;q=0.9,en;q=0.7", Cookie: "_EDGE_CD=m=pt-br&u=pt-br; _EDGE_S=mkt=pt-br&ui=pt-br" },
+    headers: { Accept: "text/html,application/xhtml+xml", "User-Agent": BROWSER_USER_AGENT, "Accept-Language": "pt-BR,pt;q=0.9,en;q=0.7" },
     signal: AbortSignal.timeout(UPSTREAM_TIMEOUT)
   });
   if (!response.ok) throw Error("bing_" + response.status);
@@ -972,6 +969,93 @@ async function bingSearch(query, limit, page = 1, { transparent = false } = {}) 
     });
   }
   return items;
+}
+var DUCK_CHUNK = 100;
+async function duckChunk(query, chunk, transparent, gif = false) {
+  const headers = { Accept: "text/html,application/json;q=0.9,*/*;q=0.8", "User-Agent": BROWSER_USER_AGENT, "Accept-Language": "pt-BR,pt;q=0.9,en;q=0.6", Referer: "https://duckduckgo.com/" };
+  const home = await fetch("https://duckduckgo.com/?" + new URLSearchParams({ q: query, iax: "images", ia: "images", kl: "br-pt" }), { headers, signal: AbortSignal.timeout(UPSTREAM_TIMEOUT) });
+  if (!home.ok) throw Error("duck_" + home.status);
+  const vqd = /vqd=["']?([\d-]+)["']?/.exec(await home.text())?.[1];
+  if (!vqd) throw Error("duck_token");
+  const params = new URLSearchParams({ l: "br-pt", o: "json", q: query, vqd, f: gif ? ",,,type:gif,," : transparent ? ",,,type:transparent,," : ",,,,,", p: "1", s: String(chunk * DUCK_CHUNK) });
+  const response = await fetch("https://duckduckgo.com/i.js?" + params, { headers: { ...headers, Accept: "application/json" }, signal: AbortSignal.timeout(UPSTREAM_TIMEOUT) });
+  if (!response.ok) throw Error("duck_" + response.status);
+  const payload = await response.json();
+  return duckItems(payload?.results, query, transparent);
+}
+function duckItems(results, query = "", transparent = false) {
+  const items = [];
+  for (const result of Array.isArray(results) ? results : []) {
+    const original = clean2(result?.image), thumbnail = clean2(result?.thumbnail).replace(/^http:\/\//, "https://");
+    if (!/^https:\/\//.test(thumbnail)) continue;
+    const title = plainText(result.title || query);
+    if (isDocument({ file: original, title })) continue;
+    const page = clean2(result.url);
+    items.push({
+      id: "duck:" + clip2(thumbnail.replace(/^.*[?&]id=/, "").replace(/&.*$/, "") || thumbnail, 80),
+      title: clip2(title || query, 200),
+      file: clip2(title || query, 200),
+      description: "",
+      thumbnail: bingSized(thumbnail, 480, 360),
+      url: bingSized(thumbnail, 1200, 1200),
+      original: /^https:\/\//.test(original) ? clip2(original, 900) : "",
+      transparent,
+      source: /^https:\/\//.test(page) ? clip2(page, 600) : "",
+      catalog: "DuckDuckGo Imagens",
+      author: "",
+      license: "",
+      licenseUrl: "",
+      width: Number(result.width) || 0,
+      height: Number(result.height) || 0,
+      kind: /\.png(?:$|[?#])/i.test(original) ? "image/png" : /\.svg(?:$|[?#])/i.test(original) ? "image/svg+xml" : /\.webp(?:$|[?#])/i.test(original) ? "image/webp" : "image"
+    });
+  }
+  return items;
+}
+async function duckSearch(query, limit, page = 1, { transparent = false, gif = false } = {}) {
+  const start = (page - 1) * limit, chunk = Math.floor(start / DUCK_CHUNK), offset = start % DUCK_CHUNK;
+  const key = "v1-duck-" + encodeURIComponent(query.toLowerCase()) + "-" + chunk + (gif ? "-gif" : transparent ? "-png" : "");
+  const { items } = await cached(key, async () => ({ items: await duckChunk(query, chunk, transparent, gif) }));
+  return items.slice(offset, offset + limit);
+}
+function pixabayItems(hits, query = "", transparent = false) {
+  return (Array.isArray(hits) ? hits : []).filter((hit) => /^https:\/\//.test(clean2(hit?.webformatURL))).map((hit) => ({
+    id: "pixabay:" + hit.id,
+    title: clip2(clean2(hit.tags) || query, 200),
+    file: clip2(clean2(hit.tags) || query, 200),
+    description: "",
+    thumbnail: clean2(hit.webformatURL),
+    url: clean2(hit.largeImageURL || hit.webformatURL),
+    original: clean2(hit.largeImageURL || hit.webformatURL),
+    transparent,
+    source: clip2(hit.pageURL, 600),
+    catalog: "Pixabay",
+    author: clip2(hit.user, 120),
+    license: "Licen\xE7a Pixabay",
+    licenseUrl: "https://pixabay.com/service/license-summary/",
+    width: Number(hit.imageWidth) || 0,
+    height: Number(hit.imageHeight) || 0,
+    kind: /\.png(?:$|[?#])/i.test(clean2(hit.largeImageURL)) ? "image/png" : "image"
+  }));
+}
+async function pixabaySearch(key, query, limit, page, transparent) {
+  if (!key) return [];
+  const params = new URLSearchParams({ key, q: query.slice(0, 100), lang: "pt", safesearch: "true", per_page: String(Math.max(3, Math.min(limit, 40))), page: String(page) });
+  if (transparent) params.set("colors", "transparent");
+  const response = await fetch("https://pixabay.com/api/?" + params, { signal: AbortSignal.timeout(UPSTREAM_TIMEOUT) });
+  if (!response.ok) throw Error("pixabay_" + response.status);
+  return pixabayItems((await response.json())?.hits, query, transparent);
+}
+function mergeEngines(...lists) {
+  const merged = [], seen = /* @__PURE__ */ new Set();
+  for (let index = 0; index < Math.max(0, ...lists.map((list) => list.length)); index++) for (const item of lists.map((list) => list[index])) {
+    if (!item) continue;
+    const key = (item.original || item.thumbnail).replace(/^https?:\/\/(?:www\.)?/, "").replace(/[?#].*$/, "").toLowerCase();
+    if (seen.has(key)) continue;
+    seen.add(key);
+    merged.push(item);
+  }
+  return merged;
 }
 var fileKey = (value) => clean2(value).replace(/^File:/i, "").replace(/_/g, " ").trim().toLowerCase();
 async function resolveWikipediaLicenses(items) {
@@ -1170,14 +1254,20 @@ async function cached(key, loader) {
   }
   return value;
 }
-async function searchImages(query, page, limit, { transparent = false, bingOnly = false } = {}) {
+async function searchImages(query, page, limit, { transparent = false, bingOnly = false, pixabayKey = "", gif = false } = {}) {
   const term = clip2(query, MAX_QUERY);
-  const key = "v5-" + (bingOnly ? "bing-" : "") + encodeURIComponent(term.toLowerCase()) + "-" + page + "-" + limit + (transparent ? "-png" : "");
+  const key = "v6-" + (bingOnly ? "bing-" : "") + encodeURIComponent(term.toLowerCase()) + "-" + page + "-" + limit + (gif ? "-gif" : transparent ? "-png" : "");
   return cached(key, async () => {
     if (bingOnly) {
-      let items = await bingSearch(term, limit, page, { transparent });
-      if (transparent && !items.length && page === 1) items = await bingSearch(term + " png", limit, page);
-      return { query: term, page, transparent, items, total: page * limit + (items.length ? 1 : 0) };
+      const [duck, bing2, pixabay] = await Promise.allSettled([
+        duckSearch(term, limit, page, { transparent, gif }),
+        bingSearch(term, limit, page, { transparent, gif }).then(async (found) => transparent && !found.length && page === 1 ? bingSearch(term + " png", limit, page) : found),
+        gif ? [] : pixabaySearch(pixabayKey, term, Math.ceil(limit / 2), page, transparent)
+      ]);
+      const fromDuck = duck.status === "fulfilled" ? duck.value : [], fromBing = bing2.status === "fulfilled" ? bing2.value : [];
+      const fromPixabay = pixabay.status === "fulfilled" ? pixabay.value : [];
+      const items = mergeEngines(fromDuck, fromBing, fromPixabay).filter((item) => !gif || item.original).map((item) => gif ? { ...item, url: item.original, kind: "image/gif" } : item);
+      return { query: term, page, transparent, items, engines: { duckduckgo: duck.status === "fulfilled" ? fromDuck.length : String(duck.reason?.message || "erro"), bing: bing2.status === "fulfilled" ? fromBing.length : String(bing2.reason?.message || "erro"), pixabay: !pixabayKey ? "sem chave" : pixabay.status === "fulfilled" ? fromPixabay.length : String(pixabay.reason?.message || "erro") }, total: page * limit + (items.length ? 1 : 0) };
     }
     const queryTokens = tokens(term).filter((token) => token.length > 1 && !STOP_WORDS.has(token));
     const wantsIcon = queryTokens.some((token) => ["logo", "logotipo", "logomarca", "icon", "icone", "simbolo", "symbol"].includes(token));
@@ -1269,7 +1359,7 @@ async function handleStorageAIImages(request, env, user, headers) {
   const transparent = !raw && (url.searchParams.get("transparent") === "1" || hinted.transparent);
   if (!query) return json({ error: "invalid_query", items: [] }, 400);
   try {
-    const result = await searchImages(hinted.subject, page, limit, { transparent, bingOnly: url.searchParams.get("source") === "bing" });
+    const result = await searchImages(hinted.subject, page, limit, { transparent, bingOnly: url.searchParams.get("source") === "bing" || url.searchParams.get("gif") === "1", gif: url.searchParams.get("gif") === "1", pixabayKey: clean2(env?.PIXABAY_KEY) });
     return json(result, 200, { "Cache-Control": "private, max-age=300" });
   } catch {
     return json({ error: "search_unavailable", items: [] }, 502);
@@ -1448,10 +1538,39 @@ async function handleMusic(request, env, headers) {
 
 // cloudflare/presentation-worker.js
 var tokenPattern = /^\/presentations\/([a-f0-9]{8}-[a-f0-9]{4}-4[a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12})$/i;
+var codePattern = /^\/presentations\/code\/([a-z0-9]{6})$/i;
+var codeForPattern = /^\/presentations\/([a-f0-9]{8}-[a-f0-9]{4}-4[a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12})\/code$/i;
+var CODE_ALPHABET = "ABCDEFGHJKMNPQRSTUVWXYZ23456789";
+function shortCode(random = crypto.getRandomValues(new Uint8Array(6))) {
+  return [...random].map((value) => CODE_ALPHABET[value % CODE_ALPHABET.length]).join("");
+}
+async function createCode(env, token, owner) {
+  const saved = await env.FILES.get("presentation-code-of/" + token);
+  if (saved) return (await saved.text()).trim();
+  for (let attempt = 0; attempt < 6; attempt++) {
+    const code = shortCode();
+    if (await env.FILES.head("presentation-codes/" + code)) continue;
+    await env.FILES.put("presentation-codes/" + code, token, { customMetadata: { owner } });
+    await env.FILES.put("presentation-code-of/" + token, code, { customMetadata: { owner } });
+    return code;
+  }
+  return "";
+}
 async function readPublicPresentation(request, env, headers) {
-  const match = tokenPattern.exec(new URL(request.url).pathname);
+  const pathname = new URL(request.url).pathname, json = (body, status) => Response.json(body, { status, headers });
+  const code = codePattern.exec(pathname);
+  if (code && request.method === "GET") {
+    if (!env.FILES) return json({ error: "storage_not_configured" }, 503);
+    try {
+      const object = await env.FILES.get("presentation-codes/" + code[1].toUpperCase());
+      if (!object) return json({ error: "not_found" }, 404);
+      return json({ token: (await object.text()).trim() }, 200);
+    } catch {
+      return json({ error: "storage_unavailable" }, 503);
+    }
+  }
+  const match = tokenPattern.exec(pathname);
   if (!match || request.method !== "GET") return null;
-  const json = (body, status) => Response.json(body, { status, headers });
   if (!env.FILES) return json({ error: "storage_not_configured" }, 503);
   try {
     const object = await env.FILES.get("presentations/" + match[1].toLowerCase());
@@ -1465,8 +1584,8 @@ async function readPublicPresentation(request, env, headers) {
   }
 }
 async function writePublicPresentation(request, env, user, headers) {
-  const path = new URL(request.url).pathname, match = tokenPattern.exec(path), json = (body, status = 200) => Response.json(body, { status, headers });
-  if (path !== "/presentations" && !match) return null;
+  const path = new URL(request.url).pathname, match = tokenPattern.exec(path), codeFor = codeForPattern.exec(path), json = (body, status = 200) => Response.json(body, { status, headers });
+  if (path !== "/presentations" && !match && !codeFor) return null;
   if (!env.FILES) return json({ error: "storage_not_configured" }, 503);
   try {
     if (request.method === "POST" && path === "/presentations") {
@@ -1475,13 +1594,29 @@ async function writePublicPresentation(request, env, user, headers) {
       if (!["application/json", "application/gzip"].includes(type)) return json({ error: "invalid_type" }, 415);
       const token = crypto.randomUUID();
       await env.FILES.put("presentations/" + token, request.body, { httpMetadata: { contentType: "application/json" }, customMetadata: { owner: user.id, format: type === "application/gzip" ? "gzip" : "raw" } });
-      return json({ token }, 201);
+      const code = await createCode(env, token, user.id).catch(() => "");
+      return json({ token, code }, 201);
+    }
+    if (request.method === "POST" && codeFor) {
+      const token = codeFor[1].toLowerCase(), object = await env.FILES.head("presentations/" + token);
+      if (!object) return json({ error: "not_found" }, 404);
+      if (object.customMetadata?.owner !== user.id) return json({ error: "forbidden" }, 403);
+      const code = await createCode(env, token, user.id);
+      return code ? json({ token, code }) : json({ error: "code_unavailable" }, 503);
     }
     if (request.method === "DELETE" && match) {
       const key = "presentations/" + match[1].toLowerCase(), object = await env.FILES.head(key);
       if (!object) return json({ error: "not_found" }, 404);
       if (object.customMetadata?.owner !== user.id) return json({ error: "forbidden" }, 403);
       await env.FILES.delete(key);
+      try {
+        const saved = await env.FILES.get("presentation-code-of/" + match[1].toLowerCase());
+        if (saved) {
+          await env.FILES.delete("presentation-codes/" + (await saved.text()).trim());
+          await env.FILES.delete("presentation-code-of/" + match[1].toLowerCase());
+        }
+      } catch {
+      }
       return json({ ok: true });
     }
     return json({ error: "method_not_allowed" }, 405);
@@ -1507,7 +1642,7 @@ function createR2Handler(verifyUser = async (token, env) => {
     if (origin && !allowed.includes(origin)) return new Response("Origin not allowed", { status: 403 });
     const headers = { "Access-Control-Allow-Origin": origin || allowed[0], "Access-Control-Allow-Methods": "GET,POST,PUT,DELETE,OPTIONS", "Access-Control-Allow-Headers": "Authorization,Content-Type,X-Lesson-Title,X-Original-Bytes,X-Lesson-Origin", "Cache-Control": "private, no-store", Vary: "Origin" };
     const json = (body, status = 200) => Response.json(body, { status, headers });
-    if (new URL(request.url).pathname === "/health" && request.method === "GET") return json({ version: 20, storageAI: storageAIEnabled(env), storageAIMedia: storageAIEnabled(env), storageAIHistory: Boolean(env.FILES), imageSearch: true, openRouterConfigured: Boolean(env.OPENROUTER_API_KEY), geminiConfigured: Boolean(env.GEMINI_API_KEY), groqConfigured: Boolean(env.GROQ_API_KEY), lessonCovers: true, lessonDeletion: true, voiceChat: true, collaboration: true, animatedAvatars: true, roles: true, people: true });
+    if (new URL(request.url).pathname === "/health" && request.method === "GET") return json({ version: 22, storageAI: storageAIEnabled(env), storageAIMedia: storageAIEnabled(env), storageAIHistory: Boolean(env.FILES), imageSearch: true, openRouterConfigured: Boolean(env.OPENROUTER_API_KEY), geminiConfigured: Boolean(env.GEMINI_API_KEY), groqConfigured: Boolean(env.GROQ_API_KEY), lessonCovers: true, lessonDeletion: true, voiceChat: true, collaboration: true, animatedAvatars: true, roles: true, people: true });
     if (request.method === "OPTIONS") return new Response(null, { status: 204, headers });
     const publicPresentation = await readPublicPresentation(request, env, headers);
     if (publicPresentation) return publicPresentation;
