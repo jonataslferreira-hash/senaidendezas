@@ -1070,3 +1070,158 @@ html[data-appearance=dark] #app .rank-row{--rank-card:#2b2540;box-shadow:0 6px 1
 #app .game-stage[data-game-type=survival][data-game-state=done] .sv-options{display:none}
 #app .sv-arena,#app .sv-crowd{overflow:visible}
 #app .sv-arena[data-state]{overflow:visible;padding-top:44px}
+
+/* 37. Bonequinho novo: corpo macio que amassa e estica (substitui o boneco de juntas) */
+#app .game-character .buddy{animation:none;transform:none}
+#app .buddy>i,#app .buddy-top>i{display:block;position:absolute}
+#app .buddy-shadow{left:17px;bottom:-1px;width:58px;height:11px;border-radius:50%;background:radial-gradient(closest-side,rgba(0,0,0,.34),transparent);animation:buddy-shadow var(--beat,1.2s) infinite;animation-delay:var(--lag,0s)}
+#app .buddy-foot{bottom:3px;width:25px;height:13px;border-radius:13px 13px 7px 7px;background:#2f3150;box-shadow:inset 0 -3px 0 rgba(0,0,0,.25)}
+#app .buddy-foot.left{left:19px}#app .buddy-foot.right{right:19px}
+#app .buddy-top{position:absolute;left:0;right:0;top:0;bottom:11px;transform-origin:50% 100%;animation:buddy-hop var(--beat,1.2s) infinite;animation-delay:var(--lag,0s)}
+#app .game-character{--lag:calc(var(--beat-shift,0)*-13ms)}
+#app .buddy-body{left:19px;top:66px;width:54px;height:66px;border-radius:25px 25px 23px 23px;background:linear-gradient(160deg,color-mix(in srgb,var(--player-color,#b390e2),#fff 30%),var(--player-color,#b390e2) 55%,color-mix(in srgb,var(--player-color,#b390e2),#1d1238 22%));box-shadow:inset 0 -7px 0 rgba(0,0,0,.1),inset 0 2px 0 rgba(255,255,255,.35)}
+#app .buddy-body::after{content:'';position:absolute;left:14px;top:24px;width:26px;height:26px;border-radius:50%;background:rgba(255,255,255,.26)}
+#app .buddy-hand{top:84px;width:19px;height:19px;border-radius:50%;background:color-mix(in srgb,var(--player-color,#b390e2),#fff 45%);border:2.5px solid rgba(255,255,255,.75);box-sizing:border-box;z-index:4;box-shadow:0 2px 3px rgba(0,0,0,.18);animation:buddy-hand-l var(--beat,1.2s) infinite;animation-delay:var(--lag,0s)}
+#app .buddy-hand.left{left:5px;transform-origin:24px 2px}
+#app .buddy-hand.right{right:5px;transform-origin:-5px 2px;animation-name:buddy-hand-r}
+#app .buddy .character-head{position:absolute;z-index:3;top:2px;left:11px;width:70px;height:70px;box-sizing:border-box;border:3.5px solid #fff;border-radius:27px;background:color-mix(in srgb,var(--player-color,#b390e2) 24%,#fff);box-shadow:inset 0 -6px 0 rgba(0,0,0,.07),0 4px 8px rgba(0,0,0,.16);display:grid;place-items:center;overflow:hidden;font-size:40px;transform-origin:50% 100%;animation:buddy-head var(--beat,1.2s) infinite;animation-delay:var(--lag,0s)}
+#app .buddy .character-head svg{width:66%;height:66%}
+/* pulinho com antecipação, subida esticada e aterrissagem amassada */
+@keyframes buddy-hop{0%,100%{transform:none;animation-timing-function:ease-in-out}14%{transform:scale(1.1,.87);animation-timing-function:cubic-bezier(.2,.7,.3,1)}44%{transform:translateY(-17px) scale(.94,1.08);animation-timing-function:cubic-bezier(.6,0,.9,.5)}72%{transform:scale(1.13,.84);animation-timing-function:cubic-bezier(.2,1.6,.4,1)}86%{transform:scale(.97,1.04)}}
+@keyframes buddy-shadow{0%,100%{transform:none}14%{transform:scaleX(1.08)}44%{transform:scale(.72);opacity:.6}72%{transform:scaleX(1.12)}}
+@keyframes buddy-head{0%,100%{transform:none}14%{transform:translateY(3px) rotate(-3deg)}44%{transform:translateY(-3px) rotate(4deg)}72%{transform:translateY(4px) rotate(-2deg)}86%{transform:translateY(-1px) rotate(1deg)}}
+@keyframes buddy-hand-l{0%,100%{transform:rotate(-8deg)}14%{transform:rotate(-22deg)}44%{transform:rotate(58deg)}72%{transform:rotate(-26deg)}}
+@keyframes buddy-hand-r{0%,100%{transform:rotate(8deg)}14%{transform:rotate(22deg)}44%{transform:rotate(-58deg)}72%{transform:rotate(26deg)}}
+/* variações: balanço, aceno e remelexo */
+#app .dance-1{--beat:1.9s}
+#app .dance-1 .buddy-top{animation-name:buddy-sway;animation-timing-function:cubic-bezier(.45,0,.55,1)}
+#app .dance-1 .character-head{animation-name:buddy-head-sway;animation-timing-function:cubic-bezier(.45,0,.55,1)}
+#app .dance-1 .buddy-hand.left{animation-name:buddy-swing-l}#app .dance-1 .buddy-hand.right{animation-name:buddy-swing-r}
+#app .dance-1 .buddy-shadow{animation:none}
+@keyframes buddy-sway{0%,100%{transform:rotate(-8deg) scale(1,1)}25%,75%{transform:rotate(0) scale(1.05,.94)}50%{transform:rotate(8deg) scale(1,1)}}
+@keyframes buddy-head-sway{0%,100%{transform:rotate(-7deg) translateX(-2px)}50%{transform:rotate(7deg) translateX(2px)}}
+@keyframes buddy-swing-l{0%,100%{transform:rotate(48deg)}50%{transform:rotate(-24deg)}}
+@keyframes buddy-swing-r{0%,100%{transform:rotate(24deg)}50%{transform:rotate(-48deg)}}
+#app .dance-2{--beat:2.4s}
+#app .dance-2 .buddy-top{animation-name:buddy-breathe;animation-timing-function:ease-in-out}
+#app .dance-2 .character-head{animation-name:buddy-head-tilt;animation-timing-function:ease-in-out}
+#app .dance-2 .buddy-hand.left{animation-name:buddy-rest-l}
+#app .dance-2 .buddy-hand.right{animation-name:buddy-wave;animation-timing-function:ease-in-out}
+#app .dance-2 .buddy-shadow{animation:none}
+@keyframes buddy-breathe{0%,100%{transform:none}50%{transform:scale(1.04,.95)}}
+@keyframes buddy-head-tilt{0%,100%{transform:rotate(-5deg)}50%{transform:rotate(8deg) translateY(2px)}}
+@keyframes buddy-rest-l{0%,100%{transform:rotate(-10deg)}50%{transform:rotate(-20deg)}}
+@keyframes buddy-wave{0%,100%{transform:rotate(-96deg)}12%,36%,60%{transform:rotate(-128deg)}24%,48%,72%{transform:rotate(-92deg)}86%{transform:rotate(-110deg)}}
+#app .dance-3{--beat:.95s}
+#app .dance-3 .buddy-top{animation-name:buddy-wiggle;animation-timing-function:cubic-bezier(.4,0,.6,1)}
+#app .dance-3 .character-head{animation-name:buddy-head-sway;animation-duration:calc(var(--beat)*2)}
+#app .dance-3 .buddy-hand.left{animation-name:buddy-pump-l}#app .dance-3 .buddy-hand.right{animation-name:buddy-pump-r}
+@keyframes buddy-wiggle{0%,100%{transform:skewX(-5deg) scale(1.04,.95)}25%{transform:translateY(-7px) scale(.97,1.05)}50%{transform:skewX(5deg) scale(1.04,.95)}75%{transform:translateY(-7px) scale(.97,1.05)}}
+@keyframes buddy-pump-l{0%,100%{transform:rotate(20deg)}50%{transform:rotate(100deg)}}
+@keyframes buddy-pump-r{0%,100%{transform:rotate(-100deg)}50%{transform:rotate(-20deg)}}
+/* cabo de guerra: corpo parado (quem inclina é o boneco inteiro) e as duas mãos na corda */
+#app .tug-puller .buddy :is(.buddy-top,.character-head,.buddy-hand,.buddy-shadow){animation:none}
+#app .tug-team.left .buddy-hand.left{transform:translate(50px,4px)}#app .tug-team.left .buddy-hand.right{transform:translate(8px,4px)}
+#app .tug-team.right .buddy-hand.left{transform:translate(-8px,4px)}#app .tug-team.right .buddy-hand.right{transform:translate(-50px,4px)}
+#app .tug-team[data-result=won] .buddy-top{animation:buddy-hop .7s infinite;animation-delay:var(--lag)}
+#app .tug-team[data-result=won] .buddy-hand.left{transform:rotate(115deg)}#app .tug-team[data-result=won] .buddy-hand.right{transform:rotate(-115deg)}
+/* sobrevivência */
+#app .sv-player[data-fell=now] .buddy *{animation-play-state:paused}
+#app .sv-arena[data-state=open] .sv-player[data-fell=""] .game-character{--beat:.6s}
+#app .sv-player[data-winner=true] .game-character{--beat:.7s}
+#app .sv-player[data-winner=true] .buddy-hand.left{animation:none;transform:rotate(115deg)}#app .sv-player[data-winner=true] .buddy-hand.right{animation:none;transform:rotate(-115deg)}
+/* pódio: quem ganhou comemora de braços para cima */
+#app .final-contestant.place-1 .game-character{--beat:.8s}
+#app .final-contestant.place-1 .buddy-hand.left{animation-name:buddy-pump-l}#app .final-contestant.place-1 .buddy-hand.right{animation-name:buddy-pump-r}
+/* lobby usa o mesmo bonequinho */
+#app .lobby-character.lobby-buddy{background:none;box-shadow:none;transform:none;height:112px;display:flex;align-items:flex-end;justify-content:center;border-radius:0}
+#app .lobby-character.lobby-buddy::before{content:none}
+#app .lobby-buddy .game-character{width:76px;height:108px;--character-scale:.74;--player-color:color-mix(in srgb,var(--player-color-base,#a78bfa),#6d3fd0 0%)}
+#app .lobby-player:nth-child(6n+1){--player-color-base:#a78bfa}#app .lobby-player:nth-child(6n+2){--player-color-base:#34d399}#app .lobby-player:nth-child(6n+3){--player-color-base:#fb923c}#app .lobby-player:nth-child(6n+4){--player-color-base:#60a5fa}#app .lobby-player:nth-child(6n+5){--player-color-base:#fbbf24}#app .lobby-player:nth-child(6n){--player-color-base:#f472b6}
+@media(max-height:620px){#app .lobby-character.lobby-buddy{height:80px}#app .lobby-buddy .game-character{height:76px;--character-scale:.52}}
+@media (prefers-reduced-motion:reduce){:root:not([data-motion=normal]) #app .buddy *{animation:none!important}}
+
+/* 38. Editor de quiz e de enquete refeitos + prévia de música */
+html[data-theme][data-ui-style][data-appearance] body #app .qe{display:grid;gap:14px;max-width:820px;margin:0 auto;padding:16px 18px 28px;box-sizing:border-box;color:var(--studio-ink,inherit);--qe-line:color-mix(in srgb,currentColor 16%,transparent);--qe-soft:color-mix(in srgb,currentColor 5%,transparent)}
+html[data-theme][data-ui-style][data-appearance] body #app .qe-card{display:grid;gap:10px;padding:16px;border:1px solid var(--qe-line);border-radius:16px;background:var(--qe-soft);min-width:0}
+html[data-theme][data-ui-style][data-appearance] body #app .qe-label{display:block;font-size:12px;font-weight:750;letter-spacing:.04em;text-transform:uppercase;opacity:.75;margin:0}
+html[data-theme][data-ui-style][data-appearance] body #app .qe-label em{font-style:normal;font-weight:500;text-transform:none;letter-spacing:0;opacity:.75;margin-left:6px}
+html[data-theme][data-ui-style][data-appearance] body #app .qe small{font-size:12px;opacity:.65;display:block}
+html[data-theme][data-ui-style][data-appearance] body #app .qe :is(textarea,input[type=text],input[type=number],input:not([type])){width:100%;box-sizing:border-box;margin:0;padding:11px 13px;font:inherit;font-size:15px;color:inherit;background:color-mix(in srgb,currentColor 4%,transparent);border:1.5px solid var(--qe-line);border-radius:11px;outline:none;transition:border-color .15s,box-shadow .15s}
+html[data-theme][data-ui-style][data-appearance] body #app .qe :is(textarea,input):focus-visible{border-color:var(--ui-accent,#8b5cf6);box-shadow:0 0 0 3px rgba(139,92,246,.28)}
+html[data-theme][data-ui-style][data-appearance] body #app .qe textarea{resize:vertical;min-height:58px;line-height:1.4}
+html[data-theme][data-ui-style][data-appearance] body #app .qe-question textarea{font-size:19px;font-weight:650;min-height:76px}
+#app .qe-row{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
+#app .qe-row small{margin-top:3px}
+/* botões segmentados (nº de alternativas, dificuldade) */
+#app .qe-seg{display:inline-flex;padding:3px;gap:3px;border-radius:12px;border:1px solid var(--qe-line);background:color-mix(in srgb,currentColor 4%,transparent)}
+#app .qe-seg.wide{display:flex;margin:8px 0 6px}
+#app .qe-seg label{position:relative;flex:1;margin:0;cursor:pointer}
+#app .qe-seg input{position:absolute;inset:0;opacity:0;margin:0;cursor:pointer}
+#app .qe-seg span{display:block;min-width:38px;padding:8px 12px;border-radius:9px;text-align:center;font-size:14px;font-weight:650;white-space:nowrap;transition:background .15s,color .15s,transform .15s}
+#app .qe-seg label:hover span{background:color-mix(in srgb,currentColor 9%,transparent)}
+#app .qe-seg input:checked+span{background:var(--ui-accent,#7c3aed);color:#fff;box-shadow:0 2px 8px rgba(124,58,237,.4)}
+#app .qe-seg input:focus-visible+span{outline:2px solid var(--ui-accent,#8b5cf6);outline-offset:2px}
+/* alternativas como as peças coloridas que a turma vê */
+#app .qe-options{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+#app .qe-option{--c:#3b82f6;display:flex;align-items:center;gap:8px;padding:8px;border-radius:14px;border:2px solid color-mix(in srgb,var(--c) 45%,transparent);background:color-mix(in srgb,var(--c) 12%,transparent);transition:border-color .15s,box-shadow .15s,background .15s;min-width:0}
+#app .qe-option[data-letter=B]{--c:#f97316}#app .qe-option[data-letter=C]{--c:#22c55e}#app .qe-option[data-letter=D]{--c:#ec4899}
+#app .qe-option>b{flex:none;width:36px;height:36px;display:grid;place-items:center;border-radius:10px;background:var(--c);color:#fff;font-size:16px}
+html[data-theme][data-ui-style][data-appearance] body #app .qe-option>input{flex:1;min-width:0;border-color:transparent;background:transparent;padding:9px 6px;font-weight:600}
+#app .qe-check{position:relative;flex:none;width:36px;height:36px;margin:0;cursor:pointer}
+#app .qe-check input{position:absolute;inset:0;opacity:0;margin:0;cursor:pointer}
+#app .qe-check span{display:grid;place-items:center;width:100%;height:100%;border-radius:50%;border:2px dashed color-mix(in srgb,currentColor 35%,transparent);color:transparent;font-size:18px;font-weight:900;transition:all .18s cubic-bezier(.3,1.6,.5,1)}
+#app .qe-check:hover span{color:color-mix(in srgb,currentColor 40%,transparent);border-style:solid}
+#app .qe-check input:checked+span{background:#16a34a;border:2px solid #16a34a;color:#fff;transform:scale(1.08)}
+#app .qe-check input:focus-visible+span{outline:2px solid var(--ui-accent,#8b5cf6);outline-offset:2px}
+#app .qe-option:has(.qe-check input:checked){border-color:#16a34a;background:color-mix(in srgb,#16a34a 16%,transparent);box-shadow:0 0 0 3px rgba(22,163,74,.22)}
+#app .qe-meta{grid-template-columns:repeat(2,minmax(0,1fr));gap:18px;align-items:start}
+#app .qe-time{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin:8px 0 6px}
+#app .qe-chips{display:flex;gap:5px;flex-wrap:wrap}
+html[data-theme][data-ui-style][data-appearance] body #app .qe :is(.qe-chips button,.qe-add,.qe-remove){font:inherit;font-size:13px;font-weight:650;color:inherit;cursor:pointer;margin:0;padding:8px 11px;min-height:0;border-radius:99px;border:1px solid var(--qe-line);background:color-mix(in srgb,currentColor 4%,transparent);box-shadow:none;transition:background .15s,transform .15s}
+html[data-theme][data-ui-style][data-appearance] body #app .qe :is(.qe-chips button,.qe-add,.qe-remove):hover{background:color-mix(in srgb,currentColor 11%,transparent)}
+html[data-theme][data-ui-style][data-appearance] body #app .qe .qe-chips button[aria-pressed=true]{background:var(--ui-accent,#7c3aed);border-color:var(--ui-accent,#7c3aed);color:#fff}
+#app .qe-number{position:relative;width:86px;flex:none}
+html[data-theme][data-ui-style][data-appearance] body #app .qe-number input{padding:8px 24px 8px 11px;font-weight:650}
+#app .qe-number i{position:absolute;right:11px;top:50%;transform:translateY(-50%);font-style:normal;opacity:.6;pointer-events:none}
+html[data-theme][data-ui-style][data-appearance] body #app .qe .qe-add{justify-self:start;border-style:dashed;padding:10px 16px}
+html[data-theme][data-ui-style][data-appearance] body #app .qe .qe-remove{flex:none;width:32px;height:32px;padding:0;font-size:18px;line-height:1}
+#app .qe-head{display:flex;gap:12px;align-items:center}
+#app .qe-head>span{font-size:30px;width:52px;height:52px;display:grid;place-items:center;border-radius:15px;background:color-mix(in srgb,var(--ui-accent,#7c3aed) 20%,transparent)}
+#app .qe-head h2{margin:0;font-size:22px}#app .qe-head p{margin:2px 0 0;font-size:13px;opacity:.7}
+@media(max-width:720px){#app .qe-options,#app .qe-meta{grid-template-columns:1fr}html[data-theme][data-ui-style][data-appearance] body #app .qe{padding:12px 10px 24px}}
+/* música do quiz */
+html[data-theme][data-ui-style][data-appearance] body #app details.game-settings{max-width:820px;margin:14px auto 0;padding:0;border:1px solid color-mix(in srgb,currentColor 16%,transparent);border-radius:16px;background:color-mix(in srgb,currentColor 5%,transparent);overflow:hidden;width:calc(100% - 36px);box-sizing:border-box}
+html[data-theme][data-ui-style][data-appearance] body #app details.game-settings>summary{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:13px 16px;cursor:pointer;font-weight:700;font-size:14px;list-style:none;border:0;background:none;border-radius:0}
+#app details.game-settings>summary::-webkit-details-marker{display:none}
+#app details.game-settings>summary small{font-weight:500;font-size:12px;opacity:.65}
+#app details.game-settings>summary::after{content:'▾';transition:transform .2s;opacity:.7}
+#app details.game-settings[open]>summary::after{transform:rotate(180deg)}
+#app details.game-settings[open]>summary small{display:none}
+#app details.game-settings>:not(summary){margin-left:16px;margin-right:16px}
+#app details.game-settings>p{font-size:12px;opacity:.65;margin-bottom:14px}
+#app details.game-settings .game-setting-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px 18px;margin-bottom:14px;align-items:start}
+#app .music-pick>label,#app .music-volume{display:block;font-size:12px;font-weight:700;margin:0 0 6px}
+#app .music-pick-row{display:flex;gap:8px;align-items:stretch}
+html[data-theme][data-ui-style][data-appearance] body #app .music-pick-row select{flex:1;min-width:0;width:auto;margin:0}
+html[data-theme][data-ui-style][data-appearance] body #app button.music-preview{flex:none;display:inline-flex;align-items:center;gap:6px;margin:0;padding:0 14px;min-height:40px;font:inherit;font-size:13px;font-weight:700;cursor:pointer;color:#fff;background:var(--ui-accent,#7c3aed);border:0;border-radius:11px;box-shadow:0 2px 8px rgba(124,58,237,.35);transition:transform .15s,background .15s}
+html[data-theme][data-ui-style][data-appearance] body #app button.music-preview:hover{background:color-mix(in srgb,var(--ui-accent,#7c3aed),#000 14%);transform:translateY(-1px)}
+html[data-theme][data-ui-style][data-appearance] body #app button.music-preview[aria-pressed=true]{background:#16a34a;box-shadow:0 0 0 3px rgba(22,163,74,.3);animation:music-pulse 1s ease-in-out infinite alternate}
+@keyframes music-pulse{to{box-shadow:0 0 0 6px rgba(22,163,74,.12)}}
+#app .music-now{display:block;min-height:16px;margin-top:5px;font-size:12px;opacity:.75}
+#app .music-volume input{display:block;width:100%;margin-top:8px}
+#app .music-effects{display:flex;align-items:center;gap:8px;font-size:13px;font-weight:600;align-self:center}
+@media(max-width:720px){#app details.game-settings .game-setting-grid{grid-template-columns:1fr}html[data-theme][data-ui-style][data-appearance] body #app details.game-settings{width:calc(100% - 20px)}}
+html[data-theme][data-ui-style][data-appearance] body #app details.game-settings :is(.music-pick>label,label.music-volume,label.music-effects){color:inherit;opacity:1;font-size:12px;font-weight:700;text-transform:none;letter-spacing:0}
+html[data-theme][data-ui-style][data-appearance] body #app details.game-settings label.music-effects{display:flex;flex-direction:row;align-items:center;justify-content:flex-start;gap:8px;align-self:center;font-size:13px}
+html[data-theme][data-ui-style][data-appearance] body #app details.game-settings label.music-effects input{width:18px;height:18px;margin:0;flex:none}
+html[data-theme][data-ui-style][data-appearance] body #app details.game-settings .music-pick-row select{height:40px;padding:0 10px;font:inherit;font-size:14px;color:inherit;background:color-mix(in srgb,currentColor 5%,transparent);border:1.5px solid color-mix(in srgb,currentColor 18%,transparent);border-radius:11px}
+html[data-theme][data-ui-style][data-appearance] body #app details.game-settings .music-pick-row select option{color:#1b1530;background:#fff}
+html[data-theme][data-ui-style][data-appearance] body #app details.game-settings .music-pick-row button.music-preview{color:var(--ui-accent-ink,#fff);background:var(--ui-accent,#7c3aed);border:0;min-width:92px;justify-content:center}
+html[data-theme][data-ui-style][data-appearance] body #app details.game-settings .music-pick-row button.music-preview[aria-pressed=true]{background:#16a34a;color:#fff}
+#app .qe-seg input:checked+span,html[data-theme][data-ui-style][data-appearance] body #app .qe .qe-chips button[aria-pressed=true]{color:var(--ui-accent-ink,#fff)}
+/* desempenho: sem filtro por cima de partes animadas */
+#app .game-character:has(.buddy){filter:none}
+#app .buddy-top{will-change:transform}
+#app .buddy-hand{box-shadow:none}
+#app .buddy .character-head{box-shadow:inset 0 -6px 0 rgba(0,0,0,.07)}

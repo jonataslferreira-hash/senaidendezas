@@ -37,26 +37,46 @@ export class LiveDocument {
     this.channel.track({uid:this.uid,name:this.studio.account.user?.user_metadata?.display_name||'Colaborador',editing,slideId}).catch(()=>{if(this.presenceKey===key)this.presenceKey='';});
   }
   async connect(){
+    if(!this.wake){this.wake=()=>{if(!document.hidden&&!this.realtimeConnected&&this.retries)this.reconnect();};addEventListener('online',this.wake);document.addEventListener('visibilitychange',this.wake);}
     // Recover published changes even if a Realtime event was missed.
     this.recoveryTimer=setInterval(()=>this.recover(),6000);
     await this.client.realtime.setAuth();if(!this.current())return;
     this.roleChannel=this.client.channel('sl-members:'+this.row.id).on('postgres_changes',{event:'UPDATE',schema:'public',table:'sl_group_members',filter:'group_id=eq.'+this.row.group_id},()=>this.studio.groups.refreshMembers().then(()=>this.studio.callbacks.render()).catch(()=>{})).subscribe();
-    this.channel=this.client.channel('sl-doc-v2:'+this.row.id,{config:{private:true,broadcast:{self:false,ack:true},presence:{key:this.uid}}});
+    const channel=this.channel=this.client.channel('sl-doc-v2:'+this.row.id,{config:{private:true,broadcast:{self:false,ack:true},presence:{key:this.uid}}});
     this.channel.on('broadcast',{event:'update'},({payload})=>{if(payload?.client!==this.clientId&&typeof payload?.data==='string'&&payload.data.length<33000){this.queue.push(payload.data);this.drain();}})
       .on('broadcast',{event:'saved'},()=>this.recover())
       .on('presence',{event:'sync'},()=>{this.people=Object.values(this.channel.presenceState()).flat().filter(p=>typeof p.uid==='string').map(p=>({uid:p.uid,name:String(p.name||'Colaborador').slice(0,60),editing:Boolean(p.editing),slideId:String(p.slideId||'').slice(0,100)}));this.paint();})
       .subscribe(async status=>{
-        if(!this.current())return;
+        if(!this.current()||channel!==this.channel)return;
         if(status==='SUBSCRIBED'){
-          this.realtimeConnected=true;
+          this.realtimeConnected=true;this.retries=0;clearTimeout(this.retryTimer);
           this.status=this.studio.groups.canEdit?'Edição ao vivo conectada':'Acompanhando a aula ao vivo';this.paint();
           this.presenceReady=true;this.trackPosition(true);
           this.recover();
         }else if(['CHANNEL_ERROR','TIMED_OUT','CLOSED'].includes(status)){
           this.realtimeConnected=false;
-          this.presenceReady=false;this.status='Reconectando ao grupo';this.paint();
+          this.presenceReady=false;this.offline();
         }
       });
+  }
+  // A conexão ao vivo caiu: tenta de novo sozinho (com intervalos maiores a cada vez).
+  // Depois de algumas tentativas o aviso some e volta o estado normal de salvamento,
+  // porque salvar não depende do tempo real; as tentativas continuam em silêncio.
+  offline(){
+    if(!this.current())return;
+    this.retries=(this.retries||0)+1;
+    this.status=this.retries<=3?'Reconectando ao grupo':this.version!==this.savedVersion?'Alterações por salvar':'Salvo no grupo';this.paint();
+    clearTimeout(this.retryTimer);this.retryTimer=setTimeout(()=>this.reconnect(),Math.min(30000,1500*2**(this.retries-1)));
+  }
+  async reconnect(){
+    if(!this.current()||this.realtimeConnected||this.reconnecting)return;
+    this.reconnecting=true;clearTimeout(this.retryTimer);
+    const old=[this.channel,this.roleChannel];this.channel=this.roleChannel=null;clearInterval(this.recoveryTimer);
+    try{
+      for(const item of old)if(item)await this.client.removeChannel(item).catch(()=>{});
+      if(this.current())await this.connect();
+    }catch{this.offline();}
+    finally{this.reconnecting=false;}
   }
   async recover(){
     if(!this.current()||document.hidden||this.recovering||this.saving||this.composing||this.studio.designer.drag||this.studio.designer.cropPointers?.size)return;
@@ -155,5 +175,5 @@ export class LiveDocument {
     }throw Error('O grupo está salvando muitas alterações. Tente salvar novamente.');
   }
   async cleanup(revision){try{await groupRequest(this.client,`/groups/${this.row.group_id}/${revision}`,{method:'DELETE'});}catch{/* Keep recovery possible when cleanup fails. */}}
-  close(){this.closed=true;clearInterval(this.recoveryTimer);clearTimeout(this.saveTimer);clearTimeout(this.queueTimer);clearTimeout(this.editTimer);if(this.roleChannel)this.client.removeChannel(this.roleChannel);this.doc.off('update',this.update);if(this.channel)this.client.removeChannel(this.channel);this.doc.destroy();}
+  close(){this.closed=true;clearTimeout(this.retryTimer);if(this.wake){removeEventListener('online',this.wake);document.removeEventListener('visibilitychange',this.wake);}clearInterval(this.recoveryTimer);clearTimeout(this.saveTimer);clearTimeout(this.queueTimer);clearTimeout(this.editTimer);if(this.roleChannel)this.client.removeChannel(this.roleChannel);this.doc.off('update',this.update);if(this.channel)this.client.removeChannel(this.channel);this.doc.destroy();}
 }

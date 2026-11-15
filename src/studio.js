@@ -11,6 +11,7 @@ import {defaultGame,isGameType,gameNames} from './stage-games.js';
 import {ActivityOrder,activityTabs} from './activity-order.js';
 import {ChatAudio} from './chat-audio.js';
 import {gameSettingsMarkup} from './game-settings-ui.js';
+import {quizEditorMarkup,pollEditorMarkup,wireQuizEditor} from './quiz-editor.js';
 import {recordAudio} from './record-audio.js';
 import {mobileChoice} from './slide-display.js';
 import { AccountPresenter } from './account-presenter.js';
@@ -74,6 +75,7 @@ export class Studio {
     root.addEventListener('before-account-change',event=>{event.detail.tasks.push((async()=>{
       if(this.groups.live)await this.groups.live.persist();else if(this.draft&&this.dirty){this.library.save(validateLesson(this.draft,{draft:true}));this.dirty=false;}
     })());});
+    wireQuizEditor(root,this,callbacks);
     root.addEventListener('toggle',e=>{if(e.target.matches('.game-settings')&&e.target.isConnected)this.gameSettingsOpen=e.target.open;},true);
     this.restoreRoute();
     if (!new URLSearchParams(location.search).has('presentation') && !routeParams().has('collab') && !['preview', 'present'].includes(new URLSearchParams(location.search).get('page'))) this.writeRoute(this.view, this.draft?.id, true);
@@ -449,7 +451,7 @@ export class Studio {
     const s = this.draft.slides[this.index], poll = s.poll || { text: '', options: ['Concordo', 'Ainda tenho dúvidas'] };
     return `<details class="editor-details slide-activities"><summary>▥ Atividades e passagem deste slide</summary>${s.poll ? `<div class="editor-field"><label for="poll-text">Pergunta da enquete</label><input id="poll-text" data-poll-field="text" maxlength="500" value="${esc(poll.text)}"></div><div class="editor-field"><label for="poll-options">Opções (uma por linha, de 2 a 4)</label><textarea id="poll-options" data-poll-field="options" rows="4">${esc(poll.options.join('\n'))}</textarea></div>` : ''}${mobileChoice(s)}<div class="editor-field"><label for="slide-interaction">Experimentos e modelos 3D na sala</label><select id="slide-interaction" data-scope="slide" data-field="interaction">${[['free','Cada aluno mexe no seu'],['sims','Só eu controlo o experimento'],['models','Só eu controlo o modelo 3D'],['teacher','Só eu controlo os dois']].map(([value,label])=>`<option value="${value}" ${(s.interaction||'free')===value?'selected':''}>${label}</option>`).join('')}</select><p class="editor-field-hint">Em “Só eu controlo”, o que você mudar no experimento ou girar no modelo 3D aparece ao vivo na tela de todos, e os alunos só acompanham.</p></div><div class="editor-field"><label for="slide-transition">Transição ao entrar neste slide</label><select id="slide-transition" data-scope="slide" data-field="transition">${[['slide', 'Deslizar'], ['fade', 'Dissolver'], ['zoom', 'Aproximar'], ['rise', 'Subir'], ['wipe', 'Revelar'], ['iris', 'Círculo'], ['split', 'Cortina'], ['flip', 'Virar página'], ['none', 'Sem animação']].map(([value,label]) => `<option value="${value}" ${(s.transition || 'slide') === value ? 'selected' : ''}>${label}</option>`).join('')}</select></div></details>`;
   }
-  pollBlockEditor(){const poll=this.draft.slides[this.index].poll;return `${this.itemToolbar('slide',this.index,this.draft.slides.length)}<div class="poll-block-editor"><h2>Enquete</h2><label for="poll-text">Pergunta da enquete</label><input id="poll-text" data-poll-field="text" maxlength="500" value="${esc(poll.text)}"><label for="poll-options">Opções (uma por linha, de 2 a 4)</label><textarea id="poll-options" data-poll-field="options" rows="4">${esc(poll.options.join('\n'))}</textarea></div>`;}
+  pollBlockEditor(){return pollEditorMarkup(this.draft.slides[this.index].poll,this.itemToolbar('slide',this.index,this.draft.slides.length,true));}
   itemActions(type,i,total){const position=this.draft.activityBlocks?this.visibleItems().findIndex(v=>v.index===i):i,count=this.draft.activityBlocks?this.visibleItems().length:total;return `${button('move-' + type + '-up', '↑', 'square', `aria-label="Mover ${type === 'slide' ? 'slide' : 'pergunta'} para cima" ${position === 0 ? 'disabled' : ''}`)}${button('move-' + type + '-down', '↓', 'square', `aria-label="Mover ${type === 'slide' ? 'slide' : 'pergunta'} para baixo" ${position >= count - 1 ? 'disabled' : ''}`)}${button('duplicate-' + type, '⧉', 'square', `aria-label="Duplicar ${type === 'slide' ? 'slide' : 'pergunta'}" ${count?'':'disabled'}`)}${button('delete-' + type, '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M3 6h18M9 6V3h6v3M5 6l1 15h12l1-15M10 10v7m4-7v7"/></svg>', 'square danger-text', `aria-label="Excluir ${type === 'slide' ? 'slide' : 'pergunta'}" ${count?'':'disabled'}`)}`;}
   bindIconHints() {
     let timer, origin, hint, shown = false;
@@ -499,9 +501,9 @@ export class Studio {
         <button type="button" data-studio-action="select-slide" data-index="${index}" aria-current="${index===this.index?'page':'false'}" aria-label="${esc(item.title || 'Slide '+(index+1))}">${this.slideThumbnail(item)}<span class="mobile-slide-number">${index+1}</span></button>
       </div>`).join('')}${this.groups.canEdit?button('add-slide','+', 'studio-btn','aria-label="Adicionar slide" title="Adicionar slide"'):''}</div>`;
   }
-  itemToolbar(type, i, total) {
+  itemToolbar(type, i, total, plain = false) {
     const position=this.draft.activityBlocks?this.visibleItems().findIndex(v=>v.index===i):i,count=this.draft.activityBlocks?this.visibleItems().length:total;
-    return `<div class="item-toolbar"><div class="item-identity"><span class="item-number">${type === 'slide' ? 'SLIDE' : 'PERGUNTA'} ${String(position + 1).padStart(2, '0')}</span><span class="save-state ${this.dirty ? 'unsaved' : ''}" role="status">${this.groups.live ? esc(this.groups.live.status) : this.dirty ? 'Alterações não salvas' : 'Salvo'}</span></div>${type==='slide'&&(this.visualMode||this.draft.slides[i].kind==='canvas')?`<div class="item-tools">${this.designer.toolbarMarkup()}</div>`:''}</div>`;
+    return `<div class="item-toolbar"><div class="item-identity"><span class="item-number">${type === 'slide' ? 'SLIDE' : 'PERGUNTA'} ${String(position + 1).padStart(2, '0')}</span><span class="save-state ${this.dirty ? 'unsaved' : ''}" role="status">${this.groups.live ? esc(this.groups.live.status) : this.dirty ? 'Alterações não salvas' : 'Salvo'}</span></div>${!plain&&type==='slide'&&(this.visualMode||this.draft.slides[i].kind==='canvas')?`<div class="item-tools">${this.designer.toolbarMarkup()}</div>`:''}</div>`;
   }
   slideEditor() {
     const s = this.draft.slides[this.index];
@@ -516,7 +518,7 @@ export class Studio {
   quizEditor() {
     if (!this.visibleItems().length) return `<div class="editor-empty"><span>✦</span><h2>O aprendizado vira desafio.</h2><p>Crie perguntas com alternativas, tempo e dificuldade. O quiz é opcional: você também pode encerrar a aula sem ele.</p>${button('add-question', '+ Criar primeira pergunta', 'accent')}</div>`;
     const q = this.draft.questions[this.questionIndex];
-    return `${this.itemToolbar('question', this.questionIndex, this.draft.questions.length)}${field('Pergunta', 'text', q.text, 'question', { textarea: true })}<div class="editor-field"><label for="question-option-count">Número de alternativas</label><select id="question-option-count" data-scope="question" data-field="optionCount">${[2, 3, 4].map(n => `<option value="${n}" ${q.options.length === n ? 'selected' : ''}>${n} alternativas</option>`).join('')}</select></div><fieldset class="quiz-options-editor"><legend>Alternativas <small>Marque a resposta correta</small></legend>${q.options.map((option, i) => `<div><input type="radio" name="correct-answer" id="correct-${i}" data-scope="question" data-field="correct" value="${i}" aria-label="Alternativa correta: ${'ABCD'[i]}" ${q.correct === i ? 'checked' : ''}><label for="option-${i}">${'ABCD'[i]}</label><input id="option-${i}" data-scope="question" data-option="${i}" value="${esc(option)}" aria-label="Alternativa ${'ABCD'[i]}" maxlength="500"></div>`).join('')}</fieldset><div class="editor-field-row"><div class="editor-field"><label for="question-difficulty">Dificuldade</label><select id="question-difficulty" data-scope="question" data-field="difficulty">${Object.keys(difficulties).map(d => `<option ${q.difficulty === d ? 'selected' : ''}>${d}</option>`).join('')}</select><small id="difficulty-points">Até ${difficulties[q.difficulty].toLocaleString('pt-BR')} pontos</small></div>${field('Tempo (segundos)', 'seconds', q.seconds, 'question', { type: 'number', attributes: 'min="5" max="300" step="1"', hint: 'Entre 5 e 300 segundos.' })}</div>${field('Explicação da resposta', 'explanation', q.explanation, 'question', { textarea: true, hint: 'Aparece depois que o professor revela a resposta ou o tempo termina.' })}`;
+    return quizEditorMarkup(q, difficulties, this.itemToolbar('question', this.questionIndex, this.draft.questions.length));
   }
   previewMarkup() {
     if(isGameType(this.currentBlock()?.type)&&this.draft.slides[this.index].game)return stageMiniMarkup(this.draft.slides[this.index]);
