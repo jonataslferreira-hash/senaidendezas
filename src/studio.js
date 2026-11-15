@@ -32,6 +32,8 @@ import { readAudio } from './audio-data.js';
 import { cloudConfigured, saveCloudLesson, listCloudLessons, readCloudLesson, readCloudCover, deleteCloudLesson } from './cloud-files.js';
 import { storePages, fillAssetAudio } from './assets.js';
 import { LessonLibrary, newLesson, newSlide, newQuestion, clone, validateLesson, imageURL, difficulties, MAX_LESSON_BYTES } from './lessons.js';
+import { slideTemplates, deckTemplates, slideTemplateCategories, templateThemeChoices, externalTemplateSites, detectDeckTheme, createSlideFromTemplate, createDeckFromTemplate, previewSlideForTemplate, previewSlideForDeck } from './slide-templates.js';
+import { createTemplateStore } from './template-store.js';
 
 import { archiveImportedPages, fillAssetImages, hydrateLesson, removePageAssets } from './assets.js';
 const assetImage = (slide, cls = '') => `<img class="${cls}" ${slide.image ? `src="${esc(slide.image)}"` : `data-asset-id="${esc(slide.assetId)}"`} alt="${esc(slide.imageAlt || slide.title)}">`;
@@ -72,6 +74,19 @@ export class Studio {
     try{this.cloudLinks=JSON.parse(localStorage.getItem('sl-cloud-links')||'{}');}catch{this.cloudLinks={};}
     this.bindIconHints();
     this.activityOrder=new ActivityOrder(this);this.remote=new AccountPresenter(this);this.people=new People(this);this.groups=new GroupsPanel(this);this.chat=new LessonChat(this);this.chatAudio=new ChatAudio(this);this.social=new SocialChat(this);
+    this.templateStore = createTemplateStore({
+      render: () => callbacks.render(),
+      onRouteChange: () => this.writeRoute('templates', null, false),
+      useDeck: (deckId, theme) => {
+        const lesson = this.library.save(createDeckFromTemplate(deckId, theme ? { theme } : {}));
+        this.open(lesson.id);
+        callbacks.toast('Modelo pronto aberto no editor.');
+      },
+      downloadDeckPptx: async (deckId, theme) => {
+        const sample = createDeckFromTemplate(deckId, theme ? { theme } : {});
+        await this.exportVisual(sample, 'pptx');
+      }
+    });
     root.addEventListener('before-account-change',event=>{event.detail.tasks.push((async()=>{
       if(this.groups.live)await this.groups.live.persist();else if(this.draft&&this.dirty){this.library.save(validateLesson(this.draft,{draft:true}));this.dirty=false;}
     })());});
@@ -93,10 +108,14 @@ export class Studio {
       const menuAction=e.target.closest('.editor-sharing button,.designer-insert-more button');
       if(menuAction)menuAction.closest('details').open=false;
       const target = e.target.closest('[data-studio-action]');
-      if (target && !target.disabled) this.action(target.dataset.studioAction, target).catch(err => callbacks.toast(err.message));
+      if (target && !target.disabled) { this.action(target.dataset.studioAction, target).catch(err => callbacks.toast(err.message)); return; }
+      if (this.view === 'templates' && this.templateStore.handleClick(e.target, root)) return;
     });
     root.addEventListener('click',async e=>{const b=e.target.closest('[data-record-audio]');if(!b)return;try{const file=await recordAudio();if(file)await this.uploadAudio(file,b.dataset.recordAudio);}catch(error){callbacks.toast(error.message);}});
-    root.addEventListener('input', e => this.change(e.target));
+    root.addEventListener('input', e => {
+      if (this.view === 'templates' && this.templateStore.handleInput(e.target, root)) return;
+      this.change(e.target);
+    });
     root.addEventListener('change', e => {
       if (this.receivingRemote || !this.root.contains(e.target)) return;
       if (e.target.dataset.audioUpload) this.uploadAudio(e.target.files[0], e.target.dataset.audioUpload).catch(err => callbacks.toast(err.message));
@@ -139,7 +158,13 @@ export class Studio {
     });
     window.addEventListener('beforeunload', e => { if (this.dirty) { e.preventDefault(); e.returnValue = ''; } });
     document.addEventListener('keydown', e => {
-      if (e.key === 'Escape' && this.dialog) { this.dialog = null; callbacks.render(); }
+      if (e.key === 'Escape' && (this.dialog || (this.importDialog && !this.importing))) {
+        if (this.dialog) this.dialog = null;
+        else this.importDialog = false;
+        callbacks.render();
+        return;
+      }
+      if (this.view === 'templates' && !this.dialog && !this.importDialog && this.templateStore.handleKeydown(e, root)) return;
       if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 's' && this.view === 'editor' && this.root.querySelector('.studio-editor')) {
         e.preventDefault();
         this.saveEditor().catch(error=>callbacks.toast(error.message));
@@ -149,7 +174,8 @@ export class Studio {
   writeRoute(page = this.view, id = this.draft?.id, replace = false) {
     const url = new URL(location.href);for(const key of ['reload','edit'])url.searchParams.delete(key);url.searchParams.set('page', page);
     if (!['join', 'present'].includes(page)) url.searchParams.delete('s');
-    for (const key of ['lesson', 'tab', 'slide', 'block']) url.searchParams.delete(key);
+    for (const key of ['lesson', 'tab', 'slide', 'block', 'template']) url.searchParams.delete(key);
+    if (page === 'templates' && this.templateStore?.state.detailId) url.searchParams.set('template', this.templateStore.state.detailId);
     if (['editor', 'preview', 'present'].includes(page) && id) url.searchParams.set('lesson', id);
     if (page === 'editor') { if(this.draft?.activityBlocks&&this.currentBlock())url.searchParams.set('block',this.currentBlock().id);else url.searchParams.delete('block'); if (this.tab === 'quiz') url.searchParams.set('tab', 'quiz'); url.searchParams.set('slide', String(this.index + 1)); }
     url.searchParams.delete('presentation');
@@ -165,8 +191,13 @@ export class Studio {
       this.open(params.get('lesson'), false); this.tab = params.get('tab') === 'quiz' ? 'quiz' : 'slides';
       const selected=Math.max(0,Math.min(this.draft.slides.length-1,(Number(params.get('slide'))||1)-1));if(params.get('block'))this.selectBlock(params.get('block'));if(!this.draft.activityBlocks||this.currentBlock()?.items.includes(this.draft.slides[selected]?.id))this.index=selected;const question=Math.max(0,Math.min(this.draft.questions.length-1,(Number(params.get('question'))||1)-1));if(this.tab==='quiz'&&this.currentBlock()?.items.includes(this.draft.questions[question]?.id))this.questionIndex=question;
     } else {
-      this.view = ['shared','storage-ai'].includes(page)?page:page === 'join' || (!page && params.has('s')) ? 'join' : 'library';
+      this.view = ['shared','storage-ai','templates'].includes(page)?page:page === 'join' || (!page && params.has('s')) ? 'join' : 'library';
       if(this.view==='storage-ai')this.ai.freshPending=true;
+      if(this.view==='templates'){
+        const tplId=params.get('template');
+        if(tplId)this.templateStore?.openDetail(tplId);
+        else this.templateStore?.openCatalog();
+      }
     }
   }
   selectBlock(id){const block=activityBlocks(this.draft).find(b=>b.id===id);if(!block)return;this.blockId=block.id;this.tab=block.type==='quiz'?'quiz':'slides';const list=this.tab==='quiz'?this.draft.questions:this.draft.slides,key=this.tab==='quiz'?'questionIndex':'index',index=list.findIndex(i=>block.items.includes(i.id));if(index>=0)this[key]=index;}
@@ -388,7 +419,7 @@ export class Studio {
     return `<button class="studio-wordmark" data-studio-action="library" aria-label="Storage Lab, biblioteca"><img class="lab-logo" src="${brandUrl}" alt=""><span>storage<span>lab.</span></span></button>`;
   }
   navigationMarkup() {
-    return `<nav>${button('library', studioIcon('library')+' Biblioteca de aulas', this.view === 'library' ? 'rail-link active' : 'rail-link','aria-label="Biblioteca de aulas"')}${button('join', studioIcon('join')+' Entrar em uma sala', this.view === 'join' ? 'rail-link active' : 'rail-link','aria-label="Entrar em uma sala"')}${button('shared',studioIcon('collaborate')+' Compartilhados',this.view==='shared'?'rail-link active':'rail-link','aria-label="Compartilhados"')} ${button('storage-ai',studioIcon('sparkle')+' Storage AI',this.view==='storage-ai'?'rail-link active':'rail-link','aria-label="Storage AI"')}<button type="button" class="studio-btn rail-link" data-social-action="open" aria-label="Chat">${studioIcon('chat')} Chat <b data-chat-badge class="chat-badge" ${this.social.badge?'':'hidden'}>${this.social.badge||''}</b></button></nav>`;
+    return `<nav>${button('library', studioIcon('library')+' Biblioteca de aulas', this.view === 'library' ? 'rail-link active' : 'rail-link','aria-label="Biblioteca de aulas"')}${button('templates', studioIcon('templates')+' Modelos', this.view === 'templates' ? 'rail-link active' : 'rail-link','aria-label="Modelos"')}${button('join', studioIcon('join')+' Entrar em uma sala', this.view === 'join' ? 'rail-link active' : 'rail-link','aria-label="Entrar em uma sala"')}${button('shared',studioIcon('collaborate')+' Compartilhados',this.view==='shared'?'rail-link active':'rail-link','aria-label="Compartilhados"')} ${button('storage-ai',studioIcon('sparkle')+' Storage AI',this.view==='storage-ai'?'rail-link active':'rail-link','aria-label="Storage AI"')}<button type="button" class="studio-btn rail-link" data-social-action="open" aria-label="Chat">${studioIcon('chat')} Chat <b data-chat-badge class="chat-badge" ${this.social.badge?'':'hidden'}>${this.social.badge||''}</b></button></nav>`;
   }
   railMarkup(closeButton = '') {
     const brand = this.brandMarkup();
@@ -417,12 +448,13 @@ export class Studio {
     const editor = this.view === 'editor';
     const ai = this.view === 'storage-ai';
     const header = editor ? '' : ai ? this.ai.navigationMarkup() : this.topbarMarkup();
-    return `<div class="studio-shell ${editor ? 'editor-shell' : ai ? 'ai-shell' : ''}">${editor || ai ? '' : this.railMarkup()}<div class="studio-body">${header}${content}</div></div>${this.dialogMarkup()}${this.importMarkup()}${this.sharing.markup()}<div data-remote-dialog>${this.remote.dialog()}</div><div data-account-dialog></div><div data-chat-slot>${this.chat.markup()}</div><div data-social-slot>${this.social.markup()}</div>`;
+    return `<div class="studio-shell ${editor ? 'editor-shell' : ai ? 'ai-shell' : ''}">${editor || ai ? '' : this.railMarkup()}<div class="studio-body">${header}${content}</div></div>${this.dialogMarkup()}${this.importMarkup()}${this.sharing.markup()}<div data-remote-dialog>${this.remote.dialog()}</div><div data-account-dialog></div><div data-chat-slot>${this.chat.markup()}</div><div data-social-slot>${this.social.markup()}</div><input type="file" id="import-slides-file" accept=".pdf,.pptx,application/pdf,application/vnd.openxmlformats-officedocument.presentationml.presentation" hidden>`;
   }
   markup() {
     if (this.view==='ai-generation') return this.shell(this.ai.generationMarkup());
     if (this.view === 'editor') return this.editor();
-    if (this.view === 'join') return this.shell(`<main class="studio-join"><svg class="join-waves" viewBox="0 0 1000 600" preserveAspectRatio="none" aria-hidden="true"><path d="M-50 360C190 180 295 510 525 340S820 165 1050 315"/><path d="M-50 415C180 235 300 540 520 395S805 215 1050 360"/><path d="M-50 470C185 295 315 605 540 450S840 295 1050 410"/></svg><div class="join-intro"><h1>Sua próxima descoberta<br>começa <em>aqui.</em></h1><p>Use o código compartilhado pelo professor ou aponte a câmera para o QR Code da apresentação.</p><div class="join-illustration join-orbit" aria-hidden="true">${[['🚀','⚡','🦉'],['🤖','🎮','👾'],['🦊','🐸','🪐']].map((icons,i)=>`<div class="join-float" style="--float:${i}">${icons.map((icon,j)=>`<span style="--cycle:${j}">${avatarContent(icon)}</span>`).join('')}</div>`).join('')}</div></div>${this.callbacks.joinForm()}</main>`);
+    if (this.view === 'templates') return this.shell(`<main class="studio-templates">${this.templateStore.markup()}</main>`);
+    if (this.view === 'join') return this.shell(`<main class="studio-join"><svg class="join-waves" viewBox="0 0 1000 600" preserveAspectRatio="none" aria-hidden="true"><path d="M-50 360C190 180 295 510 525 340S820 165 1050 315"/><path d="M-50 415C180 235 300 540 520 395S805 215 1050 360"/><path d="M-50 470C185 295 315 605 540 450S840 295 1050 410"/></svg><div class="join-intro"><h1>Entre na sala<br>e participe <em>ao vivo.</em></h1><p>Use o código compartilhado pelo professor ou aponte a câmera para o QR Code da apresentação.</p><div class="join-illustration join-orbit" aria-hidden="true">${[['🚀','⚡','🦉'],['🤖','🎮','👾'],['🦊','🐸','🪐']].map((icons,i)=>`<div class="join-float" style="--float:${i}">${icons.map((icon,j)=>`<span style="--cycle:${j}">${avatarContent(icon)}</span>`).join('')}</div>`).join('')}</div></div>${this.callbacks.joinForm()}</main>`);
     if(this.view==='storage-ai')return this.shell(this.ai.createMarkup());
     if(this.view==='shared')return this.shell(`<main class="studio-library shared-library">${this.groups.markup()}</main>`);
     return this.libraryMarkup();
@@ -433,7 +465,7 @@ export class Studio {
       <div data-live-sessions>${this.remote.markup()}</div>${showcaseMarkup()}
 
 
-      <section class="library-section"><div class="library-section-title"><h2>Minha biblioteca <span data-library-count>${this.libraryCount()}</span></h2><div class="library-actions"><button type="button" data-studio-action="storage-ai" class="studio-btn storage-ai-primary">${studioIcon('sparkle')} Criar slides com IA</button>${this.account.user?button('cloud-refresh',studioIcon('reload'),'quiet editor-icon',`aria-label="Recarregar aulas" title="Recarregar aulas" ${this.cloudBusy?'disabled':''}`):''}</div></div><div class="lesson-card-grid" data-library-grid>${this.libraryCards()}<div class="new-lesson-card create-import-card"><button class="create-half" data-studio-action="new"><span>+</span><strong>Uma ideia nova?</strong><small>Comece uma aula do zero</small></button><div class="import-half"><span>↥</span><strong>Já tem o conteúdo?</strong><small>Traga seus slides para cá</small><div>${button('upload-slides', 'Importar PDF / PPTX', 'quiet')}${button('import', 'Importar JSON', 'quiet')}</div></div></div></div></section><div data-cloud-library>${this.cloudMarkup()}</div><input type="file" id="import-lesson-file" accept=".json,application/json" hidden><input type="file" id="import-slides-file" accept=".pdf,.pptx,application/pdf,application/vnd.openxmlformats-officedocument.presentationml.presentation" hidden></main>`);
+      <section class="library-section"><div class="library-section-title"><h2>Minha biblioteca <span data-library-count>${this.libraryCount()}</span></h2><div class="library-actions">${button('open-templates', studioIcon('templates') + ' Modelos prontos', 'quiet')}<button type="button" data-studio-action="storage-ai" class="studio-btn storage-ai-primary">Criar slides com IA</button>${this.account.user?button('cloud-refresh',studioIcon('reload'),'quiet editor-icon',`aria-label="Recarregar aulas" title="Recarregar aulas" ${this.cloudBusy?'disabled':''}`):''}</div></div><div class="lesson-card-grid" data-library-grid>${this.libraryCards()}<div class="new-lesson-card create-import-card"><button class="create-half" data-studio-action="new"><span>+</span><strong>Nova apresentação</strong><small>Comece em branco ou por modelo</small></button><div class="import-half"><span>↥</span><strong>Já tem o arquivo?</strong><small>Importe slides do computador</small><div>${button('upload-slides', 'Importar PDF / PPTX', 'quiet')}${button('import', 'Importar JSON', 'quiet')}</div></div></div></div></section><div data-cloud-library>${this.cloudMarkup()}</div><input type="file" id="import-lesson-file" accept=".json,application/json" hidden></main>`);
   }
   lessonCard(l, index = 0) {
     const model=l.id==='hdd-ssd-demo';
@@ -441,7 +473,7 @@ export class Studio {
     const firstSlide=l.slides[0];
     const firstSlideImage=firstSlide&&(firstSlide.image||firstSlide.assetId?firstSlide:firstSlide.elements?.find(e=>e.type==='image'&&(e.image||e.assetId)));
     const cover=firstSlideImage&&!l.generatedByAI?{...firstSlideImage,sourceType:firstSlideImage.sourceType||'pdf',imageAlt:firstSlideImage.imageAlt||firstSlide?.title}:null;
-    return `<article class="lesson-card" style="--card-index:${Math.min(index, 6)}"><div class="lesson-card-art ${model ? 'hardware-art' : 'ideas-art'}">${l.thumbnail?`<img class="lesson-cover-image" decoding="async" src="${esc(l.thumbnail)}" alt="">`:cover?assetImage(cover,'imported-cover lesson-cover-image'):model? `<div aria-hidden="true">${deviceArt()}<span>EXPLORE POR DENTRO</span></div>`:`<div class="slide-cover-mini" inert aria-hidden="true">${canvasMarkup(presentationSlide(l.slides[0]),{interactive:false})}</div>`}${this.coverStorageIcon(Boolean(cloud),this.groups.isShared(l.id),Boolean(l.generatedByAI))}<span class="card-art-number">${String(l.slides.length).padStart(2, '0')}</span></div><div class="lesson-card-content"><h3>${esc(l.title || 'Aula sem título')}</h3><p>${esc(l.description || 'Dê forma à sua próxima descoberta.')}</p><div class="lesson-card-meta"><span>▤ ${l.slides.length} slides</span><span>✦ ${l.questions.length} perguntas</span>${this.storageBadge(l)}</div><div class="lesson-card-primary">${button('edit', 'Editar aula ↗', 'card-edit', `data-id="${esc(l.id)}" aria-label="Editar aula: ${esc(l.title)}"`)}${button('present', '▷ Apresentar', 'card-present studio-launch', `data-id="${esc(l.id)}" ${this.launching ? 'disabled' : ''}`)}<details class="lesson-menu"><summary aria-label="Mais opções: ${esc(l.title)}">···</summary><div>${button('rename', 'Renomear', '', `data-id="${esc(l.id)}"`)}${button('duplicate', 'Duplicar', '', `data-id="${esc(l.id)}"`)}${button('cover', 'Trocar capa', '', `data-id="${esc(l.id)}"`)}${button('export-pdf','Exportar PDF','',`data-id="${esc(l.id)}"`)}${button('export-pptx','Exportar PPTX','',`data-id="${esc(l.id)}"`)}${cloud?this.cloudMenu(cloud,false):''}${button('delete', cloud?'Excluir do dispositivo':'Excluir aula', 'danger-text', `data-id="${esc(l.id)}"`)}</div></details></div></div></article>`;
+    return `<article class="lesson-card" style="--card-index:${Math.min(index, 6)}"><div class="lesson-card-art ${model ? 'hardware-art' : 'ideas-art'}">${l.thumbnail?`<img class="lesson-cover-image" decoding="async" src="${esc(l.thumbnail)}" alt="">`:cover?assetImage(cover,'imported-cover lesson-cover-image'):model? `<div aria-hidden="true">${deviceArt()}<span>EXPLORE POR DENTRO</span></div>`:`<div class="slide-cover-mini" inert aria-hidden="true">${canvasMarkup(presentationSlide(l.slides[0]),{interactive:false})}</div>`}${this.coverStorageIcon(Boolean(cloud),this.groups.isShared(l.id),Boolean(l.generatedByAI))}<span class="card-art-number">${String(l.slides.length).padStart(2, '0')}</span></div><div class="lesson-card-content"><h3>${esc(l.title || 'Aula sem título')}</h3><p>${esc(l.description || 'Sem descrição')}</p><div class="lesson-card-meta"><span>${l.slides.length} ${l.slides.length === 1 ? 'slide' : 'slides'}</span><span>${l.questions.length} ${l.questions.length === 1 ? 'pergunta' : 'perguntas'}</span>${this.storageBadge(l)}</div><div class="lesson-card-primary">${button('edit', 'Editar aula ↗', 'card-edit', `data-id="${esc(l.id)}" aria-label="Editar aula: ${esc(l.title)}"`)}${button('present', '▷ Apresentar', 'card-present studio-launch', `data-id="${esc(l.id)}" ${this.launching ? 'disabled' : ''}`)}<details class="lesson-menu"><summary aria-label="Mais opções: ${esc(l.title)}">···</summary><div>${button('rename', 'Renomear', '', `data-id="${esc(l.id)}"`)}${button('duplicate', 'Duplicar', '', `data-id="${esc(l.id)}"`)}${button('cover', 'Trocar capa', '', `data-id="${esc(l.id)}"`)}${button('export-pdf','Exportar PDF','',`data-id="${esc(l.id)}"`)}${button('export-pptx','Exportar PPTX','',`data-id="${esc(l.id)}"`)}${cloud?this.cloudMenu(cloud,false):''}${button('delete', cloud?'Excluir do dispositivo':'Excluir aula', 'danger-text', `data-id="${esc(l.id)}"`)}</div></details></div></div></article>`;
   }
   editor() {
     const l = this.draft;
@@ -556,12 +588,33 @@ export class Studio {
   }
   dialogMarkup() {
     if (!this.dialog) return '';
+    if (this.dialog.type === 'new-slide') {
+      const { theme, deckTheme, category = 'all' } = this.dialog;
+      const items = category === 'all' ? slideTemplates : slideTemplates.filter(item => item.id === 'basic' || item.category === category);
+      const nativeThemes = templateThemeChoices.filter(item => item.group !== 'open-source' && item.id !== deckTheme);
+      const ossThemes = templateThemeChoices.filter(item => item.group === 'open-source' && item.id !== deckTheme);
+      return `<div class="modal-backdrop"><section class="studio-dialog template-picker-dialog" role="dialog" aria-modal="true" aria-labelledby="slide-template-title">
+        <header class="tpl-head"><div><h2 id="slide-template-title">Novo slide</h2><p>Escolha um modelo pronto editável ou use o template básico do site.</p></div>${button('cancel-dialog', '×', 'quiet tpl-close', 'aria-label="Fechar"')}</header>
+        <div class="tpl-toolbar">
+          <div class="tpl-cats" role="tablist" aria-label="Categorias de modelos">${slideTemplateCategories.map(cat => `<button type="button" class="tpl-cat ${category === cat.id ? 'active' : ''}" role="tab" aria-selected="${category === cat.id}" data-studio-action="slide-template-category" data-category="${cat.id}">${esc(cat.label)}</button>`).join('')}</div>
+          <label class="tpl-theme-select"><span>Visual</span><select data-template-theme aria-label="Tema dos modelos"><option value="${esc(deckTheme)}" ${theme === deckTheme ? 'selected' : ''}>Tema da aula atual</option><optgroup label="Storage Lab">${nativeThemes.map(item => `<option value="${esc(item.id)}" ${theme === item.id ? 'selected' : ''}>${esc(item.label)}</option>`).join('')}</optgroup><optgroup label="Open Source (CC0 / MIT)">${ossThemes.map(item => `<option value="${esc(item.id)}" ${theme === item.id ? 'selected' : ''}>${esc(item.label)}</option>`).join('')}</optgroup></select></label>
+        </div>
+        <div class="tpl-grid">${items.map(tpl => `<button type="button" class="tpl-card ${tpl.id === 'basic' ? 'is-basic' : ''}" data-studio-action="pick-slide-template" data-template="${esc(tpl.id)}"><span class="tpl-thumb">${canvasMarkup(presentationSlide(previewSlideForTemplate(tpl.id, theme)), { interactive: false })}</span><span class="tpl-info"><strong>${esc(tpl.name)}${tpl.badge ? `<em>${esc(tpl.badge)}</em>` : ''}</strong><small>${esc(tpl.description)}</small></span></button>`).join('')}</div>
+        <footer class="tpl-foot">${button('cancel-dialog', 'Cancelar', 'quiet')}</footer>
+      </section></div>`;
+    }
     if(['new','cover'].includes(this.dialog.type)){
       const creating=this.dialog.type==='new',form=this.dialog.form;
-      return `<div class="modal-backdrop"><section class="studio-dialog project-dialog" role="dialog" aria-modal="true" aria-labelledby="project-title">
+      const chosenDeck=form.template||'basic';
+      const deckFilter=this.dialog.deckFilter||'all';
+      const filteredDecks=deckFilter==='all'?deckTemplates:deckTemplates.filter(deck=>deck.id==='basic'||deck.source===deckFilter);
+      const visibleDecks=filteredDecks.slice(0,12);
+      const deckPicker=creating?`<div class="deck-tpl-section"><div class="deck-tpl-bar"><span class="deck-tpl-label">Modelo inicial</span><div class="deck-tpl-filters" role="tablist" aria-label="Filtrar modelos">${[['all','Destaques'],['native','Storage Lab'],['open-source','Comunidade']].map(([id,label])=>`<button type="button" class="deck-tpl-filter ${deckFilter===id?'active':''}" role="tab" aria-selected="${deckFilter===id}" data-studio-action="new-deck-filter" data-filter="${id}">${label}</button>`).join('')}</div>${button('open-templates',`Ver todos (${deckTemplates.length}) ↗`,'link deck-gallery-link')}</div><div class="deck-tpl-grid">${visibleDecks.map(deck=>`<button type="button" class="deck-tpl-card ${chosenDeck===deck.id?'active':''}" aria-pressed="${chosenDeck===deck.id}" data-studio-action="select-deck-template" data-template="${esc(deck.id)}"><span class="tpl-thumb">${canvasMarkup(presentationSlide(previewSlideForDeck(deck.id)),{interactive:false})}</span><span class="deck-tpl-meta"><strong>${esc(deck.name)}</strong><small>${deck.slidesCount} ${deck.slidesCount===1?'slide':'slides'}${deck.credit?' · '+esc(deck.credit.license):''}</small></span></button>`).join('')}</div></div>`:'';
+      return `<div class="modal-backdrop"><section class="studio-dialog project-dialog ${creating?'has-templates':''}" role="dialog" aria-modal="true" aria-labelledby="project-title">
         <h2 id="project-title">${creating?'Nova aula':'Trocar capa'}</h2>
         ${creating?projectFields(form):'<label class="lesson-cover-input">'+studioIcon('upload')+' Escolher capa<input type="file" data-lesson-cover-file accept="image/png,image/jpeg,image/webp,image/gif" hidden></label>'}
         ${form.thumbnail?`<img class="lesson-cover-preview" src="${esc(form.thumbnail)}" alt="Prévia da capa">${button('clear-cover','Remover capa','link')}`:''}
+        ${deckPicker}
         <div>${button('cancel-dialog','Cancelar','quiet')}${button(creating?'confirm-new':'confirm-cover',creating?'Criar aula':'Salvar capa','accent')}</div>
       </section></div>`;
     }
@@ -580,6 +633,7 @@ export class Studio {
   }
   change(input) {
     if (this.receivingRemote || !this.root.contains(input)) return;
+    if (this.dialog?.type === 'new-slide' && input.matches('[data-template-theme]')) { this.dialog.theme = input.value; this.callbacks.render(); return; }
     if (this.dialog?.form && ['rename-lesson', 'rename-description'].includes(input.id)) { this.dialog.form[input.id === 'rename-lesson' ? 'title' : 'description'] = input.value; return; }
     if (this.view !== 'editor') return;
     if (input.matches('[data-poll-enabled]')) {
@@ -748,7 +802,12 @@ export class Studio {
   importMarkup() {
     if (!this.importDialog) return '';
     const job = this.importing;
-    return `<div class="modal-backdrop"><section class="studio-dialog import-dialog" role="dialog" aria-modal="true" aria-labelledby="import-title"><h2 id="import-title">Traga seus slides</h2><p>Importe um PDF ou PowerPoint (.pptx). Cada página vira um slide para apresentar em tela cheia e acompanhar pelo celular.</p>${job ? `<div class="import-status"><strong>${esc(job.name)}</strong><p id="import-read-status" role="status">Abrindo o arquivo…</p><progress id="import-progress" max="1" aria-label="Progresso da importação"></progress></div>` : `${button('choose-slides', '↑ Escolher PDF ou PPTX', 'accent import-choose')}<p class="import-limits">Até 25 MB e 80 páginas. O arquivo é processado neste navegador.</p>`}
+    const externalShortcuts = !job ? `<section class="import-external-box" aria-label="Sites oficiais com modelos gratuitos">
+      <div class="import-external-head"><strong>Precisa de um modelo pronto grátis?</strong><small>Baixe o arquivo <code>.pptx</code> na página oficial de um destes sites e importe acima para editar no Storage Lab:</small></div>
+      <div class="import-external-grid">${externalTemplateSites.slice(0, 4).map(site => `<a class="import-ext-link" href="${esc(site.url)}" target="_blank" rel="noopener noreferrer"><span class="import-ext-name">${esc(site.name)}${studioIcon('external')}</span><small>${esc(site.category)}</small></a>`).join('')}</div>
+      <div class="import-external-alt">${button('open-templates-from-import', studioIcon('templates') + ` Explorar catálogo de modelos (${deckTemplates.length}) →`, 'link')}</div>
+    </section>` : '';
+    return `<div class="modal-backdrop"><section class="studio-dialog import-dialog" role="dialog" aria-modal="true" aria-labelledby="import-title"><h2 id="import-title">Traga seus slides</h2><p>Importe um PDF ou PowerPoint (.pptx). Cada página vira um slide para apresentar em tela cheia e acompanhar pelo celular.</p>${job ? `<div class="import-status"><strong>${esc(job.name)}</strong><p id="import-read-status" role="status">Abrindo o arquivo…</p><progress id="import-progress" max="1" aria-label="Progresso da importação"></progress></div>` : `${button('choose-slides', '↑ Escolher PDF ou PPTX', 'accent import-choose')}<p class="import-limits">Até 25 MB e 80 páginas. O arquivo é processado neste navegador.</p>`}${externalShortcuts}
       ${this.importError ? `<p class="studio-warning" role="alert">${esc(this.importError)}</p>` : ''}<div>${button('cancel-import', job ? 'Cancelar importação' : 'Fechar', 'quiet')}</div></section></div>`;
   }
   async importSlideFile(file) {
@@ -803,7 +862,7 @@ export class Studio {
     if (action.startsWith('cloud-')) { await this.cloudAction(action, target); return; }
     const id = target.dataset.id;
     const lookup = () => this.library.lessons.find(l => l.id === id);
-    if (['library', 'join','shared','storage-ai'].includes(action)) {
+    if (['library', 'join', 'shared', 'storage-ai', 'templates'].includes(action)) {
       // Sair com mudanças pendentes pede confirmação em vez de decidir sozinho.
       if (this.view==='editor'&&this.dirty&&!this.groups.live&&this.groups.canEdit&&!this.leaveDecided) {
         this.dialog={type:'leave',target:action};this.callbacks.render();return;
@@ -812,6 +871,7 @@ export class Studio {
       if (this.groups.live) await this.groups.stop();
       if (this.dirty) this.save();
       if(action==='storage-ai'&&this.view!=='storage-ai')this.ai.freshPending=true;
+      if (action === 'templates') { this.dialog = null; this.importDialog = false; this.templateStore.openCatalog(); }
       this.view = action; this.writeRoute(); this.callbacks.render();
       if(action==='shared'&&this.account.user){await this.groups.refresh();if(this.view==='shared')this.callbacks.render();}
       return;
@@ -822,16 +882,49 @@ export class Studio {
     if(action==='export-pdf'||action==='export-pptx'){await this.exportVisual(id?lookup():this.draft,action.slice(7));return;}
     if (action === 'share-presentation') { await this.sharePresentation(); return; }
     if (action === 'upload-slides') { this.importDialog = true; this.importError = ''; }
+    else if (action === 'open-templates' || action === 'open-templates-from-import') {
+      this.dialog = null;
+      this.importDialog = false;
+      this.templateStore.openCatalog();
+      this.view = 'templates';
+      this.writeRoute('templates', null, false);
+      window.scrollTo?.({ top: 0, behavior: 'instant' });
+    }
+    else if (action === 'use-deck-template') {
+      const lesson = this.library.save(createDeckFromTemplate(target.dataset.template || 'basic'));
+      this.dialog = null;
+      this.open(lesson.id);
+      this.callbacks.toast('Modelo pronto aberto no editor.');
+    }
+    else if (action === 'download-deck-pptx') {
+      const sample = createDeckFromTemplate(target.dataset.template || 'basic');
+      await this.exportVisual(sample, 'pptx');
+      return;
+    }
     else if (action === 'choose-slides') { document.querySelector('#import-slides-file').click(); return; }
     else if (action === 'cancel-import') {
       if (this.importing) this.importing.controller.abort();
       else this.importDialog = false;
     }
-    else if(action==='new')this.dialog={type:'new',form:{title:'',description:'',thumbnail:''}};
+    else if(action==='new')this.dialog={type:'new',deckFilter:'all',form:{title:'',description:'',thumbnail:'',template:'basic'}};
+    else if(action==='new-deck-filter'&&this.dialog?.type==='new'){this.dialog.deckFilter=target.dataset.filter||'all';}
+    else if(action==='select-deck-template'&&this.dialog?.type==='new'){this.dialog.form.template=target.dataset.template||'basic';}
+    else if(action==='slide-template-category'&&this.dialog?.type==='new-slide'){this.dialog.category=target.dataset.category||'all';}
+    else if(action==='pick-slide-template'&&this.dialog?.type==='new-slide'){
+      const list=this.draft.slides;
+      if(list.length>=80)throw Error('Você chegou ao limite de 80 slides.');
+      let item=createSlideFromTemplate(target.dataset.template||'basic',{themeId:this.dialog.theme});
+      if(this.groups.live)item=canvasFromSlide(item);
+      const next=list.length;
+      list.splice(next,0,item); this.index=next;
+      if(this.draft.activityBlocks){const block=this.currentBlock();if(block)block.items.push(item.id);this.draft.activityBlocks=normalizeBlocks(this.draft.activityBlocks,this.draft);}
+      this.dialog=null;
+      this.markDirty();
+    }
     else if(action==='confirm-new'){
       const form=this.dialog?.form,title=form?.title.trim();
       if(!title){this.root.querySelector('#rename-lesson').reportValidity();return;}
-      const l=this.library.save({...newLesson(),title,description:form.description,thumbnail:form.thumbnail});
+      const l=this.library.save(createDeckFromTemplate(form.template||'basic',{title,description:form.description,thumbnail:form.thumbnail}));
       this.dialog=null;this.open(l.id);
     }
     else if(action==='cover')this.openCoverDialog(lookup());
@@ -914,23 +1007,31 @@ export class Studio {
     else if (action === 'clear-image') { this.draft.slides[this.index].image = ''; delete this.draft.slides[this.index].assetId; this.markDirty(); }
     else {
       const isSlide = action.includes('slide'), list = isSlide ? this.draft.slides : this.draft.questions, indexKey = isSlide ? 'index' : 'questionIndex', i = this[indexKey];
-      if (action.startsWith('add-') || action.startsWith('duplicate-')) {
+      if (action === 'add-slide' && !isLiveStage(this.currentBlock()?.type)) {
+        if (list.length >= 80) throw Error('Você chegou ao limite de 80 slides.');
+        const deckTheme = detectDeckTheme(list, list[this.index]);
+        this.dialog = { type: 'new-slide', theme: deckTheme, deckTheme, category: 'all' };
+      } else if (action.startsWith('add-') || action.startsWith('duplicate-')) {
         if (list.length >= (isSlide ? 80 : 50)) throw Error('Você chegou ao limite de ' + (isSlide ? '80 slides.' : '50 perguntas.'));
         let item = action.startsWith('add-') ? (isSlide ? newSlide() : newQuestion()) : { ...clone(list[i]), id: createUuid() };
         if(isSlide&&this.currentBlock()?.type==='poll')item.poll||={text:'Qual é a sua opinião?',options:['Concordo','Ainda tenho dúvidas']};if(isSlide&&isGameType(this.currentBlock()?.type)&&action.startsWith('add-')){item.game=defaultGame(this.currentBlock().type);item.title=gameNames[item.game.type];}
         if (isSlide && this.groups.live) item = canvasFromSlide(item);
         const next = action.startsWith('add-') ? list.length : i + 1;
         list.splice(next, 0, item); this[indexKey] = next;if(this.draft.activityBlocks){const block=this.currentBlock();if(block)block.items.push(item.id);}
+        if(this.draft.activityBlocks){this.draft.activityBlocks=normalizeBlocks(this.draft.activityBlocks,this.draft);const visible=this.visibleItems();if(visible.length&&!visible.some(({index})=>index===this[indexKey]))this[indexKey]=visible[0].index;}
+        this.markDirty();
       } else if (action.startsWith('delete-')) {
         if (isSlide && (list.length === 1||this.draft.activityBlocks&&this.visibleItems().length===1)) throw Error('Mantenha pelo menos um slide na aula.');
         list.splice(i, 1); this[indexKey] = Math.max(0, Math.min(i, list.length - 1));
+        if(this.draft.activityBlocks){this.draft.activityBlocks=normalizeBlocks(this.draft.activityBlocks,this.draft);const visible=this.visibleItems();if(visible.length&&!visible.some(({index})=>index===this[indexKey]))this[indexKey]=visible[0].index;}
+        this.markDirty();
       } else if (action.startsWith('move-')) {
         const visible=this.visibleItems().map(v=>v.index),at=visible.indexOf(i),next=visible[at+(action.endsWith('up')?-1:1)]??-1;
         if (next < 0 || next >= list.length) return;
         [list[i], list[next]] = [list[next], list[i]]; this[indexKey] = next;
+        if(this.draft.activityBlocks){this.draft.activityBlocks=normalizeBlocks(this.draft.activityBlocks,this.draft);const visible2=this.visibleItems();if(visible2.length&&!visible2.some(({index})=>index===this[indexKey]))this[indexKey]=visible2[0].index;}
+        this.markDirty();
       } else return;
-      if(this.draft.activityBlocks){this.draft.activityBlocks=normalizeBlocks(this.draft.activityBlocks,this.draft);const visible=this.visibleItems();if(visible.length&&!visible.some(({index})=>index===this[indexKey]))this[indexKey]=visible[0].index;}
-      this.markDirty();
     }
     if (this.view === 'editor') this.writeRoute(this.view, this.draft.id, true);
     this.callbacks.render();

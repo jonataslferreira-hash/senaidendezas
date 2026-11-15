@@ -44,9 +44,17 @@ const paths = {
   next: 'm9 5 7 7-7 7',
   back: 'M20 12H4m7-7-7 7 7 7',
   mic: 'M9 5a3 3 0 0 1 6 0v7a3 3 0 0 1-6 0zM5 11v1a7 7 0 0 0 14 0v-1m-7 8v3m-4 0h8',
-  send: 'm22 2-7 20-4-9-9-4zm0 0L11 13'
+  send: 'm22 2-7 20-4-9-9-4zm0 0L11 13',
+  templates: 'M3 4h18v16H3zM3 10h18M10 10v10',
+  external: 'M14 4h6v6M10 14 20 4M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5',
+  plus: 'M12 5v14M5 12h14',
+  chevronLeft: 'm15 5-7 7 7 7',
+  chevronRight: 'm9 5 7 7-7 7',
+  heart: 'M12 20.5s-7.5-4.8-9.2-9.2C1.6 8.2 3.7 5 7 5c1.9 0 3.6 1 5 2.7C13.4 6 15.1 5 17 5c3.3 0 5.4 3.2 4.2 6.3-1.7 4.4-9.2 9.2-9.2 9.2Z',
+  heartFilled: 'M12 20.5s-7.5-4.8-9.2-9.2C1.6 8.2 3.7 5 7 5c1.9 0 3.6 1 5 2.7C13.4 6 15.1 5 17 5c3.3 0 5.4 3.2 4.2 6.3-1.7 4.4-9.2 9.2-9.2 9.2Z'
 };
 
 export function studioIcon(name) {
-  return `<svg width="18" height="18" viewBox="0 0 24 24" fill="${name==='sparkle'?'currentColor':'none'}" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="${paths[name]}"/></svg>`;
+  const filled = name === 'sparkle' || name === 'heartFilled';
+  return `<svg width="18" height="18" viewBox="0 0 24 24" fill="${filled ? 'currentColor' : 'none'}" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="${paths[name] || ''}"/></svg>`;
 }

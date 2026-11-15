@@ -1,7 +1,7 @@
 // StorageAI + etapas de jogo. A IA só sabe devolver slides, enquetes e perguntas;
 // aqui o pedido do professor ("com sobrevivência", "cabo de guerra"…) vira etapas de verdade:
 // pedimos perguntas a mais e transformamos essas perguntas nas dinâmicas.
-import { defaultGame, gameNames } from './stage-games.js';
+import { defaultGame, gameNames, TUG_ROUNDS, TUG_VARIANTS } from './stage-games.js';
 
 const lead = '(?:etapas?|din[aâ]micas?|jogos?|modos?|desafios?|rodadas?|atividades?|brincadeiras?)\\s+(?:(?:de|da|do|com|tipo)\\s+)?(?:um[a]?\\s+)?';
 const rules = [
@@ -14,19 +14,22 @@ const rules = [
 ];
 
 // Quais dinâmicas o pedido cita e quantas perguntas cada uma precisa.
-// Quantas perguntas cada dinâmica aceita: [mínimo, máximo]. Relâmpago é sempre 1; equipes e sorteio não usam.
-// No cabo de guerra o número é de rodadas (uma pergunta por rodada, até 12).
-export const GAME_QUESTION_RANGE = { flash: [1, 25], survival: [1, 25], tug: [1, 12], race: [2, 25] };
+// Quantas perguntas cada dinâmica aceita: [mínimo, máximo]. Equipes e sorteio não usam.
+// No cabo de guerra o número é de rodadas (até 12), e a IA gera 3 perguntas por rodada.
+export const TUG_QUESTIONS_PER_ROUND = TUG_VARIANTS;
+export const GAME_QUESTION_RANGE = { flash: [1, 25], survival: [1, 25], tug: [1, TUG_ROUNDS], race: [2, 25] };
 export const QUIZ_LIMIT = 50;
+export const gameQuestionTotal = (type, count) => type === 'tug' ? count * TUG_QUESTIONS_PER_ROUND : count;
 const clampNeed = (type, value, fallback) => { const range = GAME_QUESTION_RANGE[type]; if (!range) return fallback; const n = Math.trunc(Number(value)); return Number.isFinite(n) && n > 0 ? Math.max(range[0], Math.min(range[1], n)) : fallback; };
-// `picked` são as etapas marcadas no painel "Montar a aula"; `counts` é o número de perguntas escolhido para cada uma.
+// `picked` são as etapas marcadas no painel "Montar a aula"; `counts` é o número de perguntas/rodadas escolhido para cada uma.
 export function requestedGames(prompt, picked = [], counts = {}) {
   const source = String(prompt || ''), chosen = new Set(Array.isArray(picked) ? picked : []);
   return rules.filter(([type, pattern]) => chosen.has(type) || pattern.test(source)).map(([type, , need]) => {
-    // "corrida com 20 perguntas", "sobrevivência de 8", "cabo de guerra com 10 questões"
+    // "corrida com 20 perguntas", "sobrevivência de 8", "cabo de guerra com 5 rodadas"
     const label = { flash: '(?:desafio\\s+)?rel[aâ]mpago', survival: 'sobreviv[eê]ncia', tug: 'cabo\\s+de\\s+guerra', race: 'corrida(?:\\s+do\\s+saber)?' }[type];
     const asked = label ? Number(source.match(new RegExp(label + '\\s+(?:com|de)\\s+(\\d{1,2})', 'i'))?.[1]) : 0;
-    return { type, need: clampNeed(type, chosen.has(type) && counts?.[type] ? counts[type] : asked, need) };
+    const count = clampNeed(type, chosen.has(type) && counts?.[type] ? counts[type] : asked, need);
+    return type === 'tug' ? { type, rounds: count, need: count * TUG_QUESTIONS_PER_ROUND } : { type, need: count };
   });
 }
 export const gameQuestionNeed = games => games.reduce((sum, game) => sum + game.need, 0);
@@ -51,7 +54,7 @@ export function takeGameQuestions(result, games, quizTotal) {
   let spare = rest.length - takes.reduce((sum, n) => sum + n, 0);
   for (let moved = true; spare > 0 && moved;) { moved = false; games.forEach((game, i) => { if (spare > 0 && takes[i] < game.need) { takes[i]++; spare--; moved = true; } }); }
   let at = 0;
-  result.games = games.map((game, i) => { const questions = rest.slice(at, at + takes[i]); at += takes[i]; return { type: game.type, questions }; });
+  result.games = games.map((game, i) => { const questions = rest.slice(at, at + takes[i]); at += takes[i]; return { type: game.type, questions, ...(game.rounds ? { rounds: game.rounds } : {}) }; });
   return result;
 }
 
@@ -63,13 +66,25 @@ export function addGameStages(lesson, games, { newSlide, createUuid }) {
   const skipped = []; let added = 0;
   if (!Array.isArray(games) || !games.length) return { added, skipped };
   if (!lesson.activityBlocks) lesson.activityBlocks = [{ id: 'slides', type: 'slides', items: lesson.slides.filter(slide => !slide.poll && !slide.game).map(slide => slide.id) }, ...lesson.slides.filter(slide => slide.poll).map(slide => ({ id: createUuid(), type: 'poll', items: [slide.id] })), ...(lesson.questions.length ? [{ id: 'quiz', type: 'quiz', items: lesson.questions.map(question => question.id) }] : [])];
-  for (const { type, questions } of games) {
+  for (const { type, questions, rounds } of games) {
     if (lesson.activityBlocks.length >= 24 || lesson.slides.length >= 80) { skipped.push(gameNames[type]); continue; }
     const game = defaultGame(type), list = (questions || []).map(usable).filter(Boolean);
     if (type === 'flash' || type === 'survival' || type === 'tug' || type === 'race') {
       if (list.length < (type === 'race' ? 2 : 1)) { skipped.push(gameNames[type]); continue; }
-      // Cabo de guerra: cada pergunta da IA vira uma rodada (dá para somar até 3 por rodada no editor).
-      if (type === 'tug') game.rounds = list.slice(0, 12).map(question => [question]); else game.questions = list.slice(0, 25);
+      // Cabo de guerra: agrupa 3 perguntas da IA por rodada (sorteadas durante o jogo).
+      if (type === 'tug') {
+        const targetRounds = Math.min(TUG_ROUNDS, Math.max(1, Math.min(list.length, Number(rounds) || Math.ceil(list.length / TUG_QUESTIONS_PER_ROUND))));
+        if (list.length >= targetRounds * TUG_QUESTIONS_PER_ROUND) {
+          game.rounds = Array.from({ length: targetRounds }, (_, r) => list.slice(r * TUG_QUESTIONS_PER_ROUND, (r + 1) * TUG_QUESTIONS_PER_ROUND));
+        } else {
+          const buckets = Array.from({ length: targetRounds }, () => []);
+          for (const [i, question] of list.entries()) {
+            const bucket = buckets[i % targetRounds];
+            if (bucket.length < TUG_QUESTIONS_PER_ROUND) bucket.push(question);
+          }
+          game.rounds = buckets.filter(bucket => bucket.length);
+        }
+      } else game.questions = list.slice(0, 25);
     }
     const slide = { ...newSlide(), title: gameNames[type], game };
     const block = { id: createUuid(), type, items: [slide.id] };

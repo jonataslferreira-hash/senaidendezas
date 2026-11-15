@@ -121,7 +121,7 @@ function publishRemote() {
   studio.remote.setPresentation({ code: state.code, title: activeLesson.title, slide: state.slide, total: slides.length, phase: state.phase, stage: state.activity?.type || '', hasNext: Boolean(state.activity?.hasNext), game: remoteGame(), note: lesson ? slide?.note?.slice(0, 2000) : '',
     sims: lesson ? describeSims(app) : [], customs, models: lesson ? describeModels(app, { canvasModels, slide: slide ? presentationSlide(slide) : null }) : [] });
 }
-function remoteGame() { const g = state?.game; return g ? { type: g.type, state: g.state, drawn: g.current?.name || '' } : null; }
+function remoteGame() { const g = state?.game; return g ? { type: g.type, state: g.state, drawn: g.current?.name || '', ...(Number.isInteger(g.round) ? { round: g.round, rounds: g.rounds } : {}) } : null; }
 // Comandos do controle remoto para experimentos (nativos e importados) e modelos 3D.
 function remoteInteract(value) {
   if (state?.phase !== 'lesson' || !host || !value || typeof value !== 'object') return;

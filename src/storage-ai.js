@@ -7,7 +7,7 @@ import {ensureBlocks} from './activity-blocks.js';
 import {studioIcon} from './studio-icons.js';
 import {Simulations,simulationNames} from './simulations.js';
 import {prefersReducedMotion} from './motion-preference.js';
-import {requestedGames,withGameQuestions,takeGameQuestions,addGameStages,GAME_QUESTION_RANGE,QUIZ_LIMIT} from './storage-ai-games.js';
+import {requestedGames,withGameQuestions,takeGameQuestions,addGameStages,GAME_QUESTION_RANGE,QUIZ_LIMIT,gameQuestionTotal} from './storage-ai-games.js';
 import {stageIcon} from './stage-games-view.js';
 import {coverFromImage} from './lesson-cover.js';
 import {canvasMarkup,CanvasModels,esc} from './canvas-view.js';
@@ -91,7 +91,7 @@ const gameCount=(session,type)=>{const [min,max]=GAME_QUESTION_RANGE[type];retur
 // Total de perguntas que a IA vai escrever com as escolhas do painel (cada 10 é uma chamada).
 function questionTotalNote(session){
   const {quizzes,questions}=activitySettings(session),picked=session?.games||[];
-  const total=quizzes*Math.min(questions,quizzes?Math.floor(QUIZ_LIMIT/quizzes):0)+picked.reduce((sum,type)=>sum+(GAME_QUESTION_RANGE[type]?gameCount(session,type):0),0);
+  const total=quizzes*Math.min(questions,quizzes?Math.floor(QUIZ_LIMIT/quizzes):0)+picked.reduce((sum,type)=>sum+(GAME_QUESTION_RANGE[type]?gameQuestionTotal(type,gameCount(session,type)):0),0);
   return total?`A IA vai escrever ${total} pergunta${total===1?'':'s'} diferentes${total>30?' · leva mais tempo e gasta mais da cota do dia':''}.`:'';
 }
 function countTray(session){
@@ -107,7 +107,7 @@ function countTray(session){
     </section>
     <section class="ai-tray-block"><div class="ai-tray-title"><span>Etapas de jogo</span><small data-game-total>${picked.size?picked.size+' escolhida'+(picked.size>1?'s':''):'toque para incluir'}</small></div>
       <div class="ai-game-chips">${trayGames.map(([type,name,hint],i)=>`<button type="button" class="ai-game-chip" style="--i:${i}" data-ai-game="${type}" aria-pressed="${picked.has(type)}" title="${hint}">${stageIcon(type)}<span>${name}</span></button>`).join('')}</div>
-      <div class="ai-game-counts">${trayGames.filter(([type])=>GAME_QUESTION_RANGE[type]).map(([type,name])=>stepper('game-'+type,(type==='tug'?'Rodadas · ':'Perguntas · ')+name,gameCount(session,type),GAME_QUESTION_RANGE[type][0],GAME_QUESTION_RANGE[type][1],'data-game-count="'+type+'" '+(picked.has(type)?'':'hidden'))).join('')}</div>
+      <div class="ai-game-counts">${trayGames.filter(([type])=>GAME_QUESTION_RANGE[type]).map(([type,name])=>stepper('game-'+type,(type==='tug'?'Rodadas · ':'Perguntas · ')+name+(type==='tug'?' (3 perg./rod.)':''),gameCount(session,type),GAME_QUESTION_RANGE[type][0],GAME_QUESTION_RANGE[type][1],'data-game-count="'+type+'" '+(picked.has(type)?'':'hidden'))).join('')}</div>
       <small class="ai-tray-note" data-question-total>${questionTotalNote(session)}</small>
     </section></div>`;
 }
@@ -688,7 +688,7 @@ export class StorageAI {
       if(error?.error==='ai_quota')throw Error((error.notice||'A cota gratuita diária da IA acabou. Ela renova às 00h UTC (21h em Brasília).')+' Seu pedido continua na conversa para você tentar de novo depois.');
       if(error?.error==='ai_gemini_limit')throw Error('O Gemini atingiu um limite de uso. Seu pedido continua na conversa para tentar novamente mais tarde.');
       if(error?.error==='ai_providers_failed'&&Array.isArray(error.providers)){
-        const names={groq:'Groq',gemini:'Gemini',openrouter:'OpenRouter'};
+        const names={groq:'Groq',gemini:'Gemini',mistral:'Mistral',nvidia:'NVIDIA NIM',openrouter:'OpenRouter'};
         const reasons={limit:'atingiu um limite de uso',quota:'acabou a cota diária gratuita',access_denied:'negou acesso à API. Confira a chave e o projeto',rejected:'recusou a solicitação',model_unavailable:'não encontrou o modelo configurado',invalid_response:'devolveu uma apresentação incompleta',unavailable:'não respondeu'};
         const details=error.providers.map(({provider,reason})=>names[provider]&&reasons[reason]?`${names[provider]} ${reasons[reason]}.`:'').filter(Boolean);
         if(details.length)throw Error(details.join(' ')+' O pedido continua na conversa.');

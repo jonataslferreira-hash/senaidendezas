@@ -107,7 +107,7 @@ export class StageEditor {
         <div class="stage-round-tools">${round.length < 3 ? `<button type="button" class="studio-btn quiet" data-game-edit="sv-add-q" data-r="${r}" ${off}>＋ Outra pergunta para sortear</button>` : ''}${g.rounds.length > 1 ? `<button type="button" class="studio-btn quiet" data-game-edit="sv-remove-round" data-r="${r}" ${off}>Excluir rodada</button>` : ''}</div></fieldset>`).join('')}
         ${g.rounds.length < 12 ? `<button type="button" class="studio-btn accent" data-game-edit="sv-add-round" ${off}>＋ Adicionar rodada</button>` : ''}<small>${hint}</small></div>`;
     if (g.type === 'flash') {
-      body += field('Tempo por pergunta', `<select data-game-field="seconds" ${off}>${[5, 10, 15, 20].map(n => `<option value="${n}" ${g.seconds === n ? 'selected' : ''}>${n} segundos</option>`).join('')}</select>`, 'Tempo curto é a graça do relâmpago: 5 ou 10 segundos por pergunta. Você só dá a partida e as perguntas seguem sozinhas.');
+      body += field('Tempo por pergunta', `<select data-game-field="seconds" ${off}>${[5, 10, 15, 20].map(n => `<option value="${n}" ${g.seconds === n ? 'selected' : ''}>${n} segundos</option>`).join('')}</select>`, 'Tempo curto é a graça do relâmpago: 5 ou 10 segundos por pergunta. Quando o tempo acaba ou todos respondem, a resposta e os pontos aparecem e você avança para a próxima.');
       body += questionList('Acerto vale de 100 a 200 pontos (quanto mais rápido, mais pontos) e quem acerta primeiro em cada pergunta leva +100. Use perguntas curtas, de resposta direta.');
     }
     if (g.type === 'survival') {

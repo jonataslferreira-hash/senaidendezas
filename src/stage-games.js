@@ -249,9 +249,8 @@ export function tickGame(room) {
   if (game.type === 'race' && game.state === 'open' && room.now() >= game.deadline) revealRace(room);
   // A corrida segue sozinha: depois de mostrar a resposta, vem a próxima pergunta (ou o resultado).
   if (game.type === 'race' && game.state === 'reveal' && room.now() >= (game.revealAt || 0) + RACE_PAUSE) advanceRace(room);
-  // O relâmpago também segue sozinho, com uma pausa curta para ver a resposta.
+  // No relâmpago, quando o tempo acaba a resposta aparece e aguarda o professor avançar.
   if (game.type === 'flash' && game.state === 'open' && room.now() >= game.deadline) revealFlash(room);
-  if (game.type === 'flash' && game.state === 'reveal' && room.now() >= (game.revealAt || 0) + FLASH_PAUSE) advanceFlash(room);
   if (game.type === 'tug' && game.state === 'pull' && room.now() >= game.pullAt + TUG_PULL_MS) game.state = 'done';
 }
 
@@ -407,11 +406,11 @@ export function gameSnapshot(room, playerId, bare = false) {
   if (game.type === 'teams') return { ...base, pick: Boolean(d.teamPick) };
   if (game.type === 'flash') {
     const question = game.round >= 0 ? config.questions[game.round] : null, shown = game.state === 'reveal' || done, order = flashOrder(game);
-    return { ...base, round: game.round, rounds: config.questions.length, seconds: config.seconds, deadline: game.deadline, nextAt: game.state === 'reveal' ? (game.revealAt || 0) + FLASH_PAUSE : 0,
+    return { ...base, round: game.round, rounds: config.questions.length, seconds: config.seconds, deadline: game.deadline,
       question: ask(question, { ...(shown || presenter ? { correct: question?.correct } : {}), ...(shown ? { counts: question?.options.map((_, i) => Object.values(game.answers).filter(v => v === i).length) } : {}) }),
-      answered: Object.keys(game.answers).length, total: online(room).length, fastest: game.state === 'ready' || done ? null : who(game.fastest), points: [FLASH_HIT, FLASH_HIT + FLASH_SPEED, FLASH_FIRST],
+      answered: Object.keys(game.answers).length, total: online(room).length, fastest: game.state === 'reveal' ? who(game.fastest) : null, points: [FLASH_HIT, FLASH_HIT + FLASH_SPEED, FLASH_FIRST],
       board: order.slice(0, 5).map(id => ({ ...who(id), score: game.score[id], wins: game.wins[id] || 0 })).filter(item => item.id),
-      me: playerId ? { choice: Object.hasOwn(game.answers, playerId) ? game.answers[playerId] : null, gain: game.gain[playerId] || 0, right: Object.hasOwn(game.gain, playerId), first: game.fastest === playerId, score: game.score[playerId] || 0, rank: order.indexOf(playerId) + 1 } : null };
+      me: playerId ? { choice: Object.hasOwn(game.answers, playerId) ? game.answers[playerId] : null, gain: shown ? (game.gain[playerId] || 0) : 0, right: shown ? Object.hasOwn(game.gain, playerId) : false, first: shown ? game.fastest === playerId : false, score: game.score[playerId] || 0, rank: order.indexOf(playerId) + 1 } : null };
   }
   if (game.type === 'survival') {
     const question = game.round >= 0 ? config.questions[game.round] : null, shown = game.state === 'reveal' || done;

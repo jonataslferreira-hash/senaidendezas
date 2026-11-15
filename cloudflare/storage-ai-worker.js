@@ -1,10 +1,12 @@
 const MODEL='@cf/qwen/qwen3.8-27b';
 // Modelos gratuitos de cada serviço, na ordem de tentativa. Cada modelo tem a sua
-// própria cota diária, então ter dois por serviço dobra a folga antes de "cair".
-// Dá para trocar sem mexer no código: variáveis GEMINI_MODEL e GROQ_MODEL (lista separada por vírgula).
-const GEMINI_MODELS=['gemini-3.1-flash-lite','gemini-3.8-flash'];
-const GROQ_MODELS=['qwen/qwen3.8-27b','openai/gpt-oss-120b'];
-const modelList=(value,fallback)=>{const list=String(value||'').split(',').map(item=>item.trim()).filter(item=>/^[\w./:@-]{3,80}$/.test(item));return (list.length?list:fallback).slice(0,3);};
+// própria cota diária, então encadear vários modelos multiplica a folga sem exigir outra chave.
+// Dá para trocar sem mexer no código: variáveis GEMINI_MODEL, GROQ_MODEL, MISTRAL_MODEL e NVIDIA_MODEL (lista separada por vírgula).
+const GEMINI_MODELS=['gemini-3.1-flash-lite','gemini-3.5-flash-lite','gemini-3.8-flash','gemma-4-26b-a4b-it','gemma-4-31b-it'];
+const GROQ_MODELS=['qwen/qwen3.8-27b','openai/gpt-oss-120b','openai/gpt-oss-20b'];
+const MISTRAL_MODELS=['mistral-small-latest','mistral-large-latest'];
+const NVIDIA_MODELS=['openai/gpt-oss-120b','deepseek-ai/deepseek-v4.1-flash','google/gemma-4-31b-it'];
+const modelList=(value,fallback)=>{const list=String(value||'').split(',').map(item=>item.trim()).filter(item=>/^[\w./:@-]{3,80}$/.test(item));return (list.length?list:fallback).slice(0,5);};
 const MAX_BYTES=1_500_000;
 import {cachedAnswer,isQuotaExhausted,openRouterEnabled,openRouterModels,openRouterQuota,quotaNotice,runOpenRouter,spendQuota} from './storage-ai-openrouter.js';
 
@@ -23,19 +25,39 @@ async function boundedJSON(request) {
 }
 
 const cloudflareEnabled=env=>env.STORAGE_AI_FREE_CONFIRMED==='true'&&Boolean(env.AI);
-export const storageAIEnabled=env=>Boolean(env.AI_LIMIT&&(env.GROQ_API_KEY||env.GEMINI_API_KEY||openRouterEnabled(env)||cloudflareEnabled(env)));
+export const storageAIEnabled=env=>Boolean(env.AI_LIMIT&&(env.GROQ_API_KEY||env.GEMINI_API_KEY||env.MISTRAL_API_KEY||env.NVIDIA_API_KEY||openRouterEnabled(env)||cloudflareEnabled(env)));
 
 async function runGroq(key,messages,maxTokens,model){
   const response=await fetch('https://api.groq.com/openai/v1/chat/completions',{
     method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+key},
     body:JSON.stringify({
-      model,messages,temperature:.25,max_completion_tokens:maxTokens,
+      model,messages,temperature:.25,max_completion_tokens:Math.min(maxTokens,6000),
       // Só o Qwen aceita desligar o raciocínio; os gpt-oss usam 'low'.
       reasoning_effort:/qwen/i.test(model)?'none':'low',response_format:{type:'json_object'}
     }),
     signal:AbortSignal.timeout(35000)
   });
   if(!response.ok)throw Object.assign(Error('groq_request_failed'),{status:response.status});
+  return response.json();
+}
+
+async function runMistral(key,messages,maxTokens,model){
+  const response=await fetch('https://api.mistral.ai/v1/chat/completions',{
+    method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+key},
+    body:JSON.stringify({model,messages,temperature:.25,max_tokens:maxTokens,response_format:{type:'json_object'}}),
+    signal:AbortSignal.timeout(45000)
+  });
+  if(!response.ok)throw Object.assign(Error('mistral_request_failed'),{status:response.status});
+  return response.json();
+}
+
+async function runNvidia(key,messages,maxTokens,model){
+  const response=await fetch('https://integrate.api.nvidia.com/v1/chat/completions',{
+    method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+key},
+    body:JSON.stringify({model,messages,temperature:.25,max_tokens:maxTokens,response_format:{type:'json_object'}}),
+    signal:AbortSignal.timeout(45000)
+  });
+  if(!response.ok)throw Object.assign(Error('nvidia_request_failed'),{status:response.status});
   return response.json();
 }
 
@@ -116,7 +138,7 @@ export async function handleStorageAI(request,env,user,headers) {
     'Prefira layouts do catálogo quando combinarem com o conteúdo. Estes IDs também são válidos: '+openLayoutCatalog.map(layout=>'opf-'+layout.id+' ('+layout.summary+')').join('; ')+'.',
     'Gere chatTitle em português com 2 a 6 palavras que nomeiem o tema da conversa. Evite copiar o pedido e não comece com “Aula sobre” ou “Crie”. Para layouts de processo, comparação ou listas, coloque um ponto curto por linha em body.',
     'Se houver uma decisão concreta que precise de confirmação, retorne reviewQuestion com uma pergunta curta sobre ela. Inclua a proposta de slides normalmente, usando a melhor suposição.',
-    'Use cover na abertura, feature para destacar um visual, gallery para grupos de fotos, split para explicar junto a um visual, editorial para texto em colunas e statement para uma ideia-chave. Evite repetir a mesma composição ou paleta em páginas seguidas.',
+    'Use cover na abertura, cards para 2 a 3 pilares/conceitos (escreva cada linha no formato "• Subtítulo curto: explicação"), timeline para etapas/processos em sequência (3 a 4 linhas), columns para comparações ou prós e contras, highlight para um conceito principal em destaque, editorial para explicação em duas áreas, statement para uma ideia-chave ou conclusão, split/stack para texto ao lado de imagem, feature/banner para foto em destaque e gallery para várias imagens. Varie os layouts entre páginas seguidas para a aula nunca ficar repetitiva.',
     'theme pode ser '+aiThemes.join(', ')+'. Escolha cores coerentes com o assunto.',
     'Respeite as cores citadas no pedido. Se o usuário citar azul, verde e rosa pastel, escolha pastel; se citar rosa, escolha rose; verde, sage; azul, ocean; roxo, iris; laranja ou amarelo, citrus; vermelho, ember; preto ou escuro, midnight; branco, paper. Se pedir um padrão de cor para todos os slides, repita o mesmo theme em todas as páginas. O aplicativo também detecta as cores e aplica a paleta final.',
     'Quando houver fotos enviadas, use photos como lista de índices inteiros iniciando em zero. Associe as fotos ao assunto; use cada imagem apenas uma vez e distribua todas entre os slides. Para imagens do catálogo livre, informe imageSearch em cada slide que comporta um visual relevante; a busca é feita pelo aplicativo.',
@@ -152,13 +174,16 @@ export async function handleStorageAI(request,env,user,headers) {
   })):[];
   const groqAttempts=env.GROQ_API_KEY?modelList(env.GROQ_MODEL,GROQ_MODELS).filter((model,index)=>!photos.length||index===0||/qwen|llama-4|vision/i.test(model)).map(model=>({provider:'groq',model,run:()=>runGroq(env.GROQ_API_KEY,messages,maxTokens,model)})):[];
   const geminiAttempts=env.GEMINI_API_KEY?modelList(env.GEMINI_MODEL,GEMINI_MODELS).map(model=>({provider:'gemini',model,run:()=>runGemini(env.GEMINI_API_KEY,messages[0].content,message,photos,maxTokens,model)})):[];
+  const mistralAttempts=env.MISTRAL_API_KEY?modelList(env.MISTRAL_MODEL,MISTRAL_MODELS).filter(model=>!photos.length||/small|pixtral|vision/i.test(model)).map(model=>({provider:'mistral',model,run:()=>runMistral(env.MISTRAL_API_KEY,messages,maxTokens,model)})):[];
+  const nvidiaAttempts=env.NVIDIA_API_KEY?modelList(env.NVIDIA_MODEL,NVIDIA_MODELS).filter(model=>!photos.length||/gemma-4|vision|vl/i.test(model)).map(model=>({provider:'nvidia',model,run:()=>runNvidia(env.NVIDIA_API_KEY,messages,maxTokens,model)})):[];
   const attempts=[
-    // Ordem pela qualidade dos slides: Groq e Gemini (cotas gratuitas grandes e
-    // modelos mais fortes) vêm antes; o OpenRouter :free (50 chamadas por dia,
-    // modelo sorteado) e o Cloudflare ficam de reserva. Quando um serviço cai
-    // ou a cota dele acaba, o pedido passa sozinho para o seguinte.
+    // Ordem pela qualidade e folga gratuita: Groq e Gemini (incl. Gemma 4) vêm primeiro;
+    // Mistral e NVIDIA NIM entram como reforço gratuito quando configurados;
+    // OpenRouter :free (50 chamadas/dia) e Cloudflare ficam de reserva.
     ...groqAttempts,
     ...geminiAttempts,
+    ...mistralAttempts,
+    ...nvidiaAttempts,
     ...openRouterAttempts,
     ...cloudflareAttempts.map(({model,options})=>({provider:'cloudflare',model,run:()=>env.AI.run(model,{messages,temperature:.25,...options})}))
   ];
@@ -168,7 +193,9 @@ export async function handleStorageAI(request,env,user,headers) {
     let quotaState=null;
     let minuteLimited=false;
     const externalFailures=[];
+    const deniedProviders=new Set();
     for(const {provider,model,run} of attempts){
+      if(deniedProviders.has(provider))continue;
       // A cota gratuita é conferida antes de gastar uma chamada: se o dia já
       // acabou, o pedido é preservado no navegador em vez de virar erro 429.
       if(provider==='openrouter'){
@@ -212,6 +239,7 @@ export async function handleStorageAI(request,env,user,headers) {
         }
         if(provider!=='cloudflare'){
           const reason=openRouterReason||(status===429?'limit':status===401||status===403?'access_denied':status===400?'rejected':status===404?'model_unavailable':'unavailable');
+          if(reason==='access_denied')deniedProviders.add(provider);
           externalFailures.push({provider,reason});
         }
         if(Number(error?.code)===3036||/\b3036\b|daily free allocation/i.test(message)){
