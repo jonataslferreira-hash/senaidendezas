@@ -4,6 +4,7 @@ import {takePhoto} from './camera-photo.js';
 import {GameLayout} from './game-layout.js';
 import {GameAudio} from './game-audio.js';
 import {quizMarkup,leaderboardMarkup} from './game-ui.js';
+import { gameMarkup, keepGame, animateRaffle, teamStrip } from './stage-games-view.js';
 import {Simulations} from './simulations.js';
 import {loadSlideFonts} from './fonts.js';
 import {editParticipant,participantPhoto,manageParticipants} from './participant-profile.js';
@@ -35,7 +36,7 @@ let slides = activeLesson.slides;
 import { Classroom } from './network.js';
 import { Room } from './room.js';
 import { HardwareViewer } from './models.js';
-import { teacherControls, captureInteraction, applyInteraction, InteractionBroadcaster, describeSims, applySimCommand } from './live-interaction.js';
+import { teacherControls, captureInteraction, applyInteraction, InteractionBroadcaster, describeSims, applySimCommand, describeModels, applyModelCommand } from './live-interaction.js';
 import { cleanSimEvents, cleanSimValues } from './custom-sim-bridge.js';
 import { VideoSync } from './video-sync.js';
 import QRCode from 'qrcode';
@@ -81,7 +82,7 @@ let liveInteraction = null, liveInteractionTimers = [];
 // Vídeos do YouTube: o relógio do professor chega pelo estado da sala (timerOffset).
 const videoSync = new VideoSync(() => Date.now() + (host ? 0 : timerOffset));
 // Experimentos importados rodam em iframes isolados: a conversa é por mensagens.
-let customSimValues = {}, customSimKey = '';
+let customSimValues = {}, customSimKey = '', customSimControls = {}, customSimPads = {};
 const customSimFrames = () => [...app.querySelectorAll('.canvas-presenting .custom-sim iframe')];
 const customSimRole = () => { const teacher = state?.phase === 'lesson' ? teacherControls(slides[state.slide]) : ''; return !teacher || teacher === 'models' ? 'off' : host ? (demo ? 'off' : 'send') : 'follow'; };
 const tellCustomSim = (frame, message) => { try { frame?.contentWindow?.postMessage(message, '*'); } catch { /* iframe ainda carregando */ } };
@@ -91,7 +92,17 @@ window.addEventListener('message', event => {
   const frames = customSimFrames(), index = frames.findIndex(frame => frame.contentWindow === event.source);
   if (index < 0) return;
   const role = customSimRole();
+  if (data.storageLab === 'sim-controls') {
+    // Lista de controles do experimento importado, para o controle remoto desenhar.
+    const text = value => String(value ?? '').slice(0, 60);
+    const fields = (Array.isArray(data.fields) ? data.fields : []).slice(0, 14).filter(f => f && Number.isInteger(f.i) && ['range', 'select', 'toggle', 'text'].includes(f.k)).map(f => ({ i: f.i, k: f.k, label: text(f.label), value: text(f.value), ...(f.k === 'range' ? { min: text(f.min), max: text(f.max), step: text(f.step) } : {}), ...(f.k === 'select' ? { options: (Array.isArray(f.options) ? f.options : []).slice(0, 24).map(o => [text(o?.[0]), text(o?.[1])]) } : {}) }));
+    const buttons = (Array.isArray(data.buttons) ? data.buttons : []).slice(0, 16).filter(b => b && Number.isInteger(b.a)).map(b => ({ a: b.a, label: text(b.label) }));
+    const next = { fields, buttons };
+    if (JSON.stringify(next) !== JSON.stringify(customSimControls[index])) { customSimControls[index] = next; publishRemote(); }
+    return;
+  }
   if (data.storageLab === 'sim-ready') {
+    if (host) tellCustomSim(frames[index], { storageLab: 'sim-describe' });
     tellCustomSim(frames[index], { storageLab: 'sim-role', role });
     const values = liveInteraction?.slide === state?.slide ? liveInteraction.payload?.custom?.[index] : null;
     if (role === 'follow' && Array.isArray(values)) tellCustomSim(frames[index], { storageLab: 'sim-state', values: cleanSimValues(values) });
@@ -103,12 +114,49 @@ window.addEventListener('message', event => {
 });
 // O que o controle remoto (celular do professor) precisa saber da apresentação.
 function publishRemote() {
-  studio.remote.setPresentation(state && host && !demo ? { code: state.code, title: activeLesson.title, slide: state.slide, total: slides.length, phase: state.phase, note: state.phase === 'lesson' ? slides[state.slide]?.note?.slice(0, 2000) : '', sims: state.phase === 'lesson' ? describeSims(app) : [] } : null);
+  if (!state || !host || demo) { studio.remote.setPresentation(null); return; }
+  const lesson = state.phase === 'lesson', slide = lesson ? slides[state.slide] : null;
+  const frames = lesson ? customSimFrames() : [];
+  const customs = frames.slice(0, 3).map((frame, index) => ({ name: String(frame.closest('.custom-sim')?.querySelector('strong')?.textContent || 'Experimento importado').replace(/\s+/g, ' ').trim().slice(0, 60), fields: customSimControls[index]?.fields || [], buttons: customSimControls[index]?.buttons || [] }));
+  studio.remote.setPresentation({ code: state.code, title: activeLesson.title, slide: state.slide, total: slides.length, phase: state.phase, stage: state.activity?.type || '', hasNext: Boolean(state.activity?.hasNext), game: remoteGame(), note: lesson ? slide?.note?.slice(0, 2000) : '',
+    sims: lesson ? describeSims(app) : [], customs, models: lesson ? describeModels(app, { canvasModels, slide: slide ? presentationSlide(slide) : null }) : [] });
+}
+function remoteGame() { const g = state?.game; return g ? { type: g.type, state: g.state, drawn: g.current?.name || '' } : null; }
+// Comandos do controle remoto para experimentos (nativos e importados) e modelos 3D.
+function remoteInteract(value) {
+  if (state?.phase !== 'lesson' || !host || !value || typeof value !== 'object') return;
+  if (value.model !== undefined) { if (applyModelCommand(value, { canvasModels, viewer, slide: presentationSlide(slides[state.slide]) }) && value.explode) setTimeout(publishRemote, 200); return; }
+  if (Number.isInteger(value.custom)) {
+    const frame = customSimFrames()[value.custom];
+    if (!frame) return;
+    if (value.pad && typeof value.pad === 'object') {
+      const pad = customSimPads[value.custom] ||= { x: .5, y: .5 }, kind = String(value.pad.t);
+      if (!['move', 'down', 'up', 'tap'].includes(kind)) return;
+      pad.x = Math.max(0, Math.min(1, pad.x + (Number(value.pad.dx) || 0))); pad.y = Math.max(0, Math.min(1, pad.y + (Number(value.pad.dy) || 0)));
+      showRemoteCursor(frame, pad, kind);
+      tellCustomSim(frame, { storageLab: 'sim-command', pad: { t: kind, x: pad.x, y: pad.y } });
+    } else if (Number.isInteger(value.button)) tellCustomSim(frame, { storageLab: 'sim-command', button: value.button });
+    else if (Number.isInteger(value.field)) tellCustomSim(frame, { storageLab: 'sim-command', field: value.field, value: String(value.value ?? '').slice(0, 60) });
+    return;
+  }
+  if (applySimCommand(app, value)) setTimeout(publishRemote, 200);
+}
+// Mostra na tela projetada onde o "dedo" do controle remoto está.
+let remoteCursorTimer = 0;
+function showRemoteCursor(frame, pad, kind) {
+  const box = frame.getBoundingClientRect();
+  let dot = document.querySelector('.remote-cursor');
+  if (!dot) { dot = document.createElement('i'); dot.className = 'remote-cursor'; dot.setAttribute('aria-hidden', 'true'); document.body.append(dot); }
+  dot.style.left = box.left + pad.x * box.width + 'px'; dot.style.top = box.top + pad.y * box.height + 'px';
+  dot.dataset.down = String(kind === 'down' || kind === 'tap' || (kind === 'move' && dot.dataset.down === 'true' && kind !== 'up'));
+  if (kind === 'up') dot.dataset.down = 'false';
+  if (kind === 'tap') setTimeout(() => { dot.dataset.down = 'false'; }, 180);
+  clearTimeout(remoteCursorTimer); remoteCursorTimer = setTimeout(() => dot.remove(), 4000);
 }
 function syncInteraction() {
   const slide = state?.phase === 'lesson' ? slides[state.slide] : null, teacher = teacherControls(slide);
   const simKey = slide ? activeLesson.id + ':' + state.slide : '';
-  if (simKey !== customSimKey) { customSimKey = simKey; customSimValues = {}; }
+  if (simKey !== customSimKey) { customSimKey = simKey; customSimValues = {}; customSimControls = {}; customSimPads = {}; }
   for (const frame of customSimFrames()) tellCustomSim(frame, { storageLab: 'sim-role', role: customSimRole() });
   const tools = { canvasModels, viewer, slide: slide ? presentationSlide(slide) : null };
   if (teacher && !host) app.dataset.teacherControls = teacher; else delete app.dataset.teacherControls;
@@ -154,7 +202,7 @@ phoneLayout.addEventListener('change',()=>{if(state?.phase==='lesson')render();}
 const qrCache = new Map();
 const params = routeParams();
 let codeDraft = (params.get('s') || '').replace(/\D/g, '').slice(0, 6);
-const studio = new Studio(app, { render, toast, joinForm, preview, remoteAction:(name,value)=>{if(name!=='sim'){action(name);return;}if(state?.phase==='lesson'&&host&&applySimCommand(app,value))setTimeout(publishRemote,200);}, present: (lesson,startIndex,fromEditor) => connectSession({host:true,lesson,startIndex,fromEditor}) });
+const studio = new Studio(app, { render, toast, joinForm, preview, remoteAction:(name,value)=>{if(name==='sim')remoteInteract(value);else action(name);}, present: (lesson,startIndex,fromEditor) => connectSession({host:true,lesson,startIndex,fromEditor}) });
 if (codeDraft) studio.view = 'join';
 
 function toast(message) {
@@ -318,7 +366,7 @@ function render() {
   // para onde estava e quem assiste volta ao início.
   if (state?.phase === 'finished' && !state.totalQuestions) { focusView.close(); leave(); return; }
   app.classList.toggle('quiz-party', Boolean(state && state.phase !== 'lesson'));
-  const markup = sharedLoading || busy && host && !state ? `${header()}<main class="public-loading"><p role="status">Carregando apresentação…</p></main>` : sharedError ? `${header()}<main class="public-loading"><h1>Apresentação indisponível</h1><p>${esc(sharedError)}</p><button class="btn secondary" data-action="home">Voltar</button></main>` : !state ? studio.markup() : state.phase === 'lesson' ? lesson() : ['lobby', 'countdown'].includes(state.phase) ? lobbyMarkup(state, { host, demo, header, shareDialog, shareOpen }) : state.phase === 'finished' ? finished() : state.phase==='leaderboard'?leaderboardMarkup(state,{header,host,offset:timerOffset}):state.poll ? pollMarkup() : quiz();
+  const markup = sharedLoading || busy && host && !state ? `${header()}<main class="public-loading"><p role="status">Carregando apresentação…</p></main>` : sharedError ? `${header()}<main class="public-loading"><h1>Apresentação indisponível</h1><p>${esc(sharedError)}</p><button class="btn secondary" data-action="home">Voltar</button></main>` : !state ? studio.markup() : state.phase === 'lesson' ? lesson() : ['lobby', 'countdown'].includes(state.phase) ? lobbyMarkup(state, { host, demo, header, shareDialog, shareOpen }) : state.phase === 'finished' ? finished() : state.phase==='leaderboard'?leaderboardMarkup(state,{header,host,offset:timerOffset}):state.game ? gameMarkup(state, { host, demo, header }) : state.poll ? pollMarkup() : quiz();
   const chatSlots = '[data-chat-slot], [data-social-slot]';
   const currentAIPage = app.querySelector('.storage-ai-page');
   const keepAI = !state && !sharedLoading && !sharedError && !(busy && host) &&
@@ -344,6 +392,8 @@ function render() {
     app.prepend(next.content);
     studio.chat.paint();
     studio.social.paint();
+  } else if (keepGame(app, markup, state)) {
+    liveSlide = null;
   } else if (!keepLiveSlide(markup, slideMotionKey)) {
     app.innerHTML = markup;
     const frame = slideMotionKey ? app.querySelector(LIVE_SLIDE) : null;
@@ -354,7 +404,9 @@ function render() {
     if (editDraft) app.insertAdjacentHTML('beforeend', liveEditDialog(editDraft, editError));
   }
   app.dataset.transition = state?.phase === 'lesson' ? slides[state.slide]?.transition || 'slide' : 'slide';
-  if(state)app.insertAdjacentHTML('beforeend','<div data-remote-dialog></div>');
+  if (state?.teams && ['leaderboard', 'finished'].includes(state.phase) && !app.querySelector('.team-strip')) app.querySelector('main')?.insertAdjacentHTML('beforeend', teamStrip(state));
+  if (state?.game?.type === 'raffle') animateRaffle(app, () => Date.now() + timerOffset);
+  if(state&&!app.querySelector('[data-remote-dialog]'))app.insertAdjacentHTML('beforeend','<div data-remote-dialog></div>');
   studio.remote.paint();
   syncPresentationMode();
   if (editDraft) for (const el of app.querySelectorAll('.header, .classroom, .document-classroom, .presentation-toolbar, .pinned-room-qr')) el.inert = true;
@@ -372,7 +424,7 @@ function render() {
   const upcoming = state?.phase === 'lesson' ? slides[state.slide + 1] : null;
   canvasModels.preload(upcoming ? presentationSlide(upcoming) : null);
   focusView.sync(state?.phase==='lesson'?slides[state.slide]?.id:'');
-  fillAssetImages(app);simulations.mount(state?.phase==='lesson'?app:null);syncInteraction();publishRemote();if(state?.phase==='lesson')loadSlideFonts(slides[state.slide],activeLesson.customFonts);
+  fillAssetImages(app);simulations.mount(state?.phase==='lesson'||state?.game?.type==='challenge'?app:null);syncInteraction();publishRemote();if(state?.phase==='lesson')loadSlideFonts(slides[state.slide],activeLesson.customFonts);
   if (state && (shareOpen || (host && !demo && presenterSettings.qrVisible && state.phase === 'lesson'))) {
     const url = joinUrl();
     const setQR = src => { if (state && joinUrl() === url) for (const image of document.querySelectorAll('#room-qr, [data-pinned-qr]')) image.src = src; };
@@ -523,6 +575,42 @@ async function answer(choice) {
     else await classroom.answer(choice, questionIndex);
   } catch (err) { toast(err.message); }
 }
+// Etapas interativas: o que o aluno envia (resposta, palavra, toques…).
+async function sendGame(payload, quiet = false) {
+  if (!state?.game || state.phase !== 'game') return;
+  try {
+    if (!quiet) { gameAudio.unlock(); gameAudio.cue('answer'); }
+    if (demo) { classroom.answer(demoPlayer, { choice: payload, questionIndex: state.game.id }); receive({ ...classroom.snapshot(demoPlayer), lesson: classroom.publicLesson(true) }); }
+    else await classroom.answer(payload, state.game.id);
+  } catch (err) { if (!quiet) toast(err.message); }
+}
+let tugTaps = 0, tugTimer = 0;
+function tugTap(button) {
+  tugTaps++; navigator.vibrate?.(8);
+  button.classList.remove('pulse'); void button.offsetWidth; button.classList.add('pulse');
+  if (!tugTimer) tugTimer = setTimeout(() => { const taps = tugTaps; tugTaps = 0; tugTimer = 0; sendGame({ taps }, true); }, 450);
+}
+app.addEventListener('pointerdown', event => { const button = event.target.closest('[data-tug-tap]'); if (button) { event.preventDefault(); tugTap(button); } });
+app.addEventListener('keydown', event => { const button = event.target.closest?.('[data-tug-tap]'); if (button && (event.key === ' ' || event.key === 'Enter') && !event.repeat) { event.preventDefault(); tugTap(button); } });
+app.addEventListener('submit', event => {
+  const form = event.target.closest('[data-cloud-form]');
+  if (!form) return;
+  event.preventDefault();
+  const input = form.querySelector('input'), word = input.value.trim();
+  if (!word) return;
+  if (Number(form.dataset.left) <= 0) { toast('Você já enviou as suas 3 respostas.'); return; }
+  input.value = ''; sendGame({ word });
+});
+app.addEventListener('click', event => {
+  const button = event.target.closest('[data-game-send],[data-game-do],[data-challenge-send]');
+  if (!button || button.disabled || !state?.game) return;
+  if (button.dataset.gameDo) { if (host) control('game', { do: button.dataset.gameDo, id: button.dataset.id }); return; }
+  if (button.hasAttribute('data-challenge-send')) {
+    const values = [...app.querySelectorAll('[data-challenge-sim] :is([data-param],[data-sim-select],[data-sim-text],[data-sim-toggle])')].map(field => field.dataset.simToggle !== undefined ? field.dataset.value || '0' : String(field.value).slice(0, 80));
+    sendGame({ values }); return;
+  }
+  try { sendGame(JSON.parse(button.dataset.gameSend)); } catch { /* botão inválido */ }
+});
 function exportResults() {
   const rows = [['Posição', 'Nome', 'Pontos', 'Acertos'], ...state.ranking.map((p, i) => [i + 1, p.name, p.score, p.correct])];
   const csv = '\uFEFF' + rows.map(row => row.map(value => '"' + String(value).replace(/^[=+@-]/, "'$&").replace(/"/g, '""') + '"').join(';')).join('\r\n');
@@ -556,6 +644,10 @@ async function action(name) {
     case 'reveal': control('reveal'); break;
     case 'next-question': control(state.phase==='reveal'?'ranking':'next'); break;
     case 'back-lesson': control('lesson'); break;
+    case 'game-draw': control('game', { do: 'draw' }); break;
+    case 'game-end': control('game', { do: 'end' }); break;
+    case 'game-restart': control('game', { do: 'restart' }); break;
+    case 'game-shuffle': control('game', { do: 'shuffle' }); break;
     case 'edit-current-slide': await editInStudio(); break;
     case 'cancel-edit-slide': editDraft = null; editError = ''; render(); showPresentationControls(); break;
     case 'image-text': imageText = !imageText; syncPresentationMode(); showPresentationControls(); break;

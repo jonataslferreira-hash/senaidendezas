@@ -121,3 +121,35 @@ export function applySimCommand(root, command) {
   field.dispatchEvent(new Event('input', { bubbles: true })); field.dispatchEvent(new Event('change', { bubbles: true }));
   return true;
 }
+
+// ---- Controle remoto: modelos 3D. O celular vira um "touchpad" que gira o modelo.
+export function orbitCamera(viewer, { dx = 0, dy = 0, zoom = 1 } = {}) {
+  if (!viewer?.camera || !viewer.controls) return false;
+  const p = viewer.camera.position, t = viewer.controls.target;
+  let x = p.x - t.x, y = p.y - t.y, z = p.z - t.z;
+  const radius = Math.hypot(x, y, z) || 1;
+  const theta = Math.atan2(x, z) - (Number(dx) || 0);
+  const phi = Math.max(.08, Math.min(Math.PI - .08, Math.acos(Math.max(-1, Math.min(1, y / radius))) - (Number(dy) || 0)));
+  const next = Math.max(.2, Math.min(400, radius * Math.max(.5, Math.min(2, Number(zoom) || 1))));
+  x = next * Math.sin(phi) * Math.sin(theta); y = next * Math.cos(phi); z = next * Math.sin(phi) * Math.cos(theta);
+  p.set(t.x + x, t.y + y, t.z + z);
+  viewer.controls.update?.(); viewer.invalidate?.();
+  return true;
+}
+const modelTitles = { hdd: 'HD', ssd: 'SSD', nvme: 'NVMe', custom: 'Modelo 3D' };
+export function describeModels(root, { canvasModels, slide } = {}) {
+  const list = [];
+  for (const id of canvasModels?.viewers?.keys() || []) {
+    const element = slide?.elements?.find(item => item.id === id);
+    list.push({ id, name: short(element?.modelLabel || modelTitles[element?.model] || 'Modelo 3D', 40), explode: Boolean(element && element.model !== 'custom'), exploded: canvasModels.exploded.has(id) });
+  }
+  if (root?.querySelector('#viewer-slot')) list.push({ id: 'main', name: 'Modelo 3D', explode: false, exploded: false });
+  return list.slice(0, 4);
+}
+export function applyModelCommand(command, { canvasModels, viewer, slide } = {}) {
+  const id = String(command?.model ?? '');
+  const target = id === 'main' ? viewer : canvasModels?.viewers?.get(id);
+  if (!target) return false;
+  if (command.explode) { if (id === 'main' || !slide) return false; canvasModels.toggle(id, slide); return true; }
+  return orbitCamera(target, { dx: command.dx, dy: command.dy, zoom: command.zoom });
+}

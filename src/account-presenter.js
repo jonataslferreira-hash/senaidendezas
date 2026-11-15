@@ -7,7 +7,7 @@
 // chegar, ele é reenviado, e o computador ignora os repetidos.
 import { createUuid } from './uuid.js';
 const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-const commands=new Set(['previous','next-slide','next-stage','quiz','start-quiz','reveal','next-question','back-lesson','finish','poll','close-poll','sim']);
+const commands=new Set(['previous','next-slide','next-stage','quiz','start-quiz','reveal','next-question','back-lesson','finish','poll','close-poll','sim','game-draw','game-end','game-restart','game-shuffle']);
 const GRACE=15000; // uma sessão só some depois deste tempo sem sinal (a presença oscila)
 export function remoteConnectionMessage(state,error,online=true){
  const reason=String(error?.message||'');
@@ -26,9 +26,27 @@ export class AccountPresenter{
   studio.root.addEventListener('click',e=>{const b=e.target.closest('[data-remote-action]');if(b)this.action(b).catch(error=>{this.status=error.message;this.paint();});});
   studio.root.addEventListener('input',e=>{const field=e.target.closest('[data-remote-field]');if(field)this.fieldChanged(field);});
   studio.root.addEventListener('change',e=>{const field=e.target.closest('[data-remote-field]');if(field)this.fieldChanged(field,true);});
+  const root=studio.root;
+  // Touchpad do controle: gira o modelo 3D ou move o cursor do experimento importado.
+  root.addEventListener('pointerdown',e=>{const pad=e.target.closest?.('[data-remote-pad]');if(!pad||!this.available())return;e.preventDefault();try{pad.setPointerCapture(e.pointerId);}catch{/* sem captura */}
+   this.pad={node:pad,id:e.pointerId,x:e.clientX,y:e.clientY,dx:0,dy:0,moved:0,at:Date.now(),hold:pad.dataset.hold==='true'};this.dragging=true;pad.dataset.active='true';
+   if(this.pad.hold)this.padSend({t:'down'});});
+  root.addEventListener('pointermove',e=>{const pad=this.pad;if(!pad||e.pointerId!==pad.id)return;const box=pad.node.getBoundingClientRect(),dx=(e.clientX-pad.x)/Math.max(1,box.width),dy=(e.clientY-pad.y)/Math.max(1,box.height);
+   pad.moved+=Math.abs(e.clientX-pad.x)+Math.abs(e.clientY-pad.y);pad.x=e.clientX;pad.y=e.clientY;pad.dx+=dx;pad.dy+=dy;
+   if(!pad.timer)pad.timer=setTimeout(()=>{pad.timer=0;this.padFlush();},60);});
+  const padEnd=e=>{const pad=this.pad;if(!pad||e.pointerId!==pad.id)return;clearTimeout(pad.timer);pad.timer=0;this.padFlush();
+   if(pad.hold)this.padSend({t:'up'});else if(pad.moved<8&&Date.now()-pad.at<350&&pad.node.dataset.remotePad==='custom'){navigator.vibrate?.(10);this.padSend({t:'tap'});}
+   pad.node.dataset.active='false';this.pad=null;this.dragging=false;};
+  root.addEventListener('pointerup',padEnd);root.addEventListener('pointercancel',padEnd);
   setInterval(()=>this.tick(),2500);
   queueMicrotask(()=>this.connect());
  }
+ // Movimento acumulado do touchpad (enviado sem confirmação: o próximo já corrige).
+ padFlush(){const pad=this.pad;if(!pad||(!pad.dx&&!pad.dy))return;const {dx,dy}=pad;pad.dx=0;pad.dy=0;
+  if(pad.node.dataset.remotePad==='model')this.volatile({model:pad.node.dataset.model,dx:dx*Math.PI,dy:dy*Math.PI*.7});
+  else this.padSend({t:'move',dx:dx*.9,dy:dy*.9});}
+ padSend(event){const pad=this.pad;if(!pad||pad.node.dataset.remotePad!=='custom')return;this.volatile({custom:Number(pad.node.dataset.custom),pad:event});}
+ volatile(value){this.send({kind:'control',target:this.open,action:'sim',value,id:createUuid()});}
  state(){this.seen||=new Map();this.statuses||=new Map();this.handled||=[];this.waiting||=new Map();return this;}
  async connect(force=false){
   this.state();
@@ -150,32 +168,66 @@ export class AccountPresenter{
  retryMarkup(){return this.status&&!this.ready&&this.open?`<div class="remote-connection-status"><p role="status">${esc(this.status)}</p><button type="button" class="studio-btn quiet" data-remote-action="reconnect">Reconectar controle</button></div>`:'';}
  markup(){return this.retryMarkup()+(this.sessions.length?`<section class="account-live-sessions"><h2>Apresentação em andamento</h2>${this.sessions.map(p=>`<article><div><strong>${esc(p.title)}</strong><small>${Number.isInteger(p.slide)?'Slide '+(p.slide+1)+' de '+Number(p.total)+' · ':''}sala ${esc(p.code)}</small></div><button class="studio-btn accent" type="button" data-remote-action="open" data-device="${esc(p.device)}">Usar este aparelho como controle</button></article>`).join('')}</section>`:'');}
  roomButton(code){const session=this.sessions.find(p=>p.code===code);return session?`<button type="button" class="btn secondary small" data-remote-action="open" data-device="${esc(session.device)}">Controlar slide</button>`:'';}
+ controlsMarkup(fields,at,stepAt,off){
+  return (fields||[]).map(f=>{
+   const a=`data-remote-field ${at} data-field="${Number(f.i)}" ${off}`;
+   if(f.k==='range')return `<label class="remote-range"><span>${esc(f.label)} <output>${esc(f.value)}</output></span><div><button type="button" data-remote-action="sim-step" data-step="-1" aria-label="Diminuir ${esc(f.label)}" ${off}>−</button><input type="range" min="${esc(f.min)}" max="${esc(f.max)}" step="${esc(f.step)}" value="${esc(f.value)}" aria-label="${esc(f.label)}" ${a}><button type="button" data-remote-action="sim-step" data-step="1" aria-label="Aumentar ${esc(f.label)}" ${off}>+</button></div></label>`;
+   if(f.k==='select')return `<label class="remote-select"><span>${esc(f.label)}</span><select aria-label="${esc(f.label)}" ${a}>${(f.options||[]).map(([value,name])=>`<option value="${esc(value)}" ${String(value)===String(f.value)?'selected':''}>${esc(name)}</option>`).join('')}</select></label>`;
+   if(f.k==='toggle')return `<button type="button" class="studio-btn quiet remote-toggle" data-remote-action="sim-toggle" ${at} data-field="${Number(f.i)}" data-value="${f.value==='1'?'1':'0'}" aria-pressed="${f.value==='1'}" ${off}>${esc(f.label)}</button>`;
+   return `<label class="remote-select"><span>${esc(f.label)}</span><input type="text" maxlength="60" value="${esc(f.value)}" ${a}></label>`;
+  }).join('');
+ }
  simsMarkup(p,off){
-  const sims=Array.isArray(p?.sims)?p.sims:[];
-  if(!sims.length)return '<p class="remote-empty">Este slide não tem experimento. Passe para um slide com experimento e ele aparece aqui.</p>';
-  return sims.map((sim,s)=>`<section class="remote-sim"><h3>${esc(sim.name)}</h3>${(sim.fields||[]).map(f=>{
-   const at=`data-remote-field data-sim="${s}" data-field="${Number(f.i)}" ${off}`;
-   if(f.k==='range')return `<label class="remote-range"><span>${esc(f.label)} <output>${esc(f.value)}</output></span><div><button type="button" data-remote-action="sim-step" data-step="-1" data-sim="${s}" data-field="${Number(f.i)}" aria-label="Diminuir ${esc(f.label)}" ${off}>−</button><input type="range" min="${esc(f.min)}" max="${esc(f.max)}" step="${esc(f.step)}" value="${esc(f.value)}" aria-label="${esc(f.label)}" ${at}><button type="button" data-remote-action="sim-step" data-step="1" data-sim="${s}" data-field="${Number(f.i)}" aria-label="Aumentar ${esc(f.label)}" ${off}>+</button></div></label>`;
-   if(f.k==='select')return `<label class="remote-select"><span>${esc(f.label)}</span><select aria-label="${esc(f.label)}" ${at}>${(f.options||[]).map(([value,name])=>`<option value="${esc(value)}" ${String(value)===String(f.value)?'selected':''}>${esc(name)}</option>`).join('')}</select></label>`;
-   if(f.k==='toggle')return `<button type="button" class="studio-btn quiet remote-toggle" data-remote-action="sim-toggle" data-sim="${s}" data-field="${Number(f.i)}" data-value="${f.value==='1'?'1':'0'}" aria-pressed="${f.value==='1'}" ${off}>${esc(f.label)}</button>`;
-   return `<label class="remote-select"><span>${esc(f.label)}</span><input type="text" maxlength="160" value="${esc(f.value)}" ${at}></label>`;
-  }).join('')}${(sim.acts||[]).length?`<div class="remote-acts">${sim.acts.map(act=>`<button type="button" class="studio-btn quiet" data-remote-action="sim-act" data-sim="${s}" data-act="${Number(act.a)}" ${off}>${esc(act.label)}</button>`).join('')}</div>`:''}${sim.play?`<button type="button" class="studio-btn accent remote-play" data-remote-action="sim-play" data-sim="${s}" ${off}>${esc(sim.play)}</button>`:''}</section>`).join('');
+  const sims=Array.isArray(p?.sims)?p.sims:[],customs=Array.isArray(p?.customs)?p.customs:[],models=Array.isArray(p?.models)?p.models:[];
+  if(!sims.length&&!customs.length&&!models.length)return '<p class="remote-empty">Este slide não tem experimento nem modelo 3D. Passe para um slide que tenha e os controles aparecem aqui.</p>';
+  const native=sims.map((sim,s)=>`<section class="remote-sim"><h3>🧪 ${esc(sim.name)}</h3>${this.controlsMarkup(sim.fields,`data-sim="${s}"`,'',off)}${(sim.acts||[]).length?`<div class="remote-acts">${sim.acts.map(act=>`<button type="button" class="studio-btn quiet" data-remote-action="sim-act" data-sim="${s}" data-act="${Number(act.a)}" ${off}>${esc(act.label)}</button>`).join('')}</div>`:''}${sim.play?`<button type="button" class="studio-btn accent remote-play" data-remote-action="sim-play" data-sim="${s}" ${off}>${esc(sim.play)}</button>`:''}</section>`).join('');
+  const imported=customs.map((sim,c)=>`<section class="remote-sim"><h3>🧩 ${esc(sim.name)}</h3>
+   <div class="remote-pad" data-remote-pad="custom" data-custom="${c}" data-hold="${this.padHold===c}" role="application" aria-label="Touchpad do experimento"><span>${this.padHold===c?'Arraste o dedo: o cursor arrasta junto':'Deslize para mover o cursor · toque para clicar'}</span></div>
+   <div class="remote-pad-tools"><button type="button" class="studio-btn quiet" data-remote-action="pad-click" data-custom="${c}" ${off}>Clicar</button><button type="button" class="studio-btn quiet" data-remote-action="pad-hold" data-custom="${c}" aria-pressed="${this.padHold===c}" ${off}>${this.padHold===c?'✋ Arrastando':'✋ Arrastar'}</button></div>
+   <p class="remote-hint">Um ponto aparece no telão mostrando onde está o cursor.</p>
+   ${this.controlsMarkup(sim.fields,`data-custom="${c}"`,'',off)}${(sim.buttons||[]).length?`<div class="remote-acts">${sim.buttons.map(b=>`<button type="button" class="studio-btn quiet" data-remote-action="custom-button" data-custom="${c}" data-button="${Number(b.a)}" ${off}>${esc(b.label)}</button>`).join('')}</div>`:''}</section>`).join('');
+  const three=models.map(m=>`<section class="remote-sim"><h3>🧊 ${esc(m.name)}</h3>
+   <div class="remote-pad" data-remote-pad="model" data-model="${esc(m.id)}" role="application" aria-label="Girar o modelo 3D"><span>Deslize o dedo para girar o modelo</span></div>
+   <div class="remote-pad-tools"><button type="button" class="studio-btn quiet" data-remote-action="model-zoom" data-zoom="0.82" data-model="${esc(m.id)}" aria-label="Aproximar" ${off}>＋ Zoom</button><button type="button" class="studio-btn quiet" data-remote-action="model-zoom" data-zoom="1.22" data-model="${esc(m.id)}" aria-label="Afastar" ${off}>－ Zoom</button>${m.explode?`<button type="button" class="studio-btn quiet" data-remote-action="model-explode" data-model="${esc(m.id)}" aria-pressed="${Boolean(m.exploded)}" ${off}>${m.exploded?'Montar':'Explodir'}</button>`:''}</div></section>`).join('');
+  return native+imported+three;
+ }
+ // Botões principais de acordo com o momento da aula.
+ stageMarkup(p,button){
+  const phase=p?.phase||'lesson',game=p?.game,next=p?.hasNext?'Próxima etapa →':'Concluir etapa';
+  const big=(action,label)=>button(action,label,'accent remote-big');
+  if(phase==='lobby'||phase==='countdown')return `<p class="remote-phase">Quiz · sala de espera</p>${big('start-quiz','▶ Iniciar quiz')}<div class="remote-row">${button('back-lesson','Voltar aos slides')}</div>`;
+  if(phase==='question')return `<p class="remote-phase">Quiz · pergunta no ar</p>${big('reveal','Revelar resposta')}`;
+  if(phase==='reveal'||phase==='leaderboard')return `<p class="remote-phase">Quiz · resultado</p>${big('next-question','Continuar →')}`;
+  if(phase==='finished')return `<p class="remote-phase">Quiz · pódio final</p>${big('back-lesson',next)}`;
+  if(phase==='poll')return `<p class="remote-phase">Enquete aberta</p>${big('close-poll','Encerrar votação')}`;
+  if(phase==='poll-results')return `<p class="remote-phase">Enquete · resultado</p>${big(p?.stage==='poll'?'next-stage':'back-lesson',p?.stage==='poll'?next:'Voltar aos slides')}`;
+  if(phase==='game'&&game){
+   const names={teams:'Equipes',flash:'Desafio relâmpago',cloud:'Nuvem de palavras',challenge:'Desafio no experimento',raffle:'Sorteio',tug:'Cabo de guerra'},open=game.state==='open';
+   const main=game.type==='raffle'?big('game-draw',game.drawn?'🎲 Sortear outro':'🎲 Sortear'):game.type==='teams'?big('next-stage',next):open?big('game-end','Encerrar rodada'):big('next-stage',next);
+   const extra=[game.type==='teams'?button('game-shuffle','🔀 Embaralhar times'):'',game.type==='raffle'?button('next-stage',next):'',!open&&!['teams','raffle'].includes(game.type)?button('game-restart','↻ Jogar de novo'):'',open&&!['teams','raffle'].includes(game.type)?button('next-stage',next):''].filter(Boolean).join('');
+   return `<p class="remote-phase">${esc(names[game.type]||'Dinâmica')}${game.type==='raffle'&&game.drawn?' · saiu '+esc(game.drawn):open||game.type==='teams'?'':' · encerrado'}</p>${main}<div class="remote-row">${extra}</div>`;
+  }
+  return '';
  }
  dialog(){
   if(!this.open)return '';
   const p=this.sessions.find(s=>s.device===this.open),available=Boolean(this.available()),off=available?'':'disabled';
-  const hasSlide=p&&Number.isInteger(p.slide),lesson=!p?.phase||p.phase==='lesson',simCount=Array.isArray(p?.sims)?p.sims.length:0;
+  const hasSlide=p&&Number.isInteger(p.slide),lesson=!p?.phase||p.phase==='lesson';
+  const count=['sims','customs','models'].reduce((sum,key)=>sum+(Array.isArray(p?.[key])?p[key].length:0),0);
   const button=(action,label,kind='quiet')=>`<button class="studio-btn ${kind}" data-remote-action="${action}" ${off}>${label}</button>`;
-  const head=`<button class="group-close" type="button" data-remote-action="close" aria-label="Fechar controle">×</button><header class="remote-head"><span class="remote-dot" data-on="${available}" title="${available?'Conectado':'Sem sinal'}"></span><div><h2>${esc(p?.title||'Apresentação desconectada')}</h2><p>${p?(hasSlide?'Slide '+(p.slide+1)+' de '+Number(p.total):'Conectando…')+' · sala '+esc(p.code):'Aguarde o computador reconectar.'}</p></div></header>`;
+  const head=`<button class="group-close" type="button" data-remote-action="close" aria-label="Fechar controle">×</button><header class="remote-head"><span class="remote-dot" data-on="${available}" title="${available?'Conectado':'Sem sinal'}"></span><div><h2>${esc(p?.title||'Apresentação desconectada')}</h2><p>${p?(hasSlide?(lesson?'Slide '+(p.slide+1)+' de '+Number(p.total):'Atividade em andamento'):'Conectando…')+' · sala '+esc(p.code):'Aguarde o computador reconectar.'}</p></div></header>`;
   const foot=`<p class="remote-status" role="status">${esc(this.notice||'')}</p>${this.retryMarkup()}`;
-  if(this.simOpen)return `<dialog class="group-dialog remote-dialog remote-v2" data-view="sims" aria-label="Controle do experimento">${head}<button class="studio-btn quiet remote-back" type="button" data-remote-action="sims-close">← Voltar ao controle</button><div class="remote-sims">${this.simsMarkup(p,off)}</div><div class="remote-main remote-main-small">${button('previous','← Anterior')}${button('next-slide','Próximo →','accent')}</div>${foot}</dialog>`;
+  if(this.simOpen&&lesson)return `<dialog class="group-dialog remote-dialog remote-v2" data-view="sims" aria-label="Controle do experimento">${head}<button class="studio-btn quiet remote-back" type="button" data-remote-action="sims-close">← Voltar ao controle</button><div class="remote-sims">${this.simsMarkup(p,off)}</div><div class="remote-main remote-main-small">${button('previous','← Anterior')}${button('next-slide','Próximo →','accent')}</div>${foot}</dialog>`;
+  const all=`<details class="remote-more"><summary>Todos os comandos</summary>
+   <section class="remote-group"><h3>Quiz</h3><div>${button('quiz','Abrir lobby')}${button('start-quiz','Iniciar quiz')}${button('reveal','Revelar resposta')}${button('next-question','Próxima pergunta')}</div></section>
+   <section class="remote-group"><h3>Enquete</h3><div>${button('poll','Abrir enquete')}${button('close-poll','Encerrar enquete')}</div></section>
+   <section class="remote-group"><h3>Aula</h3><div>${button('next-stage','Próxima etapa')}${button('back-lesson','Voltar aos slides')}${button('finish','Encerrar atividade')}</div></section></details>`;
+  if(!lesson)return `<dialog class="group-dialog remote-dialog remote-v2" data-view="stage" aria-label="Controle da apresentação">${head}<div class="remote-stage">${this.stageMarkup(p,button)}</div>${all}${foot}</dialog>`;
   return `<dialog class="group-dialog remote-dialog remote-v2" aria-label="Controle da apresentação">${head}
    <div class="remote-main">${button('previous','<i aria-hidden="true">←</i><span>Anterior</span>')}${button('next-slide','<span>Próximo</span><i aria-hidden="true">→</i>','accent')}</div>
-   <button class="studio-btn quiet remote-sim-open" type="button" data-remote-action="sims-open" ${off}><span>🧪 Mexer no experimento</span><small>${simCount?(simCount===1?'1 experimento neste slide':simCount+' experimentos neste slide'):'Nenhum neste slide'}</small></button>
-   ${p?.note?`<details class="remote-notes"><summary>Roteiro deste slide</summary><p>${esc(p.note)}</p></details>`:''}
-   <section class="remote-group" data-active="${!lesson}"><h3>Quiz</h3><div>${button('quiz','Abrir lobby')}${button('start-quiz','Iniciar quiz')}${button('reveal','Revelar resposta')}${button('next-question','Próxima pergunta')}</div></section>
-   <section class="remote-group"><h3>Enquete</h3><div>${button('poll','Abrir enquete')}${button('close-poll','Encerrar enquete')}</div></section>
-   <section class="remote-group"><h3>Atividade</h3><div>${button('back-lesson','Voltar aos slides')}${button('finish','Encerrar atividade')}</div></section>${foot}</dialog>`;
+   <button class="studio-btn quiet remote-sim-open" type="button" data-remote-action="sims-open" ${off||(count?'':'disabled')}><span>🧪 Mexer no experimento ou modelo 3D</span><small>${count?(count===1?'1 item interativo neste slide':count+' itens interativos neste slide'):'Nada interativo neste slide'}</small></button>
+   ${p?.note?`<details class="remote-notes" open><summary>Roteiro deste slide</summary><p>${esc(p.note)}</p></details>`:''}
+   ${all}${foot}</dialog>`;
  }
  // A janela só é redesenhada quando algo visível muda: redesenhar a cada sinal
  // fazia botões e controles deslizantes "escaparem" do dedo.
@@ -196,11 +248,11 @@ export class AccountPresenter{
  }
  // Controle deslizante: envia enquanto arrasta (no máximo ~12 vezes por segundo).
  fieldChanged(field,final=false){
-  const sim=Number(field.dataset.sim),index=Number(field.dataset.field),value=field.value;
+  const custom=field.dataset.custom!==undefined,sim=Number(custom?field.dataset.custom:field.dataset.sim),index=Number(field.dataset.field),value=field.value;
   const output=field.closest('.remote-range')?.querySelector('output');if(output)output.textContent=value;
   this.dragging=!final&&field.type==='range';
   clearTimeout(this.dragTimer);if(this.dragging)this.dragTimer=setTimeout(()=>{this.dragging=false;},1500);
-  const push=()=>{this.fieldTimer=0;this.send({kind:'control',target:this.open,action:'sim',value:{sim,field:index,value:this.fieldValue},id:createUuid()});};
+  const push=()=>{this.fieldTimer=0;this.send({kind:'control',target:this.open,action:'sim',value:custom?{custom:sim,field:index,value:this.fieldValue}:{sim,field:index,value:this.fieldValue},id:createUuid()});};
   this.fieldValue=value;
   if(final){clearTimeout(this.fieldTimer);push();}else if(!this.fieldTimer)this.fieldTimer=setTimeout(push,80);
  }
@@ -211,11 +263,16 @@ export class AccountPresenter{
   if(action==='close'){this.open='';this.simOpen=false;this.paint();return;}
   if(action==='sims-open'||action==='sims-close'){this.simOpen=action==='sims-open';this.send({kind:'hello',target:this.open});this.paint();return;}
   if(!this.available())return;
-  const sim=Number(button.dataset.sim);
+  const custom=button.dataset.custom!==undefined,sim=Number(custom?button.dataset.custom:button.dataset.sim);
   let name=action,value;
+  if(action==='pad-hold'){this.padHold=this.padHold===sim?null:sim;this.paint();return;}
+  if(action==='pad-click'){navigator.vibrate?.(10);this.volatile({custom:sim,pad:{t:'tap'}});return;}
+  if(action==='custom-button'){name='sim';value={custom:sim,button:Number(button.dataset.button)};}
+  if(action==='model-zoom'){this.volatile({model:button.dataset.model,zoom:Number(button.dataset.zoom)});return;}
+  if(action==='model-explode'){name='sim';value={model:button.dataset.model,explode:true};}
   if(action==='sim-play'){name='sim';value={sim,play:true};}
   else if(action==='sim-act'){name='sim';value={sim,act:Number(button.dataset.act)};}
-  else if(action==='sim-toggle'){const next=button.dataset.value==='1'?'0':'1';button.dataset.value=next;button.setAttribute('aria-pressed',String(next==='1'));name='sim';value={sim,field:Number(button.dataset.field),value:next};}
+  else if(action==='sim-toggle'){const next=button.dataset.value==='1'?'0':'1';button.dataset.value=next;button.setAttribute('aria-pressed',String(next==='1'));name='sim';value=custom?{custom:sim,field:Number(button.dataset.field),value:next}:{sim,field:Number(button.dataset.field),value:next};}
   else if(action==='sim-step'){
    const input=button.parentElement.querySelector('input[type=range]');if(!input)return;
    if(Number(button.dataset.step)>0)input.stepUp();else input.stepDown();

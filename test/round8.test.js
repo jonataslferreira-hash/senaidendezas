@@ -145,3 +145,54 @@ test('controle remoto: comando repetido só vale uma vez e a sessão tolera falh
   phone.item.open = 'pc';
   assert.match(phone.item.dialog(), /Apresentação desconectada/);
 });
+
+test('etapas interativas: equipes, relâmpago, nuvem, desafio, sorteio e cabo de guerra', async () => {
+  const { Room } = await import('../src/room.js');
+  const { demoLesson } = await import('../src/lessons.js');
+  const { defaultGame, challengeMatches, validateGame } = await import('../src/stage-games.js');
+  const lesson = demoLesson(); let now = 1000;
+  const add = (type, extra = {}) => { const slide = { ...lesson.slides[0], id: 'g-' + type, game: { ...defaultGame(type), ...extra } }; lesson.slides.push(slide); return { id: 'b-' + type, type, items: [slide.id] }; };
+  lesson.activityBlocks = [add('teams'), add('flash'), add('cloud'), add('challenge', { answer: [{ k: 'range', label: 'v', v: '50', min: 0, max: 100 }, { k: 'select', label: 's', v: 'a' }] }), add('raffle'), add('tug'), { id: 's', type: 'slides', items: lesson.slides.slice(0, 2).map(s => s.id) }];
+  const room = new Room('123456', null, () => now, lesson);
+  const ana = room.join({ name: 'Ana' }), bia = room.join({ name: 'Bia' }), caio = room.join({ name: 'Caio' });
+  assert.equal(room.data.phase, 'game');
+  assert.deepEqual(room.snapshot().teams.map(t => t.members.length).sort(), [1, 2]);
+  room.control('next-stage');
+  room.answer(ana.id, { choice: { choice: 1 } });
+  assert.equal(room.snapshot(caio.id).game.correct, undefined, 'aluno não recebe a resposta antes do fim');
+  assert.equal(room.snapshot(caio.id, true).lesson.slides.find(s => s.game?.type === 'flash').game.correct, undefined);
+  room.answer(bia.id, { choice: { choice: 0 } });
+  assert.equal(room.snapshot().game.winner.name, 'Bia');
+  assert.throws(() => room.answer(caio.id, { choice: { choice: 0 } }), /terminou/);
+  room.control('next-stage');
+  room.answer(ana.id, { choice: { word: ' Legal ' } }); room.answer(bia.id, { choice: { word: 'legal' } });
+  assert.equal(room.snapshot().game.words[0].n, 2);
+  room.control('next-stage'); now += 5000;
+  room.answer(ana.id, { choice: { values: ['80', 'a'] } });
+  assert.equal(room.snapshot(ana.id).game.me.ok, false);
+  now += 2000; room.answer(ana.id, { choice: { values: ['53', 'a'] } });
+  assert.equal(room.snapshot(ana.id).game.me.place, 1);
+  room.control('next-stage'); room.control('game', { do: 'draw' });
+  assert.ok(['Ana', 'Bia', 'Caio'].includes(room.snapshot().game.current.name));
+  assert.equal(room.snapshot().game.left, 2);
+  room.control('next-stage');
+  room.answer(ana.id, { choice: { side: 0 } }); room.answer(bia.id, { choice: { side: 1 } });
+  for (let i = 0; i < 3; i++) { now += 1000; room.answer(ana.id, { choice: { taps: 50 } }); }
+  assert.equal(room.snapshot().game.winner, 0, 'toques são limitados, mas o lado A vence');
+  assert.equal(room.snapshot().teams.reduce((sum, t) => sum + t.score, 0), 500 + 500 + 200);
+  room.control('next-stage');
+  assert.equal(room.data.phase, 'lesson');
+  assert.equal(challengeMatches({ tolerance: 5, answer: [{ k: 'range', v: '50', min: 0, max: 100, skip: true }, { k: 'toggle', v: '1' }] }, ['0', '1']), true);
+  assert.throws(() => validateGame({ type: 'challenge', text: 'x', simulation: 'pendulum', answer: [] }), /resposta certa/);
+});
+
+test('controle remoto gira e aproxima o modelo 3D', async () => {
+  const { orbitCamera, applyModelCommand } = await import('../src/live-interaction.js');
+  const vec = (x, y, z) => ({ x, y, z, set(a, b, c) { this.x = a; this.y = b; this.z = c; } });
+  const viewer = { camera: { position: vec(0, 0, 10) }, controls: { target: vec(0, 0, 0), update() {} } };
+  orbitCamera(viewer, { dx: Math.PI / 2 });
+  assert.ok(Math.abs(viewer.camera.position.x + 10) < 1e-6 && Math.abs(viewer.camera.position.z) < 1e-6);
+  orbitCamera(viewer, { zoom: .5 });
+  assert.ok(Math.abs(Math.hypot(viewer.camera.position.x, viewer.camera.position.y, viewer.camera.position.z) - 5) < 1e-6);
+  assert.equal(applyModelCommand({ model: 'nope', dx: 1 }, { canvasModels: { viewers: new Map() } }), false);
+});
