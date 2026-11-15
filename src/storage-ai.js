@@ -7,6 +7,7 @@ import {ensureBlocks} from './activity-blocks.js';
 import {studioIcon} from './studio-icons.js';
 import {Simulations,simulationNames} from './simulations.js';
 import {prefersReducedMotion} from './motion-preference.js';
+import {requestedGames,withGameQuestions,takeGameQuestions,addGameStages} from './storage-ai-games.js';
 import {canvasMarkup,CanvasModels,esc} from './canvas-view.js';
 import {createSlideModel,createSlideSound} from './storage-ai-media.js';
 import {AI_PHOTO_LIMIT,AI_SLIDE_LIMIT,aiPalettes,aiThemes} from './storage-ai-options.js';
@@ -909,11 +910,15 @@ export class StorageAI {
       AbortSignal.any([job.controller.signal,AbortSignal.timeout(120000)]));
     const asksQuiz=/\bquiz\b|quest(?:ão|ões)|perguntas?\s+(?:de\s+)?(?:múltipla|alternativas?)/i.test(prompt);
     const asksPoll=/enquete|vota[cç][aã]o/i.test(prompt);
-    const activityNotice=await this.completeActivities(result,{
+    const games=requestedGames(prompt),gamePlan=withGameQuestions({
       quizzes:Number(asksQuiz),
       questions:requestedActivityCount(prompt,/quest(?:ões|ão)|perguntas?/i,3),
       polls:asksPoll?requestedActivityCount(prompt,/enquetes?|vota[cç][oõ]es?/i,1):0
-    },prompt,job.controller.signal,lesson.slides);
+    },games);
+    // Sem pedido de quiz, as perguntas que a IA mandar por conta própria não podem virar um quiz novo.
+    if(games.length&&!asksQuiz&&!gamePlan.request.quizzes)result.questions=[];
+    const activityNotice=await this.completeActivities(result,gamePlan.request,prompt,job.controller.signal,lesson.slides);
+    takeGameQuestions(result,games,gamePlan.quizTotal);
     assertCurrent();
     const edits=new Map((Array.isArray(result.edits)?result.edits:[]).map(edit=>[edit?.slideId,edit]));
     const updated=structuredClone(lesson);
@@ -937,6 +942,8 @@ export class StorageAI {
       for(const block of blocks)if(block.type==='slides')block.items.sort((a,b)=>position.get(a)-position.get(b));
     }
     changed+=addActivities(updated,result);
+    const stageResult=addGameStages(updated,result.games,{newSlide,createUuid});changed+=stageResult.added;
+    const stageNotice=[stageResult.added?`Adicionei ${stageResult.added} etapa(s) de dinâmica.`:'',stageResult.skipped.length?`Não consegui montar: ${stageResult.skipped.join(', ')} (faltaram perguntas).`:''].filter(Boolean).join(' ');
     if(!changed&&!reordered)return {saved:lesson,reply:[text(result.reply,1000)||'Nenhuma alteração foi aplicada.',activityNotice].filter(Boolean).join(' ')};
     const archived=await archiveImportedPages(updated);
     let saved;
@@ -951,7 +958,7 @@ export class StorageAI {
     const activityCount=(result.polls?.length||0)+(result.questions?.length||0);
     const summary=activityCount?`Atualizei a apresentação e adicionei ${activityCount} ${activityCount===1?'atividade':'atividades'} de quiz ou enquete.`:changed===1?'Atualizei 1 slide da apresentação.':changed?`Atualizei ${changed} slides da apresentação.`:'';
     const changes=[summary,reordered?'Reordenei as páginas da apresentação.':''].filter(Boolean).join(' ');
-    return {saved,reply:[cloudSaved?changes:changes+' As alterações ficaram neste dispositivo.',activityNotice].filter(Boolean).join(' ')};
+    return {saved,reply:[cloudSaved?changes:changes+' As alterações ficaram neste dispositivo.',activityNotice,stageNotice].filter(Boolean).join(' ')};
   }
   async syncLesson(lesson,uid) {
     try{
@@ -1074,9 +1081,12 @@ export class StorageAI {
           }
         }catch{}
       }
-      const result=await this.ask({mode:'create',prompt:generationPrompt,count,activities,photos:references,photoCount:images.length,photoSheet},AbortSignal.any([job.controller.signal,AbortSignal.timeout(160000)]));
+      // Dinâmicas pedidas no texto (sobrevivência, cabo de guerra, relâmpago…): pedimos perguntas a mais para elas.
+      const games=requestedGames(prompt),gamePlan=withGameQuestions(activities,games);
+      const result=await this.ask({mode:'create',prompt:generationPrompt,count,activities:gamePlan.request,photos:references,photoCount:images.length,photoSheet},AbortSignal.any([job.controller.signal,AbortSignal.timeout(160000)]));
       result.sources=researchSources;
-      const activityNotice=await this.completeActivities(result,activities,prompt,job.controller.signal,result.slides);
+      const activityNotice=await this.completeActivities(result,gamePlan.request,prompt,job.controller.signal,result.slides);
+      takeGameQuestions(result,games,gamePlan.quizTotal);
       if(uid!==this.studio.account.user?.id)throw Error('A conta mudou durante a geração.');
       if(/mesm[oa]\s+(?:tema|cor|paleta)|tema\s+(?:único|unico)|padr[aã]o\s+de\s+cor/i.test(prompt)){const sharedTheme=result.slides?.find(slide=>slide.theme)?.theme;if(sharedTheme)for(const slide of result.slides)slide.theme=sharedTheme;}
       const imageDefault=!/\b(?:sem|não use|não adicionar|sem adicionar|não quero|não coloque|dispense)\s+(?:(?:nenhuma?|as?)\s+)?(?:imagem|foto)s?\b|\b(?:apenas|só)\s+texto\b/i.test(prompt);
@@ -1090,11 +1100,13 @@ export class StorageAI {
           if(!document.hidden)await new Promise(resolve=>setTimeout(resolve,34));
         }
       },activities,imageDefault,{prompt:brief});
+      const stageResult=addGameStages(lesson,result.games,{newSlide,createUuid});
+      const stageNotice=stageResult.skipped.length?`Não consegui montar: ${stageResult.skipped.join(', ')} (faltaram perguntas). Você pode adicionar pelo editor.`:'';
       const title=cleanChatTitle(result.chatTitle);
       if(title)session.title=chatTitle(title);
       const imageNotice=missingImages===1?'Um slide ficou sem imagem: não havia foto relevante no catálogo livre.':
         missingImages>1?`${missingImages} slides ficaram sem imagem: preferi não usar fotos fora do assunto.`:'';
-      const draft={lesson,brief,photosFiles,activityNotice:[activityNotice,imageNotice].filter(Boolean).join(' '),reviewQuestion:text(result.reviewQuestion,350),
+      const draft={lesson,brief,photosFiles,activityNotice:[activityNotice,stageNotice,imageNotice].filter(Boolean).join(' '),reviewQuestion:text(result.reviewQuestion,350),
         palette:requestedPalette(brief)||lesson.slides.find(slide=>!slide.poll&&slide.visualTheme)?.visualTheme};
       if(session.instant){await this.commitPreview(job,session,draft);return;}
       this.previews.set(session.id,draft);

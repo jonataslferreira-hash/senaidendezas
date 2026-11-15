@@ -51,6 +51,14 @@ export class GameAudio{
    if(phase==='countdown')this.cue('countdown');
   }
   if(phase==='finished'){if(state.podiumRevealed&&!this.finalSkipped){for(const timer of this.timers)clearTimeout(timer);this.timers=[];this.finalSkipped=true;if(this.key!=='podium'){this.resultKey='';this.playResult();this.startPodium();}}return;}
+  // Sobrevivência e cabo de guerra usam a mesma música das perguntas do quiz enquanto a pergunta está aberta.
+  if(phase==='game'){
+   const g=state.game,sel=this.settings.questions,custom=lesson.questionAudio||lesson.quizAudio;
+   if(!g||!['survival','tug'].includes(g.type)||g.state!=='open'||sel==='none'||sel==='custom'&&!custom?.data){if((this.key||'').startsWith('game:')&&g?.state==='reveal')this.cue('countdown');this.pause(this.audio);this.key='';return;}
+   const key='game:'+g.id+':'+g.round;if(this.key===key)return;
+   const track=sel==='custom'?{id:'custom-questions',url:custom.data}:sel==='random'?chooseTrack(timedTracks(g.seconds||15),this.lastTrack,this.random):[...lobbyTracks,...questionTracks,...editorTracks].find(t=>t.id===sel);
+   this.startTrack(track,key,{loop:true,volume:this.settings.volume*(sel==='custom'?(custom.volume??1):1)});return;
+  }
   if(!['lobby','countdown','question'].includes(phase)){if(phase!=='reveal'){this.pause(this.audio);this.key='';}return;}
   this.section=phase==='question'?'questions':'lobby';this.selected=this.settings[this.section];const custom=this.section==='lobby'?lesson.lobbyAudio:lesson.questionAudio||lesson.quizAudio;
   if(this.selected==='none'||this.selected==='custom'&&!custom?.data){this.pause(this.audio);return;}

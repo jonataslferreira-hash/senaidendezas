@@ -185,10 +185,22 @@ test('etapas interativas: equipes, relâmpago, sobrevivência, desafio, sorteio 
   assert.ok(['Ana', 'Bia', 'Caio'].includes(room.snapshot().game.current.name));
   assert.equal(room.snapshot().game.left, 2);
   room.control('next-stage');
-  room.answer(ana.id, { choice: { side: 0 } }); room.answer(bia.id, { choice: { side: 1 } });
-  for (let i = 0; i < 3; i++) { now += 1000; room.answer(ana.id, { choice: { taps: 50 } }); }
-  assert.equal(room.snapshot().game.winner, 0, 'toques são limitados, mas o lado A vence');
-  assert.equal(room.snapshot().teams.reduce((sum, t) => sum + t.score, 0), 500 + 500 + 500 + 200);
+  // Cabo de guerra por perguntas: 3 rodadas; quem é do lado A acerta tudo, o lado B erra tudo.
+  assert.equal(room.snapshot().game.state, 'ready');
+  const everyone = room.data.players;
+  for (let round = 0; round < 3; round++) {
+    room.control('game', { do: 'next' });
+    const question = room.snapshot().game.question;
+    assert.equal(room.snapshot(everyone[0].id).game.question.text, '', 'aluno não recebe o texto da pergunta');
+    for (const player of everyone) { const side = room.snapshot(player.id).game.side; room.answer(player.id, { choice: { choice: side === 0 ? question.correct : (question.correct + 1) % question.options.length, round } }); }
+    assert.equal(room.snapshot().game.state, 'reveal');
+  }
+  room.control('game', { do: 'next' });
+  assert.equal(room.snapshot().game.state, 'pull');
+  assert.equal(room.snapshot().game.winner, 0, 'o lado que acertou mais puxa a corda');
+  now += 6000; room.tick();
+  assert.equal(room.snapshot().game.state, 'done');
+  assert.equal(room.snapshot().teams.reduce((sum, t) => sum + t.score, 0), 500 + 500 + 500 + room.snapshot().game.sides[0] * (300 + 200));
   room.control('next-stage');
   assert.equal(room.data.phase, 'lesson');
   assert.equal(challengeMatches({ tolerance: 5, answer: [{ k: 'range', v: '50', min: 0, max: 100, skip: true }, { k: 'toggle', v: '1' }] }, ['0', '1']), true);
@@ -204,4 +216,68 @@ test('controle remoto gira e aproxima o modelo 3D', async () => {
   orbitCamera(viewer, { zoom: .5 });
   assert.ok(Math.abs(Math.hypot(viewer.camera.position.x, viewer.camera.position.y, viewer.camera.position.z) - 5) < 1e-6);
   assert.equal(applyModelCommand({ model: 'nope', dx: 1 }, { canvasModels: { viewers: new Map() } }), false);
+});
+
+test('rodada 14: escolha de time, pódio guiado pela sala, corrida, textos escondidos do aluno e IA com dinâmicas', async () => {
+  const { Room } = await import('../src/room.js');
+  const { newLesson, validateLesson, newQuestion } = await import('../src/lessons.js');
+  const { defaultGame, gameTypes } = await import('../src/stage-games.js');
+  const { writeLesson, readLesson } = await import('../src/collaboration-core.js');
+  const Y = await import('yjs');
+  assert.equal(gameTypes.length, 7, 'com slides, enquete e quiz são 10 tipos de etapa');
+  let now = 1000;
+  const base = newLesson(), question = { ...newQuestion(), text: 'Quanto é 2+2?', options: ['3', '4'], correct: 1, explanation: 'Conta simples.' };
+  const stage = (type, extra = {}) => ({ id: 's-' + type, title: type, kind: 'text', game: { ...defaultGame(type), ...extra } });
+  const lesson = validateLesson({ ...base, slides: [base.slides[0], stage('teams', { pick: true }), stage('race', { goal: 60 }), stage('survival')], questions: [question],
+    activityBlocks: [{ id: 'b0', type: 'slides', items: [base.slides[0].id] }, { id: 'b1', type: 'teams', items: ['s-teams'] }, { id: 'b2', type: 'race', items: ['s-race'] }, { id: 'b3', type: 'survival', items: ['s-survival'] }, { id: 'b4', type: 'quiz', items: [question.id] }] });
+  // Salvar no grupo: a lista de perguntas da sobrevivência não tem id e quebrava a gravação.
+  const doc = new Y.Doc(); writeLesson(doc, lesson);
+  assert.deepEqual(readLesson(doc).slides[3].game.questions, lesson.slides[3].game.questions);
+
+  const room = new Room('123456', null, () => now, lesson);
+  const [ana, bia, caio] = ['Ana', 'Bia', 'Caio'].map(name => room.join({ name }));
+  // "Iniciar quiz" passa pelas etapas que vêm antes dele.
+  room.control('quiz');
+  assert.equal(room.data.phase, 'game'); assert.equal(room.snapshot().game.type, 'teams');
+  assert.equal(room.snapshot(ana.id).game.pick, true);
+  room.answer(ana.id, { choice: { team: 1 } }); room.answer(bia.id, { choice: { team: 1 } });
+  assert.deepEqual(room.snapshot().teams.map(team => team.members.length), [0, 2]);
+  room.control('next-stage');
+  assert.equal(room.snapshot().game.type, 'race');
+  assert.deepEqual(room.snapshot().teams.map(team => team.members.length), [1, 2], 'quem não escolheu entra no time menor');
+  assert.equal(room.snapshot().ranking.find(p => p.id === ana.id).color, '#f97316', 'o jogador leva a cor do time');
+  // Corrida: só vale depois da largada e os toques são limitados.
+  room.control('game', { do: 'next' });
+  assert.throws(() => room.answer(ana.id, { choice: { taps: 5 } }), /largada/);
+  now += 3100;
+  for (let i = 0; i < 40 && room.snapshot().game.state === 'open'; i++) { now += 500; room.answer(ana.id, { choice: { taps: 50 } }); if (i % 2) room.answer(bia.id, { choice: { taps: 6 } }); if (i % 3 === 0) room.answer(caio.id, { choice: { taps: 6 } }); }
+  assert.equal(room.snapshot().game.state, 'done');
+  assert.equal(room.snapshot(ana.id).game.me.place, 1);
+  assert.equal(room.data.players.find(p => p.id === ana.id).bonus, 500);
+  room.control('next-stage');
+  assert.equal(room.snapshot().game.type, 'survival');
+  room.control('next-stage'); assert.equal(room.data.phase, 'lobby');
+  room.control('start-quiz'); now += 3000; room.tick();
+  // O aluno só recebe os botões; o telão recebe o texto.
+  assert.equal(room.snapshot(ana.id).question.text, ''); assert.deepEqual(room.snapshot(ana.id).question.options, ['', '']);
+  assert.equal(room.snapshot().question.text, 'Quanto é 2+2?');
+  room.answer(ana.id, { choice: 1, questionIndex: 0 }); room.control('reveal'); room.control('ranking');
+  // Pódio: os passos vêm do relógio da sala.
+  assert.equal(room.data.phase, 'finished'); assert.equal(room.snapshot(ana.id).podiumStep, 0);
+  now += 2100; room.tick(); assert.equal(room.snapshot(ana.id).podiumStep, 1);
+  now += 5000; room.tick(); assert.equal(room.snapshot(ana.id).podiumStep, 3);
+  room.control('podium-all'); assert.equal(room.snapshot(ana.id).podiumStep, 4);
+  assert.ok([0, 1, 2, 3].includes(room.snapshot().victory));
+
+  const { leaderboardMarkup, quizMarkup } = await import('../src/game-ui.js');
+  const hidden = leaderboardMarkup({ ...room.snapshot(ana.id), podiumRevealed: false, podiumStep: 1 }, { header: () => '', host: false, final: true });
+  assert.equal((hidden.match(/data-shown="true"/g) || []).length, 1); assert.ok(!hidden.includes('final-confetti'));
+  const bare = quizMarkup({ questionIndex: 0, totalQuestions: 1, answeredCount: 0, ranking: [], phase: 'question', question: { text: '', options: ['', ''], bare: true } }, { header: () => '', host: false, status: 'online' });
+  assert.ok(bare.includes('bare-answers') && !bare.includes('option-copy') && !bare.includes('<h1>'));
+
+  const ai = await import('../src/storage-ai-games.js');
+  assert.deepEqual(ai.requestedGames('aula de frações com uma etapa de sobrevivência com 6 perguntas e cabo de guerra').map(g => [g.type, g.need]), [['survival', 6], ['tug', 4]]);
+  assert.deepEqual(ai.requestedGames('corrida espacial e trabalho em equipe'), []);
+  const plan = ai.withGameQuestions({ quizzes: 1, questions: 5, polls: 0 }, ai.requestedGames('sobrevivência com 6 perguntas e cabo de guerra, uma sobrevivência'));
+  assert.equal(plan.quizTotal, 5); assert.ok(plan.request.quizzes * plan.request.questions >= 15);
 });

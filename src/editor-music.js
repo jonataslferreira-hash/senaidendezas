@@ -20,6 +20,10 @@ export class EditorMusic {
     try{this.covers=JSON.parse(localStorage.getItem('sl-editor-music-covers')||'{}');for(const track of editorTracks)if(this.covers[track.id])Object.assign(track,this.covers[track.id]);}catch{this.covers={};}
     for(const track of editorTracks)this.coverColor(track);
     const root=studio.root;
+    // Clicar fora ou apertar Esc fecha o painel de músicas.
+    document.addEventListener('pointerdown',e=>{if(this.open&&!e.target.closest?.('.editor-music,.music-panel')){this.open=false;this.paint();}});
+    document.addEventListener('keydown',e=>{if(this.open&&e.key==='Escape'){this.open=false;this.paint();}});
+    addEventListener('resize',()=>{if(this.open)this.mountPanel();});
     root.addEventListener('click',e=>{const bar=e.target.closest('[data-music-seek]');if(!bar||this.track.kind==='spotify'||!(this.audio.duration>0))return;const box=bar.getBoundingClientRect();this.audio.currentTime=Math.max(0,Math.min(1,(e.clientX-box.left)/box.width))*this.audio.duration;});
     root.addEventListener('click',e=>{const b=e.target.closest('[data-music-action]');if(b)this.action(b.dataset.musicAction,b).catch(error=>{this.message=error.message;this.paint();});});
     root.addEventListener('change',e=>{
@@ -65,7 +69,16 @@ export class EditorMusic {
       <h3 class="music-list-title">Sua lista <small>${this.tracks.length} ${this.tracks.length===1?'item':'itens'}</small></h3>
       <div class="music-track-list">${this.tracks.map((track,i)=>{const kind=track.kind==='spotify'?(spotifyItem(track.url)?.type==='playlist'?'Playlist':spotifyItem(track.url)?.type==='album'?'Álbum':'Spotify'):track.assetId?'Enviada':'';return `<div class="${i===this.index?'selected':''}"><button type="button" data-music-action="select" data-track="${i}"><img src="${esc(musicCover(track))}" alt=""><span><strong>${esc(track.title)}</strong><small>${esc(track.artist||'Spotify')}</small></span>${kind?`<em>${kind}</em>`:''}${i===this.index?'<b class="music-eq" aria-hidden="true"><i></i><i></i><i></i></b>':''}</button>${track.assetId||track.kind==='spotify'?`<button type="button" data-music-action="remove" data-track="${i}" aria-label="Remover ${esc(track.title)}">×</button>`:''}</div>`;}).join('')}</div><p class="music-message" role="status">${esc(this.message)}</p></section>`:''}</div>`;}
   paint(){const slot=this.studio.root.querySelector('[data-editor-music]');if(slot)slot.innerHTML=this.markup();this.mountPanel();this.updateProgress();}
-  mountPanel(){const panel=this.studio.root.querySelector('.music-panel');if(!panel)return;const anchor=this.studio.root.querySelector('.editor-music').getBoundingClientRect();panel.style.left=Math.max(8,Math.min(anchor.left,innerWidth-Math.min(420,innerWidth-16)-8))+'px';panel.style.top=Math.min(anchor.bottom+10,Math.max(8,innerHeight-360))+'px';if(!panel.matches(':popover-open'))panel.showPopover();}
+  // O painel abre logo abaixo do player, centralizado nele, e sempre inteiro dentro da tela
+  // (se faltar espaço ele encolhe e ganha rolagem, em vez de cobrir o editor de qualquer jeito).
+  mountPanel(){
+    const panel=this.studio.root.querySelector('.music-panel');if(!panel)return;
+    if(!panel.matches(':popover-open'))panel.showPopover();
+    const anchor=this.studio.root.querySelector('.editor-music').getBoundingClientRect(),gap=10,edge=8;
+    const width=Math.min(panel.offsetWidth||400,innerWidth-edge*2),left=Math.max(edge,Math.min(anchor.left+anchor.width/2-width/2,innerWidth-width-edge));
+    const below=innerHeight-anchor.bottom-gap-edge,top=below>=300?anchor.bottom+gap:Math.max(edge,innerHeight-Math.min(panel.scrollHeight,innerHeight-edge*2)-edge);
+    panel.style.left=Math.round(left)+'px';panel.style.top=Math.round(top)+'px';panel.style.maxHeight=Math.round(innerHeight-top-edge)+'px';
+  }
   updateProgress(){this.mountPanel();const label=time(this.position)+' / '+time(this.duration);const bar=this.studio.root.querySelector('[data-music-bar]');if(bar){bar.style.width=(this.duration>0?Math.min(100,this.position/this.duration*100):0)+'%';const a=this.studio.root.querySelector('[data-music-position]'),b=this.studio.root.querySelector('[data-music-duration]');if(a)a.textContent=time(this.position);if(b)b.textContent=time(this.duration);}for(const el of this.studio.root.querySelectorAll('[data-music-time]'))if(el.textContent!==label)el.textContent=label;const shell=this.studio.root.querySelector('.editor-music');if(shell)shell.dataset.playing=String(this.playing);for(const button of this.studio.root.querySelectorAll('[data-music-play]')){const icon=this.playing?'pause':'play';if(button.dataset.musicIcon===icon)continue;/* Trocar o SVG a cada timeupdate cancelava o clique em andamento. */button.dataset.musicIcon=icon;button.innerHTML=musicIcon(icon);button.setAttribute('aria-label',this.playing?'Pausar música':'Tocar música');}}
   setEditing(value){const entering=value&&!this.editing;this.editing=value;if(!value){this.wantsPlay=false;this.audio.pause();this.selection++;this.stopSpotify();}else if(entering)this.select(this.randomAudioIndex(),true).catch(()=>{});}
   async select(index,play=true){

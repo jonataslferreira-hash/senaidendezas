@@ -43,4 +43,25 @@ export async function editParticipant(person,save){
  };
  dialog.addEventListener('close',()=>dialog.remove(),{once:true});document.body.append(dialog);paint();paintName();dialog.showModal();
 }
-export function manageParticipants(state,kick){const dialog=document.createElement('dialog');dialog.className='participant-dialog';dialog.innerHTML=`<header><h2>Participantes · ${state.ranking.filter(p=>p.online).length}</h2><button type="button" aria-label="Fechar participantes">×</button></header><div>${state.ranking.filter(p=>p.online).map(p=>`<article class="manage-participant">${avatarContent(p.avatar)}<strong>${esc(p.name)}</strong><span>${p.online?'Conectado':'Offline'}</span>${kick?`<button type="button" data-remove-player="${p.id}">Remover da sala</button>`:''}</article>`).join('')||'<p>A turma ainda não entrou.</p>'}</div>`;dialog.addEventListener('click',e=>{const id=e.target.closest('[data-remove-player]')?.dataset.removePlayer;if(id){kick(id);e.target.closest('article').remove();}else if(e.target.closest('header button'))dialog.close();});dialog.addEventListener('close',()=>dialog.remove(),{once:true});document.body.append(dialog);dialog.showModal();}
+// Painel "N conectados": lista da turma com busca, time, pontos e (para o professor) remover da sala.
+export function manageParticipants(state,kick){
+  const dialog=document.createElement('dialog');dialog.className='participants-sheet';
+  const people=[...state.ranking].sort((a,b)=>Number(b.online)-Number(a.online)||a.name.localeCompare(b.name,'pt-BR')),online=people.filter(p=>p.online).length,teams=state.teams||[];
+  const teamOf=p=>teams.find(team=>team.members.some(member=>member.id===p.id));
+  const row=p=>{const team=teamOf(p);return `<li class="ps-person" data-name="${esc(p.name.toLowerCase())}" data-online="${p.online}" data-me="${p.id===state.me?.id}"${team?` style="--team:${esc(team.color)}"`:''}><span class="ps-avatar">${avatarContent(p.avatar)}</span><div class="ps-text"><strong>${esc(p.name)}${p.id===state.me?.id?' <em>você</em>':''}</strong><small>${p.online?'Conectado':'Saiu da sala'}${team?' · Time '+esc(team.name):''}${p.score?' · '+p.score.toLocaleString('pt-BR')+' pts':''}</small></div>${kick?`<button type="button" class="ps-remove" data-remove-player="${esc(p.id)}">Remover</button>`:''}</li>`;};
+  dialog.innerHTML=`<header><div><h2>Participantes</h2><p><b>${online}</b> ${online===1?'conectado':'conectados'}${people.length>online?' · '+(people.length-online)+' fora':''}</p></div><button type="button" data-close aria-label="Fechar participantes">×</button></header>
+    ${people.length>6?'<input type="search" class="ps-search" placeholder="Procurar pelo nome" aria-label="Procurar participante">':''}
+    ${teams.length?`<div class="ps-teams">${teams.map(team=>`<span style="--team:${esc(team.color)}">Time ${esc(team.name)} <b>${team.members.length}</b></span>`).join('')}</div>`:''}
+    <ul class="ps-list">${people.map(row).join('')||'<li class="ps-empty">A turma ainda não entrou.</li>'}</ul>`;
+  dialog.addEventListener('input',e=>{if(!e.target.matches('.ps-search'))return;const term=e.target.value.trim().toLowerCase();for(const item of dialog.querySelectorAll('.ps-person'))item.hidden=Boolean(term)&&!item.dataset.name.includes(term);});
+  dialog.addEventListener('click',e=>{
+    const button=e.target.closest('[data-remove-player]');
+    if(button){
+      // Dois toques para remover: o primeiro só pede confirmação.
+      if(button.dataset.confirm!=='true'){for(const other of dialog.querySelectorAll('[data-confirm=true]')){other.dataset.confirm='false';other.textContent='Remover';}button.dataset.confirm='true';button.textContent='Confirmar';return;}
+      kick(button.dataset.removePlayer);button.closest('li').remove();return;
+    }
+    if(e.target.closest('[data-close]')||e.target===dialog)dialog.close();
+  });
+  dialog.addEventListener('close',()=>dialog.remove(),{once:true});document.body.append(dialog);dialog.showModal();
+}

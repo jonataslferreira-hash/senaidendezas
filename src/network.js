@@ -29,7 +29,7 @@ export class Classroom {
     await this.open();
     this.peer.on('connection', conn => this.accept(conn));
     storage.set('sl-mode', { host: true, code: this.code, fromEditor });
-    this.timer = setInterval(() => { const key = () => this.room.data.phase + ':' + (this.room.data.game?.state || ''), before = key(); this.room.tick(); if (before !== key()) this.broadcast(); }, 100);
+    this.timer = setInterval(() => { const key = () => this.room.data.phase + ':' + (this.room.data.game?.state || '') + ':' + (this.room.data.podiumStep || 0), before = key(); this.room.tick(); if (before !== key()) this.broadcast(); }, 100);
     this.broadcast();
     return this.code;
   }
@@ -128,6 +128,7 @@ export class Classroom {
           storage.set('sl-mode', { host: false, code: this.code, name: this.name, avatar: this.avatar });
           playerStorage.set('sl-active-player',{host:false,code:this.code,name:this.name,avatar:this.avatar});
           this.onStatus('online');
+        } else if(msg.type==='ended'){this.stopped=true;clearTimeout(timeout);try{localStorage.removeItem('sl-active-player');sessionStorage.removeItem('sl-mode');}catch{}this.onStatus('ended','O professor encerrou a apresentação.');conn.close();
         } else if(msg.type==='kicked'){this.stopped=true;clearTimeout(timeout);try{localStorage.removeItem('sl-active-player');sessionStorage.removeItem('sl-mode');}catch{}this.onStatus('removed','Você foi removido da sala pelo professor.');conn.close();
         } else if (msg.type === 'lesson') this.lesson = msg.lesson;
         else if (msg.type === 'slide-updated' && this.lesson && Number.isInteger(msg.index) && this.lesson.slides[msg.index]) {
@@ -176,6 +177,8 @@ export class Classroom {
       this.conn.send({ type: 'answer', payload: { choice, questionIndex }, request });
     });
   }
+  // Professor saiu de vez: avisa os alunos para voltarem à tela inicial.
+  end() { if (this.host) for (const conn of this.connections?.values?.() || []) { try { conn.send({ type: 'ended' }); } catch { /* conexão já caiu */ } } }
   stop() {
     this.stopped = true; clearInterval(this.timer); clearTimeout(this.retry);
     for (const p of this.pending.values()) { clearTimeout(p.timeout); p.reject(Error('Você saiu da sala.')); }

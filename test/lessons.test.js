@@ -42,7 +42,8 @@ test('uma sala usa os slides e o quiz da aula, preserva a aula ao reconectar e n
   assert.equal(student.lesson.questions, undefined);
   assert.equal(room.snapshot().lesson.slides[0].note, 'Roteiro privado');
   room.control('quiz'); room.control('start-quiz'); time += 3000; room.tick();
-  assert.equal(room.snapshot(p.id).question.text, q.text);
+  assert.equal(room.snapshot().question.text, q.text);
+  assert.equal(room.snapshot(p.id).question.text, '', 'o aluno recebe só os botões');
   assert.equal(room.snapshot(p.id).question.base, 2000);
   assert.equal(room.snapshot(p.id).question.deadline - time, 40000);
   assert.equal(room.snapshot(p.id).question.correct, undefined);
