@@ -14,31 +14,46 @@ const rules = [
 ];
 
 // Quais dinâmicas o pedido cita e quantas perguntas cada uma precisa.
-// `picked` são as etapas marcadas no painel "Montar a aula".
-export function requestedGames(prompt, picked = []) {
+// Quantas perguntas cada dinâmica aceita: [mínimo, máximo]. Relâmpago é sempre 1; equipes e sorteio não usam.
+export const GAME_QUESTION_RANGE = { survival: [1, 25], tug: [3, 25], race: [2, 25] };
+export const QUIZ_LIMIT = 50;
+const clampNeed = (type, value, fallback) => { const range = GAME_QUESTION_RANGE[type]; if (!range) return fallback; const n = Math.trunc(Number(value)); return Number.isFinite(n) && n > 0 ? Math.max(range[0], Math.min(range[1], n)) : fallback; };
+// `picked` são as etapas marcadas no painel "Montar a aula"; `counts` é o número de perguntas escolhido para cada uma.
+export function requestedGames(prompt, picked = [], counts = {}) {
   const source = String(prompt || ''), chosen = new Set(Array.isArray(picked) ? picked : []);
   return rules.filter(([type, pattern]) => chosen.has(type) || pattern.test(source)).map(([type, , need]) => {
-    if (type !== 'survival') return { type, need };
-    const asked = Number(source.match(/sobreviv[eê]ncia\s+(?:com|de)\s+(\d{1,2})/i)?.[1]);
-    return { type, need: asked > 0 ? Math.min(10, asked) : need };
+    // "corrida com 20 perguntas", "sobrevivência de 8", "cabo de guerra com 10 questões"
+    const label = { survival: 'sobreviv[eê]ncia', tug: 'cabo\\s+de\\s+guerra', race: 'corrida(?:\\s+do\\s+saber)?' }[type];
+    const asked = label ? Number(source.match(new RegExp(label + '\\s+(?:com|de)\\s+(\\d{1,2})', 'i'))?.[1]) : 0;
+    return { type, need: clampNeed(type, chosen.has(type) && counts?.[type] ? counts[type] : asked, need) };
   });
 }
 export const gameQuestionNeed = games => games.reduce((sum, game) => sum + game.need, 0);
 
-// Ajusta o pedido de perguntas para caber as do quiz + as das dinâmicas (limites do serviço: 3 quizzes × 10).
+// O serviço entrega no máximo 3 quizzes × 10 questões por chamada. Aqui sai o primeiro pedido (até 30)
+// e `want`, o total de verdade (quiz + dinâmicas): o que faltar é buscado em lotes por completeActivities.
 export function withGameQuestions(activities, games) {
-  const quizTotal = (activities.quizzes || 0) * (activities.questions || 0), need = gameQuestionNeed(games);
-  if (!need) return { request: activities, quizTotal };
-  const total = Math.min(30, quizTotal + need), quizzes = Math.max(1, activities.quizzes || 0, Math.min(3, Math.ceil(total / 10)));
-  return { request: { ...activities, quizzes, questions: Math.max(1, Math.min(10, Math.ceil(total / quizzes))) }, quizTotal };
+  const quizzes = activities.quizzes || 0, perQuiz = quizzes ? Math.min(activities.questions || 0, Math.floor(QUIZ_LIMIT / quizzes)) : 0;
+  const quizTotal = quizzes * perQuiz, need = gameQuestionNeed(games), want = quizTotal + need;
+  if (!need && perQuiz <= 10) return { request: activities, quizTotal, want: quizTotal };
+  const first = Math.min(30, want), groups = Math.max(1, Math.min(3, Math.ceil(first / 10)));
+  return { request: { ...activities, quizzes: groups, questions: Math.max(1, Math.min(10, Math.ceil(first / groups))) }, quizTotal, want };
 }
 
 // Separa as perguntas: as primeiras ficam no quiz, as seguintes alimentam as dinâmicas.
 export function takeGameQuestions(result, games, quizTotal) {
   const all = Array.isArray(result.questions) ? result.questions : [];
-  let rest = all.slice(quizTotal);
   result.questions = all.slice(0, quizTotal);
-  result.games = games.map(game => { const questions = rest.slice(0, game.need); rest = rest.slice(game.need); return { type: game.type, questions }; });
+  const rest = all.slice(quizTotal), want = gameQuestionNeed(games);
+  // Vieram menos perguntas do que o pedido: primeiro garante o mínimo de cada dinâmica, depois reparte o que sobrar.
+  const least = game => Math.min(game.need, GAME_QUESTION_RANGE[game.type]?.[0] ?? game.need);
+  let spare = rest.length - games.reduce((sum, game) => sum + least(game), 0), at = 0;
+  result.games = games.map(game => {
+    const take = rest.length >= want ? game.need : spare < 0 ? game.need : least(game) + Math.min(game.need - least(game), Math.max(0, spare));
+    if (rest.length < want && spare > 0) spare -= take - least(game);
+    const questions = rest.slice(at, at + take); at += take;
+    return { type: game.type, questions };
+  });
   return result;
 }
 

@@ -7,7 +7,7 @@ import {ensureBlocks} from './activity-blocks.js';
 import {studioIcon} from './studio-icons.js';
 import {Simulations,simulationNames} from './simulations.js';
 import {prefersReducedMotion} from './motion-preference.js';
-import {requestedGames,withGameQuestions,takeGameQuestions,addGameStages} from './storage-ai-games.js';
+import {requestedGames,withGameQuestions,takeGameQuestions,addGameStages,GAME_QUESTION_RANGE,QUIZ_LIMIT} from './storage-ai-games.js';
 import {stageIcon} from './stage-games-view.js';
 import {coverFromImage} from './lesson-cover.js';
 import {canvasMarkup,CanvasModels,esc} from './canvas-view.js';
@@ -62,7 +62,9 @@ function usableActivities(items,quiz,limit){
 const buttonIcon=()=>studioIcon('sparkle');
 const flashIcon='<svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" aria-hidden="true"><path d="m13 2-9 12h7l-1 8 10-12h-7z"/></svg>';
 function activitySettings(session){
-  return {quizzes:session?.quizzes??0,questions:session?.questions??5,polls:session?.polls??0};
+  const quizzes=session?.quizzes??0;
+  // O quiz inteiro cabe em 50 questões: com 3 quizzes, cada um fica com no máximo 16.
+  return {quizzes,questions:Math.min(session?.questions??5,quizzes?Math.floor(50/quizzes):25),polls:session?.polls??0};
 }
 function requestedActivityCount(prompt,pattern,fallback){
   const source=pattern.source;
@@ -74,6 +76,14 @@ const trayGames=[['teams','Equipes','Divide a turma em times'],['flash','Relâmp
 function stepper(name,label,value,min,max,extra=''){
   return `<div class="ai-step" ${extra}><span>${label}</span><div class="ai-stepper"><button type="button" data-ai-step="-1" data-for="${name}" aria-label="Diminuir ${label}">−</button><input name="${name}" type="number" inputmode="numeric" min="${min}" max="${max}" value="${value}" aria-label="${label}"><button type="button" data-ai-step="1" data-for="${name}" aria-label="Aumentar ${label}">+</button></div></div>`;
 }
+const gameDefaults={survival:5,tug:4,race:5};
+const gameCount=(session,type)=>{const [min,max]=GAME_QUESTION_RANGE[type];return Math.max(min,Math.min(max,Math.trunc(Number(session?.gameCounts?.[type]))||gameDefaults[type]));};
+// Total de perguntas que a IA vai escrever com as escolhas do painel (cada 10 é uma chamada).
+function questionTotalNote(session){
+  const {quizzes,questions}=activitySettings(session),picked=session?.games||[];
+  const total=quizzes*Math.min(questions,quizzes?Math.floor(QUIZ_LIMIT/quizzes):0)+picked.reduce((sum,type)=>sum+(GAME_QUESTION_RANGE[type]?gameCount(session,type):type==='flash'?1:0),0);
+  return total?`A IA vai escrever ${total} pergunta${total===1?'':'s'} diferentes${total>30?' · leva mais tempo e gasta mais da cota do dia':''}.`:'';
+}
 function countTray(session){
   const {quizzes,questions,polls}=activitySettings(session);
   const picked=new Set(session?.games||[]),count=session?.slideCount||5;
@@ -82,11 +92,13 @@ function countTray(session){
     <section class="ai-tray-block ai-slide-count-row" style="--fill:${((count-1)/(AI_SLIDE_LIMIT-1)*100).toFixed(1)}%"><div class="ai-tray-title"><label for="ai-slide-count">Slides</label><output>${count}</output></div><input id="ai-slide-count" name="count" type="range" min="1" max="${AI_SLIDE_LIMIT}" value="${count}"></section>
     <section class="ai-tray-block"><div class="ai-tray-title"><span>Atividades</span><small>0 = a IA decide pelo pedido</small></div>
       ${stepper('quizzes','Quizzes',quizzes,0,3)}
-      ${stepper('questions','Questões por quiz',questions,1,10,'data-quiz-size '+(quizzes?'':'hidden'))}
+      ${stepper('questions','Questões por quiz',questions,1,25,'data-quiz-size '+(quizzes?'':'hidden'))}
       ${stepper('polls','Enquetes',polls,0,8)}
     </section>
     <section class="ai-tray-block"><div class="ai-tray-title"><span>Etapas de jogo</span><small data-game-total>${picked.size?picked.size+' escolhida'+(picked.size>1?'s':''):'toque para incluir'}</small></div>
       <div class="ai-game-chips">${trayGames.map(([type,name,hint],i)=>`<button type="button" class="ai-game-chip" style="--i:${i}" data-ai-game="${type}" aria-pressed="${picked.has(type)}" title="${hint}">${stageIcon(type)}<span>${name}</span></button>`).join('')}</div>
+      <div class="ai-game-counts">${trayGames.filter(([type])=>GAME_QUESTION_RANGE[type]).map(([type,name])=>stepper('game-'+type,'Perguntas · '+name,gameCount(session,type),GAME_QUESTION_RANGE[type][0],GAME_QUESTION_RANGE[type][1],'data-game-count="'+type+'" '+(picked.has(type)?'':'hidden'))).join('')}</div>
+      <small class="ai-tray-note" data-question-total>${questionTotalNote(session)}</small>
     </section></div>`;
 }
 const closeIcon='<svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24"><path d="m6 6 12 12M6 18 18 6" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>';
@@ -946,9 +958,14 @@ export class StorageAI {
     if(!tray)return;
     const session=this.sessions.find(item=>item.id===this.activeChatId);
     const updateActivity=target=>{
-      if(!session||!['quizzes','questions','polls'].includes(target.name)||target.value==='')return;
-      const value=Math.max(Number(target.min),Math.min(Number(target.max),Math.trunc(Number(target.value))));
+      if(!session||target.value==='')return;
+      const value=Math.max(Number(target.min),Math.min(Number(target.max),Math.trunc(Number(target.value))||Number(target.min)));
+      if(target.name.startsWith('game-')){session.gameCounts={...(session.gameCounts||{}),[target.name.slice(5)]:value};tray.querySelector('[data-question-total]').textContent=questionTotalNote(session);this.saveSessions();return;}
+      if(!['quizzes','questions','polls'].includes(target.name))return;
       session[target.name]=value;
+      // O quiz inteiro cabe em até 50 questões: com 3 quizzes, cada um fica com no máximo 16.
+      if(session.quizzes&&(session.questions??5)>Math.floor(QUIZ_LIMIT/session.quizzes)){session.questions=Math.floor(QUIZ_LIMIT/session.quizzes);tray.querySelector('input[name=questions]').value=String(session.questions);}
+      tray.querySelector('[data-question-total]').textContent=questionTotalNote(session);
       tray.querySelector('[data-quiz-size]').hidden=!session.quizzes;
       this.saveSessions();
     };
@@ -974,6 +991,8 @@ export class StorageAI {
         if(games.has(chip.dataset.aiGame))games.delete(chip.dataset.aiGame);else games.add(chip.dataset.aiGame);
         session.games=[...games];
         chip.setAttribute('aria-pressed',String(games.has(chip.dataset.aiGame)));
+        const row=tray.querySelector(`[data-game-count="${chip.dataset.aiGame}"]`);if(row)row.hidden=!games.has(chip.dataset.aiGame);
+        tray.querySelector('[data-question-total]').textContent=questionTotalNote(session);
         tray.querySelector('[data-game-total]').textContent=games.size?games.size+' escolhida'+(games.size>1?'s':''):'toque para incluir';
         dialog.querySelector('.ai-count-button')?.classList.toggle('has-games',games.size>0);
         this.saveSessions();
@@ -982,6 +1001,7 @@ export class StorageAI {
     tray.onchange=({target})=>{
       updateActivity(target);
       if(session&&['quizzes','questions','polls'].includes(target.name))target.value=String(session[target.name]??target.min);
+      else if(session&&target.name.startsWith('game-'))target.value=String(gameCount(session,target.name.slice(5)));
     };
   }
   async reviseLesson(id,prompt,history,photos,job) {
@@ -1012,7 +1032,7 @@ export class StorageAI {
     },games);
     // Sem pedido de quiz, as perguntas que a IA mandar por conta própria não podem virar um quiz novo.
     if(games.length&&!asksQuiz&&!gamePlan.request.quizzes)result.questions=[];
-    const activityNotice=await this.completeActivities(result,gamePlan.request,prompt,job.controller.signal,lesson.slides);
+    const activityNotice=await this.completeActivities(result,{...gamePlan.request,want:gamePlan.want},prompt,job.controller.signal,lesson.slides);
     takeGameQuestions(result,games,gamePlan.quizTotal);
     assertCurrent();
     const edits=new Map((Array.isArray(result.edits)?result.edits:[]).map(edit=>[edit?.slideId,edit]));
@@ -1078,12 +1098,15 @@ export class StorageAI {
   async completeActivities(result,activities,prompt,signal,sourceSlides=[]){
     const questionMention=/\bquiz\b|quest(?:ão|ões)|perguntas?\s+(?:de\s+)?(?:múltipla|alternativas?)/i.test(prompt);
     const pollMention=/enquete|vota[cç][aã]o/i.test(prompt);
-    const expectedQuestions=activities.quizzes*activities.questions||(
+    const expectedQuestions=activities.want||activities.quizzes*activities.questions||(
       questionMention?requestedActivityCount(prompt,/quest(?:ões|ão)|perguntas?/i,3):0);
     const expectedPolls=activities.polls||(pollMention?requestedActivityCount(prompt,/enquetes?|vota[cç][oõ]es?/i,1):0);
     const maxQuestions=expectedQuestions||30;
     const maxPolls=activities.polls||8;
-    result.questions=usableActivities(result.questions,true,maxQuestions);
+    // Mesma pergunta com outra pontuação ou maiúsculas conta como repetida.
+    const sameKey=item=>text(item.text,600).normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().replace(/[^a-z0-9]+/g,' ').trim();
+    const unique=(items,seen=new Set())=>items.filter(item=>{const key=sameKey(item);if(!key||seen.has(key))return false;seen.add(key);return true;});
+    result.questions=unique(usableActivities(result.questions,true,200)).slice(0,maxQuestions);
     result.polls=usableActivities(result.polls,false,maxPolls);
     let missingQuestions=Math.max(0,expectedQuestions-result.questions.length);
     let missingPolls=Math.max(0,expectedPolls-result.polls.length);
@@ -1091,29 +1114,34 @@ export class StorageAI {
     // Keep asking for the missing activities in smaller, grounded batches.
     // This avoids accepting an underfilled response or padding the quiz with
     // generic questions that merely repeat slide titles.
-    const source= (Array.isArray(sourceSlides)?sourceSlides:[]).map((slide,index)=>{
+    const sourceLines=(Array.isArray(sourceSlides)?sourceSlides:[]).map((slide,index)=>{
       const parts=[slide?.title,slide?.body,slide?.poll?.text,...(slide?.elements||[]).map(element=>element?.text)]
         .map(value=>text(value,500)).filter(Boolean);
       return parts.length?`Slide ${index+1}: ${parts.join(' — ')}`:'';
-    }).filter(Boolean).join('\n').slice(0,1000);
+    }).filter(Boolean);
+    // Cada rodada começa a ler a aula de um slide diferente, para as perguntas novas cobrirem outra parte do conteúdo.
+    const sourceFor=attempt=>{const at=sourceLines.length?attempt*Math.max(1,Math.ceil(sourceLines.length/4))%sourceLines.length:0;return [...sourceLines.slice(at),...sourceLines.slice(0,at)].map(line=>line.slice(0,330)).join('\n').slice(0,800);};
     let questionBatch=Math.min(10,missingQuestions),stalled=0;
-    // Cada rodada custa uma chamada da cota diária. Duas tentativas bastam
-    // para completar o que faltou sem queimar o limite do dia.
-    for(let attempt=0;attempt<2&&(missingQuestions||missingPolls);attempt++){
+    // Cada rodada traz até 10 perguntas novas e custa uma chamada da cota diária:
+    // o número de rodadas acompanha o que falta (25 perguntas = 3 rodadas), com duas de folga.
+    const maxAttempts=Math.min(16,Math.ceil(missingQuestions/10)+2+Number(missingPolls>0));
+    for(let attempt=0;attempt<maxAttempts&&(missingQuestions||missingPolls);attempt++){
       if(signal.aborted)throw signal.reason||new DOMException('Aborted','AbortError');
       questionBatch=Math.min(10,missingQuestions,Math.max(1,questionBatch||1));
-      const skip=[...result.questions,...result.polls].map(item=>text(item.text,110)).join('; ').slice(0,350);
+      // As mais recentes primeiro: são as que a IA mais tende a repetir.
+      const skip=[...result.questions,...result.polls].reverse().map(item=>text(item.text,70)).join('; ').slice(0,560);
       const angles=['aplicação prática e situações do cotidiano','comparação, causa e consequência','interpretação de um cenário e correção de um erro comum','memória e compreensão de conceitos importantes'][attempt%4];
+      const source=sourceFor(attempt);
       const retryPrompt=`Crie apenas atividades para esta aula; não crie slides. Tema: ${text(result.title,140)||cleanChatTitle(prompt)||'aula'}. Conteúdo real dos slides:\n${source||text(prompt,1000)}\n\nComplete exatamente com ${questionBatch} questões de múltipla escolha e ${missingPolls} enquetes. Faça questões novas, específicas e variadas, explorando ${angles}; use aplicação, comparação, interpretação e conceitos diferentes, não troque só algumas palavras. Cada questão precisa de 2 a 4 alternativas, índice da resposta certa, dificuldade, tempo e explicação. Enquetes devem ter opções plausíveis. Não repita nem reformule estas atividades: ${skip||'nenhuma'}. Retorne JSON com questions e polls.`;
       const retrySettings={quizzes:Number(questionBatch>0),questions:Math.max(1,questionBatch),polls:missingPolls};
       let added=0;
       try{
-        const extra=await this.ask({mode:'create',prompt:retryPrompt,count:1,activities:retrySettings},AbortSignal.any([signal,AbortSignal.timeout(35000)]));
+        const extra=await this.ask({mode:'create',prompt:retryPrompt,count:1,activities:retrySettings},AbortSignal.any([signal,AbortSignal.timeout(70000)]));
         for(const [key,quiz,limit] of [['questions',true,expectedQuestions],['polls',false,expectedPolls]]){
-          const seen=new Set(result[key].map(item=>item.text.trim().toLocaleLowerCase('pt-BR')));
+          const seen=new Set(result[key].map(sameKey));
           for(const item of usableActivities(extra[key],quiz,quiz?30:8)){
             if(result[key].length>=limit)break;
-            const keyText=item.text.trim().toLocaleLowerCase('pt-BR');
+            const keyText=sameKey(item);
             if(!seen.has(keyText)){seen.add(keyText);result[key].push(item);added++;}
           }
         }
@@ -1126,7 +1154,7 @@ export class StorageAI {
     const remaining=[];
     if(missingQuestions)remaining.push(`${missingQuestions} questões`);
     if(missingPolls)remaining.push(`${missingPolls} enquetes`);
-    return remaining.length?`Consegui gerar ${result.questions.length} de ${expectedQuestions} questões e ${result.polls.length} de ${expectedPolls} enquetes após pedir novas versões variadas. Ainda faltam ${remaining.join(' e ')} porque o serviço de IA não devolveu itens válidos; tente novamente para eu completar sem inventar conteúdo fora da aula.`:'';
+    return remaining.length?`Montei ${result.questions.length} de ${expectedQuestions} perguntas${expectedPolls?` e ${result.polls.length} de ${expectedPolls} enquetes`:''}, todas diferentes. O serviço de IA parou de responder antes de completar ${remaining.join(' e ')}; peça "complete as perguntas que faltam" para eu continuar.`:'';
   }
   async create(form){
     if(this.busy)return;
@@ -1177,10 +1205,10 @@ export class StorageAI {
         }catch{}
       }
       // Dinâmicas pedidas no texto (sobrevivência, cabo de guerra, relâmpago…): pedimos perguntas a mais para elas.
-      const games=requestedGames(prompt,session?.games),gamePlan=withGameQuestions(activities,games);
+      const games=requestedGames(prompt,session?.games,session?.gameCounts),gamePlan=withGameQuestions(activities,games);
       const result=await this.ask({mode:'create',prompt:generationPrompt,count,activities:gamePlan.request,photos:references,photoCount:images.length,photoSheet},AbortSignal.any([job.controller.signal,AbortSignal.timeout(160000)]));
       result.sources=researchSources;
-      const activityNotice=await this.completeActivities(result,gamePlan.request,prompt,job.controller.signal,result.slides);
+      const activityNotice=await this.completeActivities(result,{...gamePlan.request,want:gamePlan.want},prompt,job.controller.signal,result.slides);
       takeGameQuestions(result,games,gamePlan.quizTotal);
       if(uid!==this.studio.account.user?.id)throw Error('A conta mudou durante a geração.');
       if(/mesm[oa]\s+(?:tema|cor|paleta)|tema\s+(?:único|unico)|padr[aã]o\s+de\s+cor/i.test(prompt)){const sharedTheme=result.slides?.find(slide=>slide.theme)?.theme;if(sharedTheme)for(const slide of result.slides)slide.theme=sharedTheme;}

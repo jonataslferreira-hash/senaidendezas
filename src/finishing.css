@@ -1552,7 +1552,6 @@ html[data-motion=reduced] #app .game-character[data-mood] .buddy,html[data-motio
 #app .race-name small{font-size:.78em;font-weight:600;opacity:.7;font-variant-numeric:tabular-nums}
 #app .race-gain{position:absolute;left:50%;top:-4px;transform:translate(-50%,-100%);padding:2px 9px;border-radius:99px;background:#22c55e;color:#fff;font-size:13px;font-weight:900;white-space:nowrap;animation:game-pop .4s cubic-bezier(.2,1.7,.4,1) both}
 #app .race-gain.miss{background:#ef4444}
-#app .race-gain.lock{background:#fff;color:#16a34a;padding:1px 7px}
 #app .race-lane[data-right=false]{opacity:.72}
 #app .game-stage[data-game-type=race] .race-track{padding:8px 12px}
 #app .game-stage[data-game-type=race]:is([data-game-state=open],[data-game-state=reveal])>h1{display:none}
@@ -1720,3 +1719,9 @@ html body dialog.cover-picker .cp-stage-actions{display:flex!important;justify-c
   #app .game-stage[data-game-type=race] .race-lane{height:calc(145px*var(--s) + 4px)}
 }
 #app .game-stage[data-game-type=race] .race-gain{left:100%;top:50%;transform:translate(4px,-50%)}
+/* 40.10 "Montar a aula": número de perguntas de cada dinâmica */
+#app .ai-game-counts{display:grid;gap:7px}
+#app .ai-game-counts:not(:has(.ai-step:not([hidden]))){display:none}
+#app .ai-game-counts .ai-step{animation:ai-tray-block .25s cubic-bezier(.2,.9,.3,1) both}
+#app .ai-tray-note{font-size:10.5px;color:var(--ui-muted);line-height:1.35}
+#app .ai-tray-note:empty{display:none}

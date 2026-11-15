@@ -5,7 +5,7 @@
 //   challenge – Desafio no experimento: acertar uma meta mexendo no experimento
 //   raffle    – Sorteio de aluno
 //   tug       – Cabo de guerra: dois lados respondem 3 perguntas; quem acerta mais puxa a corda
-//   race      – Corrida do saber: cada acerto faz o boneco avançar; quanto mais rápido a resposta, mais longe
+//   race      – Corrida do saber: cada acerto faz o boneco avançar na hora; as perguntas seguem sozinhas
 // Cada etapa é um slide com o campo `game`. Aqui ficam as regras (sem tela), para
 // a sala do professor aplicar e os testes conferirem.
 import { createUuid } from './uuid.js';
@@ -26,7 +26,7 @@ export const teamPalette = [['Azul', '#3b82f6'], ['Laranja', '#f97316'], ['Verde
 export const SURVIVAL_POINTS = 500;
 export const FLASH_POINTS = 500, CHALLENGE_FIRST = 500, CHALLENGE_POINTS = 300, TUG_POINTS = 200;
 export const TUG_ROUNDS = 3, TUG_HIT = 100, TUG_PULL_MS = 5000;
-export const RACE_POINTS = [500, 300, 200], RACE_FINISH = 100, RACE_STEP = 10, RACE_SPEED = 10;
+export const RACE_POINTS = [500, 300, 200], RACE_FINISH = 100, RACE_STEP = 10, RACE_SPEED = 10, RACE_PAUSE = 3500;
 
 const text = (value, max) => String(value ?? '').replace(/[\u0000-\u0008\u000b-\u001f\u007f]/g, '').slice(0, max);
 const line = (value, max) => text(value, max).replace(/\s+/g, ' ').trim();
@@ -48,7 +48,7 @@ export function validateGame(game, draft = false, simulationIds = null) {
   if (!draft && !result.text.trim()) throw Error('Escreva o enunciado da etapa "' + gameNames[game.type] + '".');
   if (game.type === 'teams') { result.count = Math.max(2, Math.min(4, Math.floor(Number(game.count) || 2))); result.pick = Boolean(game.pick); }
   const questionList = label => {
-    const list = (Array.isArray(game.questions) ? game.questions : []).slice(0, 20).filter(q => q && typeof q === 'object').map((q, index) => {
+    const list = (Array.isArray(game.questions) ? game.questions : []).slice(0, 25).filter(q => q && typeof q === 'object').map((q, index) => {
       const options = (Array.isArray(q.options) ? q.options : []).slice(0, 4).map(o => text(o, 200));
       while (options.length < 2) options.push('');
       if (!draft && (!text(q.text, 300).trim() || options.some(o => !o.trim()))) throw Error(label + ': preencha a pergunta ' + (index + 1) + ' e todas as opções dela.');
@@ -198,8 +198,7 @@ export function gameControl(room, value, random = Math.random) {
     if (game.state === 'open') { revealRace(room); return; }
     if (game.state === 'done') throw Error('Esta rodada já terminou.');
     if (game.state === 'ready' && !online(room).length) throw Error('Espere pelo menos um participante entrar.');
-    game.round++; game.answers = {}; game.times = {}; game.gain = {}; game.state = 'open'; game.startedAt = room.now(); game.deadline = room.now() + config.seconds * 1000;
-    return;
+    advanceRace(room); return;
   }
   if (game.type === 'survival' && action === 'next') {
     if (game.state === 'open') { revealSurvival(room); return; }
@@ -236,6 +235,8 @@ export function tickGame(room) {
   if (game.type === 'survival' && game.state === 'open' && room.now() >= game.deadline) revealSurvival(room);
   if (game.type === 'tug' && game.state === 'open' && room.now() >= game.deadline) revealTug(room);
   if (game.type === 'race' && game.state === 'open' && room.now() >= game.deadline) revealRace(room);
+  // A corrida segue sozinha: depois de mostrar a resposta, vem a próxima pergunta (ou o resultado).
+  if (game.type === 'race' && game.state === 'reveal' && room.now() >= (game.revealAt || 0) + RACE_PAUSE) advanceRace(room);
   if (game.type === 'tug' && game.state === 'pull' && room.now() >= game.pullAt + TUG_PULL_MS) game.state = 'done';
 }
 
@@ -271,20 +272,18 @@ function finishTug(room) {
 }
 
 // ---- Corrida do saber
-// Fim da pergunta: quem acertou avança RACE_STEP metros + até RACE_SPEED pela rapidez. Quem errou fica parado.
+// Fim da pergunta (todos responderam ou o tempo acabou): mostra a resposta certa por alguns segundos.
+// Os metros já foram somados na hora de cada resposta (gameInput).
 export function revealRace(room) {
-  const d = room.data, game = d.game, config = room.slides[d.slide]?.game;
+  const game = room.data.game;
   if (!game || game.type !== 'race' || game.state !== 'open') return;
-  const question = config.questions[game.round], span = Math.max(1, config.seconds * 1000);
-  game.gain = {};
-  for (const [id, choice] of Object.entries(game.answers)) {
-    if (choice !== question.correct) continue;
-    const took = Math.max(0, Math.min(span, game.times[id] ?? span));
-    game.gain[id] = RACE_STEP + Math.round(RACE_SPEED * (1 - took / span));
-    game.dist[id] = (game.dist[id] || 0) + game.gain[id];
-    game.spent[id] = (game.spent[id] || 0) + took;
-  }
-  if (game.round + 1 >= config.questions.length) finishRace(room); else game.state = 'reveal';
+  game.state = 'reveal'; game.revealAt = room.now();
+}
+// Próxima pergunta, ou o resultado depois da última.
+function advanceRace(room) {
+  const d = room.data, game = d.game, config = room.slides[d.slide]?.game;
+  if (game.round + 1 >= config.questions.length) { finishRace(room); return; }
+  game.round++; game.answers = {}; game.times = {}; game.gain = {}; game.state = 'open'; game.startedAt = room.now(); game.deadline = room.now() + config.seconds * 1000;
 }
 // Classificação: quem foi mais longe; no empate, quem gastou menos tempo nas respostas certas.
 const raceOrder = game => Object.keys(game.dist).filter(id => game.dist[id] > 0).sort((a, b) => game.dist[b] - game.dist[a] || (game.spent[a] || 0) - (game.spent[b] || 0));
@@ -333,6 +332,13 @@ export function gameInput(room, playerId, payload) {
     if (!Number.isInteger(choice) || choice < 0 || choice >= question.options.length) throw Error('Resposta inválida.');
     if (Object.hasOwn(game.answers, playerId)) throw Error('Você já respondeu.');
     game.answers[playerId] = choice; game.times[playerId] = room.now() - game.startedAt;
+    // Em tempo real: acertou, o boneco já corre RACE_STEP metros + até RACE_SPEED pela rapidez.
+    if (choice === question.correct) {
+      const span = Math.max(1, config.seconds * 1000), took = Math.max(0, Math.min(span, game.times[playerId]));
+      game.gain[playerId] = RACE_STEP + Math.round(RACE_SPEED * (1 - took / span));
+      game.dist[playerId] = (game.dist[playerId] || 0) + game.gain[playerId];
+      game.spent[playerId] = (game.spent[playerId] || 0) + took;
+    }
     if (online(room).every(p => Object.hasOwn(game.answers, p.id))) revealRace(room);
     return;
   }
@@ -385,11 +391,11 @@ export function gameSnapshot(room, playerId, bare = false) {
     const question = game.round >= 0 ? config.questions[game.round] : null, shown = game.state === 'reveal' || done;
     const track = config.questions.length * (RACE_STEP + RACE_SPEED), order = done ? game.order : raceOrder(game);
     const runners = d.players.filter(p => p.online || game.dist[p.id]).map(p => ({ ...who(p.id), p: Math.min(1, (game.dist[p.id] || 0) / track), dist: game.dist[p.id] || 0, rank: order.indexOf(p.id) + 1 || order.length + 1,
-      place: done ? order.indexOf(p.id) + 1 : 0, locked: Object.hasOwn(game.answers, p.id), ...(shown ? { gain: game.gain[p.id] || 0, right: Object.hasOwn(game.gain, p.id) } : {}) }));
+      place: done ? order.indexOf(p.id) + 1 : 0, locked: Object.hasOwn(game.answers, p.id), ...(Object.hasOwn(game.answers, p.id) && game.state !== 'ready' ? { gain: game.gain[p.id] || 0, right: Object.hasOwn(game.gain, p.id) } : {}) }));
     const mine = runners.find(r => r.id === playerId), top = [...runners].sort((a, b) => a.rank - b.rank).slice(0, 8);
     if (mine && !top.includes(mine)) top[7] = mine;
     const shownRunners = runners.filter(r => top.includes(r));
-    return { ...base, round: game.round, rounds: config.questions.length, seconds: config.seconds, deadline: game.deadline, track,
+    return { ...base, round: game.round, rounds: config.questions.length, seconds: config.seconds, deadline: game.deadline, track, nextAt: game.state === 'reveal' ? (game.revealAt || 0) + RACE_PAUSE : 0,
       question: ask(question, { ...(shown || presenter ? { correct: question?.correct } : {}), ...(shown ? { counts: question?.options.map((_, i) => Object.values(game.answers).filter(v => v === i).length) } : {}) }),
       answered: Object.keys(game.answers).length, total: runners.length, runners: shownRunners, points: RACE_POINTS,
       me: mine ? { choice: Object.hasOwn(game.answers, playerId) ? game.answers[playerId] : null, dist: mine.dist, rank: mine.rank, place: mine.place, gain: mine.gain || 0, right: Boolean(mine.right) } : null };

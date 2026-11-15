@@ -135,28 +135,29 @@ function tugView(state, g, host, player, now) {
 
 // Corrida do saber: a pergunta aparece no telão, o aluno responde no celular e cada acerto faz o boneco correr.
 // Resposta certa e rápida vai mais longe; quem erra fica parado naquela rodada.
+// Tudo em tempo real: o boneco anda assim que a pessoa responde, e as perguntas seguem sozinhas.
 function raceView(state, g, host, player, now) {
   const q = g.question, done = g.state === 'done', shown = g.state === 'reveal' || done, me = g.me, count = g.runners.length;
-  const hud = `<div class="sv-hud"><span>${stageIcon('race')} ${g.round >= 0 ? `Pergunta <b>${g.round + 1}</b> de ${g.rounds}` : `${plural(g.rounds, 'pergunta', 'perguntas')} · ${g.seconds}s cada`}</span><span>${g.state === 'open' ? `${g.answered} de ${g.total} responderam` : 'Acertou, correu · mais rápido, mais longe'}</span></div>`;
+  const hud = `<div class="sv-hud"><span>${stageIcon('race')} ${g.round >= 0 ? `Pergunta <b>${g.round + 1}</b> de ${g.rounds}` : `${plural(g.rounds, 'pergunta', 'perguntas')} · ${g.seconds}s cada`}</span><span>${g.state === 'open' ? `${g.answered} de ${g.total} responderam` : g.state === 'reveal' ? (g.round + 1 < g.rounds ? 'Próxima pergunta já vem…' : 'Resultado já vem…') : 'Acertou, correu · mais rápido, mais longe'}</span></div>`;
   const canAnswer = player && me && g.state === 'open' && me.choice === null;
   const question = q && !done ? `${g.bare ? (canAnswer ? screenHint : '') : `<h2 class="sv-text">${esc(q.text)}</h2>`}${optionButtons(q.options, { bare: g.bare, send: i => `{"choice":${i},"round":${g.round}}`, enabled: canAnswer, chosen: me?.choice, correct: q.correct, shown, counts: q.counts })}` : '';
   const medal = place => place && place <= 3 ? `<b class="race-place" data-place="${place}">${place}º</b>` : '';
-  const mood = (runner, i) => done ? (runner.place && runner.place <= 3 ? 'win-' + (runner.place + i) % 4 : runner.dist ? 'idle' : 'lose') : g.state === 'reveal' ? (runner.right ? 'run' : 'lose') : 'idle';
-  const tag = runner => done ? medal(runner.place) : g.state === 'reveal' ? (runner.right ? `<b class="race-gain">+${runner.gain} m</b>` : '<b class="race-gain miss">✕</b>') : g.state === 'open' && runner.locked ? '<b class="race-gain lock">✓</b>' : '';
-  const lanes = g.runners.map((runner, i) => `<div class="race-lane" data-k="${esc(runner.id)}" data-me="${player && runner.id === state.me?.id}" data-place="${runner.place || ''}" data-right="${shown && !done ? Boolean(runner.right) : ''}" style="--p:${runner.p.toFixed(3)};--i:${i}"><span class="race-name">${esc(runner.name)}<small>${runner.dist} m</small></span><div class="race-road"><div class="race-runner">${character(runner, i, mood(runner, i))}<span data-t>${tag(runner)}</span></div></div></div>`).join('');
+  const mood = (runner, i) => done ? (runner.place && runner.place <= 3 ? 'win-' + (runner.place + i) % 4 : runner.dist ? 'idle' : 'lose') : runner.right === undefined ? 'idle' : runner.right ? 'run' : 'lose';
+  const tag = runner => done ? medal(runner.place) : runner.right === undefined ? '' : runner.right ? `<b class="race-gain">+${runner.gain} m</b>` : '<b class="race-gain miss">✕</b>';
+  const lanes = g.runners.map((runner, i) => `<div class="race-lane" data-k="${esc(runner.id)}" data-me="${player && runner.id === state.me?.id}" data-place="${runner.place || ''}" data-right="${!done && runner.right !== undefined ? runner.right : ''}" style="--p:${runner.p.toFixed(3)};--i:${i}"><span class="race-name">${esc(runner.name)}<small>${runner.dist} m</small></span><div class="race-road"><div class="race-runner">${character(runner, i, mood(runner, i))}<span data-t>${tag(runner)}</span></div></div></div>`).join('');
   const track = `<div class="race-track" data-state="${g.state}" style="--lanes:${Math.max(1, count)};--s:${count <= 3 ? .5 : count <= 5 ? .4 : .32}">${done && g.runners.some(runner => runner.place) ? confetti(24) : ''}<i class="race-finish" aria-hidden="true"></i>${lanes || '<p class="game-wait">Aguardando participantes…</p>'}${g.total > count ? `<p class="race-more">+${g.total - count} correndo</p>` : ''}</div>`;
   const first = g.runners.find(runner => runner.place === 1);
   const status = done ? (first ? `<p class="game-winner"><b>${esc(first.name)}</b> foi mais longe: ${first.dist} m! <small>+${g.points[0]} pts</small></p>` : '<p class="game-winner none">Ninguém saiu do lugar desta vez.</p>')
-    : !player ? (g.state === 'ready' ? `<p class="game-note">Cada acerto vale de 10 a 20 metros, conforme a rapidez · 1º lugar +${g.points[0]} · 2º +${g.points[1]} · 3º +${g.points[2]} pontos</p>` : '')
+    : !player ? (g.state === 'ready' ? `<p class="game-note">Você só dá a largada: as perguntas seguem sozinhas quando todos respondem ou o tempo acaba. Cada acerto vale de 10 a 20 metros · 1º lugar +${g.points[0]} · 2º +${g.points[1]} · 3º +${g.points[2]} pontos</p>` : '')
     : !me ? '<p class="game-wait">Você entrou depois do início. Assista e torça!</p>'
     : g.state === 'ready' ? '<p class="game-wait">Fique pronto: acertou, seu boneco corre. Quanto mais rápido, mais longe!</p>'
-    : g.state === 'open' ? (me.choice === null ? '<p class="game-wait">Responda rápido para correr mais!</p>' : `<p class="game-wait">Resposta enviada. Você está em <b>${me.rank}º</b> · ${me.dist} m</p>`)
-    : `<p class="${me.right ? 'sv-safe' : 'sv-dead'}">${me.right ? `Acertou! Seu boneco correu <b>+${me.gain} m</b>` : 'Não foi dessa vez: seu boneco ficou parado'} · ${me.rank}º lugar</p>`;
+    : me.choice === null ? (g.state === 'open' ? '<p class="game-wait">Responda rápido para correr mais!</p>' : '<p class="sv-dead">O tempo acabou: seu boneco ficou parado</p>')
+    : `<p class="${me.right ? 'sv-safe' : 'sv-dead'}">${me.right ? `Acertou! Seu boneco correu <b>+${me.gain} m</b>` : 'Não foi dessa vez: seu boneco ficou parado'} · ${me.rank}º lugar${g.state === 'open' ? '<small> · esperando a turma responder…</small>' : ''}</p>`;
   const mine = done && player && me ? (me.place ? `<p class="sv-safe">Você terminou em <b>${me.place}º lugar</b> com ${me.dist} m!</p>` : '<p class="game-wait">Você não saiu do lugar. Na próxima vai!</p>') : '';
   // Uma assinatura por pergunta/estado: dentro dela só a posição e a etiqueta de cada raia mudam.
   const signature = g.state + ':' + g.round + ':' + g.runners.map(runner => runner.id).join(',');
   return live(hud) + live(timerBar(g, now), 'slim') + live(question, 'ask') + `<div class="game-live game-race" data-game-live data-soft="${esc(signature)}">${track}</div>` + live(status + mine) +
-    (host ? live(hostActions(state, [g.state === 'ready' ? ['next', '▶ Largada!', 'primary'] : g.state === 'open' ? ['next', 'Revelar agora'] : g.state === 'reveal' ? ['next', 'Próxima pergunta →', 'primary'] : ['restart', '↻ Correr de novo']])) : '');
+    (host ? live(hostActions(state, [g.state === 'ready' ? ['next', '▶ Largada!', 'primary'] : g.state === 'open' ? ['next', 'Pular pergunta'] : g.state === 'reveal' ? ['next', 'Avançar já'] : ['restart', '↻ Correr de novo']])) : '');
 }
 
 const views = { teams: teamsView, flash: flashView, survival: survivalView, challenge: challengeView, raffle: raffleView, tug: tugView, race: raceView };

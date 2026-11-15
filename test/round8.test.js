@@ -253,16 +253,22 @@ test('rodada 14: escolha de time, pódio guiado pela sala, corrida, textos escon
   assert.equal(room.snapshot(ana.id).game.question.text, '', 'aluno não recebe o texto');
   assert.equal(room.snapshot().game.question.text, 'Corrida 1');
   now += 1000; room.answer(ana.id, { choice: { choice: 0, round: 0 } });
+  let race = room.snapshot().game;
+  const lane = id => race.runners.find(r => r.id === id);
+  assert.equal(race.state, 'open'); assert.equal(lane(ana.id).right, true, 'tempo real: o boneco anda assim que a pessoa acerta');
+  assert.ok(lane(ana.id).dist >= 10); assert.equal(lane(bia.id).right, undefined);
   now += 8000; room.answer(bia.id, { choice: { choice: 0, round: 0 } });
   room.answer(caio.id, { choice: { choice: 1, round: 0 } });
-  let race = room.snapshot().game;
-  assert.equal(race.state, 'reveal', 'todos responderam: revela');
-  const lane = id => race.runners.find(r => r.id === id);
+  race = room.snapshot().game;
+  assert.equal(race.state, 'reveal', 'todos responderam: mostra a resposta');
   assert.ok(lane(ana.id).gain > lane(bia.id).gain && lane(bia.id).gain >= 10, 'rapidez rende mais metros');
   assert.equal(lane(caio.id).gain, 0); assert.equal(lane(caio.id).right, false);
-  room.control('game', { do: 'next' });
+  // O professor não clica: a próxima pergunta vem sozinha.
+  now += 2000; room.tick(); assert.equal(room.data.game.state, 'reveal');
+  now += 2000; room.tick(); assert.equal(room.data.game.state, 'open'); assert.equal(room.data.game.round, 1);
   room.answer(bia.id, { choice: { choice: 0, round: 1 } });
-  now += 16000; room.tick();
+  now += 16000; room.tick(); assert.equal(room.data.game.state, 'reveal', 'tempo esgotado também revela');
+  now += 4000; room.tick();
   race = room.snapshot(ana.id).game;
   assert.equal(race.state, 'done'); assert.equal(race.me.place, 1);
   assert.equal(room.data.players.find(p => p.id === ana.id).bonus, 500);
@@ -307,6 +313,20 @@ test('rodada 15: corrida do saber, painel de jogos da IA e boneco do placar', as
   assert.deepEqual(requestedGames('aula com cabo de guerra', ['tug']).map(game => game.type), ['tug'], 'não duplica');
   assert.deepEqual(requestedGames('aula sobre vulcões'), []);
   assert.equal(requestedGames('', ['race'])[0].need, 4, 'a corrida pede perguntas para a IA');
+  // Quantidade definida no painel, até 25 por dinâmica.
+  assert.deepEqual(requestedGames('', ['race', 'tug', 'survival'], { race: 25, tug: 99, survival: 12 }).map(game => game.need), [12, 25, 25]);
+  assert.equal(requestedGames('', ['tug'], { tug: 1 })[0].need, 3, 'cabo de guerra precisa de pelo menos 3');
+  const { withGameQuestions, takeGameQuestions } = await import('../src/storage-ai-games.js');
+  const big = withGameQuestions({ quizzes: 2, questions: 25, polls: 0 }, requestedGames('', ['race'], { race: 25 }));
+  assert.equal(big.quizTotal, 50); assert.equal(big.want, 75);
+  assert.ok(big.request.quizzes <= 3 && big.request.questions <= 10, 'o primeiro pedido respeita o limite do serviço');
+  assert.equal(withGameQuestions({ quizzes: 3, questions: 25, polls: 0 }, []).quizTotal, 48, 'o quiz inteiro cabe em 50');
+  assert.deepEqual(withGameQuestions({ quizzes: 1, questions: 5, polls: 2 }, []).request, { quizzes: 1, questions: 5, polls: 2 });
+  const many = Array.from({ length: 12 }, (_, i) => ({ text: 'P' + i }));
+  const split = takeGameQuestions({ questions: many }, [{ type: 'survival', need: 10 }, { type: 'tug', need: 10 }], 2);
+  assert.equal(split.questions.length, 2);
+  assert.ok(split.games[1].questions.length >= 3, 'com perguntas de menos, cada dinâmica ainda recebe o mínimo');
+  assert.equal(split.games[0].questions.length + split.games[1].questions.length, 10);
 
   const { rankMood, character } = await import('../src/game-ui.js');
   assert.equal(rankMood(100, true), 'idle'); assert.equal(rankMood(900, true), 'run'); assert.equal(rankMood(2000, true), 'win-0'); assert.equal(rankMood(5000, true), 'idle');
