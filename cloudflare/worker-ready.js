@@ -915,7 +915,7 @@ function splitTransparentQuery(query) {
   const subject = wanted ? text.replace(TRANSPARENT_HINT, " ").replace(/\b(?:com|de|em)\s+fundo\b/giu, " ").replace(/\s+/g, " ").trim() : text;
   return { transparent: wanted, subject: subject || text };
 }
-async function bingSearch(query, limit, page = 1, { transparent = false } = {}) {
+async function bingSearch(query, limit, page = 1, { transparent = false, gif = false } = {}) {
   const params = new URLSearchParams({
     q: query,
     first: String((page - 1) * limit + 1),
@@ -923,7 +923,8 @@ async function bingSearch(query, limit, page = 1, { transparent = false } = {}) 
     mmasync: "1",
     adlt: "moderate"
   });
-  if (transparent) params.set("qft", "+filterui:photo-transparent");
+  if (gif) params.set("qft", "+filterui:photo-animatedgif");
+  else if (transparent) params.set("qft", "+filterui:photo-transparent");
   const response = await fetch("https://www.bing.com/images/async?" + params, {
     headers: { Accept: "text/html,application/xhtml+xml", "User-Agent": BROWSER_USER_AGENT, "Accept-Language": "pt-BR,pt;q=0.9,en;q=0.7" },
     signal: AbortSignal.timeout(UPSTREAM_TIMEOUT)
@@ -970,13 +971,13 @@ async function bingSearch(query, limit, page = 1, { transparent = false } = {}) 
   return items;
 }
 var DUCK_CHUNK = 100;
-async function duckChunk(query, chunk, transparent) {
+async function duckChunk(query, chunk, transparent, gif = false) {
   const headers = { Accept: "text/html,application/json;q=0.9,*/*;q=0.8", "User-Agent": BROWSER_USER_AGENT, "Accept-Language": "pt-BR,pt;q=0.9,en;q=0.6", Referer: "https://duckduckgo.com/" };
   const home = await fetch("https://duckduckgo.com/?" + new URLSearchParams({ q: query, iax: "images", ia: "images", kl: "br-pt" }), { headers, signal: AbortSignal.timeout(UPSTREAM_TIMEOUT) });
   if (!home.ok) throw Error("duck_" + home.status);
   const vqd = /vqd=["']?([\d-]+)["']?/.exec(await home.text())?.[1];
   if (!vqd) throw Error("duck_token");
-  const params = new URLSearchParams({ l: "br-pt", o: "json", q: query, vqd, f: transparent ? ",,,type:transparent,," : ",,,,,", p: "1", s: String(chunk * DUCK_CHUNK) });
+  const params = new URLSearchParams({ l: "br-pt", o: "json", q: query, vqd, f: gif ? ",,,type:gif,," : transparent ? ",,,type:transparent,," : ",,,,,", p: "1", s: String(chunk * DUCK_CHUNK) });
   const response = await fetch("https://duckduckgo.com/i.js?" + params, { headers: { ...headers, Accept: "application/json" }, signal: AbortSignal.timeout(UPSTREAM_TIMEOUT) });
   if (!response.ok) throw Error("duck_" + response.status);
   const payload = await response.json();
@@ -1011,10 +1012,10 @@ function duckItems(results, query = "", transparent = false) {
   }
   return items;
 }
-async function duckSearch(query, limit, page = 1, { transparent = false } = {}) {
+async function duckSearch(query, limit, page = 1, { transparent = false, gif = false } = {}) {
   const start = (page - 1) * limit, chunk = Math.floor(start / DUCK_CHUNK), offset = start % DUCK_CHUNK;
-  const key = "v1-duck-" + encodeURIComponent(query.toLowerCase()) + "-" + chunk + (transparent ? "-png" : "");
-  const { items } = await cached(key, async () => ({ items: await duckChunk(query, chunk, transparent) }));
+  const key = "v1-duck-" + encodeURIComponent(query.toLowerCase()) + "-" + chunk + (gif ? "-gif" : transparent ? "-png" : "");
+  const { items } = await cached(key, async () => ({ items: await duckChunk(query, chunk, transparent, gif) }));
   return items.slice(offset, offset + limit);
 }
 function pixabayItems(hits, query = "", transparent = false) {
@@ -1253,19 +1254,19 @@ async function cached(key, loader) {
   }
   return value;
 }
-async function searchImages(query, page, limit, { transparent = false, bingOnly = false, pixabayKey = "" } = {}) {
+async function searchImages(query, page, limit, { transparent = false, bingOnly = false, pixabayKey = "", gif = false } = {}) {
   const term = clip2(query, MAX_QUERY);
-  const key = "v6-" + (bingOnly ? "bing-" : "") + encodeURIComponent(term.toLowerCase()) + "-" + page + "-" + limit + (transparent ? "-png" : "");
+  const key = "v6-" + (bingOnly ? "bing-" : "") + encodeURIComponent(term.toLowerCase()) + "-" + page + "-" + limit + (gif ? "-gif" : transparent ? "-png" : "");
   return cached(key, async () => {
     if (bingOnly) {
       const [duck, bing2, pixabay] = await Promise.allSettled([
-        duckSearch(term, limit, page, { transparent }),
-        bingSearch(term, limit, page, { transparent }).then(async (found) => transparent && !found.length && page === 1 ? bingSearch(term + " png", limit, page) : found),
-        pixabaySearch(pixabayKey, term, Math.ceil(limit / 2), page, transparent)
+        duckSearch(term, limit, page, { transparent, gif }),
+        bingSearch(term, limit, page, { transparent, gif }).then(async (found) => transparent && !found.length && page === 1 ? bingSearch(term + " png", limit, page) : found),
+        gif ? [] : pixabaySearch(pixabayKey, term, Math.ceil(limit / 2), page, transparent)
       ]);
       const fromDuck = duck.status === "fulfilled" ? duck.value : [], fromBing = bing2.status === "fulfilled" ? bing2.value : [];
       const fromPixabay = pixabay.status === "fulfilled" ? pixabay.value : [];
-      const items = mergeEngines(fromDuck, fromBing, fromPixabay);
+      const items = mergeEngines(fromDuck, fromBing, fromPixabay).filter((item) => !gif || item.original).map((item) => gif ? { ...item, url: item.original, kind: "image/gif" } : item);
       return { query: term, page, transparent, items, engines: { duckduckgo: duck.status === "fulfilled" ? fromDuck.length : String(duck.reason?.message || "erro"), bing: bing2.status === "fulfilled" ? fromBing.length : String(bing2.reason?.message || "erro"), pixabay: !pixabayKey ? "sem chave" : pixabay.status === "fulfilled" ? fromPixabay.length : String(pixabay.reason?.message || "erro") }, total: page * limit + (items.length ? 1 : 0) };
     }
     const queryTokens = tokens(term).filter((token) => token.length > 1 && !STOP_WORDS.has(token));
@@ -1358,7 +1359,7 @@ async function handleStorageAIImages(request, env, user, headers) {
   const transparent = !raw && (url.searchParams.get("transparent") === "1" || hinted.transparent);
   if (!query) return json({ error: "invalid_query", items: [] }, 400);
   try {
-    const result = await searchImages(hinted.subject, page, limit, { transparent, bingOnly: url.searchParams.get("source") === "bing", pixabayKey: clean2(env?.PIXABAY_KEY) });
+    const result = await searchImages(hinted.subject, page, limit, { transparent, bingOnly: url.searchParams.get("source") === "bing" || url.searchParams.get("gif") === "1", gif: url.searchParams.get("gif") === "1", pixabayKey: clean2(env?.PIXABAY_KEY) });
     return json(result, 200, { "Cache-Control": "private, max-age=300" });
   } catch {
     return json({ error: "search_unavailable", items: [] }, 502);
@@ -1641,7 +1642,7 @@ function createR2Handler(verifyUser = async (token, env) => {
     if (origin && !allowed.includes(origin)) return new Response("Origin not allowed", { status: 403 });
     const headers = { "Access-Control-Allow-Origin": origin || allowed[0], "Access-Control-Allow-Methods": "GET,POST,PUT,DELETE,OPTIONS", "Access-Control-Allow-Headers": "Authorization,Content-Type,X-Lesson-Title,X-Original-Bytes,X-Lesson-Origin", "Cache-Control": "private, no-store", Vary: "Origin" };
     const json = (body, status = 200) => Response.json(body, { status, headers });
-    if (new URL(request.url).pathname === "/health" && request.method === "GET") return json({ version: 21, storageAI: storageAIEnabled(env), storageAIMedia: storageAIEnabled(env), storageAIHistory: Boolean(env.FILES), imageSearch: true, openRouterConfigured: Boolean(env.OPENROUTER_API_KEY), geminiConfigured: Boolean(env.GEMINI_API_KEY), groqConfigured: Boolean(env.GROQ_API_KEY), lessonCovers: true, lessonDeletion: true, voiceChat: true, collaboration: true, animatedAvatars: true, roles: true, people: true });
+    if (new URL(request.url).pathname === "/health" && request.method === "GET") return json({ version: 22, storageAI: storageAIEnabled(env), storageAIMedia: storageAIEnabled(env), storageAIHistory: Boolean(env.FILES), imageSearch: true, openRouterConfigured: Boolean(env.OPENROUTER_API_KEY), geminiConfigured: Boolean(env.GEMINI_API_KEY), groqConfigured: Boolean(env.GROQ_API_KEY), lessonCovers: true, lessonDeletion: true, voiceChat: true, collaboration: true, animatedAvatars: true, roles: true, people: true });
     if (request.method === "OPTIONS") return new Response(null, { status: 204, headers });
     const publicPresentation = await readPublicPresentation(request, env, headers);
     if (publicPresentation) return publicPresentation;

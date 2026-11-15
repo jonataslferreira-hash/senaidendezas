@@ -95,10 +95,12 @@ export class Classroom {
     }
   }
   // Estado do experimento/modelo 3D que o professor está controlando no slide atual.
-  live(payload) {
+  live(payload, transient = false) {
     if (!this.host || this.stopped || !this.room) return;
-    this.lastLive = { type: 'live', slide: this.room.data.slide, payload };
-    for (const conn of this.connections.values()) if (conn.open && conn.lessonSent) { conn.send(this.lastLive); conn.liveSent = this.lastLive; }
+    const message = { type: 'live', slide: this.room.data.slide, payload };
+    // Gestos soltos (transient) não são guardados: quem chega depois recebe só o estado.
+    if (!transient) this.lastLive = message;
+    for (const conn of this.connections.values()) if (conn.open && conn.lessonSent) { conn.send(message); if (!transient) conn.liveSent = message; }
   }
   async join(code, name, avatar) {
     this.host = false; this.code = code; this.name = name; this.avatar = avatar;

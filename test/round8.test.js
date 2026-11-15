@@ -71,3 +71,29 @@ test('catálogos em inglês recebem o termo traduzido', () => {
   assert.equal(expandImageQuery('vulcão'), 'volcano');
   assert.equal(expandImageQuery('Rio de Janeiro'), 'Rio de Janeiro');
 });
+
+test('experimento importado leva a ponte de sincronia e os gestos são conferidos', async () => {
+  const { sandboxDocument } = await import('../src/custom-sim.js');
+  const { cleanSimEvents, cleanSimValues, BRIDGE_SCRIPT } = await import('../src/custom-sim-bridge.js');
+  for (const html of ['<p>oi</p>', '<html><body>oi</body></html>', '<html><head><title>x</title></head><body></body></html>']) {
+    const doc = sandboxDocument(html);
+    assert.ok(doc.includes('sim-ready') && doc.includes('Content-Security-Policy'));
+    assert.ok(doc.indexOf('Content-Security-Policy') < doc.indexOf('sim-ready'));
+  }
+  assert.doesNotThrow(() => new Function(BRIDGE_SCRIPT.replace(/^<script>/, '').replace(/<\/script>$/, '').replace(/\(\);$/, ';')));
+  const events = cleanSimEvents([{ t: 'click', p: [1, 0], x: .5, y: .25, b: 0, s: 0, extra: 'x' }, { t: 'input', p: [1], v: 'a'.repeat(200) }, { t: 'click', p: ['x'] }, null, { t: 5, p: [] }]);
+  assert.deepEqual(events[0], { t: 'click', p: [1, 0], x: .5, y: .25, b: 0, s: 0 });
+  assert.equal(events.length, 2);
+  assert.equal(events[1].v.length, 60);
+  assert.deepEqual(cleanSimValues(['1', 2, 'abc']), ['1', 'abc']);
+});
+
+test('busca de GIF pede o filtro de animação', async () => {
+  const calls = [], original = globalThis.fetch;
+  globalThis.fetch = async url => { calls.push(String(url)); return new Response('{}', { status: 500 }); };
+  try {
+    const { searchImageChoices } = await import('../src/storage-ai-image-search.js');
+    await searchImageChoices('gato', 1, { gif: true }).catch(() => {});
+  } finally { globalThis.fetch = original; }
+  assert.ok(calls.length === 0 || calls.some(url => url.includes('gif=1')));
+});

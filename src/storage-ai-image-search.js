@@ -401,21 +401,21 @@ export function rankImageChoices(choices,query){
 // Um JPEG nunca guarda transparência: nem vale a pena baixar para conferir.
 export const mayBeTransparent=choice=>!/\.jpe?g(?:$|[?#])/i.test(choice?.original||'');
 
-export async function searchImageChoices(query,page=1,{transparent=false,raw=false}={}){
-  const wantsAlpha=!raw&&(transparent||wantsTransparentImage(query));
+export async function searchImageChoices(query,page=1,{transparent=false,raw=false,gif=false}={}){
+  const wantsAlpha=!gif&&!raw&&(transparent||wantsTransparentImage(query));
   const spoken=normalizeImageQuery(query,{translate:false});
   const term=raw?spoken:spoken.replace(transparentWords,' ').replace(/\s+/g,' ').trim()||spoken;
   if(!term)return [];
-  const worker=await workerJson('/storage-ai/images?source=bing&q='+encodeURIComponent(term)+'&page='+String(page)+'&limit=24'+(wantsAlpha?'&transparent=1':'')+(raw?'&raw=1':''));
+  const worker=await workerJson('/storage-ai/images?source=bing&q='+encodeURIComponent(term)+'&page='+String(page)+'&limit=24'+(wantsAlpha?'&transparent=1':'')+(raw?'&raw=1':'')+(gif?'&gif=1':''));
   // A transparência só é afirmada depois de conferida no arquivo (verifyTransparentChoice).
   const usable=payload=>rankImageChoices((payload?.items||[]).map(choiceFromWorker)
     .filter(choice=>choice.thumbnail&&choice.url&&!isDocumentChoice(choice))
-    .map(choice=>({...choice,transparent:false})),query);
+    .map(choice=>({...choice,transparent:false,gif})),query);
   const found=usable(worker);
   if(found.length)return found;
   // Bing sem resposta na primeira página: os catálogos livres (Commons,
   // Wikipédia, Openverse) evitam uma galeria vazia.
-  if(page===1&&!raw){
+  if(page===1&&!raw&&!gif){
     // Os catálogos livres são quase todos em inglês: "cachorro" vai como "dog".
     const catalogs=await workerJson('/storage-ai/images?q='+encodeURIComponent(expandImageQuery(term)||term)+'&page=1&limit=24'+(wantsAlpha?'&transparent=1':''));
     const extra=usable(catalogs);
@@ -442,6 +442,7 @@ export async function verifyTransparentChoice(choice){
 export async function importImageChoice(choice){
   const blob=await fetchChoiceBlob(choice);
   if(!blob)throw Error('Não consegui carregar esta imagem. Tente outra da lista.');
+  if(choice.gif&&blob.type!=='image/gif')throw Error('Este arquivo não é um GIF animado. Tente outro da lista.');
   const prepared=blob.type==='image/svg+xml'?await rasterizeSvg(blob):blob;
   const file=await optimizeImage(new File([prepared],'imagem',{type:prepared.type||'image/png'}),{maxSide:1200});
   const data=await new Promise((resolve,reject)=>{const reader=new FileReader();reader.onload=()=>resolve(reader.result);reader.onerror=reject;reader.readAsDataURL(file);});

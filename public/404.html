@@ -1,0 +1,22 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Storage Lab</title>
+<script>
+// Link curto de apresentação: .../senaidendezas/K7M2QD abre a aula daquele código.
+(function () {
+  var parts = location.pathname.split('/').filter(Boolean), code = parts.pop() || '';
+  var home = '/' + (parts.length ? parts[0] + '/' : '');
+  if (/^[A-HJKMNP-Za-hjkmnp-z2-9]{6}$/.test(code)) location.replace(home + '?p=' + code.toUpperCase());
+  else window.storageLabHome = home;
+})();
+</script>
+<style>body{margin:0;min-height:100vh;display:grid;place-items:center;background:#171324;color:#f1eaff;font:16px/1.5 system-ui,sans-serif;text-align:center}a{color:#c9b2ff}</style>
+</head>
+<body>
+<main><h1>Página não encontrada</h1><p>Confira o código da apresentação: são 6 letras e números.</p><p><a id="home" href="/">Ir para o Storage Lab</a></p></main>
+<script>if (window.storageLabHome) document.getElementById('home').href = window.storageLabHome;</script>
+</body>
+</html>

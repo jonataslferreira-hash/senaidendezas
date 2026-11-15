@@ -1,3 +1,4 @@
+import { BRIDGE_SCRIPT } from './custom-sim-bridge.js';
 // Experimentos importados: um arquivo HTML feito fora (por exemplo com ajuda de
 // uma IA) que roda isolado dentro do slide. O código fica em um iframe sem
 // acesso à página, à conta, à sala nem à internet.
@@ -46,10 +47,10 @@ export function parseExperimentFile(text, fileName = '') {
 // formulários e qualquer recurso externo, mesmo que o arquivo peça.
 const POLICY = `<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; img-src data: blob:; media-src data: blob:; font-src data:; form-action 'none'; base-uri 'none'">`;
 export function sandboxDocument(html) {
-  const source = String(html || '');
-  if (/<head[^>]*>/i.test(source)) return source.replace(/<head[^>]*>/i, match => match + POLICY);
-  if (/<html[^>]*>/i.test(source)) return source.replace(/<html[^>]*>/i, match => match + '<head>' + POLICY + '</head>');
-  return '<!doctype html><html><head><meta charset="utf-8">' + POLICY + '</head><body>' + source + '</body></html>';
+  const source = String(html || ''), head = POLICY + BRIDGE_SCRIPT;
+  if (/<head[^>]*>/i.test(source)) return source.replace(/<head[^>]*>/i, match => match + head);
+  if (/<html[^>]*>/i.test(source)) return source.replace(/<html[^>]*>/i, match => match + '<head>' + head + '</head>');
+  return '<!doctype html><html><head><meta charset="utf-8">' + head + '</head><body>' + source + '</body></html>';
 }
 
 export const isCustomExperiment = element => element?.simulation === 'custom' && Boolean(element.customSim?.html);
