@@ -616,16 +616,16 @@ html[data-theme=aurora]{--palette-start:168;--palette-end:268}
 html[data-theme=candy]{--palette-start:330;--palette-end:32}
 html[data-theme=galaxy]{--palette-start:222;--palette-end:318}
 html[data-theme=citrus]{--palette-start:70;--palette-end:178}
-html:is([data-theme=aurora],[data-theme=candy],[data-theme=galaxy],[data-theme=citrus],[data-theme=surprise])[data-ui-style]:not([data-ui-style=minimal]) #app{
+html:is([data-theme=aurora],[data-theme=candy],[data-theme=galaxy],[data-theme=citrus],[data-theme=prism],[data-theme=lagoon],[data-theme=ember],[data-theme=nebula])[data-ui-style]:not([data-ui-style=minimal]) #app{
   --palette-surface:linear-gradient(128deg,hsl(var(--palette-start) 78% 80%) 0%,hsl(calc((var(--palette-start) + var(--palette-end)) / 2) 70% 86%) 50%,hsl(var(--palette-end) 76% 82%) 100%);
 }
-html:is([data-theme=aurora],[data-theme=candy],[data-theme=galaxy],[data-theme=citrus],[data-theme=surprise])[data-ui-style][data-appearance=dark]:not([data-ui-style=minimal]) #app{
+html:is([data-theme=aurora],[data-theme=candy],[data-theme=galaxy],[data-theme=citrus],[data-theme=prism],[data-theme=lagoon],[data-theme=ember],[data-theme=nebula])[data-ui-style][data-appearance=dark]:not([data-ui-style=minimal]) #app{
   --palette-surface:linear-gradient(128deg,hsl(var(--palette-start) 52% 26%) 0%,hsl(var(--palette-end) 50% 19%) 100%);
 }
 html[data-theme=candy][data-ui-style]:not([data-ui-style=minimal]) #app{--palette-surface:linear-gradient(128deg,hsl(330 78% 80%),hsl(32 86% 80%))}
 html[data-theme=candy][data-ui-style][data-appearance=dark]:not([data-ui-style=minimal]) #app{--palette-surface:linear-gradient(128deg,hsl(330 52% 26%),hsl(32 50% 19%))}
 /* O gradiente também pinta o fundo do espaço de trabalho, não só os destaques. */
-html:is([data-theme=aurora],[data-theme=candy],[data-theme=galaxy],[data-theme=citrus],[data-theme=surprise])[data-ui-style]:not([data-ui-style=minimal]) #app .studio-shell{background:var(--palette-surface) fixed!important}
+html:is([data-theme=aurora],[data-theme=candy],[data-theme=galaxy],[data-theme=citrus],[data-theme=prism],[data-theme=lagoon],[data-theme=ember],[data-theme=nebula])[data-ui-style]:not([data-ui-style=minimal]) #app .studio-shell{background:var(--palette-surface) fixed!important}
 .profile-swatches .profile-swatch.is-gradient{background-size:100% 100%}
 
 /* 24. Código curto do link de apresentação */
@@ -641,6 +641,14 @@ html:is([data-theme=aurora],[data-theme=candy],[data-theme=galaxy],[data-theme=c
 .image-finder-badge.image-finder-gif{background:#111c;letter-spacing:.6px}
 .image-finder-card[data-playing] .image-finder-gif{background:#e11d48}
 
-/* 26. Gradiente sorteado: o botão mostra um dado */
-.profile-swatches .profile-swatch[data-profile-theme=surprise]{position:relative}
-.profile-swatches .profile-swatch[data-profile-theme=surprise]::after{content:"🎲";position:absolute;inset:0;display:grid;place-items:center;font-size:15px;filter:drop-shadow(0 1px 2px #0006)}
+/* 26. Gradientes novos (duplas sorteadas e fixas) */
+html[data-theme=prism]{--palette-start:132;--palette-end:216;--personal-hue:132;--personal-secondary:216}
+html[data-theme=lagoon]{--palette-start:269;--palette-end:387;--personal-hue:269;--personal-secondary:27}
+html[data-theme=ember]{--palette-start:359;--palette-end:488;--personal-hue:359;--personal-secondary:128}
+html[data-theme=nebula]{--palette-start:90;--palette-end:224;--personal-hue:90;--personal-secondary:224}
+
+/* 27. QR Code no compartilhamento */
+.publish-dialog .publish-qr{display:grid;justify-items:center;gap:6px;margin:2px 0 14px}
+.publish-dialog .publish-qr[hidden]{display:none}
+.publish-dialog .publish-qr img{width:min(190px,56vw);aspect-ratio:1;border-radius:14px;background:#fff;padding:6px;box-shadow:0 6px 18px rgba(0,0,0,.18)}
+.publish-dialog .publish-qr span{font-size:12.5px;opacity:.72}

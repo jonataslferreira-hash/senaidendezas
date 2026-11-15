@@ -1,4 +1,3 @@
-import {surpriseHues,surpriseSwatch,applySurprise} from './personalization.js';
 import {AccountVault} from './account-vault.js';
 import { prefersReducedMotion } from './motion-preference.js';
 import { appearancePicker } from './appearance.js';
@@ -58,7 +57,7 @@ export class Account {
       else if (action === 'remove-photo') this.settings.removePhoto();
       else this.show(action === 'open' ? (this.user ? 'account' : 'login') : action);
     });
-    root.addEventListener('click',e=>{const swatch=e.target.closest('[data-profile-theme]');if(swatch){const select=root.querySelector('#profile-theme');if(select){if(swatch.dataset.profileTheme==='surprise'){swatch.style.setProperty('--swatch',surpriseSwatch(surpriseHues(true)));if(document.documentElement.dataset.theme==='surprise')applySurprise('surprise');}select.value=swatch.dataset.profileTheme;for(const b of root.querySelectorAll('[data-profile-theme]'))b.setAttribute('aria-pressed',String(b===swatch));this.settings.capture(root.querySelector('#account-form'));}}});
+    root.addEventListener('click',e=>{const swatch=e.target.closest('[data-profile-theme]');if(swatch){const select=root.querySelector('#profile-theme');if(select){select.value=swatch.dataset.profileTheme;for(const b of root.querySelectorAll('[data-profile-theme]'))b.setAttribute('aria-pressed',String(b===swatch));this.settings.capture(root.querySelector('#account-form'));}}});
     root.addEventListener('change', e => { if(e.target.id==='profile-theme')for(const b of root.querySelectorAll('[data-profile-theme]'))b.setAttribute('aria-pressed',String(b.dataset.profileTheme===e.target.value));if (['profile-photo', 'profile-camera-file'].includes(e.target.id)) this.settings.photo.choose(e.target.files[0]).catch(error => { this.error = error.userMessage || error.message; this.paint(); }); });
     root.addEventListener('submit', e => { if (e.target.id === 'account-form') { e.preventDefault(); this.submit(e.target); } });
     root.addEventListener('keydown', e => { if (this.mode && e.key === 'Escape' && !this.busy && this.mode !== 'recovery') { e.preventDefault(); this.close(); } });

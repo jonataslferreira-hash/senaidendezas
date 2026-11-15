@@ -12,27 +12,12 @@ export const themes=[
   ['candy','Candy','linear-gradient(135deg,#f06aa8 0%,#f79a8a 50%,#fbbf6a 100%)'],
   ['galaxy','Galáxia','linear-gradient(135deg,#3f63d6 0%,#8a5bd0 52%,#e06ac4 100%)'],
   ['citrus','Citrino','linear-gradient(135deg,#d9e04f 0%,#7fd67a 50%,#3ac7bd 100%)'],
-  // Sorteado: cada clique no botão tira duas cores novas (guardadas neste aparelho).
-  ['surprise','Sortear gradiente','conic-gradient(from 210deg,#f06aa8,#fbbf6a,#4fe0c4,#6aa6f0,#a877ea,#f06aa8)']
+  // Duplas sorteadas uma vez e deixadas fixas para escolher.
+  ['prism','Esmeralda e Azul','linear-gradient(135deg,#58ee76 0%,#6eede0 50%,#5894ee 100%)'],
+  ['lagoon','Violeta e Laranja','linear-gradient(135deg,#a158ee 0%,#ed6eb2 50%,#ee9c58 100%)'],
+  ['ember','Rubi e Esmeralda','linear-gradient(135deg,#ee585a 0%,#e6ed6e 50%,#58ee6c 100%)'],
+  ['nebula','Lima e Azul','linear-gradient(135deg,#a3ee58 0%,#6eedbc 50%,#5880ee 100%)']
 ];
-const SURPRISE_KEY='sl-surprise-gradient';
-export function surpriseHues(roll=false,random=Math.random){
-  let saved=null;
-  try{saved=JSON.parse(localStorage.getItem(SURPRISE_KEY)||'null');}catch{/* sem armazenamento */}
-  if(!roll&&Array.isArray(saved)&&saved.length===2&&saved.every(Number.isFinite))return saved;
-  // A segunda cor fica de 70° a 160° adiante no círculo cromático: sempre bem diferente da primeira.
-  const start=Math.floor(random()*360),hues=[start,start+70+Math.floor(random()*91)];
-  try{localStorage.setItem(SURPRISE_KEY,JSON.stringify(hues));}catch{/* sem armazenamento */}
-  return hues;
-}
-export const surpriseSwatch=([start,end])=>`linear-gradient(135deg,hsl(${start} 82% 64%) 0%,hsl(${(start+end)/2} 78% 68%) 50%,hsl(${end} 82% 64%) 100%)`;
-export function applySurprise(theme,root=document.documentElement){
-  const names=['--palette-start','--palette-end','--personal-hue','--personal-secondary'];
-  if(theme!=='surprise'){for(const name of names)root.style.removeProperty(name);return;}
-  const [start,end]=surpriseHues();
-  root.style.setProperty('--palette-start',String(start));root.style.setProperty('--palette-end',String(end));
-  root.style.setProperty('--personal-hue',String(start%360));root.style.setProperty('--personal-secondary',String(end%360));
-}
 export const styles=[['classic','Clássico'],['glass','Liquid Glass'],['aero','Frutiger Aero'],['minimal','Minimalista'],['editorial','Office'],['arcade','8-Bit']];
 export const validTheme=value=>themes.some(([id])=>id===value)?value:'violet';
 export const validStyle=value=>value==='material'?'editorial':styles.some(([id])=>id===value)?value:'classic';
