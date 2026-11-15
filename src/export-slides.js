@@ -60,7 +60,7 @@ async function cropPng(url,x,y,width,height){
  return canvas.toDataURL('image/png');
 }
 export async function exportSlides(input,format,onProgress=()=>{}){
- const lesson=await hydrateLesson(input,true),host=document.createElement('div'),models=new CanvasModels(),simulations=new Simulations();host.className='export-canvas-host';host.setAttribute('aria-hidden','true');host.style.cssText='position:fixed;left:-20000px;top:0;pointer-events:none;z-index:-1;';document.body.append(host);
+ const hydrated=await hydrateLesson(input,true),pages=hydrated.slides.filter(slide=>!slide.game),lesson=pages.length?{...hydrated,slides:pages}:hydrated,host=document.createElement('div'),models=new CanvasModels(),simulations=new Simulations();host.className='export-canvas-host';host.setAttribute('aria-hidden','true');host.style.cssText='position:fixed;left:-20000px;top:0;pointer-events:none;z-index:-1;';document.body.append(host);
  const pngOnly=format==='png',pdf=format==='pdf'?await import('pdf-lib'):null,pptx=format==='pptx'?await import('@office-kit/pptx'):null,deck=pdf?await pdf.PDFDocument.create():pptx?.createPresentation(),first=presentationSlide(lesson.slides[0]),ratio=first.pageWidth/first.pageHeight||16/9,deckW=pptx?.inches(13.333333),deckH=deckW/ratio;
  if(pptx)pptx.setSlideSize(deck,{width:deckW,height:Math.round(deckH)});
  try{for(const [index,original]of lesson.slides.entries()){

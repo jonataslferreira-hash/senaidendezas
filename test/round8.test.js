@@ -97,3 +97,111 @@ test('busca de GIF pede o filtro de animação', async () => {
   } finally { globalThis.fetch = original; }
   assert.ok(calls.length === 0 || calls.some(url => url.includes('gif=1')));
 });
+
+test('vídeo sincronizado: aluno alcança o professor e não repete comando à toa', async () => {
+  const { videoState, videoCommands } = await import('../src/video-sync.js');
+  const host = { state: 1, time: 30, at: 1000, sent: NaN };
+  const first = videoState(host, 3000, 100000);            // tocando: 32 s quando o relógio marca 100 s
+  assert.deepEqual(first, { s: 1, o: -68 });
+  assert.deepEqual(videoState(host, 3300, 100300), first);  // continua tocando: nada novo para enviar
+  const student = { state: 2, time: 0, at: 0 };
+  assert.deepEqual(videoCommands(student, first, 0, 110000), [['seekTo', [42, true]], ['playVideo', []]]);
+  assert.deepEqual(videoCommands({ state: 1, time: 41.6, at: 0 }, first, 0, 110000), []);
+  assert.deepEqual(videoCommands({ state: 1, time: 50, at: 0 }, { s: 2, t: 50.2 }, 0, 0), [['pauseVideo', []]]);
+  assert.deepEqual(videoState({ state: 2, time: 12.34, at: 0 }, 0, 0), { s: 2, t: 12.3 });
+  const { videoSource } = await import('../src/video-embed.js');
+  assert.match(videoSource('https://youtu.be/dQw4w9WgXcQ').embed, /enablejsapi=1/);
+});
+
+test('Spotify aceita música, playlist e álbum', async () => {
+  const { spotifyItem } = await import('../src/editor-playlist.js');
+  assert.deepEqual(spotifyItem('https://open.spotify.com/playlist/37i9dQZF1DXcBWIGoYBM5M?si=x'), { type: 'playlist', id: '37i9dQZF1DXcBWIGoYBM5M' });
+  assert.equal(spotifyItem('https://open.spotify.com/intl-pt/album/0123456789012345678901').type, 'album');
+  assert.equal(spotifyItem('https://open.spotify.com/track/0123456789012345678901').type, 'track');
+  assert.equal(spotifyItem('https://open.spotify.com/artist/0123456789012345678901'), null);
+  assert.equal(spotifyItem('https://evil.example/playlist/0123456789012345678901'), null);
+});
+
+test('controle remoto: comando repetido só vale uma vez e a sessão tolera falha de sinal', async () => {
+  const { AccountPresenter } = await import('../src/account-presenter.js');
+  const make = device => { const sent = [], actions = []; const item = Object.create(AccountPresenter.prototype); Object.assign(item, { studio: { root: { querySelector: () => null, querySelectorAll: () => [] }, callbacks: { remoteAction: (name, value) => actions.push([name, value]) } }, device, sessions: [], open: '' }); item.send = payload => sent.push({ ...payload, from: device }); return { item, sent, actions }; };
+  const pc = make('pc'), phone = make('phone');
+  pc.item.local = { code: '123456', title: 'Aula', total: 5, slide: 2, phase: 'lesson', sims: [] };
+  pc.item.announce(true);
+  phone.item.receive(pc.sent.at(-1));
+  assert.equal(phone.item.sessions.length, 1);
+  assert.equal(phone.item.sessions[0].slide, 2);
+  const command = { kind: 'control', target: 'pc', action: 'next-slide', id: 'a1', from: 'phone' };
+  pc.item.receive(command); pc.item.receive(command);
+  assert.deepEqual(pc.actions, [['next-slide', undefined]]);
+  assert.equal(pc.sent.filter(message => message.kind === 'ack' && message.id === 'a1').length, 2);
+  pc.item.receive({ kind: 'control', target: 'outro', action: 'next-slide', id: 'a2', from: 'phone' });
+  pc.item.receive({ kind: 'control', target: 'pc', action: 'apagar-tudo', id: 'a3', from: 'phone' });
+  assert.equal(pc.actions.length, 1);
+  phone.item.refresh();
+  assert.equal(phone.item.sessions.length, 1);
+  phone.item.seen.get('pc').last = Date.now() - 60000; phone.item.refresh();
+  assert.equal(phone.item.sessions.length, 0);
+  phone.item.open = 'pc';
+  assert.match(phone.item.dialog(), /Apresentação desconectada/);
+});
+
+test('etapas interativas: equipes, relâmpago, sobrevivência, desafio, sorteio e cabo de guerra', async () => {
+  const { Room } = await import('../src/room.js');
+  const { demoLesson } = await import('../src/lessons.js');
+  const { defaultGame, challengeMatches, validateGame } = await import('../src/stage-games.js');
+  const lesson = demoLesson(); let now = 1000;
+  const add = (type, extra = {}) => { const slide = { ...lesson.slides[0], id: 'g-' + type, game: { ...defaultGame(type), ...extra } }; lesson.slides.push(slide); return { id: 'b-' + type, type, items: [slide.id] }; };
+  lesson.activityBlocks = [add('teams'), add('flash'), add('survival', { questions: [{ text: 'a', options: ['x', 'y'], correct: 0 }, { text: 'b', options: ['x', 'y'], correct: 1 }, { text: 'c', options: ['x', 'y'], correct: 0 }] }), add('challenge', { answer: [{ k: 'range', label: 'v', v: '50', min: 0, max: 100 }, { k: 'select', label: 's', v: 'a' }] }), add('raffle'), add('tug'), { id: 's', type: 'slides', items: lesson.slides.slice(0, 2).map(s => s.id) }];
+  const room = new Room('123456', null, () => now, lesson);
+  const ana = room.join({ name: 'Ana' }), bia = room.join({ name: 'Bia' }), caio = room.join({ name: 'Caio' });
+  assert.equal(room.data.phase, 'game');
+  assert.deepEqual(room.snapshot().teams.map(t => t.members.length).sort(), [1, 2]);
+  room.control('next-stage');
+  room.answer(ana.id, { choice: { choice: 1 } });
+  assert.equal(room.snapshot(caio.id).game.correct, undefined, 'aluno não recebe a resposta antes do fim');
+  assert.equal(room.snapshot(caio.id, true).lesson.slides.find(s => s.game?.type === 'flash').game.correct, undefined);
+  room.answer(bia.id, { choice: { choice: 0 } });
+  assert.equal(room.snapshot().game.winner.name, 'Bia');
+  assert.throws(() => room.answer(caio.id, { choice: { choice: 0 } }), /terminou/);
+  room.control('next-stage');
+  // Sobrevivência: uma vida só; quem erra ou não responde cai e não joga mais.
+  assert.equal(room.snapshot().game.state, 'ready');
+  room.control('game', { do: 'next' });
+  room.answer(ana.id, { choice: { choice: 0, round: 0 } }); room.answer(bia.id, { choice: { choice: 1, round: 0 } });
+  assert.equal(room.snapshot(bia.id).game.question.correct, undefined);
+  now += 16000; room.tick();
+  assert.equal(room.snapshot(bia.id).game.me.alive, false);
+  assert.equal(room.snapshot(caio.id).game.me.alive, false, 'quem não respondeu a tempo também cai');
+  assert.equal(room.snapshot().game.state, 'done');
+  assert.throws(() => room.answer(bia.id, { choice: { choice: 0, round: 0 } }), /terminou|caiu/);
+  assert.equal(room.snapshot().ranking.find(p => p.name === 'Ana').score, 500, 'pontos das dinâmicas contam no ranking individual');
+  room.control('next-stage'); now += 5000;
+  room.answer(ana.id, { choice: { values: ['80', 'a'] } });
+  assert.equal(room.snapshot(ana.id).game.me.ok, false);
+  now += 2000; room.answer(ana.id, { choice: { values: ['53', 'a'] } });
+  assert.equal(room.snapshot(ana.id).game.me.place, 1);
+  room.control('next-stage'); room.control('game', { do: 'draw' });
+  assert.ok(['Ana', 'Bia', 'Caio'].includes(room.snapshot().game.current.name));
+  assert.equal(room.snapshot().game.left, 2);
+  room.control('next-stage');
+  room.answer(ana.id, { choice: { side: 0 } }); room.answer(bia.id, { choice: { side: 1 } });
+  for (let i = 0; i < 3; i++) { now += 1000; room.answer(ana.id, { choice: { taps: 50 } }); }
+  assert.equal(room.snapshot().game.winner, 0, 'toques são limitados, mas o lado A vence');
+  assert.equal(room.snapshot().teams.reduce((sum, t) => sum + t.score, 0), 500 + 500 + 500 + 200);
+  room.control('next-stage');
+  assert.equal(room.data.phase, 'lesson');
+  assert.equal(challengeMatches({ tolerance: 5, answer: [{ k: 'range', v: '50', min: 0, max: 100, skip: true }, { k: 'toggle', v: '1' }] }, ['0', '1']), true);
+  assert.throws(() => validateGame({ type: 'challenge', text: 'x', simulation: 'pendulum', answer: [] }), /resposta certa/);
+});
+
+test('controle remoto gira e aproxima o modelo 3D', async () => {
+  const { orbitCamera, applyModelCommand } = await import('../src/live-interaction.js');
+  const vec = (x, y, z) => ({ x, y, z, set(a, b, c) { this.x = a; this.y = b; this.z = c; } });
+  const viewer = { camera: { position: vec(0, 0, 10) }, controls: { target: vec(0, 0, 0), update() {} } };
+  orbitCamera(viewer, { dx: Math.PI / 2 });
+  assert.ok(Math.abs(viewer.camera.position.x + 10) < 1e-6 && Math.abs(viewer.camera.position.z) < 1e-6);
+  orbitCamera(viewer, { zoom: .5 });
+  assert.ok(Math.abs(Math.hypot(viewer.camera.position.x, viewer.camera.position.y, viewer.camera.position.z) - 5) < 1e-6);
+  assert.equal(applyModelCommand({ model: 'nope', dx: 1 }, { canvasModels: { viewers: new Map() } }), false);
+});

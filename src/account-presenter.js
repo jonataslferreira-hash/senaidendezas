@@ -1,6 +1,14 @@
+// Controle remoto da apresentação: outro aparelho da mesma conta (o celular do
+// professor) passa slides, comanda quiz/enquete e mexe no experimento do slide.
+//
+// Conexão: os comandos viajam pelo canal em tempo real da conta e, quando os dois
+// lados estão no mesmo navegador, também por um canal local (BroadcastChannel),
+// que não depende da internet. Cada comando tem um número: se a confirmação não
+// chegar, ele é reenviado, e o computador ignora os repetidos.
 import { createUuid } from './uuid.js';
 const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-const commands=new Set(['previous','next-slide','next-stage','quiz','start-quiz','reveal','next-question','back-lesson','finish','poll','close-poll']);
+const commands=new Set(['previous','next-slide','next-stage','quiz','start-quiz','reveal','next-question','back-lesson','finish','poll','close-poll','sim','game-next','game-draw','game-end','game-restart','game-shuffle']);
+const GRACE=15000; // uma sessão só some depois deste tempo sem sinal (a presença oscila)
 export function remoteConnectionMessage(state,error,online=true){
  const reason=String(error?.message||'');
  if(!online)return 'Você está sem internet. O controle reconecta quando a conexão voltar.';
@@ -9,13 +17,43 @@ export function remoteConnectionMessage(state,error,online=true){
  if(state==='TIMED_OUT')return 'A conexão do controle demorou para responder. Tentando reconectar…';
  return 'A conexão do controle foi interrompida. Tentando reconectar…';
 }
+// Dados que identificam a apresentação (não mudam a cada slide, para a presença não oscilar).
+const identity=value=>value?{code:value.code,title:value.title,total:value.total}:null;
 export class AccountPresenter{
- constructor(studio){this.studio=studio;this.device=createUuid();this.sessions=[];this.epoch=0;this.open='';this.status='';studio.root.addEventListener('account-changed',()=>this.connect());studio.root.addEventListener('click',e=>{const b=e.target.closest('[data-remote-action]');if(b)this.action(b).catch(error=>{this.status=error.message;this.paint();});});queueMicrotask(()=>this.connect());}
+ constructor(studio){
+  this.studio=studio;this.device=createUuid();this.sessions=[];this.epoch=0;this.open='';this.status='';
+  studio.root.addEventListener('account-changed',()=>this.connect());
+  studio.root.addEventListener('click',e=>{const b=e.target.closest('[data-remote-action]');if(b)this.action(b).catch(error=>{this.status=error.message;this.paint();});});
+  studio.root.addEventListener('input',e=>{const field=e.target.closest('[data-remote-field]');if(field)this.fieldChanged(field);});
+  studio.root.addEventListener('change',e=>{const field=e.target.closest('[data-remote-field]');if(field)this.fieldChanged(field,true);});
+  const root=studio.root;
+  // Touchpad do controle: gira o modelo 3D ou move o cursor do experimento importado.
+  root.addEventListener('pointerdown',e=>{const pad=e.target.closest?.('[data-remote-pad]');if(!pad||!this.available())return;e.preventDefault();try{pad.setPointerCapture(e.pointerId);}catch{/* sem captura */}
+   this.pad={node:pad,id:e.pointerId,x:e.clientX,y:e.clientY,dx:0,dy:0,moved:0,at:Date.now(),hold:pad.dataset.hold==='true'};this.dragging=true;pad.dataset.active='true';
+   if(this.pad.hold)this.padSend({t:'down'});});
+  root.addEventListener('pointermove',e=>{const pad=this.pad;if(!pad||e.pointerId!==pad.id)return;const box=pad.node.getBoundingClientRect(),dx=(e.clientX-pad.x)/Math.max(1,box.width),dy=(e.clientY-pad.y)/Math.max(1,box.height);
+   pad.moved+=Math.abs(e.clientX-pad.x)+Math.abs(e.clientY-pad.y);pad.x=e.clientX;pad.y=e.clientY;pad.dx+=dx;pad.dy+=dy;
+   if(!pad.timer)pad.timer=setTimeout(()=>{pad.timer=0;this.padFlush();},60);});
+  const padEnd=e=>{const pad=this.pad;if(!pad||e.pointerId!==pad.id)return;clearTimeout(pad.timer);pad.timer=0;this.padFlush();
+   if(pad.hold)this.padSend({t:'up'});else if(pad.moved<8&&Date.now()-pad.at<350&&pad.node.dataset.remotePad==='custom'){navigator.vibrate?.(10);this.padSend({t:'tap'});}
+   pad.node.dataset.active='false';this.pad=null;this.dragging=false;};
+  root.addEventListener('pointerup',padEnd);root.addEventListener('pointercancel',padEnd);
+  setInterval(()=>this.tick(),2500);
+  queueMicrotask(()=>this.connect());
+ }
+ // Movimento acumulado do touchpad (enviado sem confirmação: o próximo já corrige).
+ padFlush(){const pad=this.pad;if(!pad||(!pad.dx&&!pad.dy))return;const {dx,dy}=pad;pad.dx=0;pad.dy=0;
+  if(pad.node.dataset.remotePad==='model')this.volatile({model:pad.node.dataset.model,dx:dx*Math.PI,dy:dy*Math.PI*.7});
+  else this.padSend({t:'move',dx:dx*.9,dy:dy*.9});}
+ padSend(event){const pad=this.pad;if(!pad||pad.node.dataset.remotePad!=='custom')return;this.volatile({custom:Number(pad.node.dataset.custom),pad:event});}
+ volatile(value){this.send({kind:'control',target:this.open,action:'sim',value,id:createUuid()});}
+ state(){this.seen||=new Map();this.statuses||=new Map();this.handled||=[];this.waiting||=new Map();return this;}
  async connect(force=false){
+  this.state();
   const owner=this.studio.account.user?.id;
   if(!force&&owner&&owner===this.owner&&(this.channel||this.connecting))return;
   const changed=owner!==this.owner,previous=this.channel,epoch=++this.epoch;
-  this.owner=owner;this.channel=null;this.ready=false;this.connecting=Boolean(owner);this.status='';this.sessions=[];if(changed)this.open='';this.paint();
+  this.owner=owner;this.channel=null;this.ready=false;this.connecting=Boolean(owner);this.status='';if(changed){this.open='';this.seen.clear();this.statuses.clear();this.sessions=[];this.openBus(owner);}this.paint();
   try{
    if(previous)await this.studio.account.client.removeChannel(previous);
    if(epoch!==this.epoch||!owner)return;
@@ -23,12 +61,64 @@ export class AccountPresenter{
    // continues to refresh its token and retry interrupted subscriptions.
    await this.studio.account.client.realtime.setAuth();
    if(epoch!==this.epoch)return;
-   this.channel=this.studio.account.client.channel('sl-live:'+owner,{config:{private:true,broadcast:{ack:true},presence:{key:this.device}}})
-    .on('presence',{event:'sync'},()=>{if(epoch!==this.epoch)return;this.sessions=Object.values(this.channel.presenceState()).flat().filter(p=>p.role==='presenter'&&p.device!==this.device&&/^\d{6}$/.test(p.code||'')).slice(0,10);this.paint();})
-    .on('broadcast',{event:'control'},({payload})=>{if(epoch!==this.epoch||!this.local||payload?.target!==this.device||!commands.has(payload.action))return;this.studio.callbacks.remoteAction?.(payload.action);})
-    .subscribe((state,error)=>{if(epoch!==this.epoch)return;if(state==='SUBSCRIBED'){this.ready=true;this.failures=0;clearTimeout(this.retryTimer);this.track();this.status='';}else if(['CHANNEL_ERROR','TIMED_OUT','CLOSED'].includes(state)){this.ready=false;this.dropped(state,error,epoch);}this.paint();});
+   this.channel=this.studio.account.client.channel('sl-live:'+owner,{config:{private:true,broadcast:{ack:false},presence:{key:this.device}}})
+    .on('presence',{event:'sync'},()=>{if(epoch!==this.epoch)return;for(const p of Object.values(this.channel.presenceState()).flat())this.sawPresenter(p);this.refresh();})
+    .on('broadcast',{event:'remote'},({payload})=>{if(epoch===this.epoch)this.receive(payload);})
+    .subscribe((state,error)=>{if(epoch!==this.epoch)return;if(state==='SUBSCRIBED'){this.ready=true;this.failures=0;clearTimeout(this.retryTimer);this.tracked='';this.track();this.status='';if(this.open)this.send({kind:'hello',target:this.open});}else if(['CHANNEL_ERROR','TIMED_OUT','CLOSED'].includes(state)){this.ready=false;this.dropped(state,error,epoch);}this.paint();});
   }catch(error){if(epoch===this.epoch)this.dropped('CHANNEL_ERROR',error,epoch);}
   finally{if(epoch===this.epoch){this.connecting=false;this.paint();}}
+ }
+ // Canal local entre abas do mesmo navegador: funciona mesmo com a internet ruim.
+ openBus(owner){
+  try{this.bus?.close();}catch{/* já fechado */}
+  this.bus=null;
+  if(!owner||typeof BroadcastChannel==='undefined')return;
+  try{this.bus=new BroadcastChannel('sl-live:'+owner);this.bus.onmessage=event=>this.receive(event.data);this.bus.unref?.();}catch{this.bus=null;}
+ }
+ send(payload){
+  const message={...payload,from:this.device};
+  try{this.bus?.postMessage(message);}catch{/* canal local indisponível */}
+  if(this.channel&&this.ready)Promise.resolve(this.channel.send({type:'broadcast',event:'remote',payload:message})).catch(()=>{});
+ }
+ sawPresenter(p){
+  this.state();
+  if(!p||p.role!=='presenter'||p.device===this.device||typeof p.device!=='string'||!/^\d{6}$/.test(p.code||''))return;
+  this.seen.set(p.device,{device:p.device,code:p.code,title:String(p.title||'').slice(0,200),total:Number(p.total)||0,last:Date.now()});
+ }
+ receive(message){
+  this.state();
+  if(!message||typeof message!=='object'||message.from===this.device)return;
+  if(message.kind==='presence'){this.sawPresenter({...message,role:'presenter',device:message.from});this.refresh();return;}
+  if(message.kind==='gone'){this.seen.delete(message.from);this.statuses.delete(message.from);this.refresh();return;}
+  if(message.kind==='status'){
+   // Quem apresenta conta em que slide está e quais experimentos há nele.
+   if(typeof message.from!=='string')return;
+   if(message.identity)this.sawPresenter({...message.identity,role:'presenter',device:message.from});
+   const known=this.seen.get(message.from);if(known)known.last=Date.now();
+   this.statuses.set(message.from,message.status||{});this.refresh();return;
+  }
+  if(message.kind==='ack'){if(message.target===this.device){this.waiting.get(message.id)?.done();}return;}
+  if(!this.local||message.target!==this.device)return;
+  if(message.kind==='hello'){this.announce(true);return;}
+  if(message.kind==='control'&&commands.has(message.action)){
+   this.send({kind:'ack',target:message.from,id:message.id});
+   if(this.handled.includes(message.id))return;
+   this.handled.push(message.id);if(this.handled.length>80)this.handled.shift();
+   this.studio.callbacks.remoteAction?.(message.action,message.value);
+  }
+ }
+ // Lista de apresentações visíveis, tolerando falhas curtas de sinal.
+ refresh(){
+  this.state();const now=Date.now();
+  for(const [device,p] of this.seen)if(now-p.last>GRACE){this.seen.delete(device);this.statuses.delete(device);}
+  this.sessions=[...this.seen.values()].map(p=>({...p,...(this.statuses.get(p.device)||{})})).slice(0,10);
+  this.paint();
+ }
+ tick(){
+  if(!this.owner)return;
+  if(this.local)this.announce();
+  if(this.open)this.send({kind:'hello',target:this.open});
+  if(this.seen?.size)this.refresh();
  }
  // Quedas do controle remoto são comuns (por exemplo ao sair de uma
  // apresentação) e se resolvem sozinhas: reconecta em silêncio e só avisa na
@@ -42,13 +132,157 @@ export class AccountPresenter{
   if(fatal||!navigator.onLine)return;
   this.retryTimer=setTimeout(()=>{if(epoch===this.epoch&&!this.ready&&this.owner){const kept=this.failures;this.connect(true).finally(()=>{this.failures=Math.max(this.failures||0,kept);});}},Math.min(30000,1500*2**Math.min(this.failures,5)));
  }
- setPresentation(value){const key=JSON.stringify(value);if(key===this.last)return;this.last=key;this.local=value;this.track();}
- track(){if(!this.channel||!this.ready)return;if(this.local)this.channel.track({...this.local,role:'presenter',device:this.device}).catch(()=>{});else this.channel.untrack().catch(()=>{});}
+ // Chamado pela apresentação a cada mudança de tela.
+ setPresentation(value){
+  const key=JSON.stringify(value);if(key===this.last)return;
+  const was=this.local;this.last=key;this.local=value;
+  if(!value&&was)this.send({kind:'gone'});
+  this.track();this.announce(true);
+ }
+ track(){
+  if(!this.channel||!this.ready)return;
+  const key=JSON.stringify(identity(this.local));
+  if(key===this.tracked)return;
+  this.tracked=key;
+  if(this.local)this.channel.track({...identity(this.local),role:'presenter',device:this.device}).catch(()=>{});else this.channel.untrack().catch(()=>{});
+ }
+ announce(full=false){
+  if(!this.local)return;
+  const {code,title,total,...status}=this.local;
+  if(full)this.send({kind:'status',identity:{code,title,total},status});else this.send({kind:'presence',code,title,total});
+ }
+ // Comando com confirmação: reenvia até três vezes antes de avisar.
+ command(action,value){
+  this.state();
+  const id=createUuid(),target=this.open,message={kind:'control',target,action,value,id};
+  return new Promise(resolve=>{
+   let tries=0;
+   const finish=ok=>{clearInterval(timer);this.waiting.delete(id);resolve(ok);};
+   const attempt=()=>{if(++tries>4){finish(false);return;}this.send(message);};
+   const timer=setInterval(attempt,650);
+   this.waiting.set(id,{done:()=>finish(true)});attempt();
+  });
+ }
+ available(){const p=this.sessions.find(s=>s.device===this.open);return p&&(this.ready||this.bus)?p:null;}
  // O aviso só interessa a quem está usando o controle neste aparelho.
  retryMarkup(){return this.status&&!this.ready&&this.open?`<div class="remote-connection-status"><p role="status">${esc(this.status)}</p><button type="button" class="studio-btn quiet" data-remote-action="reconnect">Reconectar controle</button></div>`:'';}
- markup(){return this.retryMarkup()+(this.sessions.length?`<section class="account-live-sessions"><h2>Apresentação em andamento</h2>${this.sessions.map(p=>`<article><div><strong>${esc(p.title)}</strong><small>Slide ${Number(p.slide)+1} de ${Number(p.total)} · sala ${esc(p.code)}</small></div><button class="studio-btn accent" type="button" data-remote-action="open" data-device="${esc(p.device)}">Usar este aparelho como controle</button></article>`).join('')}</section>`:'');}
- roomButton(code){if(!this.ready)return '';const session=this.sessions.find(p=>p.code===code);return session?`<button type="button" class="btn secondary small" data-remote-action="open" data-device="${esc(session.device)}">Controlar slide</button>`:'';}
- dialog(){if(!this.open)return '';const p=this.sessions.find(s=>s.device===this.open),available=Boolean(p&&this.ready);return `<dialog class="group-dialog remote-dialog" aria-label="Controle da apresentação"><button class="group-close" type="button" data-remote-action="close" aria-label="Fechar controle">×</button><h2>${esc(p?.title||'Apresentação desconectada')}</h2><p>${p?'Slide '+(Number(p.slide)+1)+' de '+Number(p.total):'Aguarde o computador reconectar.'}</p>${p?.note?`<details class="remote-notes"><summary>Roteiro</summary><p>${esc(p.note)}</p></details>`:''}<div class="remote-main"><button class="studio-btn quiet" data-remote-action="previous" ${available?'':'disabled'}>← Anterior</button><button class="studio-btn accent" data-remote-action="next-slide" ${available?'':'disabled'}>Próximo →</button></div><div class="remote-extra">${[['quiz','Abrir lobby'],['start-quiz','Iniciar quiz'],['reveal','Revelar resposta'],['next-question','Próxima pergunta'],['poll','Abrir enquete'],['close-poll','Encerrar enquete'],['back-lesson','Voltar aos slides'],['finish','Encerrar atividade']].map(([a,t])=>`<button class="studio-btn quiet" data-remote-action="${a}" ${available?'':'disabled'}>${t}</button>`).join('')}</div><p role="status">${this.ready?esc(this.status):''}</p>${this.retryMarkup()}</dialog>`;}
- paint(){const slot=this.studio.root.querySelector('[data-live-sessions]');if(slot)slot.innerHTML=this.markup();for(const button of this.studio.root.querySelectorAll('[data-room-controller]'))button.innerHTML=this.roomButton(button.dataset.roomCode);const dialogs=this.studio.root.querySelector('[data-remote-dialog]');if(dialogs){dialogs.innerHTML=this.dialog();const dialog=dialogs.querySelector('dialog');if(dialog){dialog.showModal();dialog.addEventListener('cancel',()=>{this.open='';});}}}
- async action(button){const action=button.dataset.remoteAction;if(action==='reconnect'){await this.connect(true);return;}if(action==='open'){this.open=button.dataset.device;this.paint();return;}if(action==='close'){this.open='';this.paint();return;}if(!this.ready||!commands.has(action)||!this.sessions.some(s=>s.device===this.open))return;const result=await this.channel.send({type:'broadcast',event:'control',payload:{target:this.open,action}});if(result!=='ok')throw Error('O comando não foi confirmado. Confira a conexão.');}
+ markup(){return this.retryMarkup()+(this.sessions.length?`<section class="account-live-sessions"><h2>Apresentação em andamento</h2>${this.sessions.map(p=>`<article><div><strong>${esc(p.title)}</strong><small>${Number.isInteger(p.slide)?'Slide '+(p.slide+1)+' de '+Number(p.total)+' · ':''}sala ${esc(p.code)}</small></div><button class="studio-btn accent" type="button" data-remote-action="open" data-device="${esc(p.device)}">Usar este aparelho como controle</button></article>`).join('')}</section>`:'');}
+ roomButton(code){const session=this.sessions.find(p=>p.code===code);return session?`<button type="button" class="btn secondary small" data-remote-action="open" data-device="${esc(session.device)}">Controlar slide</button>`:'';}
+ controlsMarkup(fields,at,stepAt,off){
+  return (fields||[]).map(f=>{
+   const a=`data-remote-field ${at} data-field="${Number(f.i)}" ${off}`;
+   if(f.k==='range')return `<label class="remote-range"><span>${esc(f.label)} <output>${esc(f.value)}</output></span><div><button type="button" data-remote-action="sim-step" data-step="-1" aria-label="Diminuir ${esc(f.label)}" ${off}>−</button><input type="range" min="${esc(f.min)}" max="${esc(f.max)}" step="${esc(f.step)}" value="${esc(f.value)}" aria-label="${esc(f.label)}" ${a}><button type="button" data-remote-action="sim-step" data-step="1" aria-label="Aumentar ${esc(f.label)}" ${off}>+</button></div></label>`;
+   if(f.k==='select')return `<label class="remote-select"><span>${esc(f.label)}</span><select aria-label="${esc(f.label)}" ${a}>${(f.options||[]).map(([value,name])=>`<option value="${esc(value)}" ${String(value)===String(f.value)?'selected':''}>${esc(name)}</option>`).join('')}</select></label>`;
+   if(f.k==='toggle')return `<button type="button" class="studio-btn quiet remote-toggle" data-remote-action="sim-toggle" ${at} data-field="${Number(f.i)}" data-value="${f.value==='1'?'1':'0'}" aria-pressed="${f.value==='1'}" ${off}>${esc(f.label)}</button>`;
+   return `<label class="remote-select"><span>${esc(f.label)}</span><input type="text" maxlength="60" value="${esc(f.value)}" ${a}></label>`;
+  }).join('');
+ }
+ simsMarkup(p,off){
+  const sims=Array.isArray(p?.sims)?p.sims:[],customs=Array.isArray(p?.customs)?p.customs:[],models=Array.isArray(p?.models)?p.models:[];
+  if(!sims.length&&!customs.length&&!models.length)return '<p class="remote-empty">Este slide não tem experimento nem modelo 3D. Passe para um slide que tenha e os controles aparecem aqui.</p>';
+  const native=sims.map((sim,s)=>`<section class="remote-sim"><h3>🧪 ${esc(sim.name)}</h3>${this.controlsMarkup(sim.fields,`data-sim="${s}"`,'',off)}${(sim.acts||[]).length?`<div class="remote-acts">${sim.acts.map(act=>`<button type="button" class="studio-btn quiet" data-remote-action="sim-act" data-sim="${s}" data-act="${Number(act.a)}" ${off}>${esc(act.label)}</button>`).join('')}</div>`:''}${sim.play?`<button type="button" class="studio-btn accent remote-play" data-remote-action="sim-play" data-sim="${s}" ${off}>${esc(sim.play)}</button>`:''}</section>`).join('');
+  const imported=customs.map((sim,c)=>`<section class="remote-sim"><h3>🧩 ${esc(sim.name)}</h3>
+   <div class="remote-pad" data-remote-pad="custom" data-custom="${c}" data-hold="${this.padHold===c}" role="application" aria-label="Touchpad do experimento"><span>${this.padHold===c?'Arraste o dedo: o cursor arrasta junto':'Deslize para mover o cursor · toque para clicar'}</span></div>
+   <div class="remote-pad-tools"><button type="button" class="studio-btn quiet" data-remote-action="pad-click" data-custom="${c}" ${off}>Clicar</button><button type="button" class="studio-btn quiet" data-remote-action="pad-hold" data-custom="${c}" aria-pressed="${this.padHold===c}" ${off}>${this.padHold===c?'✋ Arrastando':'✋ Arrastar'}</button></div>
+   <p class="remote-hint">Um ponto aparece no telão mostrando onde está o cursor.</p>
+   ${this.controlsMarkup(sim.fields,`data-custom="${c}"`,'',off)}${(sim.buttons||[]).length?`<div class="remote-acts">${sim.buttons.map(b=>`<button type="button" class="studio-btn quiet" data-remote-action="custom-button" data-custom="${c}" data-button="${Number(b.a)}" ${off}>${esc(b.label)}</button>`).join('')}</div>`:''}</section>`).join('');
+  const three=models.map(m=>`<section class="remote-sim"><h3>🧊 ${esc(m.name)}</h3>
+   <div class="remote-pad" data-remote-pad="model" data-model="${esc(m.id)}" role="application" aria-label="Girar o modelo 3D"><span>Deslize o dedo para girar o modelo</span></div>
+   <div class="remote-pad-tools"><button type="button" class="studio-btn quiet" data-remote-action="model-zoom" data-zoom="0.82" data-model="${esc(m.id)}" aria-label="Aproximar" ${off}>＋ Zoom</button><button type="button" class="studio-btn quiet" data-remote-action="model-zoom" data-zoom="1.22" data-model="${esc(m.id)}" aria-label="Afastar" ${off}>－ Zoom</button>${m.explode?`<button type="button" class="studio-btn quiet" data-remote-action="model-explode" data-model="${esc(m.id)}" aria-pressed="${Boolean(m.exploded)}" ${off}>${m.exploded?'Montar':'Explodir'}</button>`:''}</div></section>`).join('');
+  return native+imported+three;
+ }
+ // Botões principais de acordo com o momento da aula.
+ stageMarkup(p,button){
+  const phase=p?.phase||'lesson',game=p?.game,next=p?.hasNext?'Próxima etapa →':'Concluir etapa';
+  const big=(action,label)=>button(action,label,'accent remote-big');
+  if(phase==='lobby'||phase==='countdown')return `<p class="remote-phase">Quiz · sala de espera</p>${big('start-quiz','▶ Iniciar quiz')}<div class="remote-row">${button('back-lesson','Voltar aos slides')}</div>`;
+  if(phase==='question')return `<p class="remote-phase">Quiz · pergunta no ar</p>${big('reveal','Revelar resposta')}`;
+  if(phase==='reveal'||phase==='leaderboard')return `<p class="remote-phase">Quiz · resultado</p>${big('next-question','Continuar →')}`;
+  if(phase==='finished')return `<p class="remote-phase">Quiz · pódio final</p>${big('back-lesson',next)}`;
+  if(phase==='poll')return `<p class="remote-phase">Enquete aberta</p>${big('close-poll','Encerrar votação')}`;
+  if(phase==='poll-results')return `<p class="remote-phase">Enquete · resultado</p>${big(p?.stage==='poll'?'next-stage':'back-lesson',p?.stage==='poll'?next:'Voltar aos slides')}`;
+  if(phase==='game'&&game){
+   const names={teams:'Equipes',flash:'Desafio relâmpago',survival:'Sobrevivência',challenge:'Desafio no experimento',raffle:'Sorteio',tug:'Cabo de guerra'},open=game.state==='open';
+   if(game.type==='survival'){const label={ready:'▶ Começar',open:'Revelar agora',reveal:'Próxima pergunta →'}[game.state];return `<p class="remote-phase">Sobrevivência${game.state==='done'?' · fim':''}</p>${label?big('game-next',label):big('next-stage',next)}<div class="remote-row">${game.state==='done'?button('game-restart','↻ Jogar de novo'):button('next-stage',next)}</div>`;}
+   const main=game.type==='raffle'?big('game-draw',game.drawn?'🎲 Sortear outro':'🎲 Sortear'):game.type==='teams'?big('next-stage',next):open?big('game-end','Encerrar rodada'):big('next-stage',next);
+   const extra=[game.type==='teams'?button('game-shuffle','🔀 Embaralhar times'):'',game.type==='raffle'?button('next-stage',next):'',!open&&!['teams','raffle'].includes(game.type)?button('game-restart','↻ Jogar de novo'):'',open&&!['teams','raffle'].includes(game.type)?button('next-stage',next):''].filter(Boolean).join('');
+   return `<p class="remote-phase">${esc(names[game.type]||'Dinâmica')}${game.type==='raffle'&&game.drawn?' · saiu '+esc(game.drawn):open||game.type==='teams'?'':' · encerrado'}</p>${main}<div class="remote-row">${extra}</div>`;
+  }
+  return '';
+ }
+ dialog(){
+  if(!this.open)return '';
+  const p=this.sessions.find(s=>s.device===this.open),available=Boolean(this.available()),off=available?'':'disabled';
+  const hasSlide=p&&Number.isInteger(p.slide),lesson=!p?.phase||p.phase==='lesson';
+  const count=['sims','customs','models'].reduce((sum,key)=>sum+(Array.isArray(p?.[key])?p[key].length:0),0);
+  const button=(action,label,kind='quiet')=>`<button class="studio-btn ${kind}" data-remote-action="${action}" ${off}>${label}</button>`;
+  const head=`<button class="group-close" type="button" data-remote-action="close" aria-label="Fechar controle">×</button><header class="remote-head"><span class="remote-dot" data-on="${available}" title="${available?'Conectado':'Sem sinal'}"></span><div><h2>${esc(p?.title||'Apresentação desconectada')}</h2><p>${p?(hasSlide?(lesson?'Slide '+(p.slide+1)+' de '+Number(p.total):'Atividade em andamento'):'Conectando…')+' · sala '+esc(p.code):'Aguarde o computador reconectar.'}</p></div></header>`;
+  const foot=`<p class="remote-status" role="status">${esc(this.notice||'')}</p>${this.retryMarkup()}`;
+  if(this.simOpen&&lesson)return `<dialog class="group-dialog remote-dialog remote-v2" data-view="sims" aria-label="Controle do experimento">${head}<button class="studio-btn quiet remote-back" type="button" data-remote-action="sims-close">← Voltar ao controle</button><div class="remote-sims">${this.simsMarkup(p,off)}</div><div class="remote-main remote-main-small">${button('previous','← Anterior')}${button('next-slide','Próximo →','accent')}</div>${foot}</dialog>`;
+  const all=`<details class="remote-more"><summary>Todos os comandos</summary>
+   <section class="remote-group"><h3>Quiz</h3><div>${button('quiz','Abrir lobby')}${button('start-quiz','Iniciar quiz')}${button('reveal','Revelar resposta')}${button('next-question','Próxima pergunta')}</div></section>
+   <section class="remote-group"><h3>Enquete</h3><div>${button('poll','Abrir enquete')}${button('close-poll','Encerrar enquete')}</div></section>
+   <section class="remote-group"><h3>Aula</h3><div>${button('next-stage','Próxima etapa')}${button('back-lesson','Voltar aos slides')}${button('finish','Encerrar atividade')}</div></section></details>`;
+  if(!lesson)return `<dialog class="group-dialog remote-dialog remote-v2" data-view="stage" aria-label="Controle da apresentação">${head}<div class="remote-stage">${this.stageMarkup(p,button)}</div>${all}${foot}</dialog>`;
+  return `<dialog class="group-dialog remote-dialog remote-v2" aria-label="Controle da apresentação">${head}
+   <div class="remote-main">${button('previous','<i aria-hidden="true">←</i><span>Anterior</span>')}${button('next-slide','<span>Próximo</span><i aria-hidden="true">→</i>','accent')}</div>
+   <button class="studio-btn quiet remote-sim-open" type="button" data-remote-action="sims-open" ${off||(count?'':'disabled')}><span>🧪 Mexer no experimento ou modelo 3D</span><small>${count?(count===1?'1 item interativo neste slide':count+' itens interativos neste slide'):'Nada interativo neste slide'}</small></button>
+   ${p?.note?`<details class="remote-notes" open><summary>Roteiro deste slide</summary><p>${esc(p.note)}</p></details>`:''}
+   ${all}${foot}</dialog>`;
+ }
+ // A janela só é redesenhada quando algo visível muda: redesenhar a cada sinal
+ // fazia botões e controles deslizantes "escaparem" do dedo.
+ paint(){
+  const root=this.studio.root;
+  const slot=root.querySelector('[data-live-sessions]');
+  if(slot){const html=this.markup();if(slot.__html!==html){slot.__html=html;slot.innerHTML=html;}}
+  for(const button of root.querySelectorAll('[data-room-controller]')){const html=this.roomButton(button.dataset.roomCode);if(button.__html!==html){button.__html=html;button.innerHTML=html;}}
+  const dialogs=root.querySelector('[data-remote-dialog]');
+  if(!dialogs)return;
+  if(this.dragging&&dialogs.firstElementChild)return;
+  const html=this.dialog();
+  if(dialogs.__html===html&&(dialogs.firstElementChild||!html))return;
+  const scroll=dialogs.querySelector('dialog')?.scrollTop||0,focus=document.activeElement?.closest?.('[data-remote-dialog]')?document.activeElement.dataset.remoteAction:'';
+  dialogs.__html=html;dialogs.innerHTML=html;
+  const dialog=dialogs.querySelector('dialog');
+  if(dialog){dialog.showModal();dialog.scrollTop=scroll;dialog.addEventListener('cancel',()=>{this.open='';this.simOpen=false;});if(focus)dialog.querySelector(`[data-remote-action="${focus}"]:not([disabled])`)?.focus();}
+ }
+ // Controle deslizante: envia enquanto arrasta (no máximo ~12 vezes por segundo).
+ fieldChanged(field,final=false){
+  const custom=field.dataset.custom!==undefined,sim=Number(custom?field.dataset.custom:field.dataset.sim),index=Number(field.dataset.field),value=field.value;
+  const output=field.closest('.remote-range')?.querySelector('output');if(output)output.textContent=value;
+  this.dragging=!final&&field.type==='range';
+  clearTimeout(this.dragTimer);if(this.dragging)this.dragTimer=setTimeout(()=>{this.dragging=false;},1500);
+  const push=()=>{this.fieldTimer=0;this.send({kind:'control',target:this.open,action:'sim',value:custom?{custom:sim,field:index,value:this.fieldValue}:{sim,field:index,value:this.fieldValue},id:createUuid()});};
+  this.fieldValue=value;
+  if(final){clearTimeout(this.fieldTimer);push();}else if(!this.fieldTimer)this.fieldTimer=setTimeout(push,80);
+ }
+ async action(button){
+  const action=button.dataset.remoteAction;
+  if(action==='reconnect'){await this.connect(true);return;}
+  if(action==='open'){this.open=button.dataset.device;this.simOpen=false;this.notice='';this.send({kind:'hello',target:this.open});this.paint();return;}
+  if(action==='close'){this.open='';this.simOpen=false;this.paint();return;}
+  if(action==='sims-open'||action==='sims-close'){this.simOpen=action==='sims-open';this.send({kind:'hello',target:this.open});this.paint();return;}
+  if(!this.available())return;
+  const custom=button.dataset.custom!==undefined,sim=Number(custom?button.dataset.custom:button.dataset.sim);
+  let name=action,value;
+  if(action==='pad-hold'){this.padHold=this.padHold===sim?null:sim;this.paint();return;}
+  if(action==='pad-click'){navigator.vibrate?.(10);this.volatile({custom:sim,pad:{t:'tap'}});return;}
+  if(action==='custom-button'){name='sim';value={custom:sim,button:Number(button.dataset.button)};}
+  if(action==='model-zoom'){this.volatile({model:button.dataset.model,zoom:Number(button.dataset.zoom)});return;}
+  if(action==='model-explode'){name='sim';value={model:button.dataset.model,explode:true};}
+  if(action==='sim-play'){name='sim';value={sim,play:true};}
+  else if(action==='sim-act'){name='sim';value={sim,act:Number(button.dataset.act)};}
+  else if(action==='sim-toggle'){const next=button.dataset.value==='1'?'0':'1';button.dataset.value=next;button.setAttribute('aria-pressed',String(next==='1'));name='sim';value=custom?{custom:sim,field:Number(button.dataset.field),value:next}:{sim,field:Number(button.dataset.field),value:next};}
+  else if(action==='sim-step'){
+   const input=button.parentElement.querySelector('input[type=range]');if(!input)return;
+   if(Number(button.dataset.step)>0)input.stepUp();else input.stepDown();
+   this.fieldChanged(input,true);return;
+  }
+  if(!commands.has(name))return;
+  navigator.vibrate?.(12);
+  const ok=await this.command(name,value);
+  const notice=ok?'':'O computador não respondeu. Confira se a apresentação continua aberta.';
+  if(notice!==this.notice){this.notice=notice;this.paint();}
+ }
 }

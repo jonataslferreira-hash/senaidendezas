@@ -197,20 +197,16 @@ html[data-theme][data-ui-style] #app .account-dialog .profile-photo-button{
   height:clamp(46px,15vw,64px);
 }
 
-html[data-theme=aurora]{--palette-start:174;--palette-end:250}
-html[data-theme=candy]{--palette-start:340;--palette-end:26}
-html[data-theme=galaxy]{--palette-start:242;--palette-end:307}
-html[data-theme=citrus]{--palette-start:104;--palette-end:177}
-html:is([data-theme=aurora],[data-theme=candy],[data-theme=galaxy],[data-theme=citrus],[data-theme=prism],[data-theme=lagoon],[data-theme=ember],[data-theme=nebula])[data-ui-style]:not([data-ui-style=minimal]) #app{
+html:is([data-theme=prism],[data-theme=lagoon],[data-theme=ember],[data-theme=nebula])[data-ui-style]:not([data-ui-style=minimal]) #app{
   --palette-surface:linear-gradient(128deg,hsl(var(--palette-start) 55% 89%),hsl(var(--palette-end) 52% 94%));
 }
-html:is([data-theme=aurora],[data-theme=candy],[data-theme=galaxy],[data-theme=citrus],[data-theme=prism],[data-theme=lagoon],[data-theme=ember],[data-theme=nebula])[data-ui-style][data-appearance=dark] #app{
+html:is([data-theme=prism],[data-theme=lagoon],[data-theme=ember],[data-theme=nebula])[data-ui-style][data-appearance=dark] #app{
   --palette-surface:linear-gradient(128deg,hsl(var(--palette-start) 31% 22%),hsl(var(--palette-end) 29% 16%));
 }
-html:is([data-theme=aurora],[data-theme=candy],[data-theme=galaxy],[data-theme=citrus],[data-theme=prism],[data-theme=lagoon],[data-theme=ember],[data-theme=nebula])[data-ui-style]:not([data-ui-style=minimal]) #app :is(.experience-feature,.shared-hero){
+html:is([data-theme=prism],[data-theme=lagoon],[data-theme=ember],[data-theme=nebula])[data-ui-style]:not([data-ui-style=minimal]) #app :is(.experience-feature,.shared-hero){
   background:var(--palette-surface)!important;
 }
-html:is([data-theme=aurora],[data-theme=candy],[data-theme=galaxy],[data-theme=citrus],[data-theme=prism],[data-theme=lagoon],[data-theme=ember],[data-theme=nebula])[data-ui-style=glass] #app .studio-shell{
+html:is([data-theme=prism],[data-theme=lagoon],[data-theme=ember],[data-theme=nebula])[data-ui-style=glass] #app .studio-shell{
   background:var(--palette-surface)!important;
 }
 .profile-swatches .profile-swatch.is-gradient[aria-pressed=true]{outline-color:var(--ui-ink)}

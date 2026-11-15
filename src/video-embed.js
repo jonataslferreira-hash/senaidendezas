@@ -16,7 +16,7 @@ export function videoSource(value) {
   }
   if (id) {
     if (!/^[\w-]{6,20}$/.test(id)) return null;
-    return { kind: 'youtube', id, label: 'YouTube', embed: `https://www.youtube-nocookie.com/embed/${id}?rel=0${start ? '&start=' + start : ''}`, poster: `https://i.ytimg.com/vi/${id}/hqdefault.jpg` };
+    return { kind: 'youtube', id, label: 'YouTube', embed: `https://www.youtube-nocookie.com/embed/${id}?rel=0&enablejsapi=1${start ? '&start=' + start : ''}`, poster: `https://i.ytimg.com/vi/${id}/hqdefault.jpg` };
   }
   if (host === 'vimeo.com' || host === 'player.vimeo.com') {
     const vimeo = /(?:^|\/)(\d{5,12})(?:\/|$)/.exec(url.pathname)?.[1];
@@ -33,6 +33,6 @@ export function videoMarkup(element, playable) {
   const source = videoSource(element.video);
   if (!source) return '<div class="canvas-video canvas-video-empty"><i aria-hidden="true">▶</i><span>Cole o link do vídeo nos ajustes</span></div>';
   if (playable && source.kind === 'file') return `<div class="canvas-video"><video src="${escapeHtml(source.embed)}" controls playsinline preload="metadata"></video></div>`;
-  if (playable) return `<div class="canvas-video"><iframe src="${escapeHtml(source.embed)}" title="Vídeo do slide (${source.label})" loading="lazy" referrerpolicy="strict-origin-when-cross-origin" allow="accelerometer; encrypted-media; gyroscope; picture-in-picture; fullscreen" allowfullscreen></iframe></div>`;
+  if (playable) return `<div class="canvas-video"><iframe src="${escapeHtml(source.embed)}" title="Vídeo do slide (${source.label})" loading="lazy" referrerpolicy="strict-origin-when-cross-origin" allow="autoplay; accelerometer; encrypted-media; gyroscope; picture-in-picture; fullscreen" allowfullscreen></iframe></div>`;
   return `<div class="canvas-video canvas-video-poster"${source.poster ? ` style="background-image:url('${escapeHtml(source.poster)}')"` : ''}><i aria-hidden="true">▶</i><span>${source.label}</span></div>`;
 }
