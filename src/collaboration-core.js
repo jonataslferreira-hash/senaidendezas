@@ -7,11 +7,14 @@ const isText = (value,key) => textFields.has(key) && typeof value === 'string' &
 function shared(value, key = '') {
   if(isText(value,key))return new Y.Text(value);
   if(Array.isArray(value)) {
-    if(['slides','questions','elements'].includes(key) || key!=='animations' && value.length && value.every(item=>item && typeof item==='object' && typeof item.id==='string')) {
+    // Lista com identidade (slides, perguntas do quiz…): só quando todo item tem id.
+    // As perguntas da Sobrevivência também se chamam "questions" mas não têm id.
+    const keyed=value.every(item=>item && typeof item==='object' && typeof item.id==='string');
+    if(keyed && (['slides','questions','elements'].includes(key) || key!=='animations' && value.length)) {
       const map=new Y.Map(),items=new Y.Map(),order=new Y.Array();map.set('$list',true);map.set('items',items);map.set('order',order);
       for(const item of value)items.set(item.id,shared(item));order.insert(0,value.map(item=>item.id));return map;
     }
-    const array=new Y.Array();array.insert(0,value.map(item=>shared(item,key)));return array;
+    const array=new Y.Array();array.insert(0,value.map(item=>item===undefined?null:shared(item,key)));return array;
   }
   if(value && typeof value==='object'){const map=new Y.Map();for(const [key,item]of Object.entries(value))if(item!==undefined)map.set(key,shared(item,key));return map;}
   return value;
@@ -48,7 +51,7 @@ function reconcile(old, value, replace, key = '') {
     for(const [key,item]of Object.entries(value))if(item!==undefined)reconcile(old.get(key),item,v=>old.set(key,v),key);return;
   }
   if(old instanceof Y.Array && Array.isArray(value)){
-    for(let i=0;i<value.length;i++)if(i<old.length)reconcile(old.get(i),value[i],v=>{old.delete(i,1);old.insert(i,[v]);},key);else old.insert(i,[shared(value[i],key)]);
+    for(let i=0;i<value.length;i++)if(i<old.length)reconcile(old.get(i),value[i]===undefined?null:value[i],v=>{old.delete(i,1);old.insert(i,[v]);},key);else old.insert(i,[value[i]===undefined?null:shared(value[i],key)]);
     if(old.length>value.length)old.delete(value.length,old.length-value.length);return;
   }
   if(JSON.stringify(readShared(old))!==JSON.stringify(value))replace(shared(value,key));

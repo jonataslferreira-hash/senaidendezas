@@ -121,7 +121,7 @@ function publishRemote() {
   studio.remote.setPresentation({ code: state.code, title: activeLesson.title, slide: state.slide, total: slides.length, phase: state.phase, stage: state.activity?.type || '', hasNext: Boolean(state.activity?.hasNext), game: remoteGame(), note: lesson ? slide?.note?.slice(0, 2000) : '',
     sims: lesson ? describeSims(app) : [], customs, models: lesson ? describeModels(app, { canvasModels, slide: slide ? presentationSlide(slide) : null }) : [] });
 }
-function remoteGame() { const g = state?.game; return g ? { type: g.type, state: g.state, drawn: g.current?.name || '' } : null; }
+function remoteGame() { const g = state?.game; return g ? { type: g.type, state: g.state, drawn: g.current?.name || '', ...(Number.isInteger(g.round) ? { round: g.round, rounds: g.rounds } : {}) } : null; }
 // Comandos do controle remoto para experimentos (nativos e importados) e modelos 3D.
 function remoteInteract(value) {
   if (state?.phase !== 'lesson' || !host || !value || typeof value !== 'object') return;
@@ -197,7 +197,8 @@ const trackPlayer = new Audio(); let playingTrack = null;
 trackPlayer.dataset.soundtrack = ''; trackPlayer.hidden = true; document.body.append(trackPlayer);
 let demoTimer, toastTimer, controlsTimer, editDraft = null, editIndex = -1, editError = '', imageText = false;
 const presenterSettings = loadPresenterSettings();
-const phoneLayout=matchMedia('(max-width: 800px)');
+// Só celular de verdade recebe a versão em texto: zoom no computador encolhe a largura, mas não muda o tipo de ponteiro.
+const phoneLayout=matchMedia('(max-width: 800px) and (pointer: coarse), (max-width: 800px) and (hover: none)');
 phoneLayout.addEventListener('change',()=>{if(state?.phase==='lesson')render();});
 const qrCache = new Map();
 const params = routeParams();
@@ -408,6 +409,8 @@ function render() {
   if (state?.phase === 'leaderboard') animateRanking(app, Math.max(0, (Date.now() + timerOffset - (state.resultStartedAt || 0)) / 1000));
   if (state?.game?.type === 'raffle') animateRaffle(app, () => Date.now() + timerOffset);
   if(state&&!app.querySelector('[data-remote-dialog]'))app.insertAdjacentHTML('beforeend','<div data-remote-dialog></div>');
+  // Nas telas de jogo os bonecos e o pódio sempre se mexem (a não ser que a pessoa escolha "reduzido" no perfil).
+  document.documentElement.toggleAttribute('data-play', Boolean(state) && state.phase !== 'lesson');
   studio.remote.paint();
   syncPresentationMode();
   if (editDraft) for (const el of app.querySelectorAll('.header, .classroom, .document-classroom, .presentation-toolbar, .pinned-room-qr')) el.inert = true;
@@ -459,6 +462,7 @@ function receive(next) {
 }
 function connection(next, message = '') {
   if(next==='removed'){leave();studio.view='join';render();toast(message);return;}
+  if(next==='ended'){leave();toast(message);return;}
   status = next; statusMessage = message;
   if (state) render();
 }
@@ -475,10 +479,11 @@ function preview(lesson = demoLesson(), options = {}) {
   readOnlyPresentation=Boolean(options.readOnly);publicPresentationToken=options.token||'';
   if (!options.token) studio.writeRoute('preview', lesson.id);
   classroom = new Room('PREVIA', undefined, Date.now, lesson, options?.startIndex);
+  classroom.fullText = true; // na prévia o professor é telão e aluno ao mesmo tempo
   demoPlayer = classroom.join({ name: 'Você', avatar: selectedAvatar }).id;
   receive({ ...classroom.snapshot(demoPlayer), lesson: classroom.publicLesson(true) });
   demoTimer = setInterval(() => {
-    const key = () => classroom.data.phase + ':' + (classroom.data.game?.state || ''), phase = key(); classroom.tick();
+    const key = () => classroom.data.phase + ':' + (classroom.data.game?.state || '') + ':' + (classroom.data.podiumStep || 0), phase = key(); classroom.tick();
     if (phase !== key()) receive({ ...classroom.snapshot(demoPlayer), lesson: classroom.publicLesson(true) });
   }, 100);
 }
@@ -502,7 +507,10 @@ function leave(show = true) {
   clearInterval(clockTimer); clockTimer = null;
   editDraft = null; editError = ''; clearTimeout(controlsTimer);
   if (document.fullscreenElement) document.exitFullscreen().catch(() => {});
-  clearInterval(demoTimer); classroom?.stop?.(); classroom = null;
+  clearInterval(demoTimer);
+  // Professor saindo: avisa os alunos (eles voltam para a tela inicial) antes de fechar as conexões.
+  if (host && !demo && classroom?.end) { const room = classroom; room.end(); clearInterval(room.timer); setTimeout(() => room.stop(), 300); } else classroom?.stop?.();
+  classroom = null;
   readOnlyPresentation=false;publicPresentationToken='';sharedLoading=false;sharedError='';
   state = null; host = false; demo = false; editorLaunch=false;shareOpen = false; lastSlide = -1;
   localModel = 'ssd'; localExploded = true; status = 'offline'; stopMusic();

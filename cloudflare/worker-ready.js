@@ -520,15 +520,21 @@ var AI_PHOTO_LIMIT = 15;
 var AI_SLIDE_LIMIT = 20;
 var AI_PHOTOS_PER_SHEET = 5;
 var aiThemes = ["ocean", "midnight", "paper", "sage", "ember", "iris", "glacier", "sand", "cosmos", "citrus", "lagoon", "rose", "pastel", ...Object.keys(openSlideThemes), ...Object.keys(studioSlideThemes)];
-var aiLayouts = ["cover", "split", "feature", "gallery", "statement", "editorial"];
+var aiLayouts = ["cover", "split", "banner", "stack", "feature", "gallery", "statement", "editorial", "cards", "columns", "timeline", "highlight"];
 
 // src/open-layout-catalog.json
 var open_layout_catalog_default = [{ id: "cover", name: "Cover", group: "Openers and closers", summary: "The opening slide: title, subtitle and an optional picture.", direction: "row", regions: [{ name: "title", anchor: "bottom", rule: true }, { name: "media", accepts: ["image", "video"], role: "media", flow: "none", bleed: true }] }, { id: "section", name: "Section", group: "Openers and closers", summary: "A divider between parts: the section title and an optional subtitle.", direction: "column", regions: [{ name: "title", size: 1, anchor: "bottom", rule: true }] }, { id: "agenda", name: "Agenda", group: "Openers and closers", summary: "What the talk covers: the parts, as one list that flows into columns when long.", direction: "column", regions: [{ name: "title" }, { name: "items", accepts: ["list", "text"], role: "primary", flow: "column", listColumns: "auto", sequence: "numbered" }] }, { id: "agenda-split", name: "Agenda beside", group: "Openers and closers", summary: "A concise agenda beside its title and introduction.", direction: "row", regions: [{ name: "title" }, { name: "items", accepts: ["list", "text"], role: "primary", flow: "column", listColumns: "auto", sequence: "numbered", anchor: "middle" }] }, { id: "statement", name: "Statement", group: "Openers and closers", summary: "One message, large and alone.", direction: "column", regions: [{ name: "title", rule: true }, { name: "message", size: "auto", accepts: ["text", "quote", "metric"], role: "primary", flow: "none" }] }, { id: "closing", name: "Closing", group: "Openers and closers", summary: "The last slide: thanks, the call to action and contact details.", direction: "column", regions: [{ name: "title", rule: true }, { name: "details", size: "auto", accepts: ["text", "list", "image"], role: "supporting", flow: "auto" }] }, { id: "text", name: "Text", group: "Text", summary: "Prose. Several blocks sit side by side when short and stack when long.", direction: "column", regions: [{ name: "title" }, { name: "body", accepts: ["text", "list", "quote", "code", "group"], role: "primary", flow: "auto" }] }, { id: "list", name: "List", group: "Text", summary: "Bulleted or numbered points; one long list flows into columns.", direction: "column", regions: [{ name: "title" }, { name: "body", accepts: ["list", "text", "group"], role: "primary", flow: "auto", listColumns: "auto" }] }, { id: "quote", name: "Quote", group: "Text", summary: "One or more quotations with attribution and photo.", direction: "column", regions: [{ name: "title" }, { name: "quotes", size: "auto", accepts: ["quote", "group"], role: "primary", flow: "grid" }] }, { id: "two-column", name: "Two columns", group: "Text", summary: "Two independent columns of any content.", direction: "column", regions: [{ name: "title" }, { direction: "row", regions: [{ name: "first", accepts: ["text", "list", "quote", "code", "image", "shape", "video", "chart", "table", "metric", "timeline", "group", "diagram"], role: "primary", flow: "none" }, { name: "second", accepts: ["text", "list", "quote", "code", "image", "shape", "video", "chart", "table", "metric", "timeline", "group", "diagram"], role: "primary", flow: "none" }] }] }, { id: "three-column", name: "Three columns", group: "Text", summary: "Three independent columns of any content.", direction: "column", regions: [{ name: "title" }, { direction: "row", regions: [{ name: "first", accepts: ["text", "list", "quote", "code", "image", "shape", "video", "chart", "table", "metric", "timeline", "group", "diagram"], role: "primary", flow: "none" }, { name: "second", accepts: ["text", "list", "quote", "code", "image", "shape", "video", "chart", "table", "metric", "timeline", "group", "diagram"], role: "primary", flow: "none" }, { name: "third", accepts: ["text", "list", "quote", "code", "image", "shape", "video", "chart", "table", "metric", "timeline", "group", "diagram"], role: "primary", flow: "none" }] }] }, { id: "pillars", name: "Pillars", group: "Groups of items", summary: "Related ideas arranged in equal columns.", direction: "column", regions: [{ name: "title" }, { name: "pillars", accepts: ["text", "list", "metric", "image", "group"], role: "primary", flow: "grid" }] }, { id: "comparison", name: "Comparison", group: "Groups of items", summary: "Two options side by side (before and after, pros and cons, us and them), with an optional verdict.", direction: "column", regions: [{ name: "title" }, { direction: "row", size: "auto", regions: [{ name: "first", accepts: ["text", "list", "metric", "image", "chart", "table", "group", "diagram"], role: "primary", flow: "none" }, { name: "second", accepts: ["text", "list", "metric", "image", "chart", "table", "group", "diagram"], role: "primary", flow: "none" }] }, { name: "verdict", size: "auto", accepts: ["text"], role: "supporting", flow: "none" }] }, { id: "process", name: "Process", group: "Groups of items", summary: "Steps in order, in one row.", direction: "column", regions: [{ name: "title" }, { name: "steps", accepts: ["timeline", "list", "text", "metric", "group", "diagram"], role: "primary", flow: "grid", sequence: "steps" }] }, { id: "timeline", name: "Timeline", group: "Groups of items", summary: "Dated events or a roadmap along one axis, with optional notes.", direction: "column", regions: [{ name: "title" }, { name: "lead", size: "auto", accepts: ["text"], role: "supporting", flow: "none" }, { name: "timeline", accepts: ["timeline", "diagram"], role: "primary", flow: "column" }, { name: "notes", size: "auto", accepts: ["text", "list", "metric"], role: "supporting", flow: "auto" }] }, { id: "faq", name: "FAQ", group: "Groups of items", summary: "Questions with their answers.", direction: "column", regions: [{ name: "title" }, { name: "questions", accepts: ["list", "text", "group"], role: "primary", flow: "column", listColumns: "auto" }] }, { id: "pyramid", name: "Pyramid", group: "Groups of items", summary: "Levels that build on each other, as a pyramid, the first at the top.", direction: "column", regions: [{ name: "title" }, { name: "levels", accepts: ["list"], role: "primary", flow: "none", arrangement: "pyramid" }] }, { id: "matrix", name: "Matrix", group: "Groups of items", summary: "Four parts of a whole, as the quadrants of a square beside the title.", direction: "row", regions: [{ name: "title", size: 2 }, { name: "quadrants", accepts: ["list"], role: "primary", flow: "none", arrangement: "matrix", size: 3 }] }, { id: "cycle", name: "Cycle", group: "Groups of items", summary: "Steps that repeat, as a loop of nodes with arrows beside the title.", direction: "row", regions: [{ name: "title", size: 2 }, { name: "stages", accepts: ["list"], role: "primary", flow: "none", arrangement: "cycle", size: 3 }] }, { id: "chevrons", name: "Chevrons", group: "Groups of items", summary: "Stages in order, as a row of chevrons.", direction: "column", regions: [{ name: "title" }, { name: "stages", accepts: ["list"], role: "primary", flow: "none", arrangement: "chevrons" }] }, { id: "flow", name: "Flow", group: "Groups of items", summary: "Steps in order, as boxes joined by arrows in one row.", direction: "column", regions: [{ name: "title" }, { name: "stages", accepts: ["list"], role: "primary", flow: "none", arrangement: "flow" }] }, { id: "vertical-flow", name: "Vertical flow", group: "Groups of items", summary: "Steps in order, as boxes joined by arrows in a column beside the title.", direction: "row", regions: [{ name: "title", size: 2 }, { name: "stages", accepts: ["list"], role: "primary", flow: "none", arrangement: "vertical-flow", size: 3 }] }, { id: "metrics", name: "Metrics", group: "Numbers", summary: "One to six headline numbers, with an optional note.", direction: "column", regions: [{ name: "title" }, { name: "metrics", accepts: ["metric", "group"], role: "primary", flow: "grid", anchor: "middle" }, { name: "note", size: "auto", accepts: ["text", "list"], role: "supporting", flow: "none" }] }, { id: "scorecard", name: "Scorecard", group: "Numbers", summary: "Headline measures with their targets and status.", direction: "column", regions: [{ name: "title" }, { name: "cards", accepts: ["metric", "text", "list", "group"], role: "primary", flow: "grid", metrics: "tile" }] }, { id: "image", name: "Image", group: "Visuals", summary: "One picture, filling the slide or shown whole, under an optional title.", direction: "column", regions: [{ name: "title" }, { name: "media", accepts: ["image", "video", "diagram"], role: "media", flow: "none", bleed: true }] }, { id: "image-beside", name: "Image beside", group: "Visuals", summary: "A picture or video beside text.", direction: "column", regions: [{ name: "title" }, { direction: "row", regions: [{ name: "media", accepts: ["image", "video", "diagram"], role: "media", flow: "none", anchor: "middle" }, { name: "body", accepts: ["text", "list", "metric", "quote", "group"], role: "primary", flow: "auto", anchor: "middle" }] }] }, { id: "gallery", name: "Gallery", group: "Visuals", summary: "One to six framed pictures: a screenshot, a diagram, a photo set.", direction: "column", regions: [{ name: "title" }, { name: "pictures", accepts: ["image", "video", "group"], role: "media", flow: "grid" }] }, { id: "chart", name: "Chart", group: "Visuals", summary: "One to six charts, with an optional note.", direction: "column", regions: [{ name: "title" }, { name: "charts", accepts: ["chart", "group", "diagram"], role: "primary", flow: "grid" }, { name: "note", size: "auto", accepts: ["text"], role: "supporting", flow: "none" }] }, { id: "chart-beside", name: "Chart beside", group: "Visuals", summary: "A chart with the takeaway beside it.", direction: "column", regions: [{ name: "title" }, { direction: "row", regions: [{ name: "chart", size: 3, accepts: ["chart", "diagram"], role: "primary", flow: "none" }, { name: "notes", size: 2, accepts: ["text", "list", "metric", "quote", "chart"], role: "supporting", flow: "column" }] }] }, { id: "table", name: "Table", group: "Visuals", summary: "A table across the slide, with an optional note.", direction: "column", regions: [{ name: "title" }, { name: "table", accepts: ["table"], role: "primary", flow: "column" }, { name: "note", size: "auto", accepts: ["text"], role: "supporting", flow: "none" }] }, { id: "table-beside", name: "Table beside", group: "Visuals", summary: "A table with commentary beside it.", direction: "column", regions: [{ name: "title" }, { direction: "row", regions: [{ name: "table", size: 3, accepts: ["table"], role: "primary", flow: "none" }, { name: "notes", size: 2, accepts: ["text", "list", "metric", "quote"], role: "supporting", flow: "column" }] }] }, { id: "code", name: "Code", group: "Visuals", summary: "Source code with the explanation beside it.", direction: "column", regions: [{ name: "title" }, { direction: "row", regions: [{ name: "code", size: 3, accepts: ["code"], role: "primary", flow: "column" }, { name: "notes", size: 2, accepts: ["text", "list"], role: "supporting", flow: "column" }] }] }, { id: "hero", name: "Hero", group: "Mixed", summary: "A lead message and its supporting points beside a full-height picture.", direction: "row", regions: [{ direction: "column", size: 3, regions: [{ name: "title" }, { name: "lead", size: "auto", accepts: ["text", "quote", "metric"], role: "primary", flow: "none" }, { name: "support", accepts: ["text", "list", "metric", "group"], role: "supporting", flow: "auto" }] }, { name: "media", size: 2, accepts: ["image", "video", "diagram"], role: "media", flow: "none", bleed: true }] }, { id: "dashboard", name: "Dashboard", group: "Mixed", summary: "Headline numbers over charts.", direction: "column", regions: [{ name: "title" }, { name: "kpis", size: 2, accepts: ["metric"], role: "secondary", flow: "grid" }, { name: "charts", size: 3, accepts: ["chart", "table"], role: "primary", flow: "grid" }] }, { id: "team", name: "Team", group: "Mixed", summary: "People: photo, name and role cards.", direction: "column", regions: [{ name: "title" }, { name: "people", accepts: ["group", "image", "text", "quote", "list"], role: "primary", flow: "grid" }] }, { id: "logos", name: "Logos", group: "Mixed", summary: "Customer, partner or sponsor logos in a grid of up to 12.", direction: "column", regions: [{ name: "title" }, { name: "logos", accepts: ["image", "text", "group"], role: "media", flow: "grid", anchor: "middle", max: 12 }] }];
 
 // cloudflare/storage-ai-worker.js
 var MODEL = "@cf/qwen/qwen3.8-27b";
-var GEMINI_MODEL = "gemini-3.1-flash-lite";
-var GROQ_MODEL = "qwen/qwen3.8-27b";
+var GEMINI_MODELS = ["gemini-3.1-flash-lite", "gemini-3.5-flash-lite", "gemini-3.8-flash", "gemma-4-26b-a4b-it", "gemma-4-31b-it"];
+var GROQ_MODELS = ["qwen/qwen3.8-27b", "openai/gpt-oss-120b", "openai/gpt-oss-20b"];
+var MISTRAL_MODELS = ["mistral-small-latest", "mistral-large-latest"];
+var NVIDIA_MODELS = ["openai/gpt-oss-120b", "deepseek-ai/deepseek-v4.1-flash", "google/gemma-4-31b-it"];
+var modelList = (value, fallback) => {
+  const list = String(value || "").split(",").map((item) => item.trim()).filter((item) => /^[\w./:@-]{3,80}$/.test(item));
+  return (list.length ? list : fallback).slice(0, 5);
+};
 var MAX_BYTES = 15e5;
 async function boundedJSON(request) {
   if (!request.body) throw Error("empty");
@@ -547,17 +553,18 @@ async function boundedJSON(request) {
   }
 }
 var cloudflareEnabled = (env) => env.STORAGE_AI_FREE_CONFIRMED === "true" && Boolean(env.AI);
-var storageAIEnabled = (env) => Boolean(env.AI_LIMIT && (env.GROQ_API_KEY || env.GEMINI_API_KEY || openRouterEnabled(env) || cloudflareEnabled(env)));
-async function runGroq(key, messages, maxTokens) {
+var storageAIEnabled = (env) => Boolean(env.AI_LIMIT && (env.GROQ_API_KEY || env.GEMINI_API_KEY || env.MISTRAL_API_KEY || env.NVIDIA_API_KEY || openRouterEnabled(env) || cloudflareEnabled(env)));
+async function runGroq(key, messages, maxTokens, model) {
   const response = await fetch("https://api.groq.com/openai/v1/chat/completions", {
     method: "POST",
     headers: { "Content-Type": "application/json", Authorization: "Bearer " + key },
     body: JSON.stringify({
-      model: GROQ_MODEL,
+      model,
       messages,
       temperature: 0.25,
-      max_completion_tokens: maxTokens,
-      reasoning_effort: "none",
+      max_completion_tokens: Math.min(maxTokens, 6e3),
+      // Só o Qwen aceita desligar o raciocínio; os gpt-oss usam 'low'.
+      reasoning_effort: /qwen/i.test(model) ? "none" : "low",
       response_format: { type: "json_object" }
     }),
     signal: AbortSignal.timeout(35e3)
@@ -565,9 +572,29 @@ async function runGroq(key, messages, maxTokens) {
   if (!response.ok) throw Object.assign(Error("groq_request_failed"), { status: response.status });
   return response.json();
 }
-async function runGemini(key, system, message, photos, maxOutputTokens) {
+async function runMistral(key, messages, maxTokens, model) {
+  const response = await fetch("https://api.mistral.ai/v1/chat/completions", {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Authorization: "Bearer " + key },
+    body: JSON.stringify({ model, messages, temperature: 0.25, max_tokens: maxTokens, response_format: { type: "json_object" } }),
+    signal: AbortSignal.timeout(45e3)
+  });
+  if (!response.ok) throw Object.assign(Error("mistral_request_failed"), { status: response.status });
+  return response.json();
+}
+async function runNvidia(key, messages, maxTokens, model) {
+  const response = await fetch("https://integrate.api.nvidia.com/v1/chat/completions", {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Authorization: "Bearer " + key },
+    body: JSON.stringify({ model, messages, temperature: 0.25, max_tokens: maxTokens, response_format: { type: "json_object" } }),
+    signal: AbortSignal.timeout(45e3)
+  });
+  if (!response.ok) throw Object.assign(Error("nvidia_request_failed"), { status: response.status });
+  return response.json();
+}
+async function runGemini(key, system, message, photos, maxOutputTokens, model) {
   const parts = [{ text: message }, ...photos.map((photo) => ({ inlineData: { mimeType: "image/jpeg", data: photo.split(",")[1] } }))];
-  const response = await fetch("https://generativelanguage.googleapis.com/v1beta/models/" + GEMINI_MODEL + ":generateContent", {
+  const response = await fetch("https://generativelanguage.googleapis.com/v1beta/models/" + model + ":generateContent", {
     method: "POST",
     headers: { "Content-Type": "application/json", "x-goog-api-key": key },
     body: JSON.stringify({
@@ -633,7 +660,7 @@ async function handleStorageAI(request, env, user, headers) {
     "Prefira layouts do cat\xE1logo quando combinarem com o conte\xFAdo. Estes IDs tamb\xE9m s\xE3o v\xE1lidos: " + open_layout_catalog_default.map((layout) => "opf-" + layout.id + " (" + layout.summary + ")").join("; ") + ".",
     "Gere chatTitle em portugu\xEAs com 2 a 6 palavras que nomeiem o tema da conversa. Evite copiar o pedido e n\xE3o comece com \u201CAula sobre\u201D ou \u201CCrie\u201D. Para layouts de processo, compara\xE7\xE3o ou listas, coloque um ponto curto por linha em body.",
     "Se houver uma decis\xE3o concreta que precise de confirma\xE7\xE3o, retorne reviewQuestion com uma pergunta curta sobre ela. Inclua a proposta de slides normalmente, usando a melhor suposi\xE7\xE3o.",
-    "Use cover na abertura, feature para destacar um visual, gallery para grupos de fotos, split para explicar junto a um visual, editorial para texto em colunas e statement para uma ideia-chave. Evite repetir a mesma composi\xE7\xE3o ou paleta em p\xE1ginas seguidas.",
+    'Use cover na abertura, cards para 2 a 3 pilares/conceitos (escreva cada linha no formato "\u2022 Subt\xEDtulo curto: explica\xE7\xE3o"), timeline para etapas/processos em sequ\xEAncia (3 a 4 linhas), columns para compara\xE7\xF5es ou pr\xF3s e contras, highlight para um conceito principal em destaque, editorial para explica\xE7\xE3o em duas \xE1reas, statement para uma ideia-chave ou conclus\xE3o, split/stack para texto ao lado de imagem, feature/banner para foto em destaque e gallery para v\xE1rias imagens. Varie os layouts entre p\xE1ginas seguidas para a aula nunca ficar repetitiva.',
     "theme pode ser " + aiThemes.join(", ") + ". Escolha cores coerentes com o assunto.",
     "Respeite as cores citadas no pedido. Se o usu\xE1rio citar azul, verde e rosa pastel, escolha pastel; se citar rosa, escolha rose; verde, sage; azul, ocean; roxo, iris; laranja ou amarelo, citrus; vermelho, ember; preto ou escuro, midnight; branco, paper. Se pedir um padr\xE3o de cor para todos os slides, repita o mesmo theme em todas as p\xE1ginas. O aplicativo tamb\xE9m detecta as cores e aplica a paleta final.",
     "Quando houver fotos enviadas, use photos como lista de \xEDndices inteiros iniciando em zero. Associe as fotos ao assunto; use cada imagem apenas uma vez e distribua todas entre os slides. Para imagens do cat\xE1logo livre, informe imageSearch em cada slide que comporta um visual relevante; a busca \xE9 feita pelo aplicativo.",
@@ -665,13 +692,19 @@ async function handleStorageAI(request, env, user, headers) {
       return { choices: [{ message: { content: result.content } }] };
     }
   })) : [];
+  const groqAttempts = env.GROQ_API_KEY ? modelList(env.GROQ_MODEL, GROQ_MODELS).filter((model, index) => !photos.length || index === 0 || /qwen|llama-4|vision/i.test(model)).map((model) => ({ provider: "groq", model, run: () => runGroq(env.GROQ_API_KEY, messages, maxTokens, model) })) : [];
+  const geminiAttempts = env.GEMINI_API_KEY ? modelList(env.GEMINI_MODEL, GEMINI_MODELS).map((model) => ({ provider: "gemini", model, run: () => runGemini(env.GEMINI_API_KEY, messages[0].content, message, photos, maxTokens, model) })) : [];
+  const mistralAttempts = env.MISTRAL_API_KEY ? modelList(env.MISTRAL_MODEL, MISTRAL_MODELS).filter((model) => !photos.length || /small|pixtral|vision/i.test(model)).map((model) => ({ provider: "mistral", model, run: () => runMistral(env.MISTRAL_API_KEY, messages, maxTokens, model) })) : [];
+  const nvidiaAttempts = env.NVIDIA_API_KEY ? modelList(env.NVIDIA_MODEL, NVIDIA_MODELS).filter((model) => !photos.length || /gemma-4|vision|vl/i.test(model)).map((model) => ({ provider: "nvidia", model, run: () => runNvidia(env.NVIDIA_API_KEY, messages, maxTokens, model) })) : [];
   const attempts = [
-    // O OpenRouter com modelos :free é a opção hospedada e sem cobrança. Ele
-    // vem primeiro quando a chave está configurada; os demais serviços
-    // entram como reserva.
+    // Ordem pela qualidade e folga gratuita: Groq e Gemini (incl. Gemma 4) vêm primeiro;
+    // Mistral e NVIDIA NIM entram como reforço gratuito quando configurados;
+    // OpenRouter :free (50 chamadas/dia) e Cloudflare ficam de reserva.
+    ...groqAttempts,
+    ...geminiAttempts,
+    ...mistralAttempts,
+    ...nvidiaAttempts,
     ...openRouterAttempts,
-    ...env.GROQ_API_KEY ? [{ provider: "groq", model: GROQ_MODEL, run: () => runGroq(env.GROQ_API_KEY, messages, maxTokens) }] : [],
-    ...env.GEMINI_API_KEY ? [{ provider: "gemini", model: GEMINI_MODEL, run: () => runGemini(env.GEMINI_API_KEY, messages[0].content, message, photos, maxTokens) }] : [],
     ...cloudflareAttempts.map(({ model, options }) => ({ provider: "cloudflare", model, run: () => env.AI.run(model, { messages, temperature: 0.25, ...options }) }))
   ];
   const cacheKey = { mode: generate ? "create" : revise ? "revise" : "edit", prompt, count: generate ? count : void 0, activities: generate ? activities : void 0, context: revise ? context : void 0, photos: photos.map((photo) => photo.slice(0, 64) + photo.length) };
@@ -680,7 +713,9 @@ async function handleStorageAI(request, env, user, headers) {
     let quotaState = null;
     let minuteLimited = false;
     const externalFailures = [];
+    const deniedProviders = /* @__PURE__ */ new Set();
     for (const { provider, model, run } of attempts) {
+      if (deniedProviders.has(provider)) continue;
       if (provider === "openrouter") {
         const quota = await openRouterQuota(env);
         if (isQuotaExhausted(quota)) {
@@ -722,6 +757,7 @@ async function handleStorageAI(request, env, user, headers) {
         }
         if (provider !== "cloudflare") {
           const reason = openRouterReason || (status === 429 ? "limit" : status === 401 || status === 403 ? "access_denied" : status === 400 ? "rejected" : status === 404 ? "model_unavailable" : "unavailable");
+          if (reason === "access_denied") deniedProviders.add(provider);
           externalFailures.push({ provider, reason });
         }
         if (Number(error?.code) === 3036 || /\b3036\b|daily free allocation/i.test(message2)) {
@@ -1642,7 +1678,7 @@ function createR2Handler(verifyUser = async (token, env) => {
     if (origin && !allowed.includes(origin)) return new Response("Origin not allowed", { status: 403 });
     const headers = { "Access-Control-Allow-Origin": origin || allowed[0], "Access-Control-Allow-Methods": "GET,POST,PUT,DELETE,OPTIONS", "Access-Control-Allow-Headers": "Authorization,Content-Type,X-Lesson-Title,X-Original-Bytes,X-Lesson-Origin", "Cache-Control": "private, no-store", Vary: "Origin" };
     const json = (body, status = 200) => Response.json(body, { status, headers });
-    if (new URL(request.url).pathname === "/health" && request.method === "GET") return json({ version: 22, storageAI: storageAIEnabled(env), storageAIMedia: storageAIEnabled(env), storageAIHistory: Boolean(env.FILES), imageSearch: true, openRouterConfigured: Boolean(env.OPENROUTER_API_KEY), geminiConfigured: Boolean(env.GEMINI_API_KEY), groqConfigured: Boolean(env.GROQ_API_KEY), lessonCovers: true, lessonDeletion: true, voiceChat: true, collaboration: true, animatedAvatars: true, roles: true, people: true });
+    if (new URL(request.url).pathname === "/health" && request.method === "GET") return json({ version: 24, cloudflareAI: env.STORAGE_AI_FREE_CONFIRMED === "true" && Boolean(env.AI), storageAI: storageAIEnabled(env), storageAIMedia: storageAIEnabled(env), storageAIHistory: Boolean(env.FILES), imageSearch: true, openRouterConfigured: Boolean(env.OPENROUTER_API_KEY), geminiConfigured: Boolean(env.GEMINI_API_KEY), groqConfigured: Boolean(env.GROQ_API_KEY), mistralConfigured: Boolean(env.MISTRAL_API_KEY), nvidiaConfigured: Boolean(env.NVIDIA_API_KEY), lessonCovers: true, lessonDeletion: true, voiceChat: true, collaboration: true, animatedAvatars: true, roles: true, people: true });
     if (request.method === "OPTIONS") return new Response(null, { status: 204, headers });
     const publicPresentation = await readPublicPresentation(request, env, headers);
     if (publicPresentation) return publicPresentation;

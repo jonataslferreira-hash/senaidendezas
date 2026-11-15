@@ -92,7 +92,7 @@ const transparentHint=/\b(?:png|transparente?s?|transparent|sem\s+fundo|fundo\s+
 const transparentWords=new RegExp(transparentHint.source,'giu');
 export const wantsTransparentImage=query=>transparentHint.test(String(query||''));
 
-async function fetchImageBlob(url){
+export async function fetchImageBlob(url){
   const direct=await fetch(url,{signal:AbortSignal.timeout(15000),credentials:'omit'}).then(response=>response.ok?response.blob():null).catch(()=>null);
   if(direct&&direct.type.startsWith('image/'))return direct;
   // O proxy do Worker alcança origens que bloqueiam o navegador (Flickr, por
@@ -301,7 +301,14 @@ export async function findSlideImage(query, { transparent = false, aspectRatio =
   const spoken=normalizeImageQuery(query,{translate:false}).replace(transparentWords,' ').replace(/\s+/g,' ').trim();
   for(const term of [spoken,subject,broader].filter((value,i,list)=>value&&list.indexOf(value)===i).slice(0,2)){
     const payload=await workerJson('/storage-ai/images?source=bing&q='+encodeURIComponent(term)+'&page=1&limit=24'+(transparent?'&transparent=1':''));
-    web=(payload?.items||[]).map(choiceFromWorker).filter(choice=>choice.thumbnail&&choice.url&&!isDocumentChoice(choice));
+    const rawWeb=(payload?.items||[]).map(choiceFromWorker).filter(choice=>choice.thumbnail&&choice.url&&!isDocumentChoice(choice));
+    const goodFrame=choice=>{
+      if(!(choice.width>0&&choice.height>0))return true;
+      const r=choice.width/choice.height;
+      return Math.max(choice.width,choice.height)>=280&&r>=.45&&r<=2.6;
+    };
+    const wellFramed=rawWeb.filter(goodFrame);
+    web=wellFramed.length?[...wellFramed,...rawWeb.filter(choice=>!goodFrame(choice))]:rawWeb;
     if(web.length)break;
   }
   if(transparent)for(const choice of web.slice(0,8)){

@@ -5,6 +5,7 @@ import { shapeFields } from './shapes.js';
 import { validateAudio } from './audio-data.js';
 import { validateCustomModel } from './model-files.js';
 import { openSlideThemes } from './open-slide-themes.js';
+import { communitySlideThemes } from './open-community-themes.js';
 import { studioSlideThemes } from './studio-slide-themes.js';
 import { resolveSimulation } from './simulations.js';
 export const canvasThemes = {
@@ -26,6 +27,7 @@ export const canvasThemes = {
   pastel: { name: 'Azul, verde e rosa pastel', background: '#f7fbff', end: '#fdf2f7', color: '#243244', accent: '#2a66c9',
     tints: ['#a8d5ff', '#a9e5c6', '#ffc3da'], heading: 'Segoe UI', body: 'Segoe UI' },
   ...openSlideThemes,
+  ...communitySlideThemes,
   ...studioSlideThemes
 };
 // Mistura duas cores hexadecimais. O editor só aceita #rrggbb, então toda

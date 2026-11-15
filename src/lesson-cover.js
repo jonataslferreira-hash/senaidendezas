@@ -45,6 +45,18 @@ export async function cropLessonCover(file) {
   }
 }
 
+// Recorta qualquer imagem (data URL, blob ou arquivo) no centro, em 16:9, já no tamanho da capa.
+export async function coverFromImage(source) {
+  const blob=typeof source==='string'?await (await fetch(source)).blob():source;
+  const bitmap=await createImageBitmap(blob);
+  try{
+    const canvas=document.createElement('canvas');canvas.width=480;canvas.height=270;
+    const scale=Math.max(480/bitmap.width,270/bitmap.height),w=bitmap.width*scale,h=bitmap.height*scale;
+    canvas.getContext('2d').drawImage(bitmap,(480-w)/2,(270-h)/2,w,h);
+    return encodeCover(canvas);
+  }finally{bitmap.close();}
+}
+
 export function encodeCover(canvas) {
   for (const quality of [.8,.6,.4,.25]) {
     const url=canvas.toDataURL('image/webp',quality);

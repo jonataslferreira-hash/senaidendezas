@@ -1,6 +1,6 @@
 import { createUuid } from './uuid.js';
 import {activityBlocks} from './activity-blocks.js';
-import {tickGame,isGameType,startGame,gameControl,gameInput,gameSnapshot,teamScores,assignTeam,publicGame} from './stage-games.js';
+import {tickGame,isGameType,startGame,gameControl,gameInput,gameSnapshot,teamScores,assignTeam,publicGame,settleTeams} from './stage-games.js';
 import {isPhotoAvatar} from './player-avatar.js';
 import { avatars, defaultQuestions } from './content.js';
 import { demoLesson, validateLesson } from './lessons.js';
@@ -34,7 +34,7 @@ export class Room {
     this.tick();
   }
   selectQuestions(index){const block=this.blocks?.[index];if(!block)return;const quiz=block.type==='quiz'?block:this.blocks.slice(index+1).find(b=>b.type==='quiz');this.questions=quiz?this.lesson.questions.filter(q=>quiz.items.includes(q.id)):[];}
-  enterBlock(index){const block=this.blocks?.[index];if(!block)throw Error('Etapa não encontrada.');this.data.blockIndex=index;this.selectQuestions(index);this.data.questionIndex=-1;this.data.startedAt=0;this.data.deadline=0;if(block.type==='quiz')this.data.phase='lobby';else{const slide=this.slides.findIndex(s=>block.items.includes(s.id));this.data.slide=Math.max(0,slide);this.data.model=this.slides[this.data.slide].model;this.data.animationStep=0;this.data.phase=block.type==='poll'?'poll':'lesson';if(block.type==='poll'){this.data.pollId=newToken();this.data.votes={};}else if(isGameType(block.type))startGame(this);}}
+  enterBlock(index){const block=this.blocks?.[index];if(!block)throw Error('Etapa não encontrada.');settleTeams(this);this.data.blockIndex=index;this.selectQuestions(index);this.data.questionIndex=-1;this.data.startedAt=0;this.data.deadline=0;if(block.type==='quiz')this.data.phase='lobby';else{const slide=this.slides.findIndex(s=>block.items.includes(s.id));this.data.slide=Math.max(0,slide);this.data.model=this.slides[this.data.slide].model;this.data.animationStep=0;this.data.phase=block.type==='poll'?'poll':'lesson';if(block.type==='poll'){this.data.pollId=newToken();this.data.votes={};}else if(isGameType(block.type))startGame(this);}}
   activity(){if(!this.blocks)return null;const index=this.data.blockIndex||0,block=this.blocks[index];return {id:block.id,index,type:block.type,slideIndices:this.slides.flatMap((s,i)=>block.items.includes(s.id)?[i]:[]),hasNext:index+1<this.blocks.length||((block.type==='poll'||isGameType(block.type))&&block.items.indexOf(this.slides[this.data.slide]?.id)<block.items.length-1),nextType:this.blocks[index+1]?.type||''};}
   join({ name, avatar, token } = {}) {
     if(token&&(this.data.removedTokens||[]).includes(token))throw Error('Você foi removido desta sala pelo professor.');
@@ -62,8 +62,8 @@ export class Room {
       if (changedModel) { d.model = next.slides[d.slide].model; d.exploded = false; }
     } else if(action==='game'){gameControl(this,value);
     } else if(action==='kick'){this.kick(value);
-    } else if(action==='ranking'&&d.phase==='reveal'){d.phase=d.questionIndex+1===this.questions.length?'finished':'leaderboard';d.resultStartedAt=this.now();d.podiumRevealed=false;
-    } else if(action==='podium-all'&&d.phase==='finished'){d.podiumRevealed=true;
+    } else if(action==='ranking'&&d.phase==='reveal'){d.phase=d.questionIndex+1===this.questions.length?'finished':'leaderboard';d.resultStartedAt=this.now();d.podiumRevealed=false;d.podiumStep=0;d.victory=Math.floor(Math.random()*4);
+    } else if(action==='podium-all'&&d.phase==='finished'){d.podiumRevealed=true;d.podiumStep=4;
     } else if(action==='animation'&&d.phase==='lesson'){const max=Math.max(0,...(this.slides[d.slide].animations||[]).map(a=>a.group||0));d.animationStep=Math.max(0,Math.min(max,Math.floor(Number(value)||0)));
     } else if (action === 'slide' && d.phase === 'lesson' && Number.isInteger(value) && value >= 0 && value < this.slides.length) {
       if(this.blocks){const block=this.blocks.findIndex(b=>b.type!=='quiz'&&b.items.includes(this.slides[value].id));if(block>=0){d.blockIndex=block;this.selectQuestions(block);}}d.slide = value;d.animationStep=0; d.model = this.slides[value].model; d.exploded = false;
@@ -74,7 +74,12 @@ export class Room {
     else if (action === 'model' && d.phase === 'lesson' && (['hdd', 'ssd', 'nvme'].includes(value) || value === 'custom' && this.slides[d.slide].customModel)) d.model = value;
     else if (action === 'explode' && d.phase === 'lesson') d.exploded = Boolean(value);
     else if (action === 'quiz' && d.phase === 'lesson') {
-      if(this.blocks){const index=this.blocks.findIndex((b,i)=>i>=(d.blockIndex||0)&&b.type==='quiz');if(index>=0)this.enterBlock(index);}
+      if(this.blocks){
+        // "Iniciar quiz" passa antes pelas etapas que vêm antes dele (equipes, enquete, jogos).
+        const current=d.blockIndex||0,index=this.blocks.findIndex((b,i)=>i>=current&&b.type==='quiz'),before=this.blocks.findIndex((b,i)=>i>current&&i<index&&b.type!=='slides');
+        if(before>=0){this.enterBlock(before);return;}
+        if(index>=0)this.enterBlock(index);
+      }
       if (!this.questions.length) throw Error('Esta aula não tem perguntas de quiz.');
       Object.assign(d, { phase: 'lobby', questionIndex: -1, startedAt: 0, deadline: 0 });
     } else if (action === 'start-quiz' && d.phase === 'lobby') {
@@ -84,7 +89,7 @@ export class Room {
     } else if (action === 'reveal' && d.phase === 'question') this.reveal();
     else if (action === 'next' && ['reveal','leaderboard'].includes(d.phase)) {
       if (d.questionIndex + 1 < this.questions.length) this.startQuestion(d.questionIndex + 1);
-      else {d.phase = 'finished';d.resultStartedAt=this.now();d.podiumRevealed=false;}
+      else {d.phase = 'finished';d.resultStartedAt=this.now();d.podiumRevealed=false;d.podiumStep=0;d.victory=Math.floor(Math.random()*4);}
     } else if (action === 'finish' && d.phase === 'lesson') d.phase = 'finished';
     else if (action === 'lesson' && ['lobby', 'countdown', 'reveal','leaderboard', 'finished', 'poll', 'poll-results', 'game'].includes(d.phase)) {if(this.blocks&&(['quiz','poll'].includes(this.blocks[d.blockIndex||0].type)||isGameType(this.blocks[d.blockIndex||0].type))){if(!['lobby','countdown'].includes(d.phase)&&(d.blockIndex||0)+1<this.blocks.length)this.enterBlock((d.blockIndex||0)+1);else{const first=this.blocks.findIndex(b=>b.type==='slides');if(first>=0)this.enterBlock(first);else d.phase='finished';}}else{d.phase = 'lesson'; d.questionIndex = -1;} }
     else throw Error('Esta ação não está disponível agora.');
@@ -121,7 +126,9 @@ export class Room {
     }
     this.data.phase = 'reveal';
   }
-  tick() { tickGame(this); if (this.data.phase === 'countdown' && this.now() >= this.data.deadline) this.startQuestion(0); else if (this.data.phase === 'question' && this.now() >= this.data.deadline) this.reveal(); }
+  // O pódio é revelado pelo relógio do professor: o aluno só vê o que já apareceu no telão.
+  podiumTick(){const d=this.data;if(d.phase!=='finished'||!d.resultStartedAt||(d.podiumStep||0)>=4)return;const elapsed=(this.now()-d.resultStartedAt)/1000;d.podiumStep=d.podiumRevealed?4:[2,4.5,7,9].filter(t=>elapsed>=t).length;}
+  tick() { tickGame(this); this.podiumTick(); if (this.data.phase === 'countdown' && this.now() >= this.data.deadline) this.startQuestion(0); else if (this.data.phase === 'question' && this.now() >= this.data.deadline) this.reveal(); }
   publicLesson(presenter = false) {
     return { id: this.lesson.id, title: this.lesson.title, description: this.lesson.description,...(this.lesson.customFonts?{customFonts:this.lesson.customFonts}:{}),...(this.lesson.activityBlocks?{activityBlocks:this.lesson.activityBlocks}:{}),activityOrder:this.lesson.activityOrder,gameSettings:this.lesson.gameSettings, quizCount: this.questions.length,
       ...(presenter ? { quizAudio: this.lesson.quizAudio,lobbyAudio:this.lesson.lobbyAudio,questionAudio:this.lesson.questionAudio } : {}),
@@ -130,16 +137,18 @@ export class Room {
   snapshot(id, includeLesson = true) {
     const d = this.data, q = this.questions[d.questionIndex], p = d.players.find(p => p.id === id), a = p?.answers[d.questionIndex];
     const revealed = ['reveal','leaderboard', 'finished'].includes(d.phase);
+    // Aluno só recebe os botões (sem o texto da pergunta e das alternativas). Na prévia o texto aparece.
+    const bare = Boolean(id) && !this.fullText;
     return {
-      code: d.code, phase: d.phase,activity:this.activity(),resultStartedAt:d.resultStartedAt||0,podiumRevealed:Boolean(d.podiumRevealed), animationStep:d.animationStep||0, slide: d.slide, model: d.model, exploded: d.exploded,
+      code: d.code, phase: d.phase,activity:this.activity(),resultStartedAt:d.resultStartedAt||0,podiumRevealed:Boolean(d.podiumRevealed),podiumStep:d.phase==='finished'?(d.resultStartedAt?d.podiumStep||0:4):0,victory:d.victory||0, animationStep:d.animationStep||0, slide: d.slide, model: d.model, exploded: d.exploded,
       questionIndex: d.questionIndex, totalQuestions: this.questions.length, serverTime: this.now(),
       countdownEndsAt: d.phase === 'countdown' ? d.deadline : 0,
-      game: gameSnapshot(this, id), teams: teamScores(this),
+      game: gameSnapshot(this, id, bare), teams: teamScores(this),
       poll: ['poll', 'poll-results'].includes(d.phase) ? { ...this.slides[d.slide].poll, id: d.pollId, total: Object.keys(d.votes).length, choice: p && Object.hasOwn(d.votes, id) ? d.votes[id] : null, counts: this.slides[d.slide].poll.options.map((_, i) => Object.values(d.votes).filter(v => v === i).length) } : null,
       ...(includeLesson ? { lesson: this.publicLesson(!id) } : {}),
-      ranking: d.players.map(({ id, name, avatar, score, bonus, correct, online,streak }) => ({ id, name, avatar, score:score+(bonus||0), correct, online,streak:streak||0,previousScore:(d.previousScores?.[id]||0)+(d.previousBonus?.[id]||0),previousRank:(d.previousRanking||[]).indexOf(id)+1 })).sort((a, b) => b.score - a.score || b.correct - a.correct || a.name.localeCompare(b.name, 'pt-BR')),
+      ranking: d.players.map(({ id, name, avatar, score, bonus, correct, online,streak,team }) => ({ id, name, avatar,...(d.teams?.[team]?{color:d.teams[team].color}:{}), score:score+(bonus||0), correct, online,streak:streak||0,previousScore:(d.previousScores?.[id]||0)+(d.previousBonus?.[id]||0),previousRank:(d.previousRanking||[]).indexOf(id)+1 })).sort((a, b) => b.score - a.score || b.correct - a.correct || a.name.localeCompare(b.name, 'pt-BR')),
       answeredCount: d.players.filter(p => p.answers[d.questionIndex]).length,
-      question: q && d.phase !== 'lesson' ? { text: q.text, options: q.options, difficulty: q.difficulty, base: q.base, startedAt: d.startedAt, deadline: d.deadline, ...(revealed ? { correct: q.correct, explanation: q.explanation } : {}) } : null,
+      question: q && d.phase !== 'lesson' ? { text: bare ? '' : q.text, options: q.options.map(o => bare ? '' : o), bare, difficulty: q.difficulty, base: q.base, startedAt: d.startedAt, deadline: d.deadline, ...(revealed ? { correct: q.correct, explanation: bare ? '' : q.explanation } : {}) } : null,
       me: p ? { id: p.id,name:p.name,avatar:p.avatar,streak:p.streak||0,bonus:p.bonus||0,team:Number.isInteger(p.team)?p.team:null, score: p.score+(p.bonus||0), answer: a ? { choice: a.choice, ...(revealed ? { points: a.points, correct: a.correct } : {}) } : null } : null
     };
   }

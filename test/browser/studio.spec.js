@@ -23,6 +23,7 @@ test('cria, edita, reordena e salva aula; exporta, importa e gerencia a bibliote
   await page.getByLabel('Pergunta de discussão', { exact: true }).fill('Para onde vai a água da chuva?');
   await page.getByLabel('Explicação da discussão', { exact: true }).fill('Ela retorna ao solo, aos rios e ao mar.');
   await page.getByRole('button', { name: 'Adicionar slide', exact: true }).click();
+  await page.locator('[data-studio-action="pick-slide-template"][data-template="basic"]').click();
   await page.getByLabel('Título do slide', { exact: true }).fill('Observe a gota');
   await page.getByLabel('Formato do slide', { exact: true }).selectOption('image');
   await page.locator('#slide-image-file').setInputFiles({ name: 'gota.png', mimeType: 'image/png', buffer: Buffer.from(image.split(',')[1], 'base64') });
