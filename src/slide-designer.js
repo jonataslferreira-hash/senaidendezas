@@ -428,6 +428,7 @@ export class SlideDesigner {
       ].map(([action,icon,label])=>btn(action,studioIcon(icon),`aria-label="${label}" title="${label}" ${action==='crop-image'?`aria-pressed="${this.imageEditing===e.id}"`:''}`)).join('')}</div>
       <label>Ajuste na moldura<select data-element-field="imageFit"><option value="contain">Mostrar inteira</option><option value="cover" ${e.imageFit==='cover'?'selected':''}>Preencher</option><option value="fill" ${e.imageFit==='fill'?'selected':''}>Esticar livremente</option></select></label>
       <div class="image-crop-controls">${btn('image-minus','−','aria-label="Diminuir zoom da imagem"')}<output>${Math.round((e.imageZoom||1)*1000)/10}%</output>${btn('image-plus','+','aria-label="Aumentar zoom da imagem"')}</div>
+      ${this.imageEditing===e.id?'<small class="image-crop-hint">Arraste a imagem para mover · Roda do mouse ou puxar o canto inferior para dar zoom.</small>':''}
       <div class="designer-position-grid">${number('Deslocamento X (%)','imageX',e.imageX||0,'','')}${number('Deslocamento Y (%)','imageY',e.imageY||0,'','')}</div>
       <label>Descrição da imagem<input data-element-field="imageAlt" value="${esc(e.imageAlt)}"></label>${e.imageSource||e.imageLicense?`<p class="designer-image-credit"><strong>Créditos</strong> ${esc([e.imageCredit,e.imageLicense].filter(Boolean).join(' · '))}${e.imageSource?`<a href="${esc(e.imageSource)}" target="_blank" rel="noopener noreferrer">Ver origem</a>`:''}</p>`:''}` : ''}
       ${e.type === 'model' ? `<label>Modelo<select data-element-field="model" aria-label="Modelo do elemento">${[['ssd', 'SSD SATA'], ['hdd', 'HDD'], ['nvme', 'SSD NVMe'], ['custom', e.customModel?.name || 'Meu modelo enviado']].map(([v, label]) => `<option value="${v}" ${e.model === v ? 'selected' : ''}>${esc(label)}</option>`).join('')}</select></label><label>Nome do modelo<input data-element-field="modelLabel" maxlength="120" value="${esc(e.modelLabel||'')}" placeholder="${esc(e.model==='custom'?e.customModel?.name||'Modelo 3D':'Nome da peça selecionada')}"></label><label>Descrição do modelo<textarea data-element-field="modelDescription" maxlength="500" placeholder="Descrição ao explorar o modelo">${esc(e.modelDescription||'')}</textarea></label><label class="model-details-toggle"><input type="checkbox" data-element-field="modelDetailsHidden" ${e.modelDetailsHidden?'checked':''}> Mostrar somente o modelo 3D</label><div class="designer-model-actions">${btn('replace-model', '↑ Enviar GLB / GLTF / OBJ')}${btn('interact', this.interacting === e.id ? 'Voltar à edição' : 'Explorar o modelo')}</div>` : ''}
@@ -699,7 +700,18 @@ export class SlideDesigner {
     if(action==='search-image'){this.openImageSearch(e?.type==='image'?e.id:null);return;}
     if(action==='simulation'){if(!this.studio.groups.canEdit)return;button?.closest?.('details')?.removeAttribute('open');this.openSimulationModal('projectile',null);return;}
     if(action==='preview-simulation'){if(e?.type==='simulation')this.openSimulationModal(e.simulation,e.id,isCustomExperiment(e)?e.customSim:null);return;}
-    if(action==='crop-image'){this.ensure();this.imageEditing=this.imageEditing===e.id?'':e.id;this.refreshSelection();return;}
+    if(action==='crop-image'){
+      this.ensure();
+      const finishing=this.imageEditing===e?.id;
+      this.imageEditing=finishing?'':e?.id||'';
+      if(finishing){
+        if(e)this.paintCrop(e);
+        this.studio.callbacks.render();
+      }else{
+        this.refreshSelection();
+      }
+      return;
+    }
     if(['image-plus','image-minus','image-reset'].includes(action)){
       this.mutate(s=>{const image=s.elements.find(item=>item.id===e?.id);if(!image)return;if(action==='image-reset'){image.imageZoom=1;image.imageX=image.imageY=0;}else image.imageZoom=imageZoomValue((image.imageZoom||1)*(action==='image-plus'?1.25:.8));}, true);return;
     }
@@ -1152,24 +1164,45 @@ export class SlideDesigner {
     renderStage(activeType);
     dialog.showModal();
   }
+  stageObjectNode(id){
+    return this.studio.root.querySelector(`.designer-stage .canvas-editing [data-object-id="${id}"]`)||this.studio.root.querySelector(`.canvas-editing [data-object-id="${id}"]`)||this.studio.root.querySelector(`[data-object-id="${id}"]`);
+  }
   cropDown(event,node){
     event.preventDefault();this.selected=node.dataset.objectId;this.ensure();
     if(!this.cropPointers.size)this.cropBefore=copy(this.original);
+    this.cropMode=event.target.closest('[data-resize-handle]')||event.shiftKey?'zoom':'pan';
     this.cropPointers.set(event.pointerId,{x:event.clientX,y:event.clientY});node.setPointerCapture(event.pointerId);this.cropGesture();
   }
   cropGesture(){
     const image=this.selectedElement(),points=[...this.cropPointers.values()];if(!image||!points.length)return;
-    const node=this.studio.root.querySelector(`[data-object-id="${image.id}"]`),rect=node.getBoundingClientRect();
-    this.cropStart={zoom:image.imageZoom||1,x:image.imageX||0,y:image.imageY||0,cx:points.reduce((s,p)=>s+p.x,0)/points.length,cy:points.reduce((s,p)=>s+p.y,0)/points.length,rect,distance:points.length>1?Math.hypot(points[1].x-points[0].x,points[1].y-points[0].y):1};
+    const node=this.stageObjectNode(image.id);if(!node)return;
+    const rect=node.getBoundingClientRect();
+    const cx=points.reduce((s,p)=>s+p.x,0)/points.length,cy=points.reduce((s,p)=>s+p.y,0)/points.length;
+    const centerX=rect.left+rect.width/2,centerY=rect.top+rect.height/2;
+    this.cropStart={zoom:image.imageZoom||1,x:image.imageX||0,y:image.imageY||0,cx,cy,rect,centerX,centerY,radius:Math.max(18,Math.hypot(cx-centerX,cy-centerY)),distance:points.length>1?Math.hypot(points[1].x-points[0].x,points[1].y-points[0].y):1};
   }
   cropMove(event){
     event.preventDefault();this.cropPointers.set(event.pointerId,{x:event.clientX,y:event.clientY});
     const d=this.cropStart,image=this.selectedElement(),points=[...this.cropPointers.values()];if(!d||!image)return;
     const cx=points.reduce((s,p)=>s+p.x,0)/points.length,cy=points.reduce((s,p)=>s+p.y,0)/points.length;
+    if(points.length===1&&this.cropMode==='zoom'){
+      const currentRadius=Math.max(8,Math.hypot(cx-d.centerX,cy-d.centerY));
+      const zoom=imageZoomValue(d.zoom*(currentRadius/d.radius)),ratio=zoom/d.zoom;
+      image.imageZoom=zoom;image.imageX=d.x*ratio;image.imageY=d.y*ratio;
+      this.paintCrop(image);this.studio.markDirty();return;
+    }
     const zoom=points.length>1?imageZoomValue(d.zoom*Math.hypot(points[1].x-points[0].x,points[1].y-points[0].y)/Math.max(1,d.distance)):d.zoom,ratio=zoom/d.zoom;
     image.imageZoom=zoom;image.imageX=d.x*ratio+(cx-d.cx)/d.rect.width*100+(d.cx-d.rect.left-d.rect.width/2)/d.rect.width*100*(1-ratio);image.imageY=d.y*ratio+(cy-d.cy)/d.rect.height*100+(d.cy-d.rect.top-d.rect.height/2)/d.rect.height*100*(1-ratio);this.paintCrop(image);this.studio.markDirty();
   }
-  paintCrop(image){const node=this.studio.root.querySelector(`[data-object-id="${image.id}"] img`);if(node)node.style.transform=`translate(${image.imageX||0}%,${image.imageY||0}%) scale(${image.imageZoom||1})`;const output=this.studio.root.querySelector('.image-crop-controls output');if(output)output.textContent=Math.round((image.imageZoom||1)*1000)/10+'%';}
+  paintCrop(image){
+    const transform=`translate(${image.imageX||0}%,${image.imageY||0}%) scale(${image.imageZoom||1})`;
+    for(const img of this.studio.root.querySelectorAll(`[data-object-id="${image.id}"] img`))img.style.transform=transform;
+    const output=this.studio.root.querySelector('.image-crop-controls output');
+    if(output)output.textContent=Math.round((image.imageZoom||1)*1000)/10+'%';
+    const ix=this.studio.root.querySelector('[data-element-field="imageX"]'),iy=this.studio.root.querySelector('[data-element-field="imageY"]');
+    if(ix&&document.activeElement!==ix)ix.value=String(Math.round((image.imageX||0)*10)/10);
+    if(iy&&document.activeElement!==iy)iy.value=String(Math.round((image.imageY||0)*10)/10);
+  }
   cropWheel(event){
     const node=event.target.closest('.canvas-editing [data-object-id]');if(!node||node.dataset.objectId!==this.imageEditing)return;
     event.preventDefault();const image=this.selectedElement();if(!image)return;if(!this.cropWheelBefore||this.cropWheelSlide!==this.original.id){this.record(copy(this.original));this.cropWheelBefore=true;this.cropWheelSlide=this.original.id;}

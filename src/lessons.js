@@ -14,6 +14,17 @@ export const LIBRARY_KEY = 'storage-lab-lessons-v1';
 export const MAX_LESSON_BYTES = 48 * 1024 * 1024;
 export const difficulties = { 'Fácil': 1000, 'Média': 1500, 'Difícil': 2000 };
 export const clone = value => JSON.parse(JSON.stringify(value));
+// Soma perguntas de quiz + perguntas/rodadas em jogos ao vivo (Relâmpago, Sobrevivência, Corrida, Cabo de guerra).
+export function totalQuestionCount(lesson) {
+  let count = Array.isArray(lesson?.questions) ? lesson.questions.length : 0;
+  for (const slide of lesson?.slides || []) {
+    const g = slide?.game;
+    if (!g) continue;
+    if (Array.isArray(g.questions)) count += g.questions.length;
+    else if (Array.isArray(g.rounds)) count += g.rounds.length;
+  }
+  return count;
+}
 const uid = () => createUuid();
 const text = (value, max = 6000) => typeof value === 'string' ? value.slice(0, max) : '';
 

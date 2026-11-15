@@ -6,6 +6,9 @@
   min-height:38px;font-weight:650;cursor:pointer;box-shadow:none!important;
   transition:background .14s ease,border-color .14s ease;
 }
+.storage-ai-btn-icon{
+  width:19px;height:19px;border-radius:5px;flex:none;display:block;
+}
 #app .studio-btn.storage-ai-primary:hover,.storage-ai-primary:hover{
   background:#2d3445!important;border-color:#2d3445!important;
 }

@@ -1,6 +1,6 @@
 import { createUuid } from './uuid.js';
 import {MAX_CANVAS_ELEMENTS,canvasFromSlide,newElement,colorValue,applyCanvasTheme,canvasThemes} from './canvas-data.js';
-import {r2ApiUrl,saveCloudLesson,readCloudLesson,listCloudLessons} from './cloud-files.js';
+import {r2ApiUrl,saveCloudLesson,readCloudLesson,readCloudCover,listCloudLessons} from './cloud-files.js';
 import {archiveImportedPages,fillAssetImages,hydrateLesson,removePageAssets} from './assets.js';
 import {newLesson,newQuestion,newSlide,validateLesson} from './lessons.js';
 import {ensureBlocks} from './activity-blocks.js';
@@ -610,11 +610,19 @@ export class StorageAI {
     dialog.className='studio-dialog ai-presentation-picker';
     const card=(lesson,index)=>{
       const cloudOnly=Boolean(lesson.path),slides=lesson.slides?.length;
+      let art='';
+      if(lesson.thumbnail)art=`<img src="${esc(lesson.thumbnail)}" alt="" loading="lazy">`;
+      else if(!cloudOnly&&lesson.slides?.length){
+        const first=lesson.slides[0];
+        art=first.kind==='document'&&first.imageAsset
+          ?`<img data-asset="${esc(first.imageAsset)}" alt="" loading="lazy">`
+          :`<span class="ai-pick-mini" inert aria-hidden="true">${canvasMarkup(presentationSlide(first),{interactive:false}).replace(/<button\b[\s\S]*?<\/button>/gi,'')}</span>`;
+      }else art=`<span class="ai-pick-placeholder">${studioIcon(cloudOnly?'cloud':'library')}</span>`;
       return `<button type="button" class="ai-pick-card" role="option" aria-selected="false" data-index="${index}" data-title="${esc(String(lesson.title||'').toLowerCase())}" style="--i:${Math.min(index,14)}">
-        <span class="ai-pick-art">${lesson.thumbnail?`<img src="${esc(lesson.thumbnail)}" alt="" loading="lazy">`:studioIcon(cloudOnly?'cloud':'library')}</span>
+        <span class="ai-pick-art"${cloudOnly&&!lesson.thumbnail?` data-pick-cloud="${index}"`:''}>${art}</span>
         <span class="ai-pick-text"><strong>${esc(lesson.title||'Aula sem título')}</strong><small>${cloudOnly?'Na nuvem':slides+' slide'+(slides===1?'':'s')+' · neste aparelho'}</small></span><i class="ai-pick-check" aria-hidden="true">✓</i></button>`;
     };
-    dialog.innerHTML=`<form method="dialog"><header class="ai-pick-head"><div><h2>Adicionar da biblioteca</h2><p>Escolha a apresentação que a IA vai editar com você.</p></div><button class="ai-pick-close" value="cancel" aria-label="Fechar">×</button></header>${lessons.length?
+    dialog.innerHTML=`<form method="dialog"><header class="ai-pick-head"><div><h2>Adicionar da biblioteca</h2></div><button class="ai-pick-close" value="cancel" aria-label="Fechar">×</button></header>${lessons.length?
       `<label class="ai-pick-search">${studioIcon('search')}<input type="search" placeholder="Buscar por título" aria-label="Buscar apresentação" autocomplete="off"></label>
       <div class="ai-pick-grid" role="listbox" aria-label="Apresentações">${lessons.map(card).join('')}</div><p class="ai-pick-empty" hidden>Nenhuma apresentação com esse nome.</p><input type="hidden" name="lesson" value="">`:
       `<div class="ai-pick-none">${studioIcon('library')}<strong>Sua biblioteca está vazia</strong><span>Importe um PPTX pelo botão + para começar.</span></div>`}
@@ -631,8 +639,40 @@ export class StorageAI {
       grid.querySelectorAll('.ai-pick-card').forEach(item=>{item.hidden=Boolean(term)&&!item.dataset.title.includes(term);if(!item.hidden)shown++;});
       dialog.querySelector('.ai-pick-empty').hidden=shown>0;
     });
+    let coverObserver=null;
+    const loadCloudPickCover=target=>{
+      const item=lessons[Number(target.dataset.pickCloud)];
+      if(!item?.path||!uid)return;
+      const key=uid+':'+item.path+':'+(item.updatedAt||'');
+      let task=studio.cloudCovers?.get(key);
+      if(!task){
+        task=(studio.coverQueue||Promise.resolve()).then(async()=>{
+          if(studio.account.user?.id!==uid)return null;
+          try{return await readCloudCover(studio.account.client,item.path);}catch{
+            if(item.bytes&&item.bytes>5*1024*1024||studio.account.user?.id!==uid)return null;
+            const full=validateLesson(await readCloudLesson(studio.account.client,item.path),{draft:true});
+            const {thumbnailFor}=await import('./cover-render.js');
+            const cover=await thumbnailFor(full);
+            return cover?(await fetch(cover)).blob():null;
+          }
+        }).catch(()=>null);
+        studio.coverQueue=task;
+        if(studio.cloudCovers){
+          if(studio.cloudCovers.size>=48)studio.cloudCovers.delete(studio.cloudCovers.keys().next().value);
+          studio.cloudCovers.set(key,task);
+        }
+      }
+      task.then(blob=>{
+        if(!blob||!target.isConnected||studio.account.user?.id!==uid)return;
+        const img=new Image(),url=URL.createObjectURL(blob);
+        img.alt='';img.onload=img.onerror=()=>URL.revokeObjectURL(url);
+        img.src=url;
+        target.replaceChildren(img);
+      });
+    };
     dialog.addEventListener('click',event=>{if(event.target===dialog)dialog.close('cancel');});
     dialog.addEventListener('close',async()=>{
+      coverObserver?.disconnect();
       const picked=dialog.querySelector('[name=lesson]')?.value;
       const selected=picked===''||picked==null?null:lessons[Number(picked)];
       dialog.remove();
@@ -648,6 +688,20 @@ export class StorageAI {
     },{once:true});
     document.body.append(dialog);
     dialog.showModal();
+    fillAssetImages(dialog);
+    const cloudArts=dialog.querySelectorAll('[data-pick-cloud]');
+    if(cloudArts.length&&typeof IntersectionObserver==='function'){
+      coverObserver=new IntersectionObserver(entries=>{
+        for(const {target,isIntersecting} of entries){
+          if(!isIntersecting)continue;
+          coverObserver?.unobserve(target);
+          loadCloudPickCover(target);
+        }
+      },{root:grid,rootMargin:'120px'});
+      cloudArts.forEach(node=>coverObserver.observe(node));
+    }else{
+      cloudArts.forEach(loadCloudPickCover);
+    }
   }
   async attachPptx(file){
     if(this.busy)return;

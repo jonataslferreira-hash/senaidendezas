@@ -177,8 +177,17 @@ export function startGame(room, random = Math.random) {
   else if (config.type === 'tug') {
     // De cada rodada sai uma das perguntas cadastradas, ao acaso.
     Object.assign(game, { state: 'ready', sides: {}, picks: config.rounds.map(round => Math.floor(random() * round.length) % round.length), round: -1, answers: {}, hits: [0, 0], tries: [0, 0], winner: -1, deadline: 0, pullAt: 0 });
+    for (const p of online(room)) tugSide(room, p);
   }
   else if (config.type === 'race') Object.assign(game, { state: 'ready', round: -1, answers: {}, times: {}, dist: {}, gain: {}, spent: {}, order: [], deadline: 0 });
+}
+
+// Mantém lados/participantes atualizados assim que alguém entra durante um jogo ao vivo.
+export function syncGameJoin(room, player) {
+  const d = room.data, game = d.game;
+  if (d.phase !== 'game' || !game || !player) return;
+  if (game.type === 'tug' && !Object.hasOwn(game.sides, player.id)) tugSide(room, player);
+  if (game.type === 'survival' && game.state === 'ready' && !game.alive.includes(player.id)) game.alive.push(player.id);
 }
 
 export function gameControl(room, value, random = Math.random) {
@@ -189,7 +198,7 @@ export function gameControl(room, value, random = Math.random) {
     if (game.type === 'tug' && game.state !== 'done') { if (game.state === 'open') revealTug(room); finishTug(room); }
     if (game.type === 'race') { if (game.state === 'open') revealRace(room); finishRace(room); }
     if (game.type === 'teams') settleTeams(room);
-    game.state = 'done'; return;
+    game.state = 'done'; game.resultStartedAt = room.now(); return;
   }
   if (game.type === 'teams' && action === 'shuffle') { d.teamPick = false; formTeams(room, config.count, random); game.state = 'done'; return; }
   if (game.type === 'tug' && action === 'next') {
@@ -204,6 +213,10 @@ export function gameControl(room, value, random = Math.random) {
     if (game.state === 'open') { revealFlash(room); return; }
     if (game.state === 'done') throw Error('Esta rodada já terminou.');
     if (game.state === 'ready' && !online(room).length) throw Error('Espere pelo menos um participante entrar.');
+    if (game.state === 'reveal') {
+      if (game.round + 1 >= config.questions.length) { game.state = 'done'; game.resultStartedAt = room.now(); return; }
+      game.state = 'leaderboard'; game.resultStartedAt = room.now(); return;
+    }
     advanceFlash(room); return;
   }
   if (game.type === 'race' && action === 'next') {
@@ -239,7 +252,7 @@ export function revealSurvival(room) {
   for (const id of out) game.fallen[id] = game.round;
   game.alive = game.alive.filter(id => !out.includes(id));
   game.state = game.alive.length <= 1 || game.round + 1 >= config.questions.length ? 'done' : 'reveal';
-  if (game.state === 'done') for (const p of d.players) if (game.alive.includes(p.id)) bonus(p, SURVIVAL_POINTS);
+  if (game.state === 'done') { game.resultStartedAt = room.now(); for (const p of d.players) if (game.alive.includes(p.id)) bonus(p, SURVIVAL_POINTS); }
 }
 export function tickGame(room) {
   const game = room.data.game;
@@ -251,7 +264,7 @@ export function tickGame(room) {
   if (game.type === 'race' && game.state === 'reveal' && room.now() >= (game.revealAt || 0) + RACE_PAUSE) advanceRace(room);
   // No relâmpago, quando o tempo acaba a resposta aparece e aguarda o professor avançar.
   if (game.type === 'flash' && game.state === 'open' && room.now() >= game.deadline) revealFlash(room);
-  if (game.type === 'tug' && game.state === 'pull' && room.now() >= game.pullAt + TUG_PULL_MS) game.state = 'done';
+  if (game.type === 'tug' && game.state === 'pull' && room.now() >= game.pullAt + TUG_PULL_MS) { game.state = 'done'; game.resultStartedAt = room.now(); }
 }
 
 // ---- Relâmpago: perguntas em sequência com tempo curto.
@@ -262,7 +275,7 @@ export function revealFlash(room) {
 }
 function advanceFlash(room) {
   const d = room.data, game = d.game, config = room.slides[d.slide]?.game;
-  if (game.round + 1 >= config.questions.length) { game.state = 'done'; return; }
+  if (game.round + 1 >= config.questions.length) { game.state = 'done'; game.resultStartedAt = room.now(); return; }
   game.round++; game.answers = {}; game.times = {}; game.gain = {}; game.fastest = ''; game.state = 'open'; game.startedAt = room.now(); game.deadline = room.now() + config.seconds * 1000;
 }
 const flashOrder = game => Object.keys(game.score).sort((a, b) => game.score[b] - game.score[a] || (game.wins[b] || 0) - (game.wins[a] || 0));
@@ -320,7 +333,7 @@ function finishRace(room) {
   if (game.paid) return;
   game.paid = true; game.order = raceOrder(game);
   game.order.forEach((id, place) => { const p = room.data.players.find(p => p.id === id); if (p) bonus(p, RACE_POINTS[place] ?? RACE_FINISH); });
-  game.state = 'done';
+  game.state = 'done'; game.resultStartedAt = room.now();
 }
 
 // O que cada aluno envia durante a etapa.
@@ -402,14 +415,14 @@ export function gameSnapshot(room, playerId, bare = false) {
   // Aluno não recebe o texto das perguntas (só os botões), para não dar para pesquisar.
   const ask = (question, extra) => question ? { text: bare ? '' : question.text, options: question.options.map(option => bare ? '' : option), ...extra } : null;
   const done = game.state === 'done', presenter = !playerId;
-  const base = { id: game.id, type: game.type, state: game.state, text: config.text, startedAt: game.startedAt, bare };
+  const base = { id: game.id, type: game.type, state: game.state, text: config.text, startedAt: game.startedAt, resultStartedAt: game.resultStartedAt || 0, bare };
   if (game.type === 'teams') return { ...base, pick: Boolean(d.teamPick) };
   if (game.type === 'flash') {
-    const question = game.round >= 0 ? config.questions[game.round] : null, shown = game.state === 'reveal' || done, order = flashOrder(game);
+    const question = game.round >= 0 ? config.questions[game.round] : null, shown = game.state === 'reveal' || game.state === 'leaderboard' || done, order = flashOrder(game);
     return { ...base, round: game.round, rounds: config.questions.length, seconds: config.seconds, deadline: game.deadline,
       question: ask(question, { ...(shown || presenter ? { correct: question?.correct } : {}), ...(shown ? { counts: question?.options.map((_, i) => Object.values(game.answers).filter(v => v === i).length) } : {}) }),
       answered: Object.keys(game.answers).length, total: online(room).length, fastest: game.state === 'reveal' ? who(game.fastest) : null, points: [FLASH_HIT, FLASH_HIT + FLASH_SPEED, FLASH_FIRST],
-      board: order.slice(0, 5).map(id => ({ ...who(id), score: game.score[id], wins: game.wins[id] || 0 })).filter(item => item.id),
+      board: order.slice(0, 8).map(id => ({ ...who(id), score: game.score[id], gain: game.gain[id] || 0, wins: game.wins[id] || 0 })).filter(item => item.id),
       me: playerId ? { choice: Object.hasOwn(game.answers, playerId) ? game.answers[playerId] : null, gain: shown ? (game.gain[playerId] || 0) : 0, right: shown ? Object.hasOwn(game.gain, playerId) : false, first: shown ? game.fastest === playerId : false, score: game.score[playerId] || 0, rank: order.indexOf(playerId) + 1 } : null };
   }
   if (game.type === 'survival') {

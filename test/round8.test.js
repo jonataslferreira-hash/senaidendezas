@@ -179,17 +179,21 @@ test('etapas interativas: equipes, relâmpago, sobrevivência, desafio, sorteio 
   assert.equal(room.snapshot().game.state, 'reveal', 'não avança sozinho após revelar a resposta');
   assert.equal(room.snapshot().game.round, 0, 'espera o professor passar para a próxima pergunta');
   room.control('game', { do: 'next' });
+  assert.equal(room.snapshot().game.state, 'leaderboard', 'entre rodadas, Relâmpago exibe o placar da rodada antes da próxima pergunta');
+  room.control('game', { do: 'next' });
   assert.equal(room.snapshot().game.round, 1, 'professor avança manualmente para a próxima pergunta');
   assert.equal(room.snapshot().game.state, 'open');
   now += 10500; room.tick();
   assert.equal(room.snapshot().game.state, 'reveal', 'o tempo curto acabou e mostrou a resposta');
   now += 5000; room.tick();
   assert.equal(room.snapshot().game.state, 'reveal', 'continua mostrando a resposta após o tempo acabar');
+  room.control('game', { do: 'next' }); // placar da rodada 2
+  assert.equal(room.snapshot().game.state, 'leaderboard');
   room.control('game', { do: 'next' }); // pergunta 3 (round 2)
   assert.equal(room.snapshot().game.round, 2);
   room.control('game', { do: 'next' }); // revela pergunta 3
   assert.equal(room.snapshot().game.state, 'reveal');
-  room.control('game', { do: 'next' }); // resultado final
+  room.control('game', { do: 'next' }); // resultado final (pódio)
   assert.equal(room.snapshot().game.state, 'done');
   assert.deepEqual(room.snapshot().game.board.map(item => [item.name, item.score, item.wins]), [['Bia', 300, 1], ['Caio', 200, 0]]);
   assert.throws(() => room.answer(caio.id, { choice: { choice: 0, round: 2 } }), /terminou/);

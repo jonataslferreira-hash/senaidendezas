@@ -351,7 +351,8 @@ function keepLiveSlide(markup, key) {
 }
 function render() {
   const slideMotionKey = state?.phase === 'lesson' ? `${activeLesson.id}:${state.code}:${state.slide}` : '';
-  const outgoingSlide = pageMotion.captureSlide(app, slideMotionKey, slides[state?.slide]?.transition);
+  const activeTransition = slides[state?.slide]?.transition || state?.slideTransition || 'slide';
+  const outgoingSlide = pageMotion.captureSlide(app, slideMotionKey, activeTransition);
   const previousOutline=app.querySelector('.editor-outline');
   const outlineScroll=previousOutline?.scrollTop;
   const previewsScroll=app.querySelector('.mobile-slide-previews')?.scrollLeft;
@@ -363,9 +364,8 @@ function render() {
   viewer.el.remove();
   app.dataset.readOnly = String(readOnlyPresentation);
   app.dataset.role = state ? host ? 'presenter' : 'student' : 'studio';
-  // Aula sem quiz não tem tela de encerramento: quem apresenta volta direto
-  // para onde estava e quem assiste volta ao início.
-  if (state?.phase === 'finished' && !state.totalQuestions) { focusView.close(); leave(); return; }
+  // Aula sem atividades pontuadas (nem quiz nem jogos) volta direto ao encerrar.
+  if (state?.phase === 'finished' && !state.totalQuestions && !state.hasScoredStages) { focusView.close(); leave(); return; }
   app.classList.toggle('quiz-party', Boolean(state && state.phase !== 'lesson'));
   const markup = sharedLoading || busy && host && !state ? `${header()}<main class="public-loading"><p role="status">Carregando apresentação…</p></main>` : sharedError ? `${header()}<main class="public-loading"><h1>Apresentação indisponível</h1><p>${esc(sharedError)}</p><button class="btn secondary" data-action="home">Voltar</button></main>` : !state ? studio.markup() : state.phase === 'lesson' ? lesson() : ['lobby', 'countdown'].includes(state.phase) ? lobbyMarkup(state, { host, demo, header, shareDialog, shareOpen }) : state.phase === 'finished' ? finished() : state.phase==='leaderboard'?leaderboardMarkup(state,{header,host,offset:timerOffset}):state.game ? gameMarkup(state, { host, demo, header, now: Date.now() + timerOffset }) : state.poll ? pollMarkup() : quiz();
   const chatSlots = '[data-chat-slot], [data-social-slot]';
@@ -404,7 +404,7 @@ function render() {
     app.insertAdjacentHTML('beforeend', pinnedInvite({ host, demo, state, settings: presenterSettings }));
     if (editDraft) app.insertAdjacentHTML('beforeend', liveEditDialog(editDraft, editError));
   }
-  app.dataset.transition = state?.phase === 'lesson' ? slides[state.slide]?.transition || 'slide' : 'slide';
+  app.dataset.transition = state?.phase === 'lesson' ? activeTransition : 'slide';
   if (state?.teams && ['leaderboard', 'finished'].includes(state.phase) && !app.querySelector('.team-strip')) app.querySelector('main')?.insertAdjacentHTML('beforeend', teamStrip(state));
   if (state?.phase === 'leaderboard') animateRanking(app, Math.max(0, (Date.now() + timerOffset - (state.resultStartedAt || 0)) / 1000));
   if (state?.game?.type === 'raffle') animateRaffle(app, () => Date.now() + timerOffset);
