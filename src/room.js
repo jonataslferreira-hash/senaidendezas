@@ -1,6 +1,6 @@
 import { createUuid } from './uuid.js';
 import {activityBlocks} from './activity-blocks.js';
-import {isGameType,startGame,gameControl,gameInput,gameSnapshot,teamScores,assignTeam,publicGame} from './stage-games.js';
+import {tickGame,isGameType,startGame,gameControl,gameInput,gameSnapshot,teamScores,assignTeam,publicGame} from './stage-games.js';
 import {isPhotoAvatar} from './player-avatar.js';
 import { avatars, defaultQuestions } from './content.js';
 import { demoLesson, validateLesson } from './lessons.js';
@@ -19,9 +19,10 @@ export class Room {
     if(this.lesson.activityBlocks){this.blocks=activityBlocks(this.lesson).filter(b=>b.items.length);if(!saved)this.enterBlock(0);else this.selectQuestions(this.data.blockIndex||0);}
     if (!saved&&!this.blocks){this.data.model=this.slides[0].model;if(this.lesson.activityOrder?.[0]==='quiz'&&this.questions.length)this.data.phase='lobby';}
     if (!saved && Number.isInteger(startIndex) && this.slides[startIndex]) {
-      const blockIndex=this.blocks?.findIndex(b=>b.type==='slides'&&b.items.includes(this.slides[startIndex].id));
+      const blockIndex=this.blocks?.findIndex(b=>b.type!=='quiz'&&b.items.includes(this.slides[startIndex].id)),liveBlock=blockIndex>=0&&this.blocks[blockIndex].type!=='slides';
       if (blockIndex>=0) this.enterBlock(blockIndex);
-      if (!this.blocks || blockIndex>=0) {
+      if (liveBlock&&this.data.slide!==startIndex) { this.data.slide=startIndex; if(this.blocks[blockIndex].type==='poll'){this.data.pollId=newToken();this.data.votes={};}else startGame(this); }
+      if (!liveBlock && (!this.blocks || blockIndex>=0)) {
         this.data.phase='lesson';
         this.data.slide=startIndex;
         this.data.model=this.slides[startIndex].model;
@@ -91,7 +92,7 @@ export class Room {
   updateProfile(id,{name,avatar}={}){const p=this.data.players.find(p=>p.id===id);if(!p)throw Error('Participante não encontrado.');name=String(name||'').trim().replace(/[\x00-\x1f\x7f]/g,'').slice(0,24);if(!name)throw Error('Digite seu nome.');p.name=name;if(avatars.includes(avatar)||isPhotoAvatar(avatar))p.avatar=avatar;}
   kick(id){const p=this.data.players.find(p=>p.id===id);if(!p)throw Error('Participante não encontrado.');this.data.removedTokens=[...(this.data.removedTokens||[]),p.token].slice(-120);this.data.players=this.data.players.filter(p=>p.id!==id);if(this.data.votes)delete this.data.votes[id];}
   startQuestion(index) {
-    this.data.previousRanking=[...this.data.players].sort((a,b)=>b.score-a.score||b.correct-a.correct||a.name.localeCompare(b.name,'pt-BR')).map(p=>p.id);this.data.previousScores=Object.fromEntries(this.data.players.map(p=>[p.id,p.score]));
+    this.data.previousRanking=[...this.data.players].sort((a,b)=>b.score-a.score||b.correct-a.correct||a.name.localeCompare(b.name,'pt-BR')).map(p=>p.id);this.data.previousScores=Object.fromEntries(this.data.players.map(p=>[p.id,p.score]));this.data.previousBonus=Object.fromEntries(this.data.players.map(p=>[p.id,p.bonus||0]));
     Object.assign(this.data, { questionIndex: index, phase: 'question', startedAt: this.now(), deadline: this.now() + this.questions[index].seconds * 1000 });
   }
   answer(id, { choice, questionIndex } = {}) {
@@ -120,7 +121,7 @@ export class Room {
     }
     this.data.phase = 'reveal';
   }
-  tick() { if (this.data.phase === 'countdown' && this.now() >= this.data.deadline) this.startQuestion(0); else if (this.data.phase === 'question' && this.now() >= this.data.deadline) this.reveal(); }
+  tick() { tickGame(this); if (this.data.phase === 'countdown' && this.now() >= this.data.deadline) this.startQuestion(0); else if (this.data.phase === 'question' && this.now() >= this.data.deadline) this.reveal(); }
   publicLesson(presenter = false) {
     return { id: this.lesson.id, title: this.lesson.title, description: this.lesson.description,...(this.lesson.customFonts?{customFonts:this.lesson.customFonts}:{}),...(this.lesson.activityBlocks?{activityBlocks:this.lesson.activityBlocks}:{}),activityOrder:this.lesson.activityOrder,gameSettings:this.lesson.gameSettings, quizCount: this.questions.length,
       ...(presenter ? { quizAudio: this.lesson.quizAudio,lobbyAudio:this.lesson.lobbyAudio,questionAudio:this.lesson.questionAudio } : {}),
@@ -136,10 +137,10 @@ export class Room {
       game: gameSnapshot(this, id), teams: teamScores(this),
       poll: ['poll', 'poll-results'].includes(d.phase) ? { ...this.slides[d.slide].poll, id: d.pollId, total: Object.keys(d.votes).length, choice: p && Object.hasOwn(d.votes, id) ? d.votes[id] : null, counts: this.slides[d.slide].poll.options.map((_, i) => Object.values(d.votes).filter(v => v === i).length) } : null,
       ...(includeLesson ? { lesson: this.publicLesson(!id) } : {}),
-      ranking: d.players.map(({ id, name, avatar, score, correct, online,streak }) => ({ id, name, avatar, score, correct, online,streak:streak||0,previousScore:d.previousScores?.[id]||0,previousRank:(d.previousRanking||[]).indexOf(id)+1 })).sort((a, b) => b.score - a.score || b.correct - a.correct || a.name.localeCompare(b.name, 'pt-BR')),
+      ranking: d.players.map(({ id, name, avatar, score, bonus, correct, online,streak }) => ({ id, name, avatar, score:score+(bonus||0), correct, online,streak:streak||0,previousScore:(d.previousScores?.[id]||0)+(d.previousBonus?.[id]||0),previousRank:(d.previousRanking||[]).indexOf(id)+1 })).sort((a, b) => b.score - a.score || b.correct - a.correct || a.name.localeCompare(b.name, 'pt-BR')),
       answeredCount: d.players.filter(p => p.answers[d.questionIndex]).length,
       question: q && d.phase !== 'lesson' ? { text: q.text, options: q.options, difficulty: q.difficulty, base: q.base, startedAt: d.startedAt, deadline: d.deadline, ...(revealed ? { correct: q.correct, explanation: q.explanation } : {}) } : null,
-      me: p ? { id: p.id,name:p.name,avatar:p.avatar,streak:p.streak||0,bonus:p.bonus||0,team:Number.isInteger(p.team)?p.team:null, score: p.score, answer: a ? { choice: a.choice, ...(revealed ? { points: a.points, correct: a.correct } : {}) } : null } : null
+      me: p ? { id: p.id,name:p.name,avatar:p.avatar,streak:p.streak||0,bonus:p.bonus||0,team:Number.isInteger(p.team)?p.team:null, score: p.score+(p.bonus||0), answer: a ? { choice: a.choice, ...(revealed ? { points: a.points, correct: a.correct } : {}) } : null } : null
     };
   }
 }

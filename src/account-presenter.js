@@ -7,7 +7,7 @@
 // chegar, ele é reenviado, e o computador ignora os repetidos.
 import { createUuid } from './uuid.js';
 const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-const commands=new Set(['previous','next-slide','next-stage','quiz','start-quiz','reveal','next-question','back-lesson','finish','poll','close-poll','sim','game-draw','game-end','game-restart','game-shuffle']);
+const commands=new Set(['previous','next-slide','next-stage','quiz','start-quiz','reveal','next-question','back-lesson','finish','poll','close-poll','sim','game-next','game-draw','game-end','game-restart','game-shuffle']);
 const GRACE=15000; // uma sessão só some depois deste tempo sem sinal (a presença oscila)
 export function remoteConnectionMessage(state,error,online=true){
  const reason=String(error?.message||'');
@@ -202,7 +202,8 @@ export class AccountPresenter{
   if(phase==='poll')return `<p class="remote-phase">Enquete aberta</p>${big('close-poll','Encerrar votação')}`;
   if(phase==='poll-results')return `<p class="remote-phase">Enquete · resultado</p>${big(p?.stage==='poll'?'next-stage':'back-lesson',p?.stage==='poll'?next:'Voltar aos slides')}`;
   if(phase==='game'&&game){
-   const names={teams:'Equipes',flash:'Desafio relâmpago',cloud:'Nuvem de palavras',challenge:'Desafio no experimento',raffle:'Sorteio',tug:'Cabo de guerra'},open=game.state==='open';
+   const names={teams:'Equipes',flash:'Desafio relâmpago',survival:'Sobrevivência',challenge:'Desafio no experimento',raffle:'Sorteio',tug:'Cabo de guerra'},open=game.state==='open';
+   if(game.type==='survival'){const label={ready:'▶ Começar',open:'Revelar agora',reveal:'Próxima pergunta →'}[game.state];return `<p class="remote-phase">Sobrevivência${game.state==='done'?' · fim':''}</p>${label?big('game-next',label):big('next-stage',next)}<div class="remote-row">${game.state==='done'?button('game-restart','↻ Jogar de novo'):button('next-stage',next)}</div>`;}
    const main=game.type==='raffle'?big('game-draw',game.drawn?'🎲 Sortear outro':'🎲 Sortear'):game.type==='teams'?big('next-stage',next):open?big('game-end','Encerrar rodada'):big('next-stage',next);
    const extra=[game.type==='teams'?button('game-shuffle','🔀 Embaralhar times'):'',game.type==='raffle'?button('next-stage',next):'',!open&&!['teams','raffle'].includes(game.type)?button('game-restart','↻ Jogar de novo'):'',open&&!['teams','raffle'].includes(game.type)?button('next-stage',next):''].filter(Boolean).join('');
    return `<p class="remote-phase">${esc(names[game.type]||'Dinâmica')}${game.type==='raffle'&&game.drawn?' · saiu '+esc(game.drawn):open||game.type==='teams'?'':' · encerrado'}</p>${main}<div class="remote-row">${extra}</div>`;

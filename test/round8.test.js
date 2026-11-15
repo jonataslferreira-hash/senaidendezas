@@ -146,13 +146,13 @@ test('controle remoto: comando repetido só vale uma vez e a sessão tolera falh
   assert.match(phone.item.dialog(), /Apresentação desconectada/);
 });
 
-test('etapas interativas: equipes, relâmpago, nuvem, desafio, sorteio e cabo de guerra', async () => {
+test('etapas interativas: equipes, relâmpago, sobrevivência, desafio, sorteio e cabo de guerra', async () => {
   const { Room } = await import('../src/room.js');
   const { demoLesson } = await import('../src/lessons.js');
   const { defaultGame, challengeMatches, validateGame } = await import('../src/stage-games.js');
   const lesson = demoLesson(); let now = 1000;
   const add = (type, extra = {}) => { const slide = { ...lesson.slides[0], id: 'g-' + type, game: { ...defaultGame(type), ...extra } }; lesson.slides.push(slide); return { id: 'b-' + type, type, items: [slide.id] }; };
-  lesson.activityBlocks = [add('teams'), add('flash'), add('cloud'), add('challenge', { answer: [{ k: 'range', label: 'v', v: '50', min: 0, max: 100 }, { k: 'select', label: 's', v: 'a' }] }), add('raffle'), add('tug'), { id: 's', type: 'slides', items: lesson.slides.slice(0, 2).map(s => s.id) }];
+  lesson.activityBlocks = [add('teams'), add('flash'), add('survival', { questions: [{ text: 'a', options: ['x', 'y'], correct: 0 }, { text: 'b', options: ['x', 'y'], correct: 1 }, { text: 'c', options: ['x', 'y'], correct: 0 }] }), add('challenge', { answer: [{ k: 'range', label: 'v', v: '50', min: 0, max: 100 }, { k: 'select', label: 's', v: 'a' }] }), add('raffle'), add('tug'), { id: 's', type: 'slides', items: lesson.slides.slice(0, 2).map(s => s.id) }];
   const room = new Room('123456', null, () => now, lesson);
   const ana = room.join({ name: 'Ana' }), bia = room.join({ name: 'Bia' }), caio = room.join({ name: 'Caio' });
   assert.equal(room.data.phase, 'game');
@@ -165,8 +165,17 @@ test('etapas interativas: equipes, relâmpago, nuvem, desafio, sorteio e cabo de
   assert.equal(room.snapshot().game.winner.name, 'Bia');
   assert.throws(() => room.answer(caio.id, { choice: { choice: 0 } }), /terminou/);
   room.control('next-stage');
-  room.answer(ana.id, { choice: { word: ' Legal ' } }); room.answer(bia.id, { choice: { word: 'legal' } });
-  assert.equal(room.snapshot().game.words[0].n, 2);
+  // Sobrevivência: uma vida só; quem erra ou não responde cai e não joga mais.
+  assert.equal(room.snapshot().game.state, 'ready');
+  room.control('game', { do: 'next' });
+  room.answer(ana.id, { choice: { choice: 0, round: 0 } }); room.answer(bia.id, { choice: { choice: 1, round: 0 } });
+  assert.equal(room.snapshot(bia.id).game.question.correct, undefined);
+  now += 16000; room.tick();
+  assert.equal(room.snapshot(bia.id).game.me.alive, false);
+  assert.equal(room.snapshot(caio.id).game.me.alive, false, 'quem não respondeu a tempo também cai');
+  assert.equal(room.snapshot().game.state, 'done');
+  assert.throws(() => room.answer(bia.id, { choice: { choice: 0, round: 0 } }), /terminou|caiu/);
+  assert.equal(room.snapshot().ranking.find(p => p.name === 'Ana').score, 500, 'pontos das dinâmicas contam no ranking individual');
   room.control('next-stage'); now += 5000;
   room.answer(ana.id, { choice: { values: ['80', 'a'] } });
   assert.equal(room.snapshot(ana.id).game.me.ok, false);
@@ -179,7 +188,7 @@ test('etapas interativas: equipes, relâmpago, nuvem, desafio, sorteio e cabo de
   room.answer(ana.id, { choice: { side: 0 } }); room.answer(bia.id, { choice: { side: 1 } });
   for (let i = 0; i < 3; i++) { now += 1000; room.answer(ana.id, { choice: { taps: 50 } }); }
   assert.equal(room.snapshot().game.winner, 0, 'toques são limitados, mas o lado A vence');
-  assert.equal(room.snapshot().teams.reduce((sum, t) => sum + t.score, 0), 500 + 500 + 200);
+  assert.equal(room.snapshot().teams.reduce((sum, t) => sum + t.score, 0), 500 + 500 + 500 + 200);
   room.control('next-stage');
   assert.equal(room.data.phase, 'lesson');
   assert.equal(challengeMatches({ tolerance: 5, answer: [{ k: 'range', v: '50', min: 0, max: 100, skip: true }, { k: 'toggle', v: '1' }] }, ['0', '1']), true);

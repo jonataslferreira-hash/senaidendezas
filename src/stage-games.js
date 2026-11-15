@@ -1,7 +1,7 @@
 // Etapas interativas da aula (além de Slides, Enquete e Quiz):
 //   teams     – Competição em equipes: divide a turma em times e mostra o placar
 //   flash     – Desafio relâmpago: uma pergunta, vence quem acertar primeiro
-//   cloud     – Nuvem de palavras: cada aluno manda respostas curtas
+//   survival  – Sobrevivência: cada aluno tem 1 vida; errou, caiu e não responde mais
 //   challenge – Desafio no experimento: acertar uma meta mexendo no experimento
 //   raffle    – Sorteio de aluno
 //   tug       – Cabo de guerra: a turma escolhe um lado e puxa a corda tocando na tela
@@ -9,18 +9,19 @@
 // a sala do professor aplicar e os testes conferirem.
 import { createUuid } from './uuid.js';
 
-export const gameTypes = ['teams', 'flash', 'cloud', 'challenge', 'raffle', 'tug'];
+export const gameTypes = ['teams', 'flash', 'survival', 'challenge', 'raffle', 'tug'];
 export const isGameType = type => gameTypes.includes(type);
-export const gameNames = { teams: 'Equipes', flash: 'Desafio relâmpago', cloud: 'Nuvem de palavras', challenge: 'Desafio no experimento', raffle: 'Sorteio', tug: 'Cabo de guerra' };
+export const gameNames = { teams: 'Equipes', flash: 'Desafio relâmpago', survival: 'Sobrevivência', challenge: 'Desafio no experimento', raffle: 'Sorteio', tug: 'Cabo de guerra' };
 export const gameHints = {
   teams: 'Divide a turma em times e mostra o placar',
   flash: 'Uma pergunta: vence quem acertar primeiro',
-  cloud: 'Cada aluno manda uma palavra para o telão',
+  survival: 'Uma vida só: errou, caiu. Quem fica de pé?',
   challenge: 'Quem atinge a meta no experimento?',
   raffle: 'Roleta com os nomes de quem está na sala',
   tug: 'Dois lados puxam a corda tocando na tela'
 };
 export const teamPalette = [['Azul', '#3b82f6'], ['Laranja', '#f97316'], ['Verde', '#22c55e'], ['Rosa', '#ec4899']];
+export const SURVIVAL_POINTS = 500;
 export const FLASH_POINTS = 500, CHALLENGE_FIRST = 500, CHALLENGE_POINTS = 300, TUG_POINTS = 200;
 
 const text = (value, max) => String(value ?? '').replace(/[\u0000-\u0008\u000b-\u001f\u007f]/g, '').slice(0, max);
@@ -29,7 +30,7 @@ const line = (value, max) => text(value, max).replace(/\s+/g, ' ').trim();
 export function defaultGame(type) {
   if (type === 'teams') return { type, text: 'Que comecem os jogos!', count: 2 };
   if (type === 'flash') return { type, text: 'Quem responde primeiro?', options: ['Opção A', 'Opção B'], correct: 0 };
-  if (type === 'cloud') return { type, text: 'Em uma palavra: o que você achou da aula?' };
+  if (type === 'survival') return { type, text: 'Uma vida só. Quem sobrevive?', seconds: 15, questions: [{ text: 'Primeira pergunta', options: ['Opção A', 'Opção B'], correct: 0 }] };
   if (type === 'challenge') return { type, text: 'Ajuste o experimento até chegar à meta.', simulation: 'projectile', answer: [], tolerance: 5 };
   if (type === 'raffle') return { type, text: 'Quem vai responder?' };
   return { type: 'tug', text: 'De que lado você está?', options: ['Lado A', 'Lado B'] };
@@ -46,6 +47,16 @@ export function validateGame(game, draft = false, simulationIds = null) {
     if (!draft && (options.length < 2 || options.some(o => !o.trim()))) throw Error('O desafio relâmpago precisa de 2 a 4 opções preenchidas.');
     result.options = options.length ? options : ['', ''];
     result.correct = Math.max(0, Math.min(result.options.length - 1, Math.floor(Number(game.correct) || 0)));
+  }
+  if (game.type === 'survival') {
+    result.seconds = Math.max(5, Math.min(60, Math.round(Number(game.seconds) || 15)));
+    result.questions = (Array.isArray(game.questions) ? game.questions : []).slice(0, 20).filter(q => q && typeof q === 'object').map((q, index) => {
+      const options = (Array.isArray(q.options) ? q.options : []).slice(0, 4).map(o => text(o, 200));
+      while (options.length < 2) options.push('');
+      if (!draft && (!text(q.text, 300).trim() || options.some(o => !o.trim()))) throw Error('Na Sobrevivência, preencha a pergunta ' + (index + 1) + ' e todas as opções dela.');
+      return { text: text(q.text, 300), options, correct: Math.max(0, Math.min(options.length - 1, Math.floor(Number(q.correct) || 0))) };
+    });
+    if (!result.questions.length) { if (!draft) throw Error('A Sobrevivência precisa de pelo menos uma pergunta.'); result.questions = [{ text: '', options: ['', ''], correct: 0 }]; }
   }
   if (game.type === 'tug') {
     const options = (Array.isArray(game.options) ? game.options : []).slice(0, 2).map(o => text(o, 60));
@@ -70,7 +81,8 @@ export function validateGame(game, draft = false, simulationIds = null) {
 // O que os alunos recebem: sem a resposta.
 export function publicGame(game) {
   if (!game) return game;
-  const { correct, answer, ...rest } = game;
+  const { correct, answer, questions, ...rest } = game;
+  if (game.type === 'survival') return { ...rest, rounds: (questions || []).length };
   return game.type === 'challenge' ? { ...rest, fields: (answer || []).length } : rest;
 }
 
@@ -122,7 +134,7 @@ export function startGame(room, random = Math.random) {
   const game = d.game = { id: createUuid(), type: config.type, state: 'open', startedAt: room.now() };
   if (config.type === 'teams') { if (d.teams?.length !== config.count) formTeams(room, config.count, random); else for (const p of d.players) assignTeam(room, p); game.state = 'done'; }
   else if (config.type === 'flash') { game.answers = {}; game.winner = ''; }
-  else if (config.type === 'cloud') game.entries = [];
+  else if (config.type === 'survival') { game.alive = online(room).map(p => p.id); game.fallen = {}; game.round = -1; game.answers = {}; game.deadline = 0; game.state = 'ready'; }
   else if (config.type === 'challenge') { game.solved = []; game.tries = {}; }
   else if (config.type === 'raffle') { game.picked = []; game.current = ''; game.drawAt = 0; }
   else if (config.type === 'tug') { game.sides = {}; game.taps = [0, 0]; game.winner = -1; game.goal = 30; game.last = {}; }
@@ -134,7 +146,13 @@ export function gameControl(room, value, random = Math.random) {
   if (action === 'restart') { startGame(room, random); return; }
   if (action === 'end') { if (game.type === 'tug' && game.winner < 0) finishTug(room, game.taps[0] === game.taps[1] ? -2 : game.taps[0] > game.taps[1] ? 0 : 1); game.state = 'done'; return; }
   if (game.type === 'teams' && action === 'shuffle') { formTeams(room, config.count, random); return; }
-  if (game.type === 'cloud' && action === 'remove') { game.entries = game.entries.filter(entry => entry.id !== value.id); return; }
+  if (game.type === 'survival' && action === 'next') {
+    if (game.state === 'open') { revealSurvival(room); return; }
+    if (game.state === 'ready') { game.alive = online(room).map(p => p.id); if (!game.alive.length) throw Error('Espere pelo menos um participante entrar.'); }
+    if (game.state === 'done') throw Error('Esta rodada já terminou.');
+    game.round++; game.answers = {}; game.state = 'open'; game.startedAt = room.now(); game.deadline = room.now() + config.seconds * 1000;
+    return;
+  }
   if (game.type === 'raffle' && action === 'draw') {
     let pool = online(room).filter(p => !game.picked.includes(p.id));
     if (!pool.length) { game.picked = []; pool = online(room); }
@@ -146,6 +164,21 @@ export function gameControl(room, value, random = Math.random) {
   throw Error('Esta ação não está disponível agora.');
 }
 
+// Fim do tempo (ou todos responderam): quem errou ou não respondeu cai.
+export function revealSurvival(room) {
+  const d = room.data, game = d.game, config = room.slides[d.slide]?.game;
+  if (!game || game.type !== 'survival' || game.state !== 'open') return;
+  const question = config.questions[game.round];
+  const out = game.alive.filter(id => game.answers[id] !== question.correct);
+  for (const id of out) game.fallen[id] = game.round;
+  game.alive = game.alive.filter(id => !out.includes(id));
+  game.state = game.alive.length <= 1 || game.round + 1 >= config.questions.length ? 'done' : 'reveal';
+  if (game.state === 'done') for (const p of d.players) if (game.alive.includes(p.id)) bonus(p, SURVIVAL_POINTS);
+}
+export function tickGame(room) {
+  const game = room.data.game;
+  if (room.data.phase === 'game' && game?.type === 'survival' && game.state === 'open' && room.now() >= game.deadline) revealSurvival(room);
+}
 function finishTug(room, side) {
   const game = room.data.game;
   game.winner = side; game.state = 'done';
@@ -156,8 +189,18 @@ function finishTug(room, side) {
 export function gameInput(room, playerId, payload) {
   const d = room.data, game = d.game, config = room.slides[d.slide]?.game, player = d.players.find(p => p.id === playerId);
   if (!player || d.phase !== 'game' || !game || !config) throw Error('Esta etapa já mudou.');
-  if (game.state !== 'open') throw Error('Esta rodada já terminou.');
+  if (game.state !== 'open') throw Error(game.type === 'survival' && game.state !== 'done' ? 'Aguarde a próxima pergunta.' : 'Esta rodada já terminou.');
   if (!payload || typeof payload !== 'object') throw Error('Resposta inválida.');
+  if (game.type === 'survival') {
+    const question = config.questions[game.round], choice = payload.choice;
+    if (!game.alive.includes(playerId)) throw Error('Você já caiu nesta partida.');
+    if (payload.round !== game.round || room.now() >= game.deadline) throw Error('O tempo desta pergunta acabou.');
+    if (!Number.isInteger(choice) || choice < 0 || choice >= question.options.length) throw Error('Resposta inválida.');
+    if (Object.hasOwn(game.answers, playerId)) throw Error('Você já respondeu.');
+    game.answers[playerId] = choice;
+    if (game.alive.every(id => Object.hasOwn(game.answers, id))) revealSurvival(room);
+    return;
+  }
   if (game.type === 'flash') {
     const choice = payload.choice;
     if (!Number.isInteger(choice) || choice < 0 || choice >= config.options.length) throw Error('Resposta inválida.');
@@ -165,14 +208,6 @@ export function gameInput(room, playerId, payload) {
     game.answers[playerId] = choice;
     if (choice === config.correct) { game.winner = playerId; game.state = 'done'; bonus(player, FLASH_POINTS); }
     else if (online(room).every(p => Object.hasOwn(game.answers, p.id))) game.state = 'done';
-  } else if (game.type === 'cloud') {
-    const word = line(payload.word, 40);
-    if (!word) throw Error('Escreva uma palavra ou frase curta.');
-    const mine = game.entries.filter(entry => entry.player === playerId);
-    if (mine.length >= 3) throw Error('Você já enviou 3 respostas.');
-    if (mine.some(entry => entry.text.toLowerCase() === word.toLowerCase())) throw Error('Você já enviou esta resposta.');
-    if (game.entries.length >= 240) throw Error('O mural está cheio.');
-    game.entries.push({ id: createUuid().slice(0, 8), player: playerId, text: word });
   } else if (game.type === 'challenge') {
     if (game.solved.some(item => item.player === playerId)) throw Error('Você já acertou!');
     const now = room.now();
@@ -210,10 +245,14 @@ export function gameSnapshot(room, playerId) {
   const base = { id: game.id, type: game.type, state: game.state, text: config.text, startedAt: game.startedAt };
   if (game.type === 'teams') return base;
   if (game.type === 'flash') return { ...base, options: config.options, answered: Object.keys(game.answers).length, choice: playerId && Object.hasOwn(game.answers, playerId) ? game.answers[playerId] : null, winner: who(game.winner), points: FLASH_POINTS, ...(done || presenter ? { correct: config.correct } : {}), ...(done ? { counts: config.options.map((_, i) => Object.values(game.answers).filter(v => v === i).length) } : {}) };
-  if (game.type === 'cloud') {
-    const groups = new Map();
-    for (const entry of game.entries) { const key = entry.text.toLowerCase(); const item = groups.get(key) || { text: entry.text, n: 0, ids: [] }; item.n++; item.ids.push(entry.id); groups.set(key, item); }
-    return { ...base, words: [...groups.values()].sort((a, b) => b.n - a.n).slice(0, 60).map(({ text, n, ids }) => presenter ? { text, n, id: ids[0] } : { text, n }), total: game.entries.length, mine: playerId ? game.entries.filter(entry => entry.player === playerId).map(entry => entry.text) : [] };
+  if (game.type === 'survival') {
+    const question = game.round >= 0 ? config.questions[game.round] : null, shown = game.state === 'reveal' || done;
+    const everyone = [...game.alive, ...Object.keys(game.fallen)];
+    return { ...base, round: game.round, rounds: config.questions.length, seconds: config.seconds, deadline: game.deadline,
+      question: question ? { text: question.text, options: question.options, ...(shown || presenter ? { correct: question.correct } : {}), ...(shown ? { counts: question.options.map((_, i) => Object.values(game.answers).filter(v => v === i).length) } : {}) } : null,
+      answered: Object.keys(game.answers).length, alive: game.alive.length, total: everyone.length, points: SURVIVAL_POINTS,
+      players: everyone.slice(0, 40).map(id => ({ ...who(id), alive: game.alive.includes(id), fell: game.fallen[id] ?? -1 })).filter(item => item.id),
+      me: playerId ? { alive: game.alive.includes(playerId), playing: everyone.includes(playerId), fell: game.fallen[playerId] ?? -1, choice: Object.hasOwn(game.answers, playerId) ? game.answers[playerId] : null } : null };
   }
   if (game.type === 'challenge') {
     const mine = playerId ? game.tries[playerId] : null, place = game.solved.findIndex(item => item.player === playerId);
@@ -223,5 +262,6 @@ export function gameSnapshot(room, playerId) {
   }
   if (game.type === 'raffle') return { ...base, current: who(game.current), drawAt: game.drawAt, draws: game.draws || 0, left: online(room).filter(p => !game.picked.includes(p.id)).length, names: online(room).slice(0, 40).map(p => p.name), me: playerId ? game.current === playerId : false };
   const count = side => Object.values(game.sides).filter(v => v === side).length;
-  return { ...base, options: config.options, taps: game.taps, goal: game.goal, winner: game.winner, sides: [count(0), count(1)], side: playerId && Object.hasOwn(game.sides, playerId) ? game.sides[playerId] : null, points: TUG_POINTS };
+  const crew = side => Object.keys(game.sides).filter(id => game.sides[id] === side).slice(0, 5).map(who).filter(Boolean);
+  return { ...base, options: config.options, taps: game.taps, goal: game.goal, winner: game.winner, sides: [count(0), count(1)], crews: [crew(0), crew(1)], side: playerId && Object.hasOwn(game.sides, playerId) ? game.sides[playerId] : null, points: TUG_POINTS };
 }

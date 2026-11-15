@@ -630,7 +630,7 @@ export class Studio {
       if (this.groups.live) await this.groups.live.persist();
       const validated = validateLesson(await hydrateLesson(lesson));
       this.nativeViewer?.dispose(); this.nativeViewer = null; this.designer.models.mount(null, null);
-      await (preview ? this.callbacks.preview(validated) : this.callbacks.present(validated,startIndex,fromEditor));
+      await (preview ? this.callbacks.preview(validated,{startIndex}) : this.callbacks.present(validated,startIndex,fromEditor));
     }
     finally { this.launching = false; this.callbacks.render(); }
   }
@@ -895,7 +895,7 @@ export class Studio {
       }else await this.launch(lookup(),action==='preview');
       return;
     }
-    else if (['preview-draft', 'present-draft'].includes(action)) { this.save(); await this.launch(this.draft, action === 'preview-draft', action === 'present-draft', this.tab==='slides'&&!isLiveStage(this.currentBlock()?.type)?this.index:undefined, action==='present-draft'); return; }
+    else if (['preview-draft', 'present-draft'].includes(action)) { this.save(); await this.launch(this.draft, action === 'preview-draft', action === 'present-draft', this.tab==='slides'?this.index:undefined, action==='present-draft'); return; }
     else if (action.startsWith('tab-')) { this.selectBlock(target.dataset.block||activityBlocks(this.draft).find(b=>(b.type==='quiz'?'quiz':'slides')===action.slice(4))?.id); this.writeRoute(); }
     else if (action === 'select-slide') { this.index = Number(target.dataset.index); this.designer.mobilePanel = ''; this.writeRoute(this.view, this.draft.id, true); }
     else if (action === 'select-question') this.questionIndex = Number(target.dataset.index);

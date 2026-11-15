@@ -3,7 +3,7 @@ import {routeParams} from './editor-route.js';
 import {takePhoto} from './camera-photo.js';
 import {GameLayout} from './game-layout.js';
 import {GameAudio} from './game-audio.js';
-import {quizMarkup,leaderboardMarkup} from './game-ui.js';
+import {quizMarkup,leaderboardMarkup,animateRanking} from './game-ui.js';
 import { gameMarkup, keepGame, animateRaffle, teamStrip } from './stage-games-view.js';
 import {Simulations} from './simulations.js';
 import {loadSlideFonts} from './fonts.js';
@@ -366,7 +366,7 @@ function render() {
   // para onde estava e quem assiste volta ao início.
   if (state?.phase === 'finished' && !state.totalQuestions) { focusView.close(); leave(); return; }
   app.classList.toggle('quiz-party', Boolean(state && state.phase !== 'lesson'));
-  const markup = sharedLoading || busy && host && !state ? `${header()}<main class="public-loading"><p role="status">Carregando apresentação…</p></main>` : sharedError ? `${header()}<main class="public-loading"><h1>Apresentação indisponível</h1><p>${esc(sharedError)}</p><button class="btn secondary" data-action="home">Voltar</button></main>` : !state ? studio.markup() : state.phase === 'lesson' ? lesson() : ['lobby', 'countdown'].includes(state.phase) ? lobbyMarkup(state, { host, demo, header, shareDialog, shareOpen }) : state.phase === 'finished' ? finished() : state.phase==='leaderboard'?leaderboardMarkup(state,{header,host,offset:timerOffset}):state.game ? gameMarkup(state, { host, demo, header }) : state.poll ? pollMarkup() : quiz();
+  const markup = sharedLoading || busy && host && !state ? `${header()}<main class="public-loading"><p role="status">Carregando apresentação…</p></main>` : sharedError ? `${header()}<main class="public-loading"><h1>Apresentação indisponível</h1><p>${esc(sharedError)}</p><button class="btn secondary" data-action="home">Voltar</button></main>` : !state ? studio.markup() : state.phase === 'lesson' ? lesson() : ['lobby', 'countdown'].includes(state.phase) ? lobbyMarkup(state, { host, demo, header, shareDialog, shareOpen }) : state.phase === 'finished' ? finished() : state.phase==='leaderboard'?leaderboardMarkup(state,{header,host,offset:timerOffset}):state.game ? gameMarkup(state, { host, demo, header, now: Date.now() + timerOffset }) : state.poll ? pollMarkup() : quiz();
   const chatSlots = '[data-chat-slot], [data-social-slot]';
   const currentAIPage = app.querySelector('.storage-ai-page');
   const keepAI = !state && !sharedLoading && !sharedError && !(busy && host) &&
@@ -405,6 +405,7 @@ function render() {
   }
   app.dataset.transition = state?.phase === 'lesson' ? slides[state.slide]?.transition || 'slide' : 'slide';
   if (state?.teams && ['leaderboard', 'finished'].includes(state.phase) && !app.querySelector('.team-strip')) app.querySelector('main')?.insertAdjacentHTML('beforeend', teamStrip(state));
+  if (state?.phase === 'leaderboard') animateRanking(app, Math.max(0, (Date.now() + timerOffset - (state.resultStartedAt || 0)) / 1000));
   if (state?.game?.type === 'raffle') animateRaffle(app, () => Date.now() + timerOffset);
   if(state&&!app.querySelector('[data-remote-dialog]'))app.insertAdjacentHTML('beforeend','<div data-remote-dialog></div>');
   studio.remote.paint();
@@ -473,12 +474,12 @@ function preview(lesson = demoLesson(), options = {}) {
   leave(false); activeLesson = lesson; slides = lesson.slides; demo = true; host = true; status = 'online';
   readOnlyPresentation=Boolean(options.readOnly);publicPresentationToken=options.token||'';
   if (!options.token) studio.writeRoute('preview', lesson.id);
-  classroom = new Room('PREVIA', undefined, Date.now, lesson);
+  classroom = new Room('PREVIA', undefined, Date.now, lesson, options?.startIndex);
   demoPlayer = classroom.join({ name: 'Você', avatar: selectedAvatar }).id;
   receive({ ...classroom.snapshot(demoPlayer), lesson: classroom.publicLesson(true) });
   demoTimer = setInterval(() => {
-    const phase = classroom.data.phase; classroom.tick();
-    if (phase !== classroom.data.phase) receive({ ...classroom.snapshot(demoPlayer), lesson: classroom.publicLesson(true) });
+    const key = () => classroom.data.phase + ':' + (classroom.data.game?.state || ''), phase = key(); classroom.tick();
+    if (phase !== key()) receive({ ...classroom.snapshot(demoPlayer), lesson: classroom.publicLesson(true) });
   }, 100);
 }
 async function connectSession(mode) {
@@ -587,6 +588,10 @@ async function sendGame(payload, quiet = false) {
 let tugTaps = 0, tugTimer = 0;
 function tugTap(button) {
   tugTaps++; navigator.vibrate?.(8);
+  // Faísca "+1" subindo do botão a cada toque.
+  const box = button.getBoundingClientRect(), spark = document.createElement('i');
+  spark.className = 'tug-spark'; spark.textContent = '+1'; spark.style.left = box.left + box.width * (.3 + Math.random() * .4) + 'px'; spark.style.top = box.top + box.height * .3 + 'px'; spark.style.setProperty('--dx', Math.round(Math.random() * 60 - 30) + 'px');
+  document.body.append(spark); setTimeout(() => spark.remove(), 720);
   button.classList.remove('pulse'); void button.offsetWidth; button.classList.add('pulse');
   if (!tugTimer) tugTimer = setTimeout(() => { const taps = tugTaps; tugTaps = 0; tugTimer = 0; sendGame({ taps }, true); }, 450);
 }
@@ -644,6 +649,7 @@ async function action(name) {
     case 'reveal': control('reveal'); break;
     case 'next-question': control(state.phase==='reveal'?'ranking':'next'); break;
     case 'back-lesson': control('lesson'); break;
+    case 'game-next': control('game', { do: 'next' }); break;
     case 'game-draw': control('game', { do: 'draw' }); break;
     case 'game-end': control('game', { do: 'end' }); break;
     case 'game-restart': control('game', { do: 'restart' }); break;
