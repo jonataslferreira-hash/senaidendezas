@@ -1,6 +1,10 @@
 const MODEL='@cf/qwen/qwen3.8-27b';
-const GEMINI_MODEL='gemini-3.1-flash-lite';
-const GROQ_MODEL='qwen/qwen3.8-27b';
+// Modelos gratuitos de cada serviço, na ordem de tentativa. Cada modelo tem a sua
+// própria cota diária, então ter dois por serviço dobra a folga antes de "cair".
+// Dá para trocar sem mexer no código: variáveis GEMINI_MODEL e GROQ_MODEL (lista separada por vírgula).
+const GEMINI_MODELS=['gemini-3.1-flash-lite','gemini-3.8-flash'];
+const GROQ_MODELS=['qwen/qwen3.8-27b','openai/gpt-oss-120b'];
+const modelList=(value,fallback)=>{const list=String(value||'').split(',').map(item=>item.trim()).filter(item=>/^[\w./:@-]{3,80}$/.test(item));return (list.length?list:fallback).slice(0,3);};
 const MAX_BYTES=1_500_000;
 import {cachedAnswer,isQuotaExhausted,openRouterEnabled,openRouterModels,openRouterQuota,quotaNotice,runOpenRouter,spendQuota} from './storage-ai-openrouter.js';
 
@@ -21,12 +25,13 @@ async function boundedJSON(request) {
 const cloudflareEnabled=env=>env.STORAGE_AI_FREE_CONFIRMED==='true'&&Boolean(env.AI);
 export const storageAIEnabled=env=>Boolean(env.AI_LIMIT&&(env.GROQ_API_KEY||env.GEMINI_API_KEY||openRouterEnabled(env)||cloudflareEnabled(env)));
 
-async function runGroq(key,messages,maxTokens){
+async function runGroq(key,messages,maxTokens,model){
   const response=await fetch('https://api.groq.com/openai/v1/chat/completions',{
     method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+key},
     body:JSON.stringify({
-      model:GROQ_MODEL,messages,temperature:.25,max_completion_tokens:maxTokens,
-      reasoning_effort:'none',response_format:{type:'json_object'}
+      model,messages,temperature:.25,max_completion_tokens:maxTokens,
+      // Só o Qwen aceita desligar o raciocínio; os gpt-oss usam 'low'.
+      reasoning_effort:/qwen/i.test(model)?'none':'low',response_format:{type:'json_object'}
     }),
     signal:AbortSignal.timeout(35000)
   });
@@ -34,9 +39,9 @@ async function runGroq(key,messages,maxTokens){
   return response.json();
 }
 
-async function runGemini(key,system,message,photos,maxOutputTokens){
+async function runGemini(key,system,message,photos,maxOutputTokens,model){
   const parts=[{text:message},...photos.map(photo=>({inlineData:{mimeType:'image/jpeg',data:photo.split(',')[1]}}))];
-  const response=await fetch('https://generativelanguage.googleapis.com/v1beta/models/'+GEMINI_MODEL+':generateContent',{
+  const response=await fetch('https://generativelanguage.googleapis.com/v1beta/models/'+model+':generateContent',{
     method:'POST',headers:{'Content-Type':'application/json','x-goog-api-key':key},
     body:JSON.stringify({
       systemInstruction:{parts:[{text:system}]},
@@ -145,13 +150,16 @@ export async function handleStorageAI(request,env,user,headers) {
       return {choices:[{message:{content:result.content}}]};
     }
   })):[];
+  const groqAttempts=env.GROQ_API_KEY?modelList(env.GROQ_MODEL,GROQ_MODELS).filter((model,index)=>!photos.length||index===0||/qwen|llama-4|vision/i.test(model)).map(model=>({provider:'groq',model,run:()=>runGroq(env.GROQ_API_KEY,messages,maxTokens,model)})):[];
+  const geminiAttempts=env.GEMINI_API_KEY?modelList(env.GEMINI_MODEL,GEMINI_MODELS).map(model=>({provider:'gemini',model,run:()=>runGemini(env.GEMINI_API_KEY,messages[0].content,message,photos,maxTokens,model)})):[];
   const attempts=[
-    // O OpenRouter com modelos :free é a opção hospedada e sem cobrança. Ele
-    // vem primeiro quando a chave está configurada; os demais serviços
-    // entram como reserva.
+    // Ordem pela qualidade dos slides: Groq e Gemini (cotas gratuitas grandes e
+    // modelos mais fortes) vêm antes; o OpenRouter :free (50 chamadas por dia,
+    // modelo sorteado) e o Cloudflare ficam de reserva. Quando um serviço cai
+    // ou a cota dele acaba, o pedido passa sozinho para o seguinte.
+    ...groqAttempts,
+    ...geminiAttempts,
     ...openRouterAttempts,
-    ...(env.GROQ_API_KEY?[{provider:'groq',model:GROQ_MODEL,run:()=>runGroq(env.GROQ_API_KEY,messages,maxTokens)}]:[]),
-    ...(env.GEMINI_API_KEY?[{provider:'gemini',model:GEMINI_MODEL,run:()=>runGemini(env.GEMINI_API_KEY,messages[0].content,message,photos,maxTokens)}]:[]),
     ...cloudflareAttempts.map(({model,options})=>({provider:'cloudflare',model,run:()=>env.AI.run(model,{messages,temperature:.25,...options})}))
   ];
   const cacheKey={mode:generate?'create':revise?'revise':'edit',prompt,count:generate?count:undefined,activities:generate?activities:undefined,context:revise?context:undefined,photos:photos.map(photo=>photo.slice(0,64)+photo.length)};

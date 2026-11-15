@@ -113,7 +113,7 @@ test('storageAI usa Groq primeiro e preserva as falhas de cada serviço quando a
  groqOk=false;
  const failed=await handle(request(),env);
  assert.equal(failed.status,502);
- assert.deepEqual(await failed.json(),{error:'ai_providers_failed',providers:[{provider:'groq',reason:'limit'},{provider:'gemini',reason:'access_denied'}]});
+ assert.deepEqual(await failed.json(),{error:'ai_providers_failed',providers:[{provider:'groq',reason:'limit'},{provider:'gemini',reason:'access_denied'},{provider:'gemini',reason:'access_denied'}]});
 });
 
 test('storageAI consulta o título do slide sem erro quando imageSearch não encontra foto',async t=>{

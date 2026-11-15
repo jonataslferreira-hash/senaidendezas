@@ -6,7 +6,7 @@ import { defaultGame, gameNames } from './stage-games.js';
 const lead = '(?:etapas?|din[aâ]micas?|jogos?|modos?|desafios?|rodadas?|atividades?|brincadeiras?)\\s+(?:(?:de|da|do|com|tipo)\\s+)?(?:um[a]?\\s+)?';
 const rules = [
   ['teams', new RegExp(lead + '(?:equipes?|times?)\\b|(?:dividir|separar|formar|montar)\\s+(?:a\\s+turma\\s+|os\\s+alunos\\s+)?(?:em\\s+)?(?:\\d\\s+)?(?:equipes|times)|\\bcom\\s+(?:\\d\\s+)?(?:equipes|times)\\b', 'i'), 0],
-  ['flash', /rel[aâ]mpago/i, 1],
+  ['flash', /rel[aâ]mpago/i, 5],
   ['survival', new RegExp(lead + 'sobreviv|sobreviv[eê]ncia\\s+(?:com|de)\\s+\\d|\\b(?:uma?|a)\\s+sobreviv[eê]ncia\\b|\\be\\s+sobreviv[eê]ncia\\b', 'i'), 5],
   ['raffle', /\bsorteio\b|\broleta\b/i, 0],
   ['tug', /cabo[\s-]+de[\s-]+guerra/i, 4],
@@ -15,7 +15,8 @@ const rules = [
 
 // Quais dinâmicas o pedido cita e quantas perguntas cada uma precisa.
 // Quantas perguntas cada dinâmica aceita: [mínimo, máximo]. Relâmpago é sempre 1; equipes e sorteio não usam.
-export const GAME_QUESTION_RANGE = { survival: [1, 25], tug: [3, 25], race: [2, 25] };
+// No cabo de guerra o número é de rodadas (uma pergunta por rodada, até 12).
+export const GAME_QUESTION_RANGE = { flash: [1, 25], survival: [1, 25], tug: [1, 12], race: [2, 25] };
 export const QUIZ_LIMIT = 50;
 const clampNeed = (type, value, fallback) => { const range = GAME_QUESTION_RANGE[type]; if (!range) return fallback; const n = Math.trunc(Number(value)); return Number.isFinite(n) && n > 0 ? Math.max(range[0], Math.min(range[1], n)) : fallback; };
 // `picked` são as etapas marcadas no painel "Montar a aula"; `counts` é o número de perguntas escolhido para cada uma.
@@ -23,7 +24,7 @@ export function requestedGames(prompt, picked = [], counts = {}) {
   const source = String(prompt || ''), chosen = new Set(Array.isArray(picked) ? picked : []);
   return rules.filter(([type, pattern]) => chosen.has(type) || pattern.test(source)).map(([type, , need]) => {
     // "corrida com 20 perguntas", "sobrevivência de 8", "cabo de guerra com 10 questões"
-    const label = { survival: 'sobreviv[eê]ncia', tug: 'cabo\\s+de\\s+guerra', race: 'corrida(?:\\s+do\\s+saber)?' }[type];
+    const label = { flash: '(?:desafio\\s+)?rel[aâ]mpago', survival: 'sobreviv[eê]ncia', tug: 'cabo\\s+de\\s+guerra', race: 'corrida(?:\\s+do\\s+saber)?' }[type];
     const asked = label ? Number(source.match(new RegExp(label + '\\s+(?:com|de)\\s+(\\d{1,2})', 'i'))?.[1]) : 0;
     return { type, need: clampNeed(type, chosen.has(type) && counts?.[type] ? counts[type] : asked, need) };
   });
@@ -45,15 +46,12 @@ export function takeGameQuestions(result, games, quizTotal) {
   const all = Array.isArray(result.questions) ? result.questions : [];
   result.questions = all.slice(0, quizTotal);
   const rest = all.slice(quizTotal), want = gameQuestionNeed(games);
-  // Vieram menos perguntas do que o pedido: primeiro garante o mínimo de cada dinâmica, depois reparte o que sobrar.
-  const least = game => Math.min(game.need, GAME_QUESTION_RANGE[game.type]?.[0] ?? game.need);
-  let spare = rest.length - games.reduce((sum, game) => sum + least(game), 0), at = 0;
-  result.games = games.map(game => {
-    const take = rest.length >= want ? game.need : spare < 0 ? game.need : least(game) + Math.min(game.need - least(game), Math.max(0, spare));
-    if (rest.length < want && spare > 0) spare -= take - least(game);
-    const questions = rest.slice(at, at + take); at += take;
-    return { type: game.type, questions };
-  });
+  // Vieram menos perguntas do que o pedido: cada dinâmica recebe o mínimo e o resto é repartido uma a uma, por igual.
+  const takes = games.map(game => rest.length >= want ? game.need : Math.min(game.need, GAME_QUESTION_RANGE[game.type]?.[0] ?? game.need));
+  let spare = rest.length - takes.reduce((sum, n) => sum + n, 0);
+  for (let moved = true; spare > 0 && moved;) { moved = false; games.forEach((game, i) => { if (spare > 0 && takes[i] < game.need) { takes[i]++; spare--; moved = true; } }); }
+  let at = 0;
+  result.games = games.map((game, i) => { const questions = rest.slice(at, at + takes[i]); at += takes[i]; return { type: game.type, questions }; });
   return result;
 }
 
@@ -68,9 +66,12 @@ export function addGameStages(lesson, games, { newSlide, createUuid }) {
   for (const { type, questions } of games) {
     if (lesson.activityBlocks.length >= 24 || lesson.slides.length >= 80) { skipped.push(gameNames[type]); continue; }
     const game = defaultGame(type), list = (questions || []).map(usable).filter(Boolean);
-    if (type === 'flash') { if (!list.length) { skipped.push(gameNames[type]); continue; } Object.assign(game, list[0]); }
-    if (type === 'survival' || type === 'tug' || type === 'race') { if (list.length < (type === 'tug' ? 3 : type === 'race' ? 2 : 1)) { skipped.push(gameNames[type]); continue; } game.questions = list; }
-    const slide = { ...newSlide(), title: type === 'flash' ? game.text.slice(0, 160) : gameNames[type], game };
+    if (type === 'flash' || type === 'survival' || type === 'tug' || type === 'race') {
+      if (list.length < (type === 'race' ? 2 : 1)) { skipped.push(gameNames[type]); continue; }
+      // Cabo de guerra: cada pergunta da IA vira uma rodada (dá para somar até 3 por rodada no editor).
+      if (type === 'tug') game.rounds = list.slice(0, 12).map(question => [question]); else game.questions = list.slice(0, 25);
+    }
+    const slide = { ...newSlide(), title: gameNames[type], game };
     const block = { id: createUuid(), type, items: [slide.id] };
     lesson.slides.push(slide);
     // Equipes vem antes de todas as outras atividades; o resto entra antes do primeiro quiz.

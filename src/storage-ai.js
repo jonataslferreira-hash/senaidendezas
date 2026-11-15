@@ -52,6 +52,16 @@ const cleanChatTitle=value=>text(value,180)
   .replace(/^(?:(?:um|uma|o|a)\s+)?(?:aula|apresentação|slides?)\s+(?:sobre|de)\s+/i,'')
   .replace(/^(?:sobre|de)\s+/i,'').trim().replace(/[.!?]+$/,'');
 const chatTitle=value=>value?value[0].toLocaleUpperCase('pt-BR')+value.slice(1,64):'Nova conversa';
+// Largura ÷ altura de uma foto (0 quando não dá para medir, como fora do navegador).
+function photoRatio(source){
+  if(typeof Image==='undefined'||typeof source!=='string'||!source)return Promise.resolve(0);
+  return new Promise(resolve=>{
+    const image=new Image(),done=value=>{clearTimeout(timer);resolve(value);},timer=setTimeout(()=>done(0),4000);
+    image.onload=()=>done(image.naturalHeight?image.naturalWidth/image.naturalHeight:0);
+    image.onerror=()=>done(0);
+    image.src=source;
+  });
+}
 function usableActivities(items,quiz,limit){
   return (Array.isArray(items)?items:[]).filter(item=>{
     const options=Array.isArray(item?.options)?item.options.slice(0,4):[];
@@ -72,16 +82,16 @@ function requestedActivityCount(prompt,pattern,fallback){
   const value=Number(match?.[1]||match?.[2]);
   return Number.isFinite(value)&&value>0?Math.min(30,value):fallback;
 }
-const trayGames=[['teams','Equipes','Divide a turma em times'],['flash','Relâmpago','Quem acerta primeiro leva'],['survival','Sobrevivência','Errou, caiu'],['tug','Cabo de guerra','Dois lados, três perguntas'],['race','Corrida','Acertou, o boneco corre'],['raffle','Sorteio','Sorteia um aluno']];
+const trayGames=[['teams','Equipes','Divide a turma em times'],['flash','Relâmpago','Perguntas de 5 ou 10 segundos'],['survival','Sobrevivência','Errou, caiu'],['tug','Cabo de guerra','Dois lados, por rodadas'],['race','Corrida','Acertou, o boneco corre'],['raffle','Sorteio','Sorteia um aluno']];
 function stepper(name,label,value,min,max,extra=''){
   return `<div class="ai-step" ${extra}><span>${label}</span><div class="ai-stepper"><button type="button" data-ai-step="-1" data-for="${name}" aria-label="Diminuir ${label}">−</button><input name="${name}" type="number" inputmode="numeric" min="${min}" max="${max}" value="${value}" aria-label="${label}"><button type="button" data-ai-step="1" data-for="${name}" aria-label="Aumentar ${label}">+</button></div></div>`;
 }
-const gameDefaults={survival:5,tug:4,race:5};
+const gameDefaults={flash:5,survival:5,tug:4,race:5};
 const gameCount=(session,type)=>{const [min,max]=GAME_QUESTION_RANGE[type];return Math.max(min,Math.min(max,Math.trunc(Number(session?.gameCounts?.[type]))||gameDefaults[type]));};
 // Total de perguntas que a IA vai escrever com as escolhas do painel (cada 10 é uma chamada).
 function questionTotalNote(session){
   const {quizzes,questions}=activitySettings(session),picked=session?.games||[];
-  const total=quizzes*Math.min(questions,quizzes?Math.floor(QUIZ_LIMIT/quizzes):0)+picked.reduce((sum,type)=>sum+(GAME_QUESTION_RANGE[type]?gameCount(session,type):type==='flash'?1:0),0);
+  const total=quizzes*Math.min(questions,quizzes?Math.floor(QUIZ_LIMIT/quizzes):0)+picked.reduce((sum,type)=>sum+(GAME_QUESTION_RANGE[type]?gameCount(session,type):0),0);
   return total?`A IA vai escrever ${total} pergunta${total===1?'':'s'} diferentes${total>30?' · leva mais tempo e gasta mais da cota do dia':''}.`:'';
 }
 function countTray(session){
@@ -97,7 +107,7 @@ function countTray(session){
     </section>
     <section class="ai-tray-block"><div class="ai-tray-title"><span>Etapas de jogo</span><small data-game-total>${picked.size?picked.size+' escolhida'+(picked.size>1?'s':''):'toque para incluir'}</small></div>
       <div class="ai-game-chips">${trayGames.map(([type,name,hint],i)=>`<button type="button" class="ai-game-chip" style="--i:${i}" data-ai-game="${type}" aria-pressed="${picked.has(type)}" title="${hint}">${stageIcon(type)}<span>${name}</span></button>`).join('')}</div>
-      <div class="ai-game-counts">${trayGames.filter(([type])=>GAME_QUESTION_RANGE[type]).map(([type,name])=>stepper('game-'+type,'Perguntas · '+name,gameCount(session,type),GAME_QUESTION_RANGE[type][0],GAME_QUESTION_RANGE[type][1],'data-game-count="'+type+'" '+(picked.has(type)?'':'hidden'))).join('')}</div>
+      <div class="ai-game-counts">${trayGames.filter(([type])=>GAME_QUESTION_RANGE[type]).map(([type,name])=>stepper('game-'+type,(type==='tug'?'Rodadas · ':'Perguntas · ')+name,gameCount(session,type),GAME_QUESTION_RANGE[type][0],GAME_QUESTION_RANGE[type][1],'data-game-count="'+type+'" '+(picked.has(type)?'':'hidden'))).join('')}</div>
       <small class="ai-tray-note" data-question-total>${questionTotalNote(session)}</small>
     </section></div>`;
 }
@@ -206,6 +216,8 @@ async function buildLesson(result,count,photos,onSlide,activities={},imageDefaul
     const images=placements[i].map(index=>({index,data:photos[index]}));
     const webImage=foundImages.get(i);
     if(webImage)images.push(webImage);
+    // Mede cada foto para o layout escolher o quadro no formato dela.
+    await Promise.all(images.map(async image=>{image.ratio=await photoRatio(image.data);}));
     const design=composeAISlide({spec:styledSpec(spec),index:i+1,title,body,images,model,previous});
     previous=design;
     const {elements,background,backgroundFill,theme}=design;

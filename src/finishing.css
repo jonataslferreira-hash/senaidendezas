@@ -1725,3 +1725,27 @@ html body dialog.cover-picker .cp-stage-actions{display:flex!important;justify-c
 #app .ai-game-counts .ai-step{animation:ai-tray-block .25s cubic-bezier(.2,.9,.3,1) both}
 #app .ai-tray-note{font-size:10.5px;color:var(--ui-muted);line-height:1.35}
 #app .ai-tray-note:empty{display:none}
+/* 40.11 Relâmpago em sequência: quem acertou primeiro e o placar da rodada */
+#app .flash-first{display:inline-flex;align-items:center;gap:8px;margin:2px auto 0;padding:7px 16px;border-radius:999px;background:rgba(250,204,21,.14);border:1px solid rgba(250,204,21,.45);color:#fde68a;font-size:clamp(14px,1.5vw,18px);animation:flash-pop .35s cubic-bezier(.2,1.4,.4,1) both}
+#app .flash-first .stage-svg{color:#facc15;font-size:1.15em}
+#app .flash-first small{opacity:.8;font-weight:700}
+#app .game-flash{display:grid;justify-items:center;gap:10px}
+#app .game-flash:empty{display:none}
+#app .flash-board{list-style:none;margin:0;padding:0;display:grid;gap:6px;width:min(520px,100%)}
+#app .flash-board li{display:grid;grid-template-columns:42px 1fr auto auto;align-items:center;gap:10px;padding:8px 14px;border-radius:14px;background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.12);font-size:clamp(14px,1.4vw,17px);text-align:left;animation:flash-pop .3s ease-out both;animation-delay:calc(var(--n,0)*60ms)}
+#app .flash-board li:first-child{background:rgba(250,204,21,.16);border-color:rgba(250,204,21,.5)}
+#app .flash-board li[data-me="true"]{outline:2px solid #60a5fa}
+#app .flash-board li>b{opacity:.75}
+#app .flash-board li>span{font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+#app .flash-board li>small{display:inline-flex;align-items:center;gap:2px;color:#facc15;font-weight:700}
+#app .flash-board li>strong small{font-weight:600;opacity:.7}
+#app .flash-board[data-done="false"] li{padding:5px 12px;font-size:14px}
+@keyframes flash-pop{from{opacity:0;transform:translateY(6px) scale(.96)}to{opacity:1;transform:none}}
+/* Cabo de guerra com muitas rodadas: marcadores menores */
+#app .tug-rounds[data-many="true"]{gap:4px}
+#app .tug-rounds[data-many="true"] li{min-width:0;width:22px;height:22px;font-size:11px}
+/* Editor: rodadas do cabo de guerra */
+.stage-editor .stage-round{border:1px solid color-mix(in srgb,currentColor 18%,transparent);border-radius:14px;padding:10px 12px 12px;margin:0 0 12px;display:grid;gap:8px}
+.stage-editor .stage-round>legend{font-weight:700;padding:0 6px}
+.stage-editor .stage-round .stage-question{margin:0}
+.stage-editor .stage-round-tools{display:flex;flex-wrap:wrap;gap:8px;justify-content:space-between}

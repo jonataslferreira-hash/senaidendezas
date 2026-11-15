@@ -88,15 +88,21 @@ const gradientEnds={
 };
 const layoutsByMedia={
   none:['statement','editorial','cover'],
-  single:['split','feature','cover'],
-  multiple:['gallery','split','feature']
+  single:['split','banner','stack','feature','cover'],
+  multiple:['gallery','split','banner','stack','feature']
 };
-const layoutOrder=['cover','split','editorial','feature','statement','gallery'];
+const layoutOrder=['cover','split','editorial','banner','statement','stack','feature','gallery'];
+// Layouts de texto ao lado da foto: alternam o lado para a aula não ficar toda igual.
+const sideLayouts=['split','cover','stack'];
 const mediaLayouts={
   cover:    {title:[7,20,46,32],body:[7,57,45,32],visual:[58,8,36,84]},
   split:    {title:[7,13,47,26],body:[7,44,47,45],visual:[60,12,34,77]},
   feature:  {title:[7,7,86,19],body:[7,72,86,21],visual:[7,28,86,40]},
-  gallery:  {title:[7,7,86,18],body:[7,25,86,16],visual:[7,44,86,48]}
+  gallery:  {title:[7,7,86,18],body:[7,25,86,16],visual:[7,44,86,48]},
+  // Foto larga em cima, texto embaixo: o melhor encaixe para fotos deitadas.
+  banner:   {title:[7,55,86,15],body:[7,71,86,23],visual:[7,7,86,44]},
+  // Título na largura toda, texto e foto lado a lado embaixo.
+  stack:    {title:[7,8,86,17],body:[7,30,46,62],visual:[57,30,36,62]}
 };
 const textLayouts={
   cover:     {title:[10,20,80,31],body:[16,57,68,30],align:'center'},
@@ -141,6 +147,16 @@ function tiles(area,count){
   });
 }
 
+// Ajusta o quadro [x,y,w,h] (em % de um slide 16:9) ao formato da foto, centralizado na área original.
+// `ratio` é largura/altura da foto; 0 = desconhecido (mantém o quadro).
+export function fitPhoto(frame,ratio,slack=1.12){
+  if(!(ratio>0))return frame;
+  const [x,y,w,h]=frame,current=w*16/(h*9);
+  if(ratio>current*slack){const height=w*16/(9*ratio/slack);return [x,y+(h-height)/2,w,height];}
+  if(ratio<current/slack){const width=h*9*ratio*slack/16;return [x+(w-width)/2,y,width,h];}
+  return frame;
+}
+
 // Contraste calculado (WCAG) para nunca deixar texto da cor do fundo nem da
 // forma decorativa que está atrás dele.
 function channel(value){value/=255;return value<=.03928?value/12.92:Math.pow((value+.055)/1.055,2.4);}
@@ -175,19 +191,34 @@ export function composeAISlide({spec,index,title,body,images,model,previous}){
     if(box.some(number=>!Number.isFinite(number))||box[0]<0||box[1]<0||box[2]<8||box[3]<6||box[0]+box[2]>100||box[1]+box[3]>100)return null;
     return box;
   };
-  const customFrames={title:frame(proposed?.title),body:frame(proposed?.body),visual:frame(proposed?.visual)};
+  // Composição livre da IA só vale com quadros de tamanho útil e com margem:
+  // quadro estreito demais é o que deixava texto espremido e foto em tira.
+  const roomy=(box,minW,minH)=>box&&box[2]>=minW&&box[3]>=minH&&box[0]>=3&&box[1]>=3&&box[0]+box[2]<=97&&box[1]+box[3]<=97?box:null;
+  const customFrames={title:roomy(frame(proposed?.title),30,12),body:roomy(frame(proposed?.body),30,20),visual:roomy(frame(proposed?.visual),24,30)};
   const overlaps=(a,b)=>a&&b&&a[0]<b[0]+b[2]-2&&a[0]+a[2]>b[0]+2&&a[1]<b[1]+b[3]-2&&a[1]+a[3]>b[1]+2;
   const customComposition=customFrames.title&&customFrames.body&&(!mediaCount||customFrames.visual)&&
     !overlaps(customFrames.title,customFrames.body)&&!overlaps(customFrames.title,customFrames.visual)&&!overlaps(customFrames.body,customFrames.visual);
   const allowed=mediaCount>=5?['gallery','feature']:layoutsByMedia[mediaCount===0?'none':mediaCount===1?'single':'multiple'];
   const preferred=aiLayouts.includes(safeSpec.layout)?safeSpec.layout:layoutOrder[index%layoutOrder.length];
-  const layout=allowed.includes(preferred)&&preferred!==previous?.layout
-    ?preferred:allowed.find(name=>name!==previous?.layout)||allowed[0];
-  const mirrored=!customComposition&&layout==='split'&&index%2===0;
+  // Não repete os layouts dos últimos slides: com 5 opções por foto, a aula vai variando.
+  const recent=Array.isArray(previous?.recent)?previous.recent:previous?.layout?[previous.layout]:[];
+  const avoid=recent.slice(-Math.min(3,allowed.length-1));
+  const fresh=allowed.filter(name=>!avoid.includes(name));
+  // Foto deitada pede layout largo; foto em pé pede coluna ao lado do texto.
+  const ratio=images.length===1&&!model?Number(images[0].ratio)||0:0;
+  const suited=ratio>1.25?['banner','feature','stack']:ratio&&ratio<.9?['split','cover','stack']:[];
+  const layout=fresh.includes(preferred)&&(!suited.length||suited.includes(preferred))?preferred
+    :fresh.find(name=>suited.includes(name))||suited.find(name=>allowed.includes(name)&&name!==previous?.layout)||(fresh.includes(preferred)?preferred:fresh[index%Math.max(1,fresh.length)])||allowed.find(name=>name!==previous?.layout)||allowed[0];
+  // Cada layout lateral vai para o lado oposto do anterior.
+  const sided=!customComposition&&index>0&&mediaCount>0&&sideLayouts.includes(layout),lastFlip=previous?.sideFlip??true;
+  const mirrored=sided&&!lastFlip;
   let {title:titleFrame,body:bodyFrame,visual,align='left'}=mediaCount?mediaLayouts[layout]:textLayouts[layout];
   if(customComposition){titleFrame=customFrames.title;bodyFrame=customFrames.body;if(mediaCount)visual=customFrames.visual;align=proposed.align==='center'?'center':proposed.align==='right'?'right':'left';}
   if(mirrored){
-    titleFrame=[48,...titleFrame.slice(1)];bodyFrame=[48,...bodyFrame.slice(1)];visual=[6,visual[1],36,visual[3]];
+    const flip=([x,y,w,h])=>[100-x-w,y,w,h];
+    // O título de largura total (stack) fica onde está.
+    if(titleFrame[2]<80)titleFrame=flip(titleFrame);
+    bodyFrame=flip(bodyFrame);visual=flip(visual);
   }
   const elements=[];
   let decor=0;
@@ -234,9 +265,11 @@ export function composeAISlide({spec,index,title,body,images,model,previous}){
 
   if(layout==='editorial'&&!customComposition)elements.push(shape([49.1,15,.3,67],theme.accent,0,'accent'));
   if(layout==='statement')elements.push(shape([46,12,8,.75],theme.accent,10,'accent'));
-  if(layout==='cover')elements.push(shape([mediaCount?7:44,17,12,1],theme.accent,10,'accent'));
+  if(layout==='cover')elements.push(shape([mediaCount?titleFrame[0]:44,17,12,1],theme.accent,10,'accent'));
+  if(layout==='banner')elements.push(shape([7,52.6,14,.7],theme.accent,10,'accent'));
+  if(layout==='stack')elements.push(shape([7,26.6,14,.7],theme.accent,10,'accent'));
   if(layout==='feature')elements.push(shape([7,27.8,16,.8],theme.accent,10,'accent'));
-  if(layout==='split')elements.push(shape([mirrored?48:7,8,7,.7],theme.accent,10,'accent'));
+  if(layout==='split')elements.push(shape([titleFrame[0],8,7,.7],theme.accent,10,'accent'));
   if(layout==='gallery')elements.push(shape([7,41,86,.4],theme.accent,0,'accent'));
   if(layout==='statement'||layout==='cover'){
     const symbolX=align==='center'?titleFrame[0]+titleFrame[2]/2-4:titleFrame[0];
@@ -257,12 +290,15 @@ export function composeAISlide({spec,index,title,body,images,model,previous}){
     const frames=images.length?tiles(model?[x+modelWidth+1.5,y,w-modelWidth-1.5,h]:visual,images.length):[];
     if(model)elements.push(newElement('model',{...rect([x,y,modelWidth,h]),...model}));
     for(const [i,image] of images.entries()){
+      // O quadro acompanha o formato da foto (no máximo ~12% de corte), em vez de
+      // cortar uma foto deitada para caber numa coluna em pé.
+      frames[i]=fitPhoto(frames[i],Number(image.ratio)||0);
       const [px,py,pw,ph]=frames[i];
       elements.push(shape([px-1.1,py-1.5,pw+2.2,ph+3],veil,6));
       elements.push(shape([px-.24,py-.32,pw+.48,ph+.64],isLight?'#ffffff':theme.accent,5));
       elements.push(newElement('image',{...rect(frames[i]),image:image.data,imageFit:'cover',imageAlt:image.alt||'Foto '+(image.index+1)+' do conjunto enviado'}));
     }
   }
-  return {elements,theme:palette,layout,customComposition,background:theme.background,
+  return {elements,theme:palette,layout,recent:[...recent,layout].slice(-4),sideFlip:sided?mirrored:lastFlip,customComposition,background:theme.background,
     backgroundFill:{mode:'gradient',end,angle:(index*41+115)%360}};
 }

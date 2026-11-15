@@ -158,12 +158,33 @@ test('etapas interativas: equipes, relâmpago, sobrevivência, desafio, sorteio 
   assert.equal(room.data.phase, 'game');
   assert.deepEqual(room.snapshot().teams.map(t => t.members.length).sort(), [1, 2]);
   room.control('next-stage');
-  room.answer(ana.id, { choice: { choice: 1 } });
-  assert.equal(room.snapshot(caio.id).game.correct, undefined, 'aluno não recebe a resposta antes do fim');
-  assert.equal(room.snapshot(caio.id, true).lesson.slides.find(s => s.game?.type === 'flash').game.correct, undefined);
-  room.answer(bia.id, { choice: { choice: 0 } });
-  assert.equal(room.snapshot().game.winner.name, 'Bia');
-  assert.throws(() => room.answer(caio.id, { choice: { choice: 0 } }), /terminou/);
+  // Relâmpago: várias perguntas de tempo curto que seguem sozinhas; acerto rápido vale mais e o primeiro leva bônus.
+  assert.equal(room.snapshot().game.state, 'ready');
+  assert.throws(() => room.answer(ana.id, { choice: { choice: 0, round: 0 } }), /Aguarde/);
+  room.control('game', { do: 'next' });
+  assert.equal(room.snapshot().game.seconds, 10);
+  room.answer(ana.id, { choice: { choice: 1, round: 0 } });
+  assert.equal(room.snapshot(caio.id).game.question.correct, undefined, 'aluno não recebe a resposta antes do fim');
+  const hidden = room.snapshot(caio.id, true).lesson.slides.find(s => s.game?.type === 'flash').game;
+  assert.equal(hidden.questions, undefined); assert.equal(hidden.rounds, 3);
+  room.answer(bia.id, { choice: { choice: 0, round: 0 } });
+  assert.equal(room.snapshot().game.fastest.name, 'Bia');
+  assert.equal(room.snapshot(bia.id).game.me.gain, 300, 'acerto na hora (200) + primeiro a acertar (100)');
+  room.answer(caio.id, { choice: { choice: 0, round: 0 } });
+  assert.equal(room.snapshot(caio.id).game.me.gain, 200);
+  assert.equal(room.snapshot().game.state, 'reveal', 'todos responderam: mostra a resposta');
+  now += 3000; room.tick();
+  assert.equal(room.snapshot().game.round, 1, 'a próxima pergunta vem sozinha');
+  now += 10500; room.tick();
+  assert.equal(room.snapshot().game.state, 'reveal', 'o tempo curto acabou');
+  now += 3000; room.tick();
+  room.control('game', { do: 'next' }); room.control('game', { do: 'next' });
+  assert.equal(room.snapshot().game.state, 'done');
+  assert.deepEqual(room.snapshot().game.board.map(item => [item.name, item.score, item.wins]), [['Bia', 300, 1], ['Caio', 200, 0]]);
+  assert.throws(() => room.answer(caio.id, { choice: { choice: 0, round: 2 } }), /terminou/);
+  // Relâmpago antigo (uma pergunta só) vira uma lista de perguntas.
+  const old = validateGame({ type: 'flash', text: 'Capital do Brasil?', options: ['Brasília', 'Rio'], correct: 0 });
+  assert.deepEqual([old.text, old.seconds, old.questions.length, old.questions[0].text], ['Desafio relâmpago', 10, 1, 'Capital do Brasil?']);
   room.control('next-stage');
   // Sobrevivência: uma vida só; quem erra ou não responde cai e não joga mais.
   assert.equal(room.snapshot().game.state, 'ready');
@@ -185,7 +206,14 @@ test('etapas interativas: equipes, relâmpago, sobrevivência, desafio, sorteio 
   assert.ok(['Ana', 'Bia', 'Caio'].includes(room.snapshot().game.current.name));
   assert.equal(room.snapshot().game.left, 2);
   room.control('next-stage');
-  // Cabo de guerra por perguntas: 3 rodadas; quem é do lado A acerta tudo, o lado B erra tudo.
+  // Cabo de guerra por rodadas: até 12, cada uma sorteia 1 de até 3 perguntas.
+  const legacyTug = validateGame({ type: 'tug', text: 'x', options: ['A', 'B'], questions: Array.from({ length: 14 }, (_, i) => ({ text: 'p' + i, options: ['x', 'y'], correct: 0 })) });
+  assert.equal(legacyTug.rounds.length, 12); assert.equal(legacyTug.questions, undefined);
+  const variants = validateGame({ type: 'tug', text: 'x', options: ['A', 'B'], rounds: [[1, 2, 3, 4].map(n => ({ text: 'v' + n, options: ['x', 'y'], correct: 0 }))] });
+  assert.equal(variants.rounds[0].length, 3, 'no máximo 3 perguntas por rodada');
+  assert.throws(() => validateGame({ type: 'tug', text: 'x', options: ['A', 'B'], rounds: [] }), /rodada/);
+  // 3 rodadas; quem é do lado A acerta tudo, o lado B erra tudo.
+  assert.equal(room.snapshot().game.rounds, 3);
   assert.equal(room.snapshot().game.state, 'ready');
   const everyone = room.data.players;
   for (let round = 0; round < 3; round++) {
@@ -314,8 +342,9 @@ test('rodada 15: corrida do saber, painel de jogos da IA e boneco do placar', as
   assert.deepEqual(requestedGames('aula sobre vulcões'), []);
   assert.equal(requestedGames('', ['race'])[0].need, 4, 'a corrida pede perguntas para a IA');
   // Quantidade definida no painel, até 25 por dinâmica.
-  assert.deepEqual(requestedGames('', ['race', 'tug', 'survival'], { race: 25, tug: 99, survival: 12 }).map(game => game.need), [12, 25, 25]);
-  assert.equal(requestedGames('', ['tug'], { tug: 1 })[0].need, 3, 'cabo de guerra precisa de pelo menos 3');
+  assert.deepEqual(requestedGames('', ['race', 'tug', 'survival', 'flash'], { race: 25, tug: 99, survival: 12, flash: 8 }).map(game => [game.type, game.need]), [['flash', 8], ['survival', 12], ['tug', 12], ['race', 25]]);
+  assert.equal(requestedGames('relâmpago com 7 perguntas')[0].need, 7);
+  assert.equal(requestedGames('', ['flash'])[0].need, 5);
   const { withGameQuestions, takeGameQuestions } = await import('../src/storage-ai-games.js');
   const big = withGameQuestions({ quizzes: 2, questions: 25, polls: 0 }, requestedGames('', ['race'], { race: 25 }));
   assert.equal(big.quizTotal, 50); assert.equal(big.want, 75);
@@ -325,7 +354,7 @@ test('rodada 15: corrida do saber, painel de jogos da IA e boneco do placar', as
   const many = Array.from({ length: 12 }, (_, i) => ({ text: 'P' + i }));
   const split = takeGameQuestions({ questions: many }, [{ type: 'survival', need: 10 }, { type: 'tug', need: 10 }], 2);
   assert.equal(split.questions.length, 2);
-  assert.ok(split.games[1].questions.length >= 3, 'com perguntas de menos, cada dinâmica ainda recebe o mínimo');
+  assert.equal(split.games[1].questions.length, 5, 'com perguntas de menos, o que veio é repartido por igual');
   assert.equal(split.games[0].questions.length + split.games[1].questions.length, 10);
 
   const { rankMood, character } = await import('../src/game-ui.js');

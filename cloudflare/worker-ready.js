@@ -527,8 +527,12 @@ var open_layout_catalog_default = [{ id: "cover", name: "Cover", group: "Openers
 
 // cloudflare/storage-ai-worker.js
 var MODEL = "@cf/qwen/qwen3.8-27b";
-var GEMINI_MODEL = "gemini-3.1-flash-lite";
-var GROQ_MODEL = "qwen/qwen3.8-27b";
+var GEMINI_MODELS = ["gemini-3.1-flash-lite", "gemini-3.8-flash"];
+var GROQ_MODELS = ["qwen/qwen3.8-27b", "openai/gpt-oss-120b"];
+var modelList = (value, fallback) => {
+  const list = String(value || "").split(",").map((item) => item.trim()).filter((item) => /^[\w./:@-]{3,80}$/.test(item));
+  return (list.length ? list : fallback).slice(0, 3);
+};
 var MAX_BYTES = 15e5;
 async function boundedJSON(request) {
   if (!request.body) throw Error("empty");
@@ -548,16 +552,17 @@ async function boundedJSON(request) {
 }
 var cloudflareEnabled = (env) => env.STORAGE_AI_FREE_CONFIRMED === "true" && Boolean(env.AI);
 var storageAIEnabled = (env) => Boolean(env.AI_LIMIT && (env.GROQ_API_KEY || env.GEMINI_API_KEY || openRouterEnabled(env) || cloudflareEnabled(env)));
-async function runGroq(key, messages, maxTokens) {
+async function runGroq(key, messages, maxTokens, model) {
   const response = await fetch("https://api.groq.com/openai/v1/chat/completions", {
     method: "POST",
     headers: { "Content-Type": "application/json", Authorization: "Bearer " + key },
     body: JSON.stringify({
-      model: GROQ_MODEL,
+      model,
       messages,
       temperature: 0.25,
       max_completion_tokens: maxTokens,
-      reasoning_effort: "none",
+      // Só o Qwen aceita desligar o raciocínio; os gpt-oss usam 'low'.
+      reasoning_effort: /qwen/i.test(model) ? "none" : "low",
       response_format: { type: "json_object" }
     }),
     signal: AbortSignal.timeout(35e3)
@@ -565,9 +570,9 @@ async function runGroq(key, messages, maxTokens) {
   if (!response.ok) throw Object.assign(Error("groq_request_failed"), { status: response.status });
   return response.json();
 }
-async function runGemini(key, system, message, photos, maxOutputTokens) {
+async function runGemini(key, system, message, photos, maxOutputTokens, model) {
   const parts = [{ text: message }, ...photos.map((photo) => ({ inlineData: { mimeType: "image/jpeg", data: photo.split(",")[1] } }))];
-  const response = await fetch("https://generativelanguage.googleapis.com/v1beta/models/" + GEMINI_MODEL + ":generateContent", {
+  const response = await fetch("https://generativelanguage.googleapis.com/v1beta/models/" + model + ":generateContent", {
     method: "POST",
     headers: { "Content-Type": "application/json", "x-goog-api-key": key },
     body: JSON.stringify({
@@ -665,13 +670,16 @@ async function handleStorageAI(request, env, user, headers) {
       return { choices: [{ message: { content: result.content } }] };
     }
   })) : [];
+  const groqAttempts = env.GROQ_API_KEY ? modelList(env.GROQ_MODEL, GROQ_MODELS).filter((model, index) => !photos.length || index === 0 || /qwen|llama-4|vision/i.test(model)).map((model) => ({ provider: "groq", model, run: () => runGroq(env.GROQ_API_KEY, messages, maxTokens, model) })) : [];
+  const geminiAttempts = env.GEMINI_API_KEY ? modelList(env.GEMINI_MODEL, GEMINI_MODELS).map((model) => ({ provider: "gemini", model, run: () => runGemini(env.GEMINI_API_KEY, messages[0].content, message, photos, maxTokens, model) })) : [];
   const attempts = [
-    // O OpenRouter com modelos :free é a opção hospedada e sem cobrança. Ele
-    // vem primeiro quando a chave está configurada; os demais serviços
-    // entram como reserva.
+    // Ordem pela qualidade dos slides: Groq e Gemini (cotas gratuitas grandes e
+    // modelos mais fortes) vêm antes; o OpenRouter :free (50 chamadas por dia,
+    // modelo sorteado) e o Cloudflare ficam de reserva. Quando um serviço cai
+    // ou a cota dele acaba, o pedido passa sozinho para o seguinte.
+    ...groqAttempts,
+    ...geminiAttempts,
     ...openRouterAttempts,
-    ...env.GROQ_API_KEY ? [{ provider: "groq", model: GROQ_MODEL, run: () => runGroq(env.GROQ_API_KEY, messages, maxTokens) }] : [],
-    ...env.GEMINI_API_KEY ? [{ provider: "gemini", model: GEMINI_MODEL, run: () => runGemini(env.GEMINI_API_KEY, messages[0].content, message, photos, maxTokens) }] : [],
     ...cloudflareAttempts.map(({ model, options }) => ({ provider: "cloudflare", model, run: () => env.AI.run(model, { messages, temperature: 0.25, ...options }) }))
   ];
   const cacheKey = { mode: generate ? "create" : revise ? "revise" : "edit", prompt, count: generate ? count : void 0, activities: generate ? activities : void 0, context: revise ? context : void 0, photos: photos.map((photo) => photo.slice(0, 64) + photo.length) };
@@ -1642,7 +1650,7 @@ function createR2Handler(verifyUser = async (token, env) => {
     if (origin && !allowed.includes(origin)) return new Response("Origin not allowed", { status: 403 });
     const headers = { "Access-Control-Allow-Origin": origin || allowed[0], "Access-Control-Allow-Methods": "GET,POST,PUT,DELETE,OPTIONS", "Access-Control-Allow-Headers": "Authorization,Content-Type,X-Lesson-Title,X-Original-Bytes,X-Lesson-Origin", "Cache-Control": "private, no-store", Vary: "Origin" };
     const json = (body, status = 200) => Response.json(body, { status, headers });
-    if (new URL(request.url).pathname === "/health" && request.method === "GET") return json({ version: 22, storageAI: storageAIEnabled(env), storageAIMedia: storageAIEnabled(env), storageAIHistory: Boolean(env.FILES), imageSearch: true, openRouterConfigured: Boolean(env.OPENROUTER_API_KEY), geminiConfigured: Boolean(env.GEMINI_API_KEY), groqConfigured: Boolean(env.GROQ_API_KEY), lessonCovers: true, lessonDeletion: true, voiceChat: true, collaboration: true, animatedAvatars: true, roles: true, people: true });
+    if (new URL(request.url).pathname === "/health" && request.method === "GET") return json({ version: 23, cloudflareAI: env.STORAGE_AI_FREE_CONFIRMED === "true" && Boolean(env.AI), storageAI: storageAIEnabled(env), storageAIMedia: storageAIEnabled(env), storageAIHistory: Boolean(env.FILES), imageSearch: true, openRouterConfigured: Boolean(env.OPENROUTER_API_KEY), geminiConfigured: Boolean(env.GEMINI_API_KEY), groqConfigured: Boolean(env.GROQ_API_KEY), lessonCovers: true, lessonDeletion: true, voiceChat: true, collaboration: true, animatedAvatars: true, roles: true, people: true });
     if (request.method === "OPTIONS") return new Response(null, { status: 204, headers });
     const publicPresentation = await readPublicPresentation(request, env, headers);
     if (publicPresentation) return publicPresentation;

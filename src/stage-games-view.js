@@ -55,12 +55,23 @@ function optionButtons(options, { bare, send, enabled, chosen = null, correct = 
 const screenHint = '<p class="bare-hint">Leia a pergunta no telão e toque na sua resposta</p>';
 const timerBar = (g, now) => g.state === 'open' ? `<div class="sv-timer"><i style="animation-duration:${g.seconds}s;animation-delay:${(Math.max(0, (g.deadline - now) / 1000) - g.seconds).toFixed(2)}s"></i></div>` : '';
 
-function flashView(state, g, host, player) {
-  const done = g.state === 'done', answered = g.choice !== null && g.choice !== undefined;
-  const options = optionButtons(g.options, { bare: g.bare, send: i => `{"choice":${i}}`, enabled: player && !done && !answered, chosen: g.choice, correct: g.correct, shown: done, counts: g.counts, extra: ' flash-options' });
-  const result = done ? (g.winner ? `<p class="game-winner"><b>${esc(g.winner.name)}</b> acertou primeiro! <small>+${g.points} pts</small></p>` : '<p class="game-winner none">Ninguém acertou desta vez.</p>')
-    : player && answered ? '<p class="game-wait">Resposta enviada… não era essa. Aguarde o resultado.</p>' : `<p class="game-wait">${plural(g.answered, 'resposta', 'respostas')} até agora · só vale a primeira tentativa!</p>`;
-  return live(`${g.bare && !done ? screenHint : ''}${options}${result}`) + (host ? live(hostActions(state, [done ? ['restart', '↻ Jogar de novo'] : ['end', 'Encerrar', 'primary']])) : '');
+// Relâmpago: perguntas em sequência com tempo curto. Tudo anda sozinho depois que o professor dá a partida.
+function flashView(state, g, host, player, now) {
+  const q = g.question, done = g.state === 'done', shown = g.state === 'reveal' || done, me = g.me, bolt = stageIcon('flash');
+  const hud = `<div class="sv-hud"><span>${bolt} ${g.round >= 0 ? `Pergunta <b>${g.round + 1}</b> de ${g.rounds}` : `${plural(g.rounds, 'pergunta', 'perguntas')} · ${g.seconds}s cada`}</span><span>${g.state === 'open' ? `${g.answered} de ${g.total} responderam` : g.state === 'reveal' ? (g.round + 1 < g.rounds ? 'Próxima pergunta já vem…' : 'Resultado já vem…') : done ? 'Fim do relâmpago' : 'Pouco tempo: pense rápido!'}</span></div>`;
+  const canAnswer = player && me && g.state === 'open' && me.choice === null;
+  const question = q && !done ? `${g.bare ? (canAnswer ? screenHint : '') : `<h2 class="sv-text">${esc(q.text)}</h2>`}${optionButtons(q.options, { bare: g.bare, send: i => `{"choice":${i},"round":${g.round}}`, enabled: canAnswer, chosen: me?.choice, correct: q.correct, shown, counts: q.counts, extra: ' flash-options' })}` : '';
+  const first = g.fastest ? `<p class="flash-first">${bolt}<b>${esc(g.fastest.name)}</b> acertou primeiro! <small>+${g.points[2]} pts</small></p>` : '';
+  const board = g.board.length && (done || !player && shown) ? `<ol class="flash-board" data-done="${done}">${g.board.map((item, i) => `<li data-me="${Boolean(player && item.id === state.me?.id)}"><b>${i + 1}º</b><span>${esc(item.name)}</span><small>${item.wins ? `${bolt}×${item.wins}` : ''}</small><strong>${item.score}<small> pts</small></strong></li>`).join('')}</ol>` : '';
+  const top = g.board[0];
+  const status = done ? (top ? `<p class="game-winner"><b>${esc(top.name)}</b> foi o raio da rodada! <small>${top.score} pts</small></p>` : '<p class="game-winner none">Ninguém pontuou desta vez.</p>')
+    : !player ? (g.state === 'ready' ? `<p class="game-note">Você só dá a partida: cada pergunta fica ${g.seconds} segundos no ar e a próxima vem sozinha. Acerto vale de ${g.points[0]} a ${g.points[1]} pontos (mais rápido, mais pontos) e quem acerta primeiro leva +${g.points[2]}.</p>` : '')
+    : g.state === 'ready' ? `<p class="game-wait">Fique pronto: são ${plural(g.rounds, 'pergunta', 'perguntas')} de ${g.seconds} segundos. Pense rápido!</p>`
+    : me.choice === null ? (g.state === 'open' ? '' : '<p class="sv-dead">O tempo acabou!</p>')
+    : `<p class="${me.right ? 'sv-safe' : 'sv-dead'}">${me.right ? `Acertou! <b>+${me.gain} pts</b>${me.first ? ' · você foi o mais rápido!' : ''}` : 'Não era essa.'}${g.state === 'open' ? '<small> · esperando a turma responder…</small>' : ''}</p>`;
+  const mine = done && player && me ? (me.score ? `<p class="sv-safe">Você fez <b>${me.score} pontos</b> e ficou em ${me.rank}º lugar!</p>` : '<p class="game-wait">Você não pontuou. Na próxima vai!</p>') : '';
+  return live(hud) + live(timerBar(g, now), 'slim') + live(question, 'ask') + live(first + board, 'flash') + live(status + mine) +
+    (host ? live(hostActions(state, [g.state === 'ready' ? ['next', '▶ Valendo!', 'primary'] : g.state === 'open' ? ['next', 'Pular pergunta'] : g.state === 'reveal' ? ['next', 'Avançar já'] : ['restart', '↻ Jogar de novo']])) : '');
 }
 
 const confetti = n => `<div class="game-confetti" aria-hidden="true">${Array.from({ length: n }, (_, i) => `<i style="--n:${i};--x:${(i * 37) % 100};--h:${(i * 53) % 360};--t:${(2.2 + (i % 7) * .28).toFixed(2)}s;--w:${(i % 5) * .22}s"></i>`).join('')}</div>`;
@@ -119,18 +130,18 @@ function tugView(state, g, host, player, now) {
     <div class="tug-names">${side(0)}<i>VS</i>${side(1)}</div>
     <div class="tug-field"><i class="tug-pit"></i><i class="tug-mark"></i><div class="tug-group">${team(0)}<div class="tug-cord"><i class="tug-flag"></i></div>${team(1)}</div><i class="tug-ground"></i></div>
     <div class="tug-meter"><i class="a" style="width:${(50 + lean * 50).toFixed(1)}%;--team:${colors[0]}"></i><i class="b" style="--team:${colors[1]}"></i><b></b></div>
-    <ol class="tug-rounds" aria-label="Perguntas">${Array.from({ length: g.rounds }, (_, i) => `<li data-on="${i < g.round || i === g.round && shown}" data-now="${i === g.round && !over}">${i + 1}</li>`).join('')}</ol></div>`;
+    <ol class="tug-rounds" aria-label="Rodadas" data-many="${g.rounds > 6}">${Array.from({ length: g.rounds }, (_, i) => `<li data-on="${i < g.round || i === g.round && shown}" data-now="${i === g.round && !over}">${i + 1}</li>`).join('')}</ol></div>`;
   const result = done ? `<p class="game-winner"${g.winner >= 0 ? ` style="--team:${colors[g.winner]}"` : ''}>${g.winner >= 0 ? `<b>${esc(names[g.winner])}</b> puxou a corda!${player && g.side === g.winner ? ` <small>+${g.points} pts</small>` : ''}` : `Empate! A diferença ficou dentro de ${g.tolerance} pontos.`}</p>`
     : pulling ? '<p class="game-wait tug-suspense">Puxando… quem leva?</p>' : '';
   const canAnswer = player && g.state === 'open' && g.choice === null;
   const question = q && !over ? `${g.bare ? (canAnswer ? screenHint : '') : `<h2 class="sv-text">${esc(q.text)}</h2>`}${optionButtons(q.options, { bare: g.bare, send: i => `{"choice":${i},"round":${g.round}}`, enabled: canAnswer, chosen: g.choice, correct: q.correct, shown, counts: q.counts })}` : '';
   const mine = player && g.side !== null && g.side !== undefined ? `<p class="team-mine" style="--team:${colors[g.side]}">Você puxa pelo <b>${esc(names[g.side])}</b></p>` : '';
-  const status = over ? '' : !player ? `<p class="game-wait">${g.state === 'ready' ? `São ${plural(g.rounds, 'pergunta', 'perguntas')}. Cada acerto dá força para o seu lado puxar a corda.` : g.state === 'open' ? `${g.answered} de ${g.total} responderam` : 'Força somada! Veja o placar dos lados.'}</p>`
+  const status = over ? '' : !player ? `<p class="game-wait">${g.state === 'ready' ? `São ${plural(g.rounds, 'rodada', 'rodadas')}. Cada acerto dá força para o seu lado puxar a corda.` : g.state === 'open' ? `${g.answered} de ${g.total} responderam` : 'Força somada! Veja o placar dos lados.'}</p>`
     : g.state === 'ready' ? '<p class="game-wait">Prepare-se: cada acerto seu dá força para o seu lado.</p>'
     : g.state === 'open' ? (g.choice === null ? '' : '<p class="game-wait">Resposta enviada. Segura a corda!</p>')
     : g.choice === null ? '<p class="sv-dead">Você não respondeu a tempo.</p>' : g.choice === q?.correct ? '<p class="sv-safe">Acertou! +100 pts e mais força para o seu lado.</p>' : '<p class="sv-dead">Errou essa. Na próxima você recupera!</p>';
   return live(timerBar(g, now), 'slim') + live(question, 'ask') + live(scene + result, 'rope') + live(mine + status) +
-    (host ? live(hostActions(state, [g.state === 'ready' ? ['next', '▶ Começar', 'primary'] : g.state === 'open' ? ['next', 'Revelar agora'] : g.state === 'reveal' ? ['next', g.round + 1 < g.rounds ? 'Próxima pergunta →' : 'Puxar a corda!', 'primary'] : done ? ['restart', '↻ Revanche'] : null])) : '');
+    (host ? live(hostActions(state, [g.state === 'ready' ? ['next', '▶ Começar', 'primary'] : g.state === 'open' ? ['next', 'Revelar agora'] : g.state === 'reveal' ? ['next', g.round + 1 < g.rounds ? 'Próxima rodada →' : 'Puxar a corda!', 'primary'] : done ? ['restart', '↻ Revanche'] : null])) : '');
 }
 
 // Corrida do saber: a pergunta aparece no telão, o aluno responde no celular e cada acerto faz o boneco correr.

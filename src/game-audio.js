@@ -54,7 +54,7 @@ export class GameAudio{
   // Sobrevivência e cabo de guerra usam a mesma música das perguntas do quiz enquanto a pergunta está aberta.
   if(phase==='game'){
    const g=state.game,sel=this.settings.questions,custom=lesson.questionAudio||lesson.quizAudio;
-   if(!g||!['survival','tug','race'].includes(g.type)||g.state!=='open'||sel==='none'||sel==='custom'&&!custom?.data){if((this.key||'').startsWith('game:')&&g?.state==='reveal')this.cue('countdown');this.pause(this.audio);this.key='';return;}
+   if(!g||!['survival','tug','race','flash'].includes(g.type)||g.state!=='open'||sel==='none'||sel==='custom'&&!custom?.data){if((this.key||'').startsWith('game:')&&g?.state==='reveal')this.cue('countdown');this.pause(this.audio);this.key='';return;}
    const key='game:'+g.id+':'+g.round;if(this.key===key)return;
    const track=sel==='custom'?{id:'custom-questions',url:custom.data}:sel==='random'?chooseTrack(timedTracks(g.seconds||15),this.lastTrack,this.random):[...lobbyTracks,...questionTracks,...editorTracks].find(t=>t.id===sel);
    this.startTrack(track,key,{loop:true,volume:this.settings.volume*(sel==='custom'?(custom.volume??1):1)});return;
