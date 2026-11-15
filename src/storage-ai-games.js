@@ -10,7 +10,7 @@ const rules = [
   ['survival', new RegExp(lead + 'sobreviv|sobreviv[eê]ncia\\s+(?:com|de)\\s+\\d|\\b(?:uma?|a)\\s+sobreviv[eê]ncia\\b|\\be\\s+sobreviv[eê]ncia\\b', 'i'), 5],
   ['raffle', /\bsorteio\b|\broleta\b/i, 0],
   ['tug', /cabo[\s-]+de[\s-]+guerra/i, 4],
-  ['race', new RegExp(lead + 'corrida|corrida\\s+(?:de\\s+|dos\\s+)?(?:bonecos?|bonequinhos?|toques?)|\\buma\\s+corrida\\b|\\be\\s+corrida\\b', 'i'), 0]
+  ['race', new RegExp(lead + 'corrida|corrida\\s+(?:de\\s+|dos\\s+)?(?:bonecos?|bonequinhos?|perguntas?|saber|conhecimento)|\\buma\\s+corrida\\b|\\be\\s+corrida\\b', 'i'), 4]
 ];
 
 // Quais dinâmicas o pedido cita e quantas perguntas cada uma precisa.
@@ -54,7 +54,7 @@ export function addGameStages(lesson, games, { newSlide, createUuid }) {
     if (lesson.activityBlocks.length >= 24 || lesson.slides.length >= 80) { skipped.push(gameNames[type]); continue; }
     const game = defaultGame(type), list = (questions || []).map(usable).filter(Boolean);
     if (type === 'flash') { if (!list.length) { skipped.push(gameNames[type]); continue; } Object.assign(game, list[0]); }
-    if (type === 'survival' || type === 'tug') { if (list.length < (type === 'tug' ? 3 : 1)) { skipped.push(gameNames[type]); continue; } game.questions = list; }
+    if (type === 'survival' || type === 'tug' || type === 'race') { if (list.length < (type === 'tug' ? 3 : type === 'race' ? 2 : 1)) { skipped.push(gameNames[type]); continue; } game.questions = list; }
     const slide = { ...newSlide(), title: type === 'flash' ? game.text.slice(0, 160) : gameNames[type], game };
     const block = { id: createUuid(), type, items: [slide.id] };
     lesson.slides.push(slide);

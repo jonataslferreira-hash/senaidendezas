@@ -1427,8 +1427,6 @@ html[data-theme][data-ui-style] #app .music-panel.music-panel-v2{overflow:auto;o
   #app .game-stage[data-game-type=survival][data-game-state=open]>h1{display:none}
 }
 @media (max-width:760px){
-  #app .game-stage[data-game-type=race]>:is(.game-eyebrow,h1){order:-2}
-  #app .game-stage[data-game-type=race]>.game-live:has(.race-tap){order:-1}
   #app .game-stage[data-game-type=race][data-game-state=open]>h1{display:none}
   #app .race-tap{max-height:30dvh;width:min(30dvh,78vw)}
 }
@@ -1548,61 +1546,17 @@ html[data-motion=reduced] #app .game-character[data-mood] .buddy,html[data-motio
 @media (max-width:600px){#app .rank-race{--row:clamp(50px,8.4dvh,64px)}#app .rank-row{padding:0 10px 0 6px;gap:0 6px}}
 @media (prefers-reduced-motion:reduce){:root:not([data-motion=normal]):not([data-play]) #app :is(.rank-fill,.rank-runner,.rank-name){animation-duration:.01ms!important;animation-delay:0s!important}}
 
-/* 40.3 Corrida com obstáculos */
-#app .race-hurdle{position:absolute;z-index:1;bottom:1px;left:calc(var(--at)*100% + 92px*var(--s)*.5 - 4px);width:8px;height:calc(145px*var(--s)*.36);border-radius:3px 3px 0 0;background:repeating-linear-gradient(180deg,#f8fafc 0 6px,#ef4444 6px 12px);box-shadow:0 0 0 1px #0003}
-#app .race-hurdle::before{content:'';position:absolute;left:-7px;right:-7px;top:0;height:5px;border-radius:3px;background:#f8fafc;box-shadow:0 1px 0 #0004}
-#app .race-runner{z-index:2}
-#app .race-lane[data-air=true] .race-runner{animation:race-hop .55s cubic-bezier(.3,.6,.5,1)}
-@keyframes race-hop{0%,100%{transform:none}45%{transform:translateY(-62%) rotate(-8deg)}}
-#app .race-lane[data-trip=true] .race-runner{animation:race-trip .8s ease-out}
-#app .race-lane[data-trip=true] .race-runner::after{content:'💫';position:absolute;left:50%;top:-4px;translate:-50% -100%;font-size:calc(34px*var(--s) + 6px);animation:game-pop .3s both}
-@keyframes race-trip{0%{transform:none}20%{transform:rotate(38deg) translateY(6%)}45%{transform:rotate(-16deg)}70%{transform:rotate(9deg)}100%{transform:none}}
-#app .race-pad{--team:#8b5cf6;display:grid;gap:10px;width:min(460px,94vw);margin:0 auto;user-select:none;-webkit-user-select:none;touch-action:manipulation}
-#app .race-pad button{-webkit-tap-highlight-color:transparent;touch-action:manipulation;cursor:pointer;font:inherit;border:0;color:#fff}
-#app .race-radar{position:relative;height:78px;border-radius:20px;overflow:hidden;background:linear-gradient(180deg,rgba(56,189,248,.22),rgba(34,197,94,.16) 62%,rgba(15,23,42,.55) 62%);border:1px solid var(--g-line,#fff3)}
-#app .race-radar-road{position:absolute;left:0;right:0;bottom:26px;height:3px;background:repeating-linear-gradient(90deg,#fff9 0 14px,transparent 14px 28px);background-position-x:calc(var(--done,0)*-900px);transition:background-position-x .14s linear}
-#app .race-radar-me{position:absolute;left:16%;bottom:29px;width:26px;height:30px;border-radius:11px 11px 9px 9px;background:var(--team);border:3px solid #fff;box-sizing:border-box;box-shadow:0 4px 8px #0004}
-#app .race-pad.bump .race-radar-me{animation:race-me-step .16s ease-out}
-#app .race-pad.bump[data-last=jump] .race-radar-me{animation:race-me-jump .42s cubic-bezier(.3,.6,.5,1)}
-#app .race-pad[data-stun=true] .race-radar-me{animation:race-me-trip .9s ease-out}
-@keyframes race-me-step{50%{transform:translateY(-6px) rotate(8deg)}}
-@keyframes race-me-jump{50%{transform:translateY(-30px) rotate(-10deg)}}
-@keyframes race-me-trip{0%{transform:none}20%{transform:rotate(70deg) translateY(6px)}80%{transform:rotate(70deg) translateY(6px)}100%{transform:none}}
-#app :is(.race-radar-hurdle,.race-radar-flag){position:absolute;bottom:29px;left:calc(16% + 30px + var(--gap,12)*6.4%);transition:left .14s linear}
-#app .race-radar-hurdle{width:9px;height:26px;border-radius:3px 3px 0 0;background:repeating-linear-gradient(180deg,#f8fafc 0 6px,#ef4444 6px 12px)}
-#app .race-radar-hurdle::before{content:'';position:absolute;left:-7px;right:-7px;top:0;height:5px;border-radius:3px;background:#fff}
-#app .race-radar-flag{width:12px;height:40px;background:repeating-conic-gradient(#fff 0 25%,#111 0 50%) 0 0/12px 12px;border-radius:2px}
-#app .race-pad[data-target=flag] .race-radar-hurdle,#app .race-pad[data-target=hurdle] .race-radar-flag{display:none}
-#app :is(.race-radar-alert,.race-radar-oops){position:absolute;right:12px;top:8px;padding:3px 12px;border-radius:99px;font-size:15px;font-weight:900;letter-spacing:.5px;opacity:0;transform:scale(.6);transition:opacity .12s,transform .12s}
-#app .race-radar-alert{background:#facc15;color:#1c1917}#app .race-radar-oops{background:#ef4444;color:#fff}
-#app .race-pad[data-near=true][data-stun=false] .race-radar-alert{opacity:1;transform:none;animation:race-alert .32s ease-in-out infinite alternate}
-#app .race-pad[data-stun=true] .race-radar-oops{opacity:1;transform:none}
-@keyframes race-alert{to{transform:scale(1.14)}}
-#app .race-radar-bar{position:absolute;left:10px;right:10px;bottom:9px;height:7px;border-radius:99px;background:#fff3;overflow:hidden}
-#app .race-radar-bar i{display:block;height:100%;width:calc(var(--done,0)*100%);border-radius:99px;background:var(--team);transition:width .14s linear}
-#app .race-jump{display:grid;place-content:center;gap:1px;height:clamp(64px,13dvh,92px);border-radius:22px;background:linear-gradient(180deg,#fde047,#f59e0b);color:#1c1917!important;box-shadow:0 6px 0 #b45309,0 12px 24px #0004;transition:transform .06s,box-shadow .06s,filter .15s;filter:saturate(.55) brightness(.9)}
-#app .race-jump b{font-size:clamp(22px,6vw,32px);font-weight:900;letter-spacing:1px}#app .race-jump small{font-size:12px;opacity:.8}
-#app .race-pad[data-soon=true] .race-jump{filter:none}
-#app .race-pad[data-near=true] .race-jump{filter:none;animation:race-jump-glow .32s ease-in-out infinite alternate}
-@keyframes race-jump-glow{to{box-shadow:0 6px 0 #b45309,0 0 0 8px #fde04766,0 12px 30px #f59e0b99;transform:scale(1.03)}}
-#app .race-pad button:active{transform:translateY(4px);box-shadow:0 2px 0 #0005}
-#app .race-feet{display:grid;grid-template-columns:1fr 1fr;gap:10px}
-#app .race-feet button{height:clamp(96px,22dvh,170px);border-radius:26px;background:var(--team);border:4px solid #fff9;box-shadow:0 6px 0 color-mix(in srgb,var(--team),#000 40%),0 12px 24px #0004;transition:transform .06s,opacity .1s,filter .1s}
-#app .race-feet b{font-size:clamp(24px,7vw,38px);font-weight:900;letter-spacing:1px}
-#app .race-feet button::before{content:'';display:block;width:34px;height:46px;margin:0 auto 4px;border-radius:46% 46% 40% 40%/36% 36% 60% 60%;background:#fff;opacity:.9}
-/* o pé da vez fica aceso; o que acabou de pisar apaga */
-#app .race-pad[data-foot=l] [data-race-move=l],#app .race-pad[data-foot=r] [data-race-move=r]{opacity:.45;filter:saturate(.6)}
-#app .race-pad[data-foot=l] [data-race-move=r],#app .race-pad[data-foot=r] [data-race-move=l]{animation:race-foot-next .5s ease-in-out infinite alternate}
-@keyframes race-foot-next{to{border-color:#fff;filter:brightness(1.12)}}
-#app .race-feet button.miss{animation:race-miss .25s}
-@keyframes race-miss{25%{transform:translateX(-5px)}75%{transform:translateX(5px)}}
-#app .race-pad:is([data-stun=true],[data-waiting=true]) :is(.race-feet button,.race-jump){opacity:.4;filter:grayscale(.7);animation:none}
-#app .race-help{font-size:12px;opacity:.7;text-align:center}
-@media (pointer:coarse){#app .race-help{display:none}}
-@media (max-width:760px){
-  #app .game-stage[data-game-type=race]>.game-live:has(.race-pad){order:-1}
-  #app .race-hurdle{left:calc(var(--at)*100% + 92px*.3*.5 - 4px);height:calc(145px*.3*.36)}
-}
+/* 40.3 Corrida do saber: pergunta em cima, pista embaixo */
+#app .race-runner{z-index:2;transition:left 1.5s cubic-bezier(.3,.7,.3,1)}
+#app .race-name{display:grid;line-height:1.15}
+#app .race-name small{font-size:.78em;font-weight:600;opacity:.7;font-variant-numeric:tabular-nums}
+#app .race-gain{position:absolute;left:50%;top:-4px;transform:translate(-50%,-100%);padding:2px 9px;border-radius:99px;background:#22c55e;color:#fff;font-size:13px;font-weight:900;white-space:nowrap;animation:game-pop .4s cubic-bezier(.2,1.7,.4,1) both}
+#app .race-gain.miss{background:#ef4444}
+#app .race-gain.lock{background:#fff;color:#16a34a;padding:1px 7px}
+#app .race-lane[data-right=false]{opacity:.72}
+#app .game-stage[data-game-type=race] .race-track{padding:8px 12px}
+#app .game-stage[data-game-type=race]:is([data-game-state=open],[data-game-state=reveal])>h1{display:none}
+@media (max-width:760px){#app .race-gain{font-size:11px;padding:1px 6px}}
 
 /* 40.4 StorageAI: painel "Montar a aula" */
 #app .ai-shell .ai-count-tray{display:grid;grid-template-columns:1fr;gap:10px;width:min(348px,calc(100vw - 24px));min-width:0;padding:14px;border-radius:20px;left:auto;right:-46px;bottom:calc(100% + 14px);box-sizing:border-box;max-height:min(560px,calc(100dvh - 150px));overflow:auto;transform-origin:calc(100% - 64px) 100%;animation:ai-tray-in .26s cubic-bezier(.2,1.25,.35,1) both;box-shadow:0 24px 60px #0b0f2a66,0 0 0 1px color-mix(in srgb,var(--ai-purple,#8b5cf6) 30%,transparent)}
@@ -1758,3 +1712,11 @@ html body dialog.cover-picker .cp-upload{justify-content:center!important}
 html body dialog:is(.ai-presentation-picker,.cover-picker) :is(.ai-pick-head,.cp-head)>div{display:block!important}
 html body dialog:is(.ai-presentation-picker,.cover-picker) input:is([type=search],[type=url]){border:0!important;background:transparent!important;box-shadow:none!important;padding:0!important;margin:0!important;min-height:0!important;width:auto!important;font-weight:500}
 html body dialog.cover-picker .cp-stage-actions{display:flex!important;justify-content:space-between!important}
+/* 40.9 Corrida do saber no telão: opções numa linha só para a pista caber inteira */
+@media (min-width:761px){
+  #app .game-stage[data-game-type=race] .game-options:not(.bare){grid-template-columns:repeat(auto-fit,minmax(200px,1fr));max-width:1100px;gap:10px}
+  #app .game-stage[data-game-type=race] .game-options:not(.bare) .game-option{min-height:58px}
+  #app .game-stage[data-game-type=race]{gap:10px}
+  #app .game-stage[data-game-type=race] .race-lane{height:calc(145px*var(--s) + 4px)}
+}
+#app .game-stage[data-game-type=race] .race-gain{left:100%;top:50%;transform:translate(4px,-50%)}

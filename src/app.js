@@ -5,7 +5,6 @@ import {GameLayout} from './game-layout.js';
 import {GameAudio} from './game-audio.js';
 import {quizMarkup,leaderboardMarkup,animateRanking} from './game-ui.js';
 import { gameMarkup, keepGame, animateRaffle, teamStrip } from './stage-games-view.js';
-import { raceStep } from './stage-games.js';
 import {Simulations} from './simulations.js';
 import {loadSlideFonts} from './fonts.js';
 import {editParticipant,participantPhoto,manageParticipants} from './participant-profile.js';
@@ -409,7 +408,6 @@ function render() {
   if (state?.teams && ['leaderboard', 'finished'].includes(state.phase) && !app.querySelector('.team-strip')) app.querySelector('main')?.insertAdjacentHTML('beforeend', teamStrip(state));
   if (state?.phase === 'leaderboard') animateRanking(app, Math.max(0, (Date.now() + timerOffset - (state.resultStartedAt || 0)) / 1000));
   if (state?.game?.type === 'raffle') animateRaffle(app, () => Date.now() + timerOffset);
-  if (state?.game?.type === 'race') paintRace();
   if(state&&!app.querySelector('[data-remote-dialog]'))app.insertAdjacentHTML('beforeend','<div data-remote-dialog></div>');
   // Nas telas de jogo os bonecos e o pódio sempre se mexem (a não ser que a pessoa escolha "reduzido" no perfil).
   document.documentElement.toggleAttribute('data-play', Boolean(state) && state.phase !== 'lesson');
@@ -595,53 +593,6 @@ async function sendGame(payload, quiet = false) {
     else await classroom.answer(payload, state.game.id);
   } catch (err) { if (!quiet) toast(err.message); }
 }
-// Corrida: o celular anda na hora (mesma regra da sala, raceStep) e manda os movimentos em lotes.
-let race = null, raceTimer = 0;
-function racePad() { return app.querySelector('[data-race-pad]'); }
-function paintRace() {
-  const pad = racePad();
-  if (!pad) return;
-  if (!race || race.key !== pad.dataset.key) race = { key: pad.dataset.key, pos: 0, cleared: 0, foot: '', moves: '', stun: 0, goal: Number(pad.dataset.goal), hurdles: pad.dataset.hurdles.split(',').filter(Boolean).map(Number) };
-  // Sem nada pendente, o servidor é quem manda (corrige diferenças do limite de toques).
-  const mine = state?.game?.me;
-  if (mine && !race.moves && !raceTimer && Number.isFinite(mine.pos)) { race.pos = mine.pos; race.cleared = mine.cleared || 0; }
-  const next = race.hurdles[race.cleared], gap = (next ?? race.goal) - race.pos, waiting = Date.now() + timerOffset < Number(pad.dataset.start);
-  pad.style.setProperty('--gap', String(Math.max(0, Math.min(12, gap))));
-  pad.style.setProperty('--done', (race.pos / race.goal).toFixed(3));
-  pad.dataset.target = next === undefined ? 'flag' : 'hurdle';
-  pad.dataset.near = String(next !== undefined && gap <= 1);
-  pad.dataset.soon = String(next !== undefined && gap <= 4);
-  pad.dataset.foot = race.foot;
-  pad.dataset.stun = String(performance.now() < race.stun);
-  pad.dataset.waiting = String(waiting);
-  if (waiting) setTimeout(paintRace, Math.max(30, Number(pad.dataset.start) - Date.now() - timerOffset + 30));
-}
-function raceMove(button) {
-  const pad = button.closest('[data-race-pad]');
-  if (!pad) return;
-  paintRace();
-  const now = performance.now(), move = button.dataset.raceMove;
-  if (now < race.stun || Date.now() + timerOffset < Number(pad.dataset.start)) return;
-  if (move !== 'j' && move === race.foot) { button.classList.remove('miss'); void button.offsetWidth; button.classList.add('miss'); return; }
-  if (move !== 'j') race.foot = move;
-  const result = raceStep(race, move === 'j' ? 'j' : 's', race.goal, race.hurdles);
-  race.moves += move === 'j' ? 'j' : 's';
-  if (result === 'trip') { race.stun = now + 900; navigator.vibrate?.([40, 40, 80]); setTimeout(paintRace, 920); }
-  else navigator.vibrate?.(result === 'jump' ? 25 : 6);
-  pad.dataset.last = result; pad.classList.remove('bump'); void pad.offsetWidth; pad.classList.add('bump');
-  paintRace();
-  const flush = () => { const moves = race.moves; race.moves = ''; raceTimer = 0; if (moves) sendGame({ moves }, true); };
-  if (race.pos >= race.goal) { clearTimeout(raceTimer); flush(); }
-  else if (!raceTimer) raceTimer = setTimeout(flush, 350);
-}
-app.addEventListener('pointerdown', event => { const button = event.target.closest('[data-race-move]'); if (button) { event.preventDefault(); raceMove(button); } });
-document.addEventListener('keydown', event => {
-  const pad = racePad();
-  if (!pad || event.repeat || event.target.closest?.('input,textarea,select,[contenteditable]')) return;
-  const move = event.key === 'ArrowLeft' ? 'l' : event.key === 'ArrowRight' ? 'r' : event.key === ' ' || event.key === 'ArrowUp' ? 'j' : '';
-  if (!move) return;
-  event.preventDefault(); raceMove(pad.querySelector(`[data-race-move="${move}"]`));
-});
 let tugTaps = 0, tugTimer = 0;
 function tugTap(button) {
   tugTaps++; navigator.vibrate?.(8);

@@ -70,7 +70,7 @@ function requestedActivityCount(prompt,pattern,fallback){
   const value=Number(match?.[1]||match?.[2]);
   return Number.isFinite(value)&&value>0?Math.min(30,value):fallback;
 }
-const trayGames=[['teams','Equipes','Divide a turma em times'],['flash','Relâmpago','Quem acerta primeiro leva'],['survival','Sobrevivência','Errou, caiu'],['tug','Cabo de guerra','Dois lados, três perguntas'],['race','Corrida','Corrida no ritmo'],['raffle','Sorteio','Sorteia um aluno']];
+const trayGames=[['teams','Equipes','Divide a turma em times'],['flash','Relâmpago','Quem acerta primeiro leva'],['survival','Sobrevivência','Errou, caiu'],['tug','Cabo de guerra','Dois lados, três perguntas'],['race','Corrida','Acertou, o boneco corre'],['raffle','Sorteio','Sorteia um aluno']];
 function stepper(name,label,value,min,max,extra=''){
   return `<div class="ai-step" ${extra}><span>${label}</span><div class="ai-stepper"><button type="button" data-ai-step="-1" data-for="${name}" aria-label="Diminuir ${label}">−</button><input name="${name}" type="number" inputmode="numeric" min="${min}" max="${max}" value="${value}" aria-label="${label}"><button type="button" data-ai-step="1" data-for="${name}" aria-label="Aumentar ${label}">+</button></div></div>`;
 }

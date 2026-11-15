@@ -228,7 +228,7 @@ test('rodada 14: escolha de time, pódio guiado pela sala, corrida, textos escon
   let now = 1000;
   const base = newLesson(), question = { ...newQuestion(), text: 'Quanto é 2+2?', options: ['3', '4'], correct: 1, explanation: 'Conta simples.' };
   const stage = (type, extra = {}) => ({ id: 's-' + type, title: type, kind: 'text', game: { ...defaultGame(type), ...extra } });
-  const lesson = validateLesson({ ...base, slides: [base.slides[0], stage('teams', { pick: true }), stage('race', { goal: 60 }), stage('survival')], questions: [question],
+  const lesson = validateLesson({ ...base, slides: [base.slides[0], stage('teams', { pick: true }), stage('race', { seconds: 15, questions: [{ text: 'Corrida 1', options: ['certa', 'errada'], correct: 0 }, { text: 'Corrida 2', options: ['errada', 'certa'], correct: 1 }] }), stage('survival')], questions: [question],
     activityBlocks: [{ id: 'b0', type: 'slides', items: [base.slides[0].id] }, { id: 'b1', type: 'teams', items: ['s-teams'] }, { id: 'b2', type: 'race', items: ['s-race'] }, { id: 'b3', type: 'survival', items: ['s-survival'] }, { id: 'b4', type: 'quiz', items: [question.id] }] });
   // Salvar no grupo: a lista de perguntas da sobrevivência não tem id e quebrava a gravação.
   const doc = new Y.Doc(); writeLesson(doc, lesson);
@@ -246,24 +246,28 @@ test('rodada 14: escolha de time, pódio guiado pela sala, corrida, textos escon
   assert.equal(room.snapshot().game.type, 'race');
   assert.deepEqual(room.snapshot().teams.map(team => team.members.length), [1, 2], 'quem não escolheu entra no time menor');
   assert.equal(room.snapshot().ranking.find(p => p.id === ana.id).color, '#f97316', 'o jogador leva a cor do time');
-  // Corrida: só vale depois da largada e os toques são limitados.
+  // Corrida do saber: só anda quem acerta, e quem responde mais rápido vai mais longe.
+  assert.equal(room.snapshot(ana.id).game.question, null);
+  assert.throws(() => room.answer(ana.id, { choice: { choice: 0, round: 0 } }), /Aguarde/);
   room.control('game', { do: 'next' });
-  assert.throws(() => room.answer(ana.id, { choice: { taps: 5 } }), /largada/);
-  now += 3100;
-  // Com obstáculos: quem só corre tropeça e fica para trás; quem pula na hora passa.
-  assert.deepEqual(room.snapshot().game.hurdles, [20, 40]);
-  for (let i = 0; i < 12; i++) { now += 500; room.answer(bia.id, { choice: { taps: 6 } }); }
-  assert.ok(room.data.game.progress[bia.id] < 20, 'sem pular ninguém passa do obstáculo');
-  assert.equal(room.snapshot().game.runners.find(r => r.id === bia.id).trip, true);
-  for (let i = 0; i < 80 && room.snapshot().game.state === 'open'; i++) {
-    now += 500;
-    const me = room.snapshot(ana.id).game.me, next = [20, 40][me.cleared], gap = (next ?? 60) - me.pos;
-    room.answer(ana.id, { choice: { moves: next !== undefined && gap <= 1 ? 'j' : 's'.repeat(Math.max(1, Math.min(6, next === undefined ? 6 : gap - 1))) } });
-    if (room.data.game.finished.includes(ana.id)) room.control('game', { do: 'end' });
-  }
-  assert.equal(room.snapshot().game.state, 'done');
-  assert.equal(room.snapshot(ana.id).game.me.place, 1);
+  assert.equal(room.snapshot(ana.id).game.question.text, '', 'aluno não recebe o texto');
+  assert.equal(room.snapshot().game.question.text, 'Corrida 1');
+  now += 1000; room.answer(ana.id, { choice: { choice: 0, round: 0 } });
+  now += 8000; room.answer(bia.id, { choice: { choice: 0, round: 0 } });
+  room.answer(caio.id, { choice: { choice: 1, round: 0 } });
+  let race = room.snapshot().game;
+  assert.equal(race.state, 'reveal', 'todos responderam: revela');
+  const lane = id => race.runners.find(r => r.id === id);
+  assert.ok(lane(ana.id).gain > lane(bia.id).gain && lane(bia.id).gain >= 10, 'rapidez rende mais metros');
+  assert.equal(lane(caio.id).gain, 0); assert.equal(lane(caio.id).right, false);
+  room.control('game', { do: 'next' });
+  room.answer(bia.id, { choice: { choice: 0, round: 1 } });
+  now += 16000; room.tick();
+  race = room.snapshot(ana.id).game;
+  assert.equal(race.state, 'done'); assert.equal(race.me.place, 1);
   assert.equal(room.data.players.find(p => p.id === ana.id).bonus, 500);
+  assert.equal(room.data.players.find(p => p.id === bia.id).bonus, 300);
+  assert.equal(room.data.players.find(p => p.id === caio.id).bonus || 0, 0, 'quem não acertou nada não pontua');
   room.control('next-stage');
   assert.equal(room.snapshot().game.type, 'survival');
   room.control('next-stage'); assert.equal(room.data.phase, 'lobby');
@@ -292,23 +296,17 @@ test('rodada 14: escolha de time, pódio guiado pela sala, corrida, textos escon
   assert.equal(plan.quizTotal, 5); assert.ok(plan.request.quizzes * plan.request.questions >= 15);
 });
 
-test('rodada 15: corrida com obstáculos, painel de jogos da IA e boneco do placar', async () => {
-  const { raceHurdles, raceStep } = await import('../src/stage-games.js');
-  assert.deepEqual(raceHurdles(60), [20, 40]); assert.deepEqual(raceHurdles(100), [25, 50, 75]); assert.equal(raceHurdles(150).length, 4);
-  const runner = { pos: 0, cleared: 0 }, hurdles = raceHurdles(60);
-  for (let i = 0; i < 19; i++) assert.equal(raceStep(runner, 's', 60, hurdles), 'step');
-  assert.equal(raceStep({ pos: 5, cleared: 0 }, 'j', 60, hurdles), 'air', 'pular longe do obstáculo não adianta');
-  assert.equal(raceStep(runner, 's', 60, hurdles), 'trip'); assert.equal(runner.pos, 16, 'tropeço volta 3 passos');
-  for (let i = 0; i < 3; i++) raceStep(runner, 's', 60, hurdles);
-  assert.equal(raceStep(runner, 'j', 60, hurdles), 'jump'); assert.equal(runner.pos, 22); assert.equal(runner.cleared, 1);
-  // depois de passar, um tropeço no obstáculo seguinte nunca devolve para antes do anterior
-  const near = { pos: 39, cleared: 1 }; raceStep(near, 's', 60, hurdles); assert.equal(near.pos, 36);
-  const edge = { pos: 21, cleared: 1 }; edge.pos = 39; raceStep(edge, 's', 60, [20, 22]); assert.ok(edge.pos >= 20);
+test('rodada 15: corrida do saber, painel de jogos da IA e boneco do placar', async () => {
+  const { validateGame, defaultGame, publicGame } = await import('../src/stage-games.js');
+  assert.equal(defaultGame('race').questions.length, 3);
+  assert.equal(validateGame({ type: 'race', text: 'Antiga', goal: 100 }).questions.length, 3, 'corrida antiga (de toques) ganha perguntas-modelo');
+  assert.equal(publicGame(defaultGame('race')).questions, undefined, 'as perguntas não vão para o aluno');
 
   const { requestedGames } = await import('../src/storage-ai-games.js');
   assert.deepEqual(requestedGames('aula sobre vulcões', ['race', 'tug']).map(game => game.type), ['tug', 'race']);
   assert.deepEqual(requestedGames('aula com cabo de guerra', ['tug']).map(game => game.type), ['tug'], 'não duplica');
   assert.deepEqual(requestedGames('aula sobre vulcões'), []);
+  assert.equal(requestedGames('', ['race'])[0].need, 4, 'a corrida pede perguntas para a IA');
 
   const { rankMood, character } = await import('../src/game-ui.js');
   assert.equal(rankMood(100, true), 'idle'); assert.equal(rankMood(900, true), 'run'); assert.equal(rankMood(2000, true), 'win-0'); assert.equal(rankMood(5000, true), 'idle');

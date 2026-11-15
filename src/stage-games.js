@@ -5,7 +5,7 @@
 //   challenge – Desafio no experimento: acertar uma meta mexendo no experimento
 //   raffle    – Sorteio de aluno
 //   tug       – Cabo de guerra: dois lados respondem 3 perguntas; quem acerta mais puxa a corda
-//   race      – Corrida com obstáculos: passos alternados (esquerda/direita) e pulo na hora certa
+//   race      – Corrida do saber: cada acerto faz o boneco avançar; quanto mais rápido a resposta, mais longe
 // Cada etapa é um slide com o campo `game`. Aqui ficam as regras (sem tela), para
 // a sala do professor aplicar e os testes conferirem.
 import { createUuid } from './uuid.js';
@@ -20,33 +20,20 @@ export const gameHints = {
   challenge: 'Quem atinge a meta no experimento?',
   raffle: 'Roleta com os nomes de quem está na sala',
   tug: 'Dois lados respondem; quem acerta mais puxa a corda',
-  race: 'Alterne os pés para correr e pule os obstáculos até a chegada'
+  race: 'Cada acerto faz o boneco correr. Resposta rápida vai mais longe'
 };
 export const teamPalette = [['Azul', '#3b82f6'], ['Laranja', '#f97316'], ['Verde', '#22c55e'], ['Rosa', '#ec4899']];
 export const SURVIVAL_POINTS = 500;
 export const FLASH_POINTS = 500, CHALLENGE_FIRST = 500, CHALLENGE_POINTS = 300, TUG_POINTS = 200;
 export const TUG_ROUNDS = 3, TUG_HIT = 100, TUG_PULL_MS = 5000;
-export const RACE_POINTS = [500, 300, 200], RACE_FINISH = 100, RACE_COUNTDOWN = 3000, RACE_TRIP = 3, RACE_LEAP = 3;
-// Obstáculos da pista, em passos. Quanto maior a pista, mais obstáculos.
-export const raceHurdles = goal => { const n = goal <= 60 ? 2 : goal <= 100 ? 3 : 4; return Array.from({ length: n }, (_, i) => Math.round(goal * (i + 1) / (n + 1))); };
-// Um movimento do corredor: 's' = passo, 'j' = pulo. Vale tanto na sala quanto no celular (resposta imediata).
-// Passo em cima do obstáculo = tropeço (volta alguns passos); pulo na frente do obstáculo = salto para o outro lado.
-export function raceStep(runner, move, goal, hurdles) {
-  const next = hurdles[runner.cleared], near = next !== undefined && runner.pos >= next - 1;
-  if (move === 'j') {
-    if (!near) return 'air';
-    runner.cleared++; runner.pos = Math.min(goal, next + RACE_LEAP - 1); return 'jump';
-  }
-  if (near) { runner.pos = Math.max(runner.cleared ? hurdles[runner.cleared - 1] : 0, runner.pos - RACE_TRIP); return 'trip'; }
-  runner.pos = Math.min(goal, runner.pos + 1); return 'step';
-}
+export const RACE_POINTS = [500, 300, 200], RACE_FINISH = 100, RACE_STEP = 10, RACE_SPEED = 10;
 
 const text = (value, max) => String(value ?? '').replace(/[\u0000-\u0008\u000b-\u001f\u007f]/g, '').slice(0, max);
 const line = (value, max) => text(value, max).replace(/\s+/g, ' ').trim();
 
 export function defaultGame(type) {
   if (type === 'teams') return { type, text: 'Que comecem os jogos!', count: 2, pick: false };
-  if (type === 'race') return { type, text: 'Quem chega primeiro?', goal: 100 };
+  if (type === 'race') return { type, text: 'Corrida do saber', seconds: 15, questions: [1, 2, 3].map(n => ({ text: 'Pergunta ' + n, options: ['Opção A', 'Opção B'], correct: 0 })) };
   if (type === 'flash') return { type, text: 'Quem responde primeiro?', options: ['Opção A', 'Opção B'], correct: 0 };
   if (type === 'survival') return { type, text: 'Uma vida só. Quem sobrevive?', seconds: 15, questions: [{ text: 'Primeira pergunta', options: ['Opção A', 'Opção B'], correct: 0 }] };
   if (type === 'challenge') return { type, text: 'Ajuste o experimento até chegar à meta.', simulation: 'projectile', answer: [], tolerance: 5 };
@@ -60,7 +47,6 @@ export function validateGame(game, draft = false, simulationIds = null) {
   const result = { type: game.type, text: text(game.text, 300) };
   if (!draft && !result.text.trim()) throw Error('Escreva o enunciado da etapa "' + gameNames[game.type] + '".');
   if (game.type === 'teams') { result.count = Math.max(2, Math.min(4, Math.floor(Number(game.count) || 2))); result.pick = Boolean(game.pick); }
-  if (game.type === 'race') result.goal = [60, 100, 150].includes(Number(game.goal)) ? Number(game.goal) : 100;
   const questionList = label => {
     const list = (Array.isArray(game.questions) ? game.questions : []).slice(0, 20).filter(q => q && typeof q === 'object').map((q, index) => {
       const options = (Array.isArray(q.options) ? q.options : []).slice(0, 4).map(o => text(o, 200));
@@ -76,6 +62,11 @@ export function validateGame(game, draft = false, simulationIds = null) {
     if (!draft && (options.length < 2 || options.some(o => !o.trim()))) throw Error('O desafio relâmpago precisa de 2 a 4 opções preenchidas.');
     result.options = options.length ? options : ['', ''];
     result.correct = Math.max(0, Math.min(result.options.length - 1, Math.floor(Number(game.correct) || 0)));
+  }
+  if (game.type === 'race') {
+    result.seconds = Math.max(5, Math.min(60, Math.round(Number(game.seconds) || 15)));
+    // Corridas antigas (de toques) não tinham perguntas: entram com as perguntas-modelo para o professor trocar.
+    result.questions = Array.isArray(game.questions) && game.questions.length ? questionList('Corrida') : defaultGame('race').questions;
   }
   if (game.type === 'survival') {
     result.seconds = Math.max(5, Math.min(60, Math.round(Number(game.seconds) || 15)));
@@ -108,7 +99,7 @@ export function validateGame(game, draft = false, simulationIds = null) {
 export function publicGame(game) {
   if (!game) return game;
   const { correct, answer, questions, ...rest } = game;
-  if (game.type === 'survival' || game.type === 'tug') return { ...rest, rounds: game.type === 'tug' ? Math.min(TUG_ROUNDS, (questions || []).length) : (questions || []).length };
+  if (game.type === 'survival' || game.type === 'tug' || game.type === 'race') return { ...rest, rounds: game.type === 'tug' ? Math.min(TUG_ROUNDS, (questions || []).length) : (questions || []).length };
   // No relâmpago o enunciado é a própria pergunta: o aluno só recebe os botões.
   if (game.type === 'flash') return { ...rest, text: '', options: (game.options || []).map(() => '') };
   return game.type === 'challenge' ? { ...rest, fields: (answer || []).length } : rest;
@@ -181,7 +172,7 @@ export function startGame(room, random = Math.random) {
     for (let i = pool.length - 1; i > 0; i--) { const j = Math.floor(random() * (i + 1)); [pool[i], pool[j]] = [pool[j], pool[i]]; }
     Object.assign(game, { state: 'ready', sides: {}, order: pool.slice(0, TUG_ROUNDS), round: -1, answers: {}, hits: [0, 0], tries: [0, 0], winner: -1, deadline: 0, pullAt: 0 });
   }
-  else if (config.type === 'race') Object.assign(game, { state: 'ready', progress: {}, cleared: {}, trips: {}, jumps: {}, last: {}, finished: [], startAt: 0, goal: config.goal });
+  else if (config.type === 'race') Object.assign(game, { state: 'ready', round: -1, answers: {}, times: {}, dist: {}, gain: {}, spent: {}, order: [], deadline: 0 });
 }
 
 export function gameControl(room, value, random = Math.random) {
@@ -190,7 +181,7 @@ export function gameControl(room, value, random = Math.random) {
   if (action === 'restart') { startGame(room, random); return; }
   if (action === 'end') {
     if (game.type === 'tug' && game.state !== 'done') { if (game.state === 'open') revealTug(room); finishTug(room); }
-    if (game.type === 'race') finishRace(room);
+    if (game.type === 'race') { if (game.state === 'open') revealRace(room); finishRace(room); }
     if (game.type === 'teams') settleTeams(room);
     game.state = 'done'; return;
   }
@@ -203,9 +194,12 @@ export function gameControl(room, value, random = Math.random) {
     game.round++; game.answers = {}; game.state = 'open'; game.startedAt = room.now(); game.deadline = room.now() + config.seconds * 1000;
     return;
   }
-  if (game.type === 'race' && action === 'next' && game.state === 'ready') {
-    if (!online(room).length) throw Error('Espere pelo menos um participante entrar.');
-    game.state = 'open'; game.startAt = room.now() + RACE_COUNTDOWN; return;
+  if (game.type === 'race' && action === 'next') {
+    if (game.state === 'open') { revealRace(room); return; }
+    if (game.state === 'done') throw Error('Esta rodada já terminou.');
+    if (game.state === 'ready' && !online(room).length) throw Error('Espere pelo menos um participante entrar.');
+    game.round++; game.answers = {}; game.times = {}; game.gain = {}; game.state = 'open'; game.startedAt = room.now(); game.deadline = room.now() + config.seconds * 1000;
+    return;
   }
   if (game.type === 'survival' && action === 'next') {
     if (game.state === 'open') { revealSurvival(room); return; }
@@ -241,6 +235,7 @@ export function tickGame(room) {
   if (room.data.phase !== 'game' || !game) return;
   if (game.type === 'survival' && game.state === 'open' && room.now() >= game.deadline) revealSurvival(room);
   if (game.type === 'tug' && game.state === 'open' && room.now() >= game.deadline) revealTug(room);
+  if (game.type === 'race' && game.state === 'open' && room.now() >= game.deadline) revealRace(room);
   if (game.type === 'tug' && game.state === 'pull' && room.now() >= game.pullAt + TUG_PULL_MS) game.state = 'done';
 }
 
@@ -275,12 +270,29 @@ function finishTug(room) {
   if (game.winner >= 0) for (const p of d.players) if (game.sides[p.id] === game.winner) bonus(p, TUG_POINTS);
 }
 
-// ---- Corrida
+// ---- Corrida do saber
+// Fim da pergunta: quem acertou avança RACE_STEP metros + até RACE_SPEED pela rapidez. Quem errou fica parado.
+export function revealRace(room) {
+  const d = room.data, game = d.game, config = room.slides[d.slide]?.game;
+  if (!game || game.type !== 'race' || game.state !== 'open') return;
+  const question = config.questions[game.round], span = Math.max(1, config.seconds * 1000);
+  game.gain = {};
+  for (const [id, choice] of Object.entries(game.answers)) {
+    if (choice !== question.correct) continue;
+    const took = Math.max(0, Math.min(span, game.times[id] ?? span));
+    game.gain[id] = RACE_STEP + Math.round(RACE_SPEED * (1 - took / span));
+    game.dist[id] = (game.dist[id] || 0) + game.gain[id];
+    game.spent[id] = (game.spent[id] || 0) + took;
+  }
+  if (game.round + 1 >= config.questions.length) finishRace(room); else game.state = 'reveal';
+}
+// Classificação: quem foi mais longe; no empate, quem gastou menos tempo nas respostas certas.
+const raceOrder = game => Object.keys(game.dist).filter(id => game.dist[id] > 0).sort((a, b) => game.dist[b] - game.dist[a] || (game.spent[a] || 0) - (game.spent[b] || 0));
 function finishRace(room) {
   const game = room.data.game;
   if (game.paid) return;
-  game.paid = true;
-  game.finished.forEach((id, place) => { const p = room.data.players.find(p => p.id === id); if (p) bonus(p, RACE_POINTS[place] ?? RACE_FINISH); });
+  game.paid = true; game.order = raceOrder(game);
+  game.order.forEach((id, place) => { const p = room.data.players.find(p => p.id === id); if (p) bonus(p, RACE_POINTS[place] ?? RACE_FINISH); });
   game.state = 'done';
 }
 
@@ -288,7 +300,7 @@ function finishRace(room) {
 export function gameInput(room, playerId, payload) {
   const d = room.data, game = d.game, config = room.slides[d.slide]?.game, player = d.players.find(p => p.id === playerId);
   if (!player || d.phase !== 'game' || !game || !config) throw Error('Esta etapa já mudou.');
-  if (game.state !== 'open') throw Error(['survival', 'tug'].includes(game.type) && game.state !== 'done' ? 'Aguarde a próxima pergunta.' : game.type === 'race' && game.state === 'ready' ? 'A corrida ainda não começou.' : 'Esta rodada já terminou.');
+  if (game.state !== 'open') throw Error(['survival', 'tug', 'race'].includes(game.type) && game.state !== 'done' ? 'Aguarde a próxima pergunta.' : 'Esta rodada já terminou.');
   if (!payload || typeof payload !== 'object') throw Error('Resposta inválida.');
   if (game.type === 'survival') {
     const question = config.questions[game.round], choice = payload.choice;
@@ -316,25 +328,12 @@ export function gameInput(room, playerId, payload) {
     return;
   }
   if (game.type === 'race') {
-    const now = room.now(); game.cleared ||= {}; game.trips ||= {}; game.jumps ||= {};
-    // `moves` é a sequência de passos e pulos; `taps` (formato antigo) vale como passos.
-    let moves = typeof payload.moves === 'string' ? payload.moves.replace(/[^sj]/g, '') : 's'.repeat(Math.max(0, Math.min(60, Math.floor(Number(payload.taps) || 0))));
-    if (now < game.startAt) throw Error('Espere a largada!');
-    if (!moves || game.finished.includes(playerId)) return;
-    // Limite de ~12 movimentos por segundo por aluno.
-    const since = Math.max(200, now - (game.last[playerId] || game.startAt));
-    game.last[playerId] = now;
-    moves = moves.slice(0, Math.ceil(since / 1000 * 12));
-    const runner = { pos: game.progress[playerId] || 0, cleared: game.cleared[playerId] || 0 }, hurdles = raceHurdles(game.goal);
-    for (const move of moves) {
-      const result = raceStep(runner, move, game.goal, hurdles);
-      if (result === 'trip') game.trips[playerId] = now;
-      if (result === 'jump') game.jumps[playerId] = now;
-      if (runner.pos >= game.goal) break;
-    }
-    game.progress[playerId] = runner.pos; game.cleared[playerId] = runner.cleared;
-    if (game.progress[playerId] >= game.goal) game.finished.push(playerId);
-    if (game.finished.length >= Math.min(3, online(room).length)) finishRace(room);
+    const question = config.questions[game.round], choice = payload.choice;
+    if (payload.round !== game.round || room.now() >= game.deadline) throw Error('O tempo desta pergunta acabou.');
+    if (!Number.isInteger(choice) || choice < 0 || choice >= question.options.length) throw Error('Resposta inválida.');
+    if (Object.hasOwn(game.answers, playerId)) throw Error('Você já respondeu.');
+    game.answers[playerId] = choice; game.times[playerId] = room.now() - game.startedAt;
+    if (online(room).every(p => Object.hasOwn(game.answers, p.id))) revealRace(room);
     return;
   }
   if (game.type === 'flash') {
@@ -383,14 +382,17 @@ export function gameSnapshot(room, playerId, bare = false) {
   }
   if (game.type === 'raffle') return { ...base, current: who(game.current), drawAt: game.drawAt, draws: game.draws || 0, left: online(room).filter(p => !game.picked.includes(p.id)).length, names: online(room).slice(0, 40).map(p => p.name), me: playerId ? game.current === playerId : false };
   if (game.type === 'race') {
-    const now = room.now(); game.cleared ||= {}; game.trips ||= {}; game.jumps ||= {};
-    const runners = d.players.filter(p => p.online || game.progress[p.id]).map(p => ({ ...who(p.id), p: Math.min(1, (game.progress[p.id] || 0) / game.goal), place: game.finished.indexOf(p.id) + 1, h: game.cleared[p.id] || 0, trip: now - (game.trips[p.id] || -1e9) < 900, air: now - (game.jumps[p.id] || -1e9) < 600 }))
-      .sort((a, b) => (a.place || 99) - (b.place || 99) || b.p - a.p);
-    const mine = runners.find(r => r.id === playerId), shown = runners.slice(0, 8);
-    if (mine && !shown.includes(mine)) shown[7] = mine;
-    const rank = id => runners.findIndex(r => r.id === id) + 1, order = d.players.map(p => p.id);
-    shown.forEach(r => { r.rank = rank(r.id); }); shown.sort((x, y) => order.indexOf(x.id) - order.indexOf(y.id));
-    return { ...base, goal: game.goal, hurdles: raceHurdles(game.goal), startAt: game.startAt, runners: shown, total: runners.length, finished: game.finished.length, points: RACE_POINTS, me: mine ? { p: mine.p, pos: game.progress[playerId] || 0, cleared: mine.h, place: mine.place, rank: runners.indexOf(mine) + 1 } : null };
+    const question = game.round >= 0 ? config.questions[game.round] : null, shown = game.state === 'reveal' || done;
+    const track = config.questions.length * (RACE_STEP + RACE_SPEED), order = done ? game.order : raceOrder(game);
+    const runners = d.players.filter(p => p.online || game.dist[p.id]).map(p => ({ ...who(p.id), p: Math.min(1, (game.dist[p.id] || 0) / track), dist: game.dist[p.id] || 0, rank: order.indexOf(p.id) + 1 || order.length + 1,
+      place: done ? order.indexOf(p.id) + 1 : 0, locked: Object.hasOwn(game.answers, p.id), ...(shown ? { gain: game.gain[p.id] || 0, right: Object.hasOwn(game.gain, p.id) } : {}) }));
+    const mine = runners.find(r => r.id === playerId), top = [...runners].sort((a, b) => a.rank - b.rank).slice(0, 8);
+    if (mine && !top.includes(mine)) top[7] = mine;
+    const shownRunners = runners.filter(r => top.includes(r));
+    return { ...base, round: game.round, rounds: config.questions.length, seconds: config.seconds, deadline: game.deadline, track,
+      question: ask(question, { ...(shown || presenter ? { correct: question?.correct } : {}), ...(shown ? { counts: question?.options.map((_, i) => Object.values(game.answers).filter(v => v === i).length) } : {}) }),
+      answered: Object.keys(game.answers).length, total: runners.length, runners: shownRunners, points: RACE_POINTS,
+      me: mine ? { choice: Object.hasOwn(game.answers, playerId) ? game.answers[playerId] : null, dist: mine.dist, rank: mine.rank, place: mine.place, gain: mine.gain || 0, right: Boolean(mine.right) } : null };
   }
   const count = side => Object.values(game.sides).filter(v => v === side).length;
   const crew = side => Object.keys(game.sides).filter(id => game.sides[id] === side).slice(0, 5).map(who).filter(Boolean);
