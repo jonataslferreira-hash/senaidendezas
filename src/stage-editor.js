@@ -87,6 +87,14 @@ export class StageEditor {
   list(game, node) { return node.dataset.r !== undefined ? game.rounds[Number(node.dataset.r)] : game.questions; }
   game() { const s = this.studio; return s.view === 'editor' && s.tab === 'slides' ? s.draft?.slides?.[s.index]?.game : null; }
   changed(repaint = false) { this.studio.markDirty(); if (repaint) this.studio.callbacks.render(); }
+  // Botão da barra nas etapas: nas dinâmicas de pergunta, gera as perguntas;
+  // nas demais (equipes, sorteio, desafio, enquete), abre o chat do Storage AI.
+  aiAssist() {
+    const s = this.studio, slide = s.draft?.slides?.[s.index], g = slide?.game;
+    if (!s.groups.canEdit) return;
+    if (g && ['flash', 'survival', 'race', 'tug'].includes(g.type)) return this.aiQuestions();
+    if (g || slide?.poll) { s.action('storage-ai'); return; }
+  }
   // Storage AI nas etapas: escreve perguntas para relâmpago, sobrevivência,
   // corrida e cabo de guerra com base no conteúdo real dos slides da aula.
   async aiQuestions() {
