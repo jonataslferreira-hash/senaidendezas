@@ -457,7 +457,14 @@ function render() {
   const transition = arrive && !document.hidden && document.documentElement.dataset.motion !== 'reduced'
     && !matchMedia('(prefers-reduced-motion: reduce)').matches && typeof document.startViewTransition === 'function';
   const run = () => { applyRender(); lastStudioView = state ? null : studio.view; };
-  if (transition) { try { document.startViewTransition(run); return; } catch { /* sem transição: aplica direto */ } }
+  if (transition) {
+    try {
+      // Direção da puxada: avançar para outra visualização entra pela
+      // direita; voltar ao editor entra pela esquerda, como "voltar".
+      document.documentElement.dataset.viewDir = studio.view === 'editor' ? 'back' : 'fwd';
+      document.startViewTransition(run); return;
+    } catch { /* sem transição: aplica direto */ }
+  }
   run();
 }
 function applyRender() {
