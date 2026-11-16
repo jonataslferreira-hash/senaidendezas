@@ -1799,14 +1799,14 @@ html body dialog.cover-picker .cp-stage-actions{display:flex!important;justify-c
 #app .template-picker-dialog .tpl-cat.active{background:var(--ui-tint);border-color:var(--ui-accent);color:var(--ui-ink)}
 #app .template-picker-dialog .tpl-theme-select{display:inline-flex;align-items:center;gap:8px;font-size:12px;color:var(--ui-muted);margin:0}
 #app .template-picker-dialog .tpl-theme-select select{font:inherit;font-size:12px;padding:6px 10px;min-height:32px;border-radius:10px;border:1px solid var(--ui-line);background:var(--ui-panel);color:var(--ui-ink)}
-#app .template-picker-dialog .tpl-grid,#app .template-gallery-dialog .tpl-deck-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;overflow-y:auto;padding:2px 2px 6px;flex:1 1 auto;min-height:0;justify-content:stretch;align-content:start}
-#app .template-picker-dialog .tpl-card,#app .project-dialog .deck-tpl-card{display:flex;flex-direction:column;gap:8px;padding:9px;border-radius:14px;border:1.5px solid var(--ui-line);background:color-mix(in srgb,var(--ui-panel) 88%,transparent);color:var(--ui-ink);text-align:left;cursor:pointer;transition:transform .16s ease,border-color .16s ease,box-shadow .16s ease;min-height:0;height:auto}
+#app .template-picker-dialog .tpl-grid,#app .template-gallery-dialog .tpl-deck-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));grid-auto-rows:max-content;gap:14px;overflow-y:auto;padding:4px 4px 10px;flex:1 1 auto;min-height:0;justify-content:stretch;align-items:stretch;align-content:start}
+#app .template-picker-dialog .tpl-card,#app .project-dialog .deck-tpl-card{display:grid;grid-template-rows:auto 1fr;align-items:start;align-content:start;gap:9px;padding:10px;border-radius:14px;border:1.5px solid var(--ui-line);background:color-mix(in srgb,var(--ui-panel) 92%,transparent);color:var(--ui-ink);text-align:left;cursor:pointer;transition:transform .16s ease,border-color .16s ease,box-shadow .16s ease;width:100%;height:auto;min-height:0;box-sizing:border-box;overflow:hidden}
 #app .template-picker-dialog .tpl-card:hover,#app .project-dialog .deck-tpl-card:hover{transform:translateY(-2px);border-color:var(--ui-accent);box-shadow:0 10px 24px #0003}
 #app .template-picker-dialog .tpl-card.is-basic,#app .template-gallery-dialog .tpl-deck-card.is-basic{border-color:color-mix(in srgb,var(--ui-accent) 55%,var(--ui-line))}
-#app .template-picker-dialog .tpl-thumb,#app .project-dialog .tpl-thumb{display:block;width:100%;aspect-ratio:16/9;flex:none;border-radius:9px;overflow:hidden;position:relative;border:1px solid color-mix(in srgb,var(--ui-line) 70%,transparent);pointer-events:none;background:#171324}
-#app .template-picker-dialog .tpl-thumb .canvas-frame,#app .project-dialog .tpl-thumb .canvas-frame{display:block;width:100%;height:100%}
-#app .template-picker-dialog .tpl-thumb .slide-canvas,#app .project-dialog .tpl-thumb .slide-canvas{width:100%;height:100%;aspect-ratio:16/9;container-type:inline-size;overflow:hidden}
-#app .template-picker-dialog .tpl-info,#app .project-dialog .deck-tpl-meta{display:flex;flex-direction:column;gap:3px;min-width:0}
+#app .template-picker-dialog .tpl-thumb,#app .project-dialog .tpl-thumb{display:block;width:100%;height:0;padding-top:56.25%;aspect-ratio:auto;flex:none;border-radius:9px;overflow:hidden;position:relative;border:1px solid color-mix(in srgb,var(--ui-line) 70%,transparent);pointer-events:none;background:#171324;box-sizing:border-box}
+#app .template-picker-dialog .tpl-thumb .canvas-frame,#app .project-dialog .tpl-thumb .canvas-frame{position:absolute;inset:0;display:block;width:100%;height:100%}
+#app .template-picker-dialog .tpl-thumb .slide-canvas,#app .project-dialog .tpl-thumb .slide-canvas{position:absolute;inset:0;width:100%;height:100%;aspect-ratio:16/9;container-type:inline-size;overflow:hidden}
+#app .template-picker-dialog .tpl-info,#app .project-dialog .deck-tpl-meta{display:flex;flex-direction:column;gap:4px;min-width:0;width:100%}
 #app .template-picker-dialog .tpl-info strong,#app .project-dialog .deck-tpl-meta strong,#app .template-gallery-dialog .tpl-deck-head strong{display:flex;align-items:center;gap:6px;flex-wrap:wrap;font-size:13px;line-height:1.25}
 #app .template-picker-dialog .tpl-info strong em,#app .project-dialog .deck-tpl-meta strong em,#app .template-gallery-dialog .tpl-deck-head em,#app .ext-site-top em{font-style:normal;font-size:10px;font-weight:700;padding:2px 7px;border-radius:999px;background:var(--ui-tint);color:var(--ui-accent);border:1px solid color-mix(in srgb,var(--ui-accent) 35%,transparent)}
 #app .template-picker-dialog .tpl-info small,#app .project-dialog .deck-tpl-meta small{font-size:11.5px;line-height:1.35;color:var(--ui-muted)}
@@ -2002,4 +2002,372 @@ html body dialog.cover-picker .cp-stage-actions{display:flex!important;justify-c
 
 /* Corrida: palco mais aberto e limpo sem caixa fechada pesada */
 #app .game-stage[data-game-type="race"] .race-track{border:0;background:linear-gradient(180deg,rgba(56,189,248,.12),rgba(34,197,94,.08) 32%,rgba(15,23,42,.38));max-width:min(1320px,100%)}
+
+/* 42. QA Rodada 15: contraste do placar da rodada, torres do quiz, pódio sem corte a 100% zoom e celular em pé, diálogo de vídeo, inspetor e áudio */
+
+/* 42.1 Placar da rodada do Quiz: alto contraste no claro e no escuro (remove #5b3c74 fixo de quiz-party.css) */
+#app.quiz-party .rank-score,
+#app.quiz-party .rank-pos,
+#app.quiz-party .rank-row[data-wide=false] .rank-name{color:var(--ui-ink,#1f1833)}
+html[data-appearance=dark] #app.quiz-party .rank-score,
+html[data-appearance=dark] #app.quiz-party .rank-pos,
+html[data-appearance=dark] #app.quiz-party .rank-row[data-wide=false] .rank-name{color:#f8f7ff;text-shadow:0 1px 4px rgba(0,0,0,.45)}
+html[data-appearance=dark] #app.quiz-party .rank-row{background:color-mix(in srgb,var(--c) 22%,#1f1b33);border-color:color-mix(in srgb,var(--c) 56%,rgba(255,255,255,.16))}
+html[data-appearance=dark] #app.quiz-party .rank-lane::before{background:rgba(255,255,255,.12)}
+html[data-appearance=dark] #app.quiz-party .rs-card{background:rgba(30,27,48,.88);border-color:rgba(255,255,255,.16);color:#f8f7ff}
+html[data-appearance=dark] #app.quiz-party .rs-card small{color:#c4bed8}
+html[data-appearance=dark] #app.quiz-party .rs-card strong{color:#ffffff}
+html[data-appearance=dark] #app.quiz-party .rs-card em{color:#e2dcf7}
+
+/* 42.2 Pódio final e Torres do Quiz: 100% encaixados em 100% de zoom no PC, apresentador e celular em pé */
+#app .game-results{display:flex;flex-direction:column;justify-content:space-between;align-items:center;min-height:0;height:100%;max-height:100%;padding:clamp(8px,1.5dvh,16px) clamp(12px,3vw,34px) clamp(10px,1.6dvh,18px);gap:clamp(6px,1.1dvh,14px);overflow-x:hidden;overflow-y:auto;box-sizing:border-box}
+#app .game-results .results-heading{flex:none;margin:0;width:100%;text-align:center}
+#app .game-results .results-heading>span{display:block;font-size:10.5px;font-weight:800;letter-spacing:.16em;text-transform:uppercase;color:var(--ui-muted);margin-bottom:2px}
+#app .game-results .results-heading h1{font-size:clamp(22px,3.8dvh,42px);line-height:1.08;margin:0}
+#app .game-results .final-team-champion{display:inline-flex;align-items:center;justify-content:center;gap:10px;flex:none;width:auto;max-width:min(94%,540px);margin:0 auto;padding:7px 18px;border-radius:999px;background:color-mix(in srgb,var(--team,#60a5fa) 22%,var(--ui-panel,#1f1c32));border:1.5px solid color-mix(in srgb,var(--team,#60a5fa) 70%,#fff 18%);box-shadow:0 6px 22px color-mix(in srgb,var(--team,#60a5fa) 24%,transparent);color:var(--ui-ink,#fff);font-size:clamp(13px,1.6dvh,16px);line-height:1.2}
+#app .game-results .final-team-champion .ftc-crown{font-size:1.15em;line-height:1}
+#app .game-results .final-team-champion strong{font-weight:850;color:var(--ui-ink,#fff)}
+#app .game-results .final-team-champion em{font-style:normal;font-weight:750;padding:2px 9px;border-radius:999px;background:color-mix(in srgb,var(--team,#60a5fa) 32%,transparent);color:var(--ui-ink,#fff);font-size:.9em}
+html[data-appearance=dark] #app .game-results .final-team-champion,
+html[data-appearance=dark] #app .game-results .final-team-champion :is(strong,em){color:#ffffff}
+
+/* Pódio final responsivo (sem min-height fixo gigante que cortava a 100% zoom) */
+#app .grand-finale .final-podium{flex:1 1 auto;min-height:0;height:auto;max-height:100%;width:100%;max-width:min(920px,100%);margin:0 auto;padding-top:8px;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));align-items:end;justify-items:center;gap:clamp(8px,2vw,22px);overflow:visible;container-type:normal}
+#app .grand-finale .final-podium[data-count="1"]{grid-template-columns:minmax(0,300px);justify-content:center}
+#app .grand-finale .final-podium[data-count="1"] .place-1{grid-column:1}
+#app .grand-finale .final-podium[data-count="2"]{grid-template-columns:repeat(2,minmax(0,300px));justify-content:center}
+#app .grand-finale .final-podium[data-count="2"] .place-2{grid-column:1}
+#app .grand-finale .final-podium[data-count="2"] .place-1{grid-column:2}
+#app .grand-finale .final-contestant{height:auto;min-height:0;justify-content:flex-end;gap:2px}
+#app .grand-finale .final-contestant:not(.team-podium-slot) .game-character{--character-scale:.62;width:calc(92px * var(--character-scale));height:calc(145px * var(--character-scale));margin:0 auto}
+#app .grand-finale .team-podium-member .game-character{--character-scale:var(--crew-scale, .56);width:calc(92px * var(--crew-scale, .56));height:calc(145px * var(--crew-scale, .56));margin:0}
+#app .grand-finale .final-contestant>strong{font-size:clamp(13px,1.9dvh,20px);margin:2px 0 0;line-height:1.18}
+#app .grand-finale .final-contestant>span{font-size:clamp(12px,1.5dvh,16px);font-weight:750;opacity:.92;line-height:1.18}
+#app .grand-finale .final-contestant>small{font-size:clamp(10.5px,1.25dvh,12px);margin:1px 0 4px;opacity:.8}
+#app .grand-finale .final-tower{height:clamp(68px,15dvh,140px);min-height:54px;padding:10px 4px;font-size:clamp(26px,4.2dvh,46px);border-radius:18px 18px 0 0;display:grid;place-items:start center}
+#app .grand-finale .place-1 .final-tower{height:clamp(96px,21dvh,186px)}
+#app .grand-finale .place-3 .final-tower{height:clamp(52px,11dvh,106px)}
+#app .grand-finale .final-mine{margin:0;font-size:13px;padding:5px 14px;border-radius:999px;background:var(--ui-soft);border:1px solid var(--ui-line);flex:none}
+#app .grand-finale .game-results-actions{flex:none;margin:0;padding:2px 0;min-height:0;gap:10px}
+#app .grand-finale .result-standings{flex:none;margin:0 auto}
+
+/* Torres verticais do final do Quiz */
+#app .round-towers.quiz-end-towers{flex:1 1 auto;min-height:0;height:auto;width:100%;max-width:min(1060px,100%);margin:0 auto;padding:18px 6px 0;display:flex;align-items:flex-end;justify-content:center;gap:clamp(8px,2vw,22px);overflow:visible;container-type:normal}
+#app .quiz-end-towers .quiz-tower-slot{flex:1 1 0;max-width:168px;min-width:0;height:auto;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;gap:3px;position:relative;animation:contestant-reveal .7s cubic-bezier(.18,.85,.2,1) both;animation-delay:var(--tower-delay,0s)}
+#app .quiz-end-towers .quiz-tower-crown{font-size:clamp(20px,3.2dvh,30px);line-height:1;margin-bottom:-4px;filter:drop-shadow(0 3px 8px rgba(250,204,21,.55));animation:rank-crown .7s cubic-bezier(.3,1.8,.4,1) both}
+#app .quiz-end-towers .quiz-tower-slot .game-character{--character-scale:.6;width:calc(92px * var(--character-scale));height:calc(145px * var(--character-scale));margin:0 auto}
+#app .quiz-end-towers .quiz-tower-slot.place-1 .game-character{--character-scale:.68}
+#app .quiz-end-towers .quiz-tower-slot>strong{font-size:clamp(12px,1.65dvh,17px);font-weight:800;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--ui-ink)}
+#app .quiz-end-towers .quiz-tower-slot>small{font-size:clamp(11px,1.35dvh,13.5px);font-weight:750;color:var(--ui-muted);min-height:0;margin-bottom:4px}
+#app .quiz-end-towers .round-tower{width:100%;max-width:148px;height:clamp(54px,calc(9dvh + var(--tower-ratio,0.2) * 24dvh),215px);min-height:50px;padding:10px 6px 8px;border-radius:16px 16px 4px 4px;background:linear-gradient(160deg,var(--player-color,#a78bfa),color-mix(in srgb,var(--player-color,#a78bfa),#1b1033 36%));box-shadow:inset 0 2px 0 rgba(255,255,255,.45),0 12px 28px rgba(0,0,0,.26);color:#ffffff;display:flex;flex-direction:column;align-items:center;justify-content:flex-start;gap:2px;animation:quiz-tower-rise 1.25s cubic-bezier(.18,.82,.25,1) both;animation-delay:var(--tower-delay,0s)}
+#app .quiz-end-towers .quiz-tower-slot.place-1 .round-tower{background:linear-gradient(160deg,#fde047,#d97706);box-shadow:inset 0 3px 0 rgba(255,255,255,.6),0 0 34px rgba(250,204,21,.35)}
+#app .quiz-end-towers .round-tower>b{font-size:clamp(22px,3.6dvh,36px);line-height:1;color:#fff;text-shadow:0 2px 6px rgba(0,0,0,.28)}
+#app .quiz-end-towers .round-tower>span{font-size:clamp(11px,1.4dvh,15px);font-weight:800;color:rgba(255,255,255,.94);font-variant-numeric:tabular-nums}
+@keyframes quiz-tower-rise{from{transform:scaleY(.12);transform-origin:bottom center;opacity:.45}to{transform:scaleY(1);transform-origin:bottom center;opacity:1}}
+
+@media (max-height:780px){
+  #app .grand-finale .final-contestant:not(.team-podium-slot) .game-character{--character-scale:.52}
+  #app .grand-finale .team-podium-member .game-character{width:calc(92px * var(--crew-scale, .5) * .84);height:calc(145px * var(--crew-scale, .5) * .84);--character-scale:calc(var(--crew-scale, .5) * .84)}
+  #app .grand-finale .final-tower{height:clamp(54px,13dvh,112px)}
+  #app .grand-finale .place-1 .final-tower{height:clamp(78px,18dvh,148px)}
+  #app .grand-finale .place-3 .final-tower{height:clamp(42px,9.5dvh,84px)}
+  #app .quiz-end-towers .quiz-tower-slot .game-character{--character-scale:.5}
+  #app .quiz-end-towers .quiz-tower-slot.place-1 .game-character{--character-scale:.56}
+  #app .quiz-end-towers .round-tower{height:clamp(44px,calc(7.5dvh + var(--tower-ratio,0.2) * 19dvh),168px)}
+}
+
+/* 42.3 Sobrevivência sem arena nos dispositivos dos alunos + adaptação geral em celular em pé (portrait) */
+#app .game-stage[data-game-type="survival"] .game-live.game-arena:empty{display:none}
+#app .game-stage[data-game-type="survival"]:has(.game-live.game-arena:empty){justify-content:center;padding-bottom:24px}
+
+@media (max-width:760px){
+  #app .game-stage{padding:10px 12px 18px;gap:10px;overflow-y:auto}
+  #app .game-stage[data-game-type="survival"] .sv-crowd{min-height:clamp(140px,24dvh,210px);padding:16px 8px 4px;gap:10px 10px}
+  #app .game-stage[data-game-type="survival"] .sv-arena{--scale:.68!important;padding:24px 10px 10px}
+  #app .game-stage[data-game-type="survival"] .sv-player{--roam:14px!important}
+  #app .game-stage[data-game-type="tug"] .tug-field{height:clamp(112px,20dvh,160px);--s:.42}
+  #app .game-stage[data-game-type="tug"] .tug-names{gap:6px}
+  #app .game-stage[data-game-type="tug"] .tug-names>span{padding:8px 10px;min-width:0}
+  #app .game-stage[data-game-type="tug"] .tug-names strong{font-size:18px}
+  #app .game-stage[data-game-type="tug"] .tug-puller-prog{font-size:9.5px;padding:1px 5px}
+  #app .game-stage[data-game-type="race"] .race-track{padding:6px 8px}
+  #app .game-stage[data-game-type="race"] .race-lane{--s:.38;height:calc(145px * var(--s) + 8px)}
+  #app .flash-podium{min-height:0;gap:8px}
+  #app .flash-podium-slot .game-character{transform:scale(.56);margin-bottom:-28px}
+  #app .flash-podium-pedestal{height:76px;font-size:26px}
+  #app .flash-podium-slot.place-1 .flash-podium-pedestal{height:102px}
+  #app .flash-podium-slot.place-3 .flash-podium-pedestal{height:58px}
+  #app .grand-finale .final-podium{gap:8px;padding-top:4px}
+  #app .grand-finale .final-contestant:not(.team-podium-slot) .game-character{--character-scale:.46}
+  #app .grand-finale .team-podium-member{margin:0 -8px}
+  #app .grand-finale .team-podium-member .game-character{width:calc(92px * var(--crew-scale, .42) * .72);height:calc(145px * var(--crew-scale, .42) * .72);--character-scale:calc(var(--crew-scale, .42) * .72)}
+  #app .grand-finale .final-tower{height:clamp(48px,12dvh,92px);font-size:26px}
+  #app .grand-finale .place-1 .final-tower{height:clamp(68px,16dvh,124px)}
+  #app .grand-finale .place-3 .final-tower{height:clamp(38px,9dvh,72px)}
+  #app .quiz-end-towers{gap:6px;padding:10px 2px 0}
+  #app .quiz-end-towers .quiz-tower-slot .game-character{--character-scale:.44}
+  #app .quiz-end-towers .quiz-tower-slot.place-1 .game-character{--character-scale:.5}
+  #app .quiz-end-towers .round-tower{height:clamp(42px,calc(8dvh + var(--tower-ratio,0.2) * 18dvh),148px);padding:7px 3px}
+  #app .quiz-end-towers .round-tower>b{font-size:20px}
+  #app .quiz-end-towers .round-tower>span{font-size:11px}
+}
+@media (max-width:480px) and (orientation:portrait){
+  #app .game-stage[data-game-type="tug"] .tug-field{height:112px;--s:.36}
+  #app .game-stage[data-game-type="race"] .race-lane{--s:.32}
+  #app .grand-finale .final-contestant:not(.team-podium-slot) .game-character{--character-scale:.42}
+  #app .quiz-end-towers .quiz-tower-slot .game-character{--character-scale:.38}
+  #app .quiz-end-towers .quiz-tower-slot.place-1 .game-character{--character-scale:.44}
+}
+
+/* 42.4 Diálogo "Inserir vídeo" refeito com contraste impecável no claro e escuro */
+dialog.video-dialog.video-dialog-v2{
+  width:min(540px,calc(100vw - 24px));
+  padding:0;
+  border:1px solid var(--ui-line,rgba(128,128,148,.24));
+  border-radius:20px;
+  background:var(--ui-panel,#ffffff);
+  color:var(--ui-ink,#1c1829);
+  box-shadow:0 30px 85px rgba(10,8,22,.42);
+  overflow:hidden;
+}
+html[data-appearance=dark] dialog.video-dialog.video-dialog-v2{
+  background:var(--ui-panel,#1e2028);
+  color:var(--ui-ink,#f3f2f8);
+  border-color:rgba(255,255,255,.14);
+  box-shadow:0 32px 96px rgba(0,0,0,.68);
+}
+dialog.video-dialog.video-dialog-v2::backdrop{background:rgba(10,8,20,.62);backdrop-filter:blur(5px)}
+dialog.video-dialog.video-dialog-v2 form{display:flex;flex-direction:column;gap:0;padding:0}
+dialog.video-dialog.video-dialog-v2 .vd-head{
+  display:flex;align-items:flex-start;justify-content:space-between;gap:12px;
+  padding:18px 20px 14px;border-bottom:1px solid var(--ui-line,rgba(128,128,148,.18));
+}
+dialog.video-dialog.video-dialog-v2 .vd-title-wrap{display:flex;align-items:flex-start;gap:12px;min-width:0}
+dialog.video-dialog.video-dialog-v2 .vd-icon{
+  width:40px;height:40px;flex:none;border-radius:12px;display:grid;place-items:center;
+  background:var(--ui-tint,rgba(124,92,240,.16));color:var(--ui-accent,#7c5cf0);
+  border:1px solid color-mix(in srgb,var(--ui-accent,#7c5cf0) 32%,transparent);
+}
+dialog.video-dialog.video-dialog-v2 .vd-head h2{margin:0;font-size:18px;font-weight:800;letter-spacing:-.02em;color:inherit}
+dialog.video-dialog.video-dialog-v2 .vd-subtitle{margin:3px 0 0;font-size:12.5px;line-height:1.4;color:var(--ui-muted,#7a748e)}
+html[data-appearance=dark] dialog.video-dialog.video-dialog-v2 .vd-subtitle{color:#b4b0c7}
+dialog.video-dialog.video-dialog-v2 .vd-close{
+  width:32px;height:32px;min-width:32px;min-height:32px;padding:0;flex:none;
+  border-radius:50%;border:1px solid var(--ui-line,rgba(128,128,148,.24));
+  background:var(--ui-soft,rgba(128,128,148,.12));color:inherit;
+  display:inline-grid;place-items:center;font-size:20px;line-height:1;cursor:pointer;
+}
+dialog.video-dialog.video-dialog-v2 .vd-close:hover{background:var(--ui-tint,rgba(124,92,240,.18));border-color:var(--ui-accent,#7c5cf0)}
+dialog.video-dialog.video-dialog-v2 .vd-body{display:grid;gap:12px;padding:16px 20px 18px}
+dialog.video-dialog.video-dialog-v2 .vd-pills{display:flex;flex-wrap:wrap;gap:6px}
+dialog.video-dialog.video-dialog-v2 .vd-pills span{
+  font-size:11px;font-weight:700;padding:4px 10px;border-radius:999px;
+  background:var(--ui-soft,rgba(128,128,148,.12));border:1px solid var(--ui-line,rgba(128,128,148,.2));
+  color:var(--ui-ink,inherit);
+}
+dialog.video-dialog.video-dialog-v2 .vd-field{display:grid;gap:6px;margin:0}
+dialog.video-dialog.video-dialog-v2 .vd-field>span{font-size:12.5px;font-weight:700;color:inherit}
+dialog.video-dialog.video-dialog-v2 .vd-input-wrap{
+  display:flex;align-items:center;gap:9px;padding:0 12px;border-radius:12px;
+  border:1.5px solid var(--ui-line,rgba(128,128,148,.28));
+  background:var(--ui-soft,rgba(128,128,148,.08));
+  transition:border-color .15s,box-shadow .15s;
+}
+dialog.video-dialog.video-dialog-v2 .vd-input-wrap:focus-within{
+  border-color:var(--ui-accent,#7c5cf0);
+  box-shadow:0 0 0 3px color-mix(in srgb,var(--ui-accent,#7c5cf0) 22%,transparent);
+}
+dialog.video-dialog.video-dialog-v2 .vd-input-wrap svg{color:var(--ui-muted,#7a748e);flex:none}
+dialog.video-dialog.video-dialog-v2 .vd-input-wrap input{
+  border:0;background:transparent;padding:11px 0;width:100%;min-width:0;color:inherit;font:inherit;font-size:13.5px;outline:none;
+}
+dialog.video-dialog.video-dialog-v2 .vd-input-wrap input::placeholder{color:var(--ui-muted,#8a849c);opacity:.85}
+dialog.video-dialog.video-dialog-v2 .video-dialog-hint{
+  margin:0;padding:8px 11px;border-radius:10px;font-size:12px;line-height:1.45;opacity:1;
+  background:var(--ui-soft,rgba(128,128,148,.1));color:var(--ui-muted,#7a748e);
+  border:1px solid transparent;
+}
+html[data-appearance=dark] dialog.video-dialog.video-dialog-v2 .video-dialog-hint{color:#c4c0d6}
+dialog.video-dialog.video-dialog-v2 .video-dialog-hint[data-state=ok]{
+  background:rgba(16,185,129,.12);border-color:rgba(16,185,129,.35);color:#0f7a55;font-weight:650;
+}
+html[data-appearance=dark] dialog.video-dialog.video-dialog-v2 .video-dialog-hint[data-state=ok]{color:#6ee7b7}
+dialog.video-dialog.video-dialog-v2 .video-dialog-hint[data-state=error]{
+  background:rgba(239,68,68,.12);border-color:rgba(239,68,68,.35);color:#b91c1c;font-weight:650;
+}
+html[data-appearance=dark] dialog.video-dialog.video-dialog-v2 .video-dialog-hint[data-state=error]{color:#fca5a5}
+dialog.video-dialog.video-dialog-v2 .video-dialog-preview{
+  border-radius:12px;border:1px solid var(--ui-line,rgba(128,128,148,.22));background:#09090d;
+}
+dialog.video-dialog.video-dialog-v2 .vd-foot{
+  display:flex;align-items:center;justify-content:flex-end;gap:10px;
+  padding:14px 20px;margin:0;border-top:1px solid var(--ui-line,rgba(128,128,148,.18));
+  background:color-mix(in srgb,var(--ui-soft,rgba(128,128,148,.08)) 65%,transparent);
+}
+dialog.video-dialog.video-dialog-v2 .vd-foot button{
+  min-height:40px;padding:0 18px;border-radius:11px;font:inherit;font-size:13px;font-weight:750;cursor:pointer;
+  transition:transform .12s,background .15s,border-color .15s,opacity .15s;
+}
+dialog.video-dialog.video-dialog-v2 .video-dialog-quiet{
+  background:var(--ui-panel,transparent)!important;
+  color:var(--ui-ink,#1c1829)!important;
+  border:1.5px solid var(--ui-line,rgba(128,128,148,.34))!important;
+}
+html[data-appearance=dark] dialog.video-dialog.video-dialog-v2 .video-dialog-quiet{
+  background:rgba(255,255,255,.08)!important;
+  color:#f3f2f8!important;
+  border-color:rgba(255,255,255,.22)!important;
+}
+dialog.video-dialog.video-dialog-v2 .video-dialog-quiet:hover{background:var(--ui-soft,rgba(128,128,148,.18))!important}
+dialog.video-dialog.video-dialog-v2 .video-dialog-go{
+  background:var(--ui-accent,#7c5cf0)!important;
+  color:var(--ui-accent-ink,#ffffff)!important;
+  border:1.5px solid transparent!important;
+}
+dialog.video-dialog.video-dialog-v2 .video-dialog-go:hover:not(:disabled){transform:translateY(-1px)}
+dialog.video-dialog.video-dialog-v2 .video-dialog-go:disabled{opacity:.42;cursor:not-allowed}
+
+/* 42.5 Inspetor direito do editor: mais largo, abas 2x2 (Fundo, Tema, Áudio, Animações) e painel de Áudio renovado */
+@media (min-width:920px){
+  #app .editor-shell .designer-workspace{grid-template-columns:minmax(0,1fr) clamp(264px,22vw,300px)}
+}
+#app .editor-shell .slide-settings-tabs{
+  display:grid!important;grid-template-columns:repeat(2,minmax(0,1fr))!important;gap:7px!important;margin-bottom:10px;
+}
+#app .editor-shell .slide-settings-tabs button{
+  position:relative;display:flex!important;flex-direction:row!important;align-items:center!important;justify-content:flex-start!important;
+  gap:8px!important;min-height:42px!important;padding:8px 10px!important;border-radius:11px!important;
+  font-size:12px!important;font-weight:700!important;text-align:left;
+  background:var(--ui-soft);border:1.5px solid var(--ui-line);color:var(--ui-ink);
+  transition:background .15s,border-color .15s,transform .12s;
+}
+#app .editor-shell .slide-settings-tabs button:hover{border-color:color-mix(in srgb,var(--ui-accent) 60%,var(--ui-line))}
+#app .editor-shell .slide-settings-tabs button[aria-pressed=true]{
+  background:var(--ui-tint)!important;border-color:var(--ui-accent)!important;color:var(--ui-ink)!important;
+  box-shadow:0 2px 10px color-mix(in srgb,var(--ui-accent) 18%,transparent);
+}
+#app .editor-shell .slide-settings-tabs .background-swatch{width:18px;height:18px;border-radius:6px;flex:none;border:1.5px solid rgba(255,255,255,.55);box-shadow:0 1px 3px rgba(0,0,0,.22)}
+#app .editor-shell .slide-settings-tabs svg{width:16px;height:16px;flex:none}
+#app .editor-shell .slide-settings-tabs .tab-glyph{font-size:15px;line-height:1;width:18px;text-align:center;flex:none}
+#app .editor-shell .slide-settings-tabs .tab-glyph.is-active{color:var(--ui-accent)}
+#app .editor-shell .slide-settings-tabs .tab-badge{
+  margin-left:auto;font-style:normal;font-size:10px;font-weight:800;padding:1px 6px;border-radius:999px;
+  background:var(--ui-accent);color:var(--ui-accent-ink,#fff);
+}
+#app .editor-shell .slide-setting-panel{
+  margin-top:0;padding:12px;border-radius:14px;
+  background:color-mix(in srgb,var(--ui-soft) 55%,var(--ui-panel));
+  border:1px solid var(--ui-line);display:grid;gap:12px;
+}
+
+/* Aba unificada de Animações (transição do slide + ordem de elementos) */
+#app .inspector-animations{display:grid;gap:12px}
+#app .inspector-anim-section{
+  display:grid;gap:8px;padding:10px;border-radius:11px;
+  background:var(--ui-panel);border:1px solid var(--ui-line);
+}
+#app .inspector-anim-head{display:flex;align-items:baseline;justify-content:space-between;gap:8px}
+#app .inspector-anim-head strong{font-size:12px;font-weight:800;color:var(--ui-ink)}
+#app .inspector-anim-head small{font-size:10.5px;color:var(--ui-muted)}
+#app .inspector-anim-count{font-size:11px;font-weight:800;padding:2px 7px;border-radius:999px;background:var(--ui-tint);color:var(--ui-accent)}
+#app .inspector-anim-field{margin:0!important}
+#app .inspector-anim-field select{margin:0!important;width:100%;min-height:36px;border-radius:9px;font-size:12.5px}
+#app .inspector-anim-list{list-style:none;margin:0;padding:0;display:grid;gap:6px}
+#app .inspector-anim-list li{
+  display:flex;align-items:center;justify-content:space-between;gap:8px;padding:7px 8px;
+  border-radius:9px;background:var(--ui-soft);border:1px solid var(--ui-line);
+}
+#app .inspector-anim-list li strong{display:block;font-size:11.5px;color:var(--ui-ink);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:140px}
+#app .inspector-anim-list li small{display:block;font-size:10px;color:var(--ui-muted);margin:2px 0 0}
+#app .inspector-anim-list .timeline-actions{display:flex;gap:4px;flex:none}
+#app .inspector-anim-list .timeline-actions button{width:26px;height:26px;min-height:26px;padding:0;border-radius:7px;font-size:12px}
+#app .inspector-anim-empty{margin:0;font-size:11.5px;line-height:1.45;color:var(--ui-muted)}
+
+/* Painel de Áudio do slide v2 — limpo, intuitivo e com chips de slowed */
+#app .audio-editor.audio-editor-v2{
+  display:grid;gap:10px;padding:0;margin:0;border:0;background:transparent!important;color:var(--ui-ink);
+}
+#app details.audio-editor.audio-editor-v2{
+  padding:10px 12px;border-radius:12px;border:1px solid var(--ui-line);background:var(--ui-panel)!important;
+}
+#app details.audio-editor.audio-editor-v2>summary{font-size:12.5px;font-weight:750;cursor:pointer;list-style:none;padding:2px 0}
+#app .audio-editor-v2 .audio-empty-state{
+  display:flex;flex-direction:column;align-items:center;text-align:center;gap:6px;
+  padding:14px 10px;border-radius:12px;border:1.5px dashed var(--ui-line);
+  background:color-mix(in srgb,var(--ui-panel) 85%,transparent);
+}
+#app .audio-editor-v2 .audio-empty-icon{
+  width:34px;height:34px;border-radius:10px;display:grid;place-items:center;font-size:17px;
+  background:var(--ui-tint);color:var(--ui-accent);
+}
+#app .audio-editor-v2 .audio-empty-state p{margin:0;font-size:11.5px;line-height:1.45;color:var(--ui-muted)}
+#app .audio-editor-v2 .audio-source-actions{display:grid;grid-template-columns:1fr 1fr;gap:7px}
+#app .audio-editor-v2 .audio-source-btn{
+  position:relative;display:inline-flex;align-items:center;justify-content:center;gap:5px;
+  min-height:36px;padding:6px 10px;margin:0;border-radius:10px;
+  font:inherit;font-size:12px;font-weight:750;cursor:pointer;text-align:center;overflow:hidden;
+  background:var(--ui-panel);color:var(--ui-ink);border:1.5px solid var(--ui-line);
+  transition:border-color .15s,background .15s,transform .12s;
+}
+#app .audio-editor-v2 .audio-source-btn:hover{border-color:var(--ui-accent);transform:translateY(-1px)}
+#app .audio-editor-v2 .audio-source-btn.is-primary{
+  background:var(--ui-accent);color:var(--ui-accent-ink,#fff);border-color:transparent;
+}
+#app .audio-editor-v2 .audio-source-btn input[type=file]{position:absolute;inset:0;opacity:0;cursor:pointer;width:100%}
+#app .audio-editor-v2 .audio-format-hint{margin:0;font-size:10.5px;line-height:1.4;color:var(--ui-muted)}
+#app .audio-editor-v2 .audio-loaded-card{
+  display:grid;gap:10px;padding:10px;border-radius:12px;
+  background:var(--ui-panel);border:1px solid var(--ui-line);
+}
+#app .audio-editor-v2 .audio-track-header{display:flex;align-items:center;gap:8px;min-width:0}
+#app .audio-editor-v2 .audio-track-badge{
+  width:30px;height:30px;flex:none;border-radius:9px;display:grid;place-items:center;
+  background:var(--ui-tint);color:var(--ui-accent);font-size:14px;font-weight:800;
+}
+#app .audio-editor-v2 .audio-track-meta{flex:1 1 auto;min-width:0;display:grid;gap:1px}
+#app .audio-editor-v2 .audio-name{margin:0;font-size:12px;font-weight:750;color:var(--ui-ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#app .audio-editor-v2 .audio-duration{margin:0;font-size:10.5px;color:var(--ui-muted);font-variant-numeric:tabular-nums}
+#app .audio-editor-v2 .audio-remove-btn{
+  width:26px;height:26px;min-width:26px;min-height:26px;padding:0;flex:none;
+  border-radius:8px;border:1px solid var(--ui-line);background:var(--ui-soft);color:var(--ui-muted);
+  display:inline-grid;place-items:center;font-size:16px;line-height:1;cursor:pointer;
+}
+#app .audio-editor-v2 .audio-remove-btn:hover{border-color:#ef4444;color:#ef4444;background:rgba(239,68,68,.1)}
+#app .audio-editor-v2 .audio-player-el{width:100%;height:36px;margin:0;border-radius:9px}
+#app .audio-editor-v2 .audio-slider-block{display:grid;gap:5px}
+#app .audio-editor-v2 .audio-slider-head{display:flex;align-items:center;justify-content:space-between;gap:6px;font-size:11.5px;font-weight:700;color:var(--ui-ink)}
+#app .audio-editor-v2 .audio-slider-head output{font-variant-numeric:tabular-nums;font-size:11.5px;font-weight:800;color:var(--ui-accent)}
+#app .audio-editor-v2 .audio-speed-meta{display:inline-flex;align-items:center;gap:5px}
+#app .audio-editor-v2 .audio-speed-tag{
+  font-style:normal;font-size:10px;font-weight:750;padding:2px 6px;border-radius:999px;
+  background:var(--ui-soft);color:var(--ui-muted);
+}
+#app .audio-editor-v2 .audio-speed-block[data-slowed="true"] .audio-speed-tag{
+  background:color-mix(in srgb,var(--ui-accent) 20%,transparent);color:var(--ui-accent);
+}
+#app .audio-editor-v2 .audio-speed-chips{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:4px}
+#app .audio-editor-v2 .audio-speed-chip{
+  padding:4px 2px;min-height:26px;border-radius:7px;border:1px solid var(--ui-line);
+  background:var(--ui-soft);color:var(--ui-ink);font:inherit;font-size:10.5px;font-weight:750;
+  cursor:pointer;text-align:center;transition:background .12s,border-color .12s;
+}
+#app .audio-editor-v2 .audio-speed-chip:hover{border-color:var(--ui-accent)}
+#app .audio-editor-v2 .audio-speed-chip.active{
+  background:var(--ui-accent);color:var(--ui-accent-ink,#fff);border-color:transparent;
+}
+#app .audio-editor-v2 input[type=range]{width:100%;margin:0;padding:0;height:20px;accent-color:var(--ui-accent);background:transparent;border:0}
+#app .audio-editor-v2 .audio-field{margin:0!important;display:grid!important;gap:4px!important}
+#app .audio-editor-v2 .audio-field>span{font-size:11.5px;font-weight:700;color:var(--ui-ink)}
+#app .audio-editor-v2 .audio-field select{margin:0!important;width:100%;min-height:34px;border-radius:9px;font-size:12px}
+#app .audio-editor-v2 .audio-toggles{display:grid;gap:6px;padding-top:4px;border-top:1px solid var(--ui-line)}
+#app .audio-editor-v2 .audio-loop{
+  display:flex!important;align-items:center!important;gap:8px!important;margin:0!important;
+  font-size:11.5px!important;color:var(--ui-ink)!important;cursor:pointer;
+}
+#app .audio-editor-v2 .audio-loop input[type=checkbox]{width:15px;height:15px;margin:0;flex:none;accent-color:var(--ui-accent)}
+#app .designer-notes{margin-top:12px;border-radius:12px;border:1px solid var(--ui-line);background:var(--ui-panel);padding:0}
+#app .designer-notes>summary{padding:10px 12px;font-size:12px;font-weight:700}
+#app .designer-notes[open]{padding-bottom:10px}
+#app .designer-notes[open]>label{margin:8px 12px 0!important}
+
 

@@ -50,10 +50,18 @@ export class Room {
     p.online = true;assignTeam(this,p);syncGameJoin(this,p);
     return { id: p.id, token: p.token };
   }
-  disconnect(id) { const p = this.data.players.find(p => p.id === id); if (p) p.online = false; }
+  disconnect(id) { const p = this.data.players.find(p => p.id === id); if (p) { p.online = false; this.checkAutoReveal(); } }
+  checkAutoReveal() {
+    const d = this.data;
+    if (d.phase !== 'question') return;
+    const online = d.players.filter(pl => pl.online);
+    if (online.length && online.every(pl => pl.answers[d.questionIndex])) {
+      d.deadline = Math.min(d.deadline, this.now() + 350);
+    }
+  }
   control(action, value) {
     const d = this.data;
-    if(action==='next-stage'&&this.blocks){const a=this.activity(),next=a.slideIndices[a.slideIndices.indexOf(d.slide)+1];if(a.type==='poll'&&next!==undefined){d.slide=next;d.phase='poll';d.pollId=newToken();d.votes={};}else if(isGameType(a.type)&&next!==undefined){d.slide=next;startGame(this);}else if((d.blockIndex||0)+1<this.blocks.length)this.enterBlock((d.blockIndex||0)+1);else {d.phase='finished';d.resultStartedAt=this.now();d.podiumRevealed=false;d.podiumStep=0;d.victory=Math.floor(Math.random()*4);}
+    if(action==='next-stage'&&this.blocks){const a=this.activity(),next=a.slideIndices[a.slideIndices.indexOf(d.slide)+1];if(a.type==='poll'&&next!==undefined){d.slide=next;d.phase='poll';d.pollId=newToken();d.votes={};}else if(isGameType(a.type)&&next!==undefined){d.slide=next;startGame(this);}else if((d.blockIndex||0)+1<this.blocks.length)this.enterBlock((d.blockIndex||0)+1);else {d.phase='finished';d.resultScope='overall';d.resultStartedAt=this.now();d.podiumRevealed=false;d.podiumStep=0;d.victory=Math.floor(Math.random()*4);}
     } else if (action === 'edit-slide' && d.phase === 'lesson' && value?.index === d.slide) {
       const nextSlides = this.slides.map((slide, i) => i === value.index ? { ...value.slide, id: slide.id } : slide);
       const next = validateLesson({ ...this.lesson, slides: nextSlides });
@@ -62,7 +70,7 @@ export class Room {
       if (changedModel) { d.model = next.slides[d.slide].model; d.exploded = false; }
     } else if(action==='game'){gameControl(this,value);
     } else if(action==='kick'){this.kick(value);
-    } else if(action==='ranking'&&d.phase==='reveal'){d.phase=d.questionIndex+1===this.questions.length?'finished':'leaderboard';d.resultStartedAt=this.now();d.podiumRevealed=false;d.podiumStep=0;d.victory=Math.floor(Math.random()*4);
+    } else if(action==='ranking'&&d.phase==='reveal'){d.phase=d.questionIndex+1===this.questions.length?'finished':'leaderboard';d.resultScope='quiz';d.resultStartedAt=this.now();d.podiumRevealed=false;d.podiumStep=0;d.victory=Math.floor(Math.random()*4);
     } else if(action==='podium-all'&&d.phase==='finished'){d.podiumRevealed=true;d.podiumStep=4;
     } else if(action==='animation'&&d.phase==='lesson'){const max=Math.max(0,...(this.slides[d.slide].animations||[]).map(a=>a.group||0));d.animationStep=Math.max(0,Math.min(max,Math.floor(Number(value)||0)));
     } else if (action === 'slide' && d.phase === 'lesson' && Number.isInteger(value) && value >= 0 && value < this.slides.length) {
@@ -95,15 +103,17 @@ export class Room {
     } else if (action === 'reveal' && d.phase === 'question') this.reveal();
     else if (action === 'next' && ['reveal','leaderboard'].includes(d.phase)) {
       if (d.questionIndex + 1 < this.questions.length) this.startQuestion(d.questionIndex + 1);
-      else {d.phase = 'finished';d.resultStartedAt=this.now();d.podiumRevealed=false;d.podiumStep=0;d.victory=Math.floor(Math.random()*4);}
-    } else if (action === 'finish' && d.phase === 'lesson') { d.phase = 'finished'; d.resultStartedAt = this.now(); d.podiumRevealed = false; d.podiumStep = 0; d.victory = Math.floor(Math.random() * 4); }
+      else {d.phase = 'finished';d.resultScope='quiz';d.resultStartedAt=this.now();d.podiumRevealed=false;d.podiumStep=0;d.victory=Math.floor(Math.random()*4);}
+    } else if (action === 'finish' && d.phase === 'lesson') { d.phase = 'finished'; d.resultScope = 'overall'; d.resultStartedAt = this.now(); d.podiumRevealed = false; d.podiumStep = 0; d.victory = Math.floor(Math.random() * 4); }
     else if (action === 'lesson' && ['lobby', 'countdown', 'reveal','leaderboard', 'finished', 'poll', 'poll-results', 'game'].includes(d.phase)) {if(this.blocks&&(['quiz','poll'].includes(this.blocks[d.blockIndex||0].type)||isGameType(this.blocks[d.blockIndex||0].type))){if(!['lobby','countdown'].includes(d.phase)&&(d.blockIndex||0)+1<this.blocks.length)this.enterBlock((d.blockIndex||0)+1);else{const first=this.blocks.findIndex(b=>b.type==='slides');if(first>=0)this.enterBlock(first);else d.phase='finished';}}else{d.phase = 'lesson'; d.questionIndex = -1;} }
     else throw Error('Esta ação não está disponível agora.');
   }
   updateProfile(id,{name,avatar}={}){const p=this.data.players.find(p=>p.id===id);if(!p)throw Error('Participante não encontrado.');name=String(name||'').trim().replace(/[\x00-\x1f\x7f]/g,'').slice(0,24);if(!name)throw Error('Digite seu nome.');p.name=name;if(avatars.includes(avatar)||isPhotoAvatar(avatar))p.avatar=avatar;}
-  kick(id){const p=this.data.players.find(p=>p.id===id);if(!p)throw Error('Participante não encontrado.');this.data.removedTokens=[...(this.data.removedTokens||[]),p.token].slice(-120);this.data.players=this.data.players.filter(p=>p.id!==id);if(this.data.votes)delete this.data.votes[id];}
+  kick(id){const p=this.data.players.find(p=>p.id===id);if(!p)throw Error('Participante não encontrado.');this.data.removedTokens=[...(this.data.removedTokens||[]),p.token].slice(-120);this.data.players=this.data.players.filter(p=>p.id!==id);if(this.data.votes)delete this.data.votes[id];this.checkAutoReveal();}
   startQuestion(index) {
-    this.data.previousRanking=[...this.data.players].sort((a,b)=>(b.score+(b.bonus||0))-(a.score+(a.bonus||0))||b.correct-a.correct||a.name.localeCompare(b.name,'pt-BR')).map(p=>p.id);this.data.previousScores=Object.fromEntries(this.data.players.map(p=>[p.id,p.score]));this.data.previousBonus=Object.fromEntries(this.data.players.map(p=>[p.id,p.bonus||0]));
+    this.data.previousRanking=[...this.data.players].sort((a,b)=>(b.score+(b.bonus||0))-(a.score+(a.bonus||0))||b.correct-a.correct||a.name.localeCompare(b.name,'pt-BR')).map(p=>p.id);
+    this.data.previousQuizRanking=[...this.data.players].sort((a,b)=>b.score-a.score||b.correct-a.correct||a.name.localeCompare(b.name,'pt-BR')).map(p=>p.id);
+    this.data.previousScores=Object.fromEntries(this.data.players.map(p=>[p.id,p.score]));this.data.previousBonus=Object.fromEntries(this.data.players.map(p=>[p.id,p.bonus||0]));
     Object.assign(this.data, { questionIndex: index, phase: 'question', startedAt: this.now(), deadline: this.now() + this.questions[index].seconds * 1000 });
   }
   answer(id, { choice, questionIndex } = {}) {
@@ -123,6 +133,7 @@ export class Room {
     const correct = choice === q.correct;
     const remaining = Math.max(0, Math.min(1, (d.deadline - this.now()) / (d.deadline - d.startedAt)));
     p.answers[d.questionIndex] = { choice, correct, points: correct ? Math.round(q.base * (0.5 + 0.5 * remaining)) : 0 };
+    this.checkAutoReveal();
   }
   reveal() {
     if (this.data.phase !== 'question') return;
@@ -147,17 +158,29 @@ export class Room {
     const bare = Boolean(id) && !this.fullText;
     const hasScoredStages = this.lesson.questions.length > 0 || this.slides.some(s => s.game && !['teams', 'raffle'].includes(s.game.type));
     const slideTransition = this.slides[d.slide]?.transition || 'slide';
+    const quizRanking = d.players.map(({ id, name, avatar, score, answers, online, streak, team }) => ({
+      id, name, avatar,
+      ...(Number.isInteger(team) ? { team } : {}),
+      ...(d.teams?.[team] ? { color: d.teams[team].color } : {}),
+      score,
+      correct: Object.values(answers || {}).filter(item => item?.correct).length,
+      online,
+      streak: streak || 0,
+      previousScore: d.previousScores?.[id] || 0,
+      previousRank: (d.previousQuizRanking || []).indexOf(id) + 1
+    })).sort((a, b) => b.score - a.score || b.correct - a.correct || a.name.localeCompare(b.name, 'pt-BR'));
     return {
-      code: d.code, phase: d.phase,activity:this.activity(),resultStartedAt:d.resultStartedAt||0,podiumRevealed:Boolean(d.podiumRevealed),podiumStep:d.phase==='finished'?(d.resultStartedAt?d.podiumStep||0:4):0,victory:d.victory||0, animationStep:d.animationStep||0, slide: d.slide, slideTransition, hasScoredStages, model: d.model, exploded: d.exploded,
+      code: d.code, phase: d.phase,activity:this.activity(),resultScope:d.resultScope||'',resultStartedAt:d.resultStartedAt||0,podiumRevealed:Boolean(d.podiumRevealed),podiumStep:d.phase==='finished'?(d.resultStartedAt?d.podiumStep||0:4):0,victory:d.victory||0, animationStep:d.animationStep||0, slide: d.slide, slideTransition, hasScoredStages, model: d.model, exploded: d.exploded,
       questionIndex: d.questionIndex, totalQuestions: this.questions.length, serverTime: this.now(),
       countdownEndsAt: d.phase === 'countdown' ? d.deadline : 0,
       game: gameSnapshot(this, id, bare), teams: teamScores(this),
       poll: ['poll', 'poll-results'].includes(d.phase) ? { ...this.slides[d.slide].poll, id: d.pollId, total: Object.keys(d.votes).length, choice: p && Object.hasOwn(d.votes, id) ? d.votes[id] : null, counts: this.slides[d.slide].poll.options.map((_, i) => Object.values(d.votes).filter(v => v === i).length) } : null,
       ...(includeLesson ? { lesson: this.publicLesson(!id) } : {}),
       ranking: d.players.map(({ id, name, avatar, score, bonus, correct, online,streak,team }) => ({ id, name, avatar,...(Number.isInteger(team)?{team}:{}),...(d.teams?.[team]?{color:d.teams[team].color}:{}), score:score+(bonus||0), correct, online,streak:streak||0,previousScore:(d.previousScores?.[id]||0)+(d.previousBonus?.[id]||0),previousRank:(d.previousRanking||[]).indexOf(id)+1 })).sort((a, b) => b.score - a.score || b.correct - a.correct || a.name.localeCompare(b.name, 'pt-BR')),
+      quizRanking,
       answeredCount: d.players.filter(p => p.answers[d.questionIndex]).length,
       question: q && d.phase !== 'lesson' ? { text: bare ? '' : q.text, options: q.options.map(o => bare ? '' : o), bare, difficulty: q.difficulty, base: q.base, startedAt: d.startedAt, deadline: d.deadline, ...(revealed ? { correct: q.correct, explanation: bare ? '' : q.explanation } : {}) } : null,
-      me: p ? { id: p.id,name:p.name,avatar:p.avatar,streak:p.streak||0,bonus:p.bonus||0,team:Number.isInteger(p.team)?p.team:null, score: p.score+(p.bonus||0), answer: a ? { choice: a.choice, ...(revealed ? { points: a.points, correct: a.correct } : {}) } : null } : null
+      me: p ? { id: p.id,name:p.name,avatar:p.avatar,streak:p.streak||0,bonus:p.bonus||0,quizScore:p.score,team:Number.isInteger(p.team)?p.team:null, score: p.score+(p.bonus||0), answer: a ? { choice: a.choice, ...(revealed ? { points: a.points, correct: a.correct } : {}) } : null } : null
     };
   }
 }

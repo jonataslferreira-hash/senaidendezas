@@ -5,7 +5,8 @@ html #app .editor-music .music-panel.music-panel-v3,
 html #app .editor-context .music-panel.music-panel-v3,
 html body .music-panel.music-panel-v3{
   position:fixed!important;
-  inset:auto!important;
+  right:auto;
+  bottom:auto;
   margin:0!important;
   padding:16px!important;
   display:flex!important;
