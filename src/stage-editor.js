@@ -1,6 +1,7 @@
 // Editor das etapas interativas (equipes, relâmpago, sobrevivência, desafio, sorteio, cabo de guerra, corrida).
 import { gameNames, gameHints, defaultGame, isGameType } from './stage-games.js';
 import { gameIcon } from './stage-games-view.js';
+import { studioIcon } from './studio-icons.js';
 import { Simulations, simulationMarkup, simulationGroups, simulationNames } from './simulations.js';
 
 const esc = value => String(value ?? '').replace(/[&<>"']/g, char => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[char]);
@@ -78,13 +79,43 @@ export class StageEditor {
         else return;
       } else if (action === 'add-option' && game.options.length < 4) game.options.push('');
       else if (action === 'remove-option' && game.options.length > 2) { game.options.splice(Number(button.dataset.index), 1); game.correct = Math.min(game.correct, game.options.length - 1); }
+      else if (action === 'ai-questions') { this.aiQuestions(); return; }
       else return;
       this.changed(true);
-    });
+  });
   }
   list(game, node) { return node.dataset.r !== undefined ? game.rounds[Number(node.dataset.r)] : game.questions; }
   game() { const s = this.studio; return s.view === 'editor' && s.tab === 'slides' ? s.draft?.slides?.[s.index]?.game : null; }
   changed(repaint = false) { this.studio.markDirty(); if (repaint) this.studio.callbacks.render(); }
+  // Storage AI nas etapas: escreve perguntas para relâmpago, sobrevivência,
+  // corrida e cabo de guerra com base no conteúdo real dos slides da aula.
+  async aiQuestions() {
+    const s = this.studio, slide = s.draft?.slides?.[s.index], g = slide?.game;
+    if (!g || !['flash', 'survival', 'race', 'tug'].includes(g.type)) return;
+    const button = s.root.querySelector('[data-game-edit="ai-questions"]');
+    const note = s.root.querySelector('[data-ai-note]');
+    if (button) { button.disabled = true; button.classList.add('is-loading'); }
+    if (note) note.textContent = 'O Storage AI está escrevendo as perguntas…';
+    try {
+      const skip = [...(g.questions || []), ...(g.rounds || []).flat()].map(q => q?.text).filter(Boolean);
+      const questions = await s.ai.stageQuestions({ count: g.type === 'tug' ? 8 : 10, skip });
+      if (!questions.length) throw Error('A IA não retornou perguntas. Tente novamente.');
+      if (g.type === 'tug') {
+        g.rounds = [];
+        for (let i = 0; i < questions.length; i += 2) g.rounds.push(questions.slice(i, i + 2));
+      } else {
+        g.questions = questions;
+      }
+      s.markDirty();
+      s.callbacks.toast(`${questions.length} perguntas geradas pelo Storage AI.`);
+    } catch (error) {
+      s.callbacks.toast(error?.message || 'Não foi possível gerar as perguntas.');
+      if (note) note.textContent = error?.message || 'Não foi possível gerar as perguntas.';
+      if (button) { button.disabled = false; button.classList.remove('is-loading'); }
+      return;
+    }
+    s.callbacks.render();
+  }
   markup() {
     const s = this.studio, slide = s.draft.slides[s.index];
     if (!slide.game) slide.game = defaultGame(s.currentBlock()?.type);
@@ -94,7 +125,7 @@ export class StageEditor {
     if (g.type === 'tug' && !Array.isArray(g.rounds)) { g.rounds = (Array.isArray(g.questions) && g.questions.length ? g.questions : [{ text: '', options: ['', ''], correct: 0 }]).slice(0, 12).map(q => [q]); delete g.questions; }
     const field = (label, html, hint = '') => `<div class="stage-field"><label>${label}</label>${html}${hint ? `<small>${hint}</small>` : ''}</div>`;
     let body = field(g.type === 'teams' ? 'Frase de abertura' : g.type === 'raffle' ? 'Título do sorteio' : g.type === 'tug' || g.type === 'race' || g.type === 'flash' ? 'Título no telão' : g.type === 'challenge' ? 'Meta que os alunos devem atingir' : 'Pergunta', `<input type="text" data-game-field="text" maxlength="300" value="${esc(g.text)}" ${off}>`);
-    if (g.type === 'teams') body += field('Quantos times', `<select data-game-field="count" ${off}>${[2, 3, 4].map(n => `<option value="${n}" ${g.count === n ? 'selected' : ''}>${n} times</option>`).join('')}</select>`, 'Os pontos do quiz e das outras dinâmicas somam para o time, e o placar aparece nos rankings. Coloque esta etapa antes do quiz; se quiser mostrar o placar final, adicione outra etapa "Equipes" no fim.');
+    if (g.type === 'teams') body += field('Quantos times', `<select data-game-field="count" ${off}>${Array.from({ length: 9 }, (_, i) => i + 2).map(n => `<option value="${n}" ${g.count === n ? 'selected' : ''}>${n} times</option>`).join('')}</select>`, 'Os pontos do quiz e das outras dinâmicas somam para o time, e o placar aparece nos rankings. Coloque esta etapa antes do quiz; se quiser mostrar o placar final, adicione outra etapa "Equipes" no fim. Na apresentação dá para mudar a quantidade na hora, sem perder nome, foto e líder dos times. Toque no nome de um aluno para torná-lo líder: o líder pode trocar o nome e a foto da equipe pelo próprio celular.');
     if (g.type === 'teams') body += field('Como formar os times', `<select data-game-field="pick" ${off}><option value="0" ${g.pick ? '' : 'selected'}>Sorteio automático</option><option value="1" ${g.pick ? 'selected' : ''}>Cada aluno escolhe o seu time</option></select>`, g.pick ? 'Os alunos tocam no time que querem no celular. Quando você fechar a escolha (ou passar de etapa), quem não escolheu entra no time com menos gente.' : 'Os alunos são distribuídos automaticamente, sempre equilibrando os times.');
     // Um cartão por pergunta. `r` é a rodada (só no cabo de guerra).
     const cards = (list, r, legend, removable) => list.map((q, n) => { const at = `data-q="${n}"${r === undefined ? '' : ` data-r="${r}"`}`; return `<fieldset class="stage-question"><legend>${legend(n)}</legend><input type="text" data-game-field="sv-text" ${at} maxlength="300" value="${esc(q.text)}" placeholder="Escreva a pergunta" ${off}>
@@ -132,6 +163,7 @@ export class StageEditor {
         ${g.answer?.length ? `<ul class="stage-answer-list">${g.answer.map((item, i) => item.k === 'text' ? '' : `<li><label><input type="checkbox" data-game-field="skip" data-index="${i}" ${item.skip ? '' : 'checked'} ${off}> <span>${esc(item.label)}</span> <b>${esc(item.v)}</b></label></li>`).join('')}</ul><small>Desmarque os controles que não importam para a resposta.</small>` : '<p class="stage-help warn">Ainda não há resposta marcada.</p>'}
         ${marked.some(item => item.k === 'range') ? `<label class="stage-tolerance">Margem de erro nos controles deslizantes <output>${g.tolerance}%</output><input type="range" min="1" max="25" step="1" value="${g.tolerance}" data-game-field="tolerance" ${off}></label>` : ''}</div>`;
     }
+    if (['flash', 'survival', 'race', 'tug'].includes(g.type) && !off) body += `<div class="stage-field stage-ai-field"><button type="button" class="studio-btn quiet" data-game-edit="ai-questions">${studioIcon('sparkle')} Gerar perguntas com o Storage AI</button><small data-ai-note>Escreve perguntas sobre o conteúdo dos slides desta aula e substitui as atuais.</small></div>`;
     return `${s.itemToolbar('slide', s.index, s.draft.slides.length)}<div class="poll-block-editor stage-editor" data-stage-type="${g.type}"><h2>${gameIcon(g.type)} ${esc(gameNames[g.type])}</h2><p class="stage-help">${esc(gameHints[g.type])}</p>${body}</div>`;
   }
   // Monta o experimento do desafio e devolve os controles à resposta já marcada.

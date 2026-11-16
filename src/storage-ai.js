@@ -28,6 +28,7 @@ const starters=[
   {icon:'sparkle',label:'Preparar um quiz',prompt:'Crie uma apresentação com um quiz sobre '},
   {icon:'image',label:'Usar minhas fotos'}
 ];
+import { dedupeQuestions } from './question-dedupe.js';
 const text=(value,max)=>typeof value==='string'?value.trim().slice(0,max):'';
 // A IA às vezes devolve marcação. No slide, asteriscos, crases e hashtags
 // aparecem como sujeira visual, então o texto é limpo antes de virar layout.
@@ -236,7 +237,7 @@ async function buildLesson(result,count,photos,onSlide,activities={},imageDefaul
   const refDesign=composeAISlide({spec:{layout:'statement',theme:sharedTheme||specs[0]?.theme,font},index:count+1,title:'Referências',body:referenceBody,images:[],model:null,previous});
   const references={...newSlide(),kind:'canvas',title:'Referências',background:refDesign.background,backgroundFill:refDesign.backgroundFill,visualTheme:refDesign.theme,elements:refDesign.elements,note:referenceBody};
   lesson.slides.push(references);await onSlide(references,lesson.title);
-  if(Array.isArray(result.questions))lesson.questions=result.questions.slice(0,30).map((item,index)=>{
+  if(Array.isArray(result.questions))lesson.questions=dedupeQuestions(result.questions).slice(0,30).map((item,index)=>{
     const options=Array.isArray(item?.options)?item.options.slice(0,4).map(value=>text(value,300)):[];
     if(!text(item?.text,600)||options.length<2||options.some(value=>!value)||!Number.isInteger(item.correct)||item.correct<0||item.correct>=options.length)throw Error(`A pergunta ${index+1} veio incompleta. Tente gerar novamente.`);
     const question=newQuestion();
@@ -725,6 +726,25 @@ export class StorageAI {
       this.busy=false;
       this.renderCreate();
     }
+  }
+  // Perguntas para uma etapa de jogo (relâmpago, sobrevivência, corrida, cabo
+  // de guerra): usa o conteúdo real dos slides da aula aberta no editor.
+  async stageQuestions({ count = 10, skip = [] } = {}) {
+    const lesson = this.studio.draft;
+    if (!lesson) throw Error('Abra uma aula para usar o Storage AI.');
+    const total = Math.max(1, Math.min(10, Math.round(count)));
+    const summary = lesson.slides.filter(slide => !slide.poll && !slide.game).slice(0, 24).map((slide, index) => {
+      const points = Array.isArray(slide.points) ? slide.points.filter(Boolean).join('; ') : '';
+      return `${index + 1}. ${slide.title || ''}${slide.intro ? ' — ' + String(slide.intro).slice(0, 140) : ''}${points ? ' · ' + points.slice(0, 220) : ''}`;
+    }).join('\n').slice(0, 2600);
+    const avoid = skip.map(item => String(item).slice(0, 90)).join(' / ').slice(0, 900);
+    const prompt = `Crie apenas atividades para esta aula; não crie slides. Tema: ${text(lesson.title, 140) || 'aula'}.\nConteúdo real dos slides:\n${summary || 'use o tema da aula'}\n\nEscreva exatamente ${total} questões de múltipla escolha sobre os assuntos destes slides. Cada questão deve cobrir um ponto DIFERENTE do conteúdo (conceito, aplicação, comparação, exemplo, causa e consequência), com linguagem clara para estudantes brasileiros. Não crie perguntas genéricas que funcionariam em qualquer aula: cite os conceitos específicos dos slides. Cada questão precisa de 2 a 4 alternativas, índice da resposta certa, dificuldade, tempo e explicação. Não repita nem reformule estas perguntas: ${avoid || 'nenhuma'}. Retorne JSON com questions.`;
+    const result = await this.ask({ mode: 'create', prompt, count: 1, activities: { quizzes: 1, questions: total, polls: 0 } }, AbortSignal.timeout(70000));
+    return (Array.isArray(result.questions) ? result.questions : []).map(item => {
+      const options = Array.isArray(item?.options) ? item.options.slice(0, 4).map(value => text(value, 200)) : [];
+      if (!text(item?.text, 300) || options.length < 2 || options.some(value => !value) || !Number.isInteger(item.correct) || item.correct < 0 || item.correct >= options.length) return null;
+      return { text: text(item.text, 300), options, correct: item.correct };
+    }).filter(Boolean);
   }
   async ask(input,signal) {
     const {data}=await this.studio.account.client.auth.getSession();
@@ -1272,7 +1292,7 @@ export class StorageAI {
       }
       // Dinâmicas pedidas no texto (sobrevivência, cabo de guerra, relâmpago…): pedimos perguntas a mais para elas.
       const games=requestedGames(prompt,session?.games,session?.gameCounts),gamePlan=withGameQuestions(activities,games);
-      const result=await this.ask({mode:'create',prompt:generationPrompt,count,activities:gamePlan.request,photos:references,photoCount:images.length,photoSheet},AbortSignal.any([job.controller.signal,AbortSignal.timeout(160000)]));
+      const result=await this.ask({mode:'create',prompt:generationPrompt+'\n\nAs perguntas do quiz devem cobrir exatamente os assuntos dos slides que você criar: uma pergunta por conceito ou exemplo, sem repetir o mesmo fato e sem perguntas genéricas de conhecimento geral.',count,activities:gamePlan.request,photos:references,photoCount:images.length,photoSheet},AbortSignal.any([job.controller.signal,AbortSignal.timeout(160000)]));
       result.sources=researchSources;
       const activityNotice=await this.completeActivities(result,{...gamePlan.request,want:gamePlan.want},prompt,job.controller.signal,result.slides);
       takeGameQuestions(result,games,gamePlan.quizTotal);

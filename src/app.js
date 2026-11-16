@@ -6,7 +6,10 @@ import {GameLayout} from './game-layout.js';
 import {GameAudio} from './game-audio.js';
 import {quizMarkup,leaderboardMarkup,animateRanking} from './game-ui.js';
 import { downloadResultsPng } from './results-png.js';
-import { gameMarkup, keepGame, animateRaffle } from './stage-games-view.js';
+import { gameMarkup, keepGame, animateRaffle, gameIcon } from './stage-games-view.js';
+import { gameNames } from './stage-games.js';
+import { blockNames } from './activity-blocks.js';
+import { optimizeImage } from './image-optimize.js';
 import { applyAudioPlayback } from './audio-data.js';
 import {Simulations} from './simulations.js';
 import {loadSlideFonts} from './fonts.js';
@@ -361,9 +364,38 @@ function keepLiveSlide(markup, key) {
   });
   return true;
 }
+// Abertura das etapas: cartela animada com o nome da etapa e fanfarra curta.
+let introStageKey = '';
+function stageIntro() {
+  if (!state) { introStageKey = ''; return; }
+  let key = '', label = '', icon = '';
+  if (state.phase === 'lesson' && state.activity && state.activity.type !== 'slides') {
+    key = `${state.code || 'aula'}:${state.activity.type}:${state.activity.slideIndices?.[0] ?? state.slide}`;
+    label = blockNames[state.activity.type] || 'Etapa';
+    icon = gameIcon(state.activity.type);
+  } else if (state.phase === 'game' && state.game) {
+    key = `${state.code || 'aula'}:game:${state.game.type}:${state.slide}`;
+    label = gameNames[state.game.type] || 'Dinâmica';
+    icon = gameIcon(state.game.type);
+  } else if (state.phase === 'quiz') {
+    key = `${state.code || 'aula'}:quiz`;
+    label = 'Quiz';
+    icon = gameIcon('quiz');
+  }
+  if (!key || introStageKey === key) { if (!key) introStageKey = ''; return; }
+  introStageKey = key;
+  const overlay = document.createElement('div');
+  overlay.className = 'stage-intro';
+  overlay.setAttribute('aria-hidden', 'true');
+  overlay.innerHTML = `<div class="stage-intro-card"><span class="stage-intro-icon">${icon}</span><strong>${esc(label)}</strong><span class="stage-intro-sub">${esc(activeLesson?.title || '')}</span></div>`;
+  document.body.append(overlay);
+  setTimeout(() => overlay.remove(), 2100);
+  gameAudio.playStageIntro();
+}
 function render() {
   // Em sala ao vivo (slides, quiz e jogos) animações e transições definidas na aula sempre tocam, exceto se o usuário escolher "reduzido" no perfil.
   document.documentElement.toggleAttribute('data-play', Boolean(state));
+  stageIntro();
   const slideMotionKey = state?.phase === 'lesson' ? `${activeLesson.id}:${state.code}:${state.slide}` : '';
   const activeTransition = state?.slideTransition || slides[state?.slide]?.transition || 'slide';
   const outgoingSlide = pageMotion.captureSlide(app, slideMotionKey, activeTransition);
@@ -632,12 +664,53 @@ app.addEventListener('submit', event => {
 app.addEventListener('click', event => {
   const button = event.target.closest('[data-game-send],[data-game-do],[data-challenge-send]');
   if (!button || button.disabled || !state?.game) return;
-  if (button.dataset.gameDo) { if (host) control('game', { do: button.dataset.gameDo, id: button.dataset.id }); return; }
+  if (button.dataset.gameDo === 'team-rename') { if (host) control('game', { do: 'team-rename', team: Number(button.dataset.team), name: button.closest('.team-rename')?.querySelector('[data-team-rename-input]')?.value || '' }); return; }
+  if (button.dataset.gameDo === 'team-leader') { if (host) control('game', { do: 'team-leader', team: Number(button.dataset.team), player: button.dataset.player || '' }); return; }
+  if (button.dataset.gameDo === 'team-count') { if (host) control('game', { do: 'team-count', count: Number(button.closest('.team-count-control')?.querySelector('[data-team-count-select]')?.value) || 2 }); return; }
+  if (button.dataset.gameDo) { control('game', { do: button.dataset.gameDo, id: button.dataset.id }); return; }
   if (button.hasAttribute('data-challenge-send')) {
     const values = [...app.querySelectorAll('[data-challenge-sim] :is([data-param],[data-sim-select],[data-sim-text],[data-sim-toggle])')].map(field => field.dataset.simToggle !== undefined ? field.dataset.value || '0' : String(field.value).slice(0, 80));
     sendGame({ values }); return;
   }
   try { sendGame(JSON.parse(button.dataset.gameSend)); } catch { /* botão inválido */ }
+});
+// Líder do time: troca o nome e a foto da equipe pelo próprio celular.
+let teamPhotoDraft;
+app.addEventListener('click', async event => {
+  const photoButton = event.target.closest('[data-team-photo-button]');
+  if (photoButton) { photoButton.closest('.team-leader-tools')?.querySelector('[data-team-photo]')?.click(); return; }
+  const clearButton = event.target.closest('[data-team-photo-clear]');
+  if (clearButton) {
+    const tools = clearButton.closest('.team-leader-tools');
+    if (tools) { teamPhotoDraft = ''; sendGame({ teamCustom: { team: Number(tools.dataset.leaderTeam), name: tools.querySelector('[data-team-name]')?.value || '', photo: '' } }, true); toast('Foto do time removida.'); }
+    return;
+  }
+  const saveButton = event.target.closest('[data-team-save]');
+  if (saveButton) {
+    const tools = saveButton.closest('.team-leader-tools');
+    if (!tools) return;
+    sendGame({ teamCustom: { team: Number(tools.dataset.leaderTeam), name: tools.querySelector('[data-team-name]')?.value || '', ...(teamPhotoDraft !== undefined ? { photo: teamPhotoDraft } : {}) } }, true);
+    teamPhotoDraft = undefined;
+    toast('Time atualizado.');
+  }
+});
+app.addEventListener('change', async event => {
+  const input = event.target.closest('[data-team-photo]');
+  if (!input) return;
+  const file = input.files?.[0];
+  input.value = '';
+  if (!file) return;
+  try {
+    const optimized = await optimizeImage(file, { avatar: true });
+    teamPhotoDraft = await new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(String(reader.result));
+      reader.onerror = () => reject(reader.error);
+      reader.readAsDataURL(optimized);
+    });
+    if (teamPhotoDraft.length > 30000) { teamPhotoDraft = undefined; toast('Escolha uma foto menor.'); }
+    else toast('Foto pronta. Toque em Salvar.');
+  } catch (error) { toast(error?.message || 'Não foi possível abrir a imagem.'); }
 });
 function exportResults() {
   if (!state) return;

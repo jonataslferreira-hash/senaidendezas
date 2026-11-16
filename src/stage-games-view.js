@@ -24,11 +24,11 @@ const plural = (n, one, many) => n + ' ' + (n === 1 ? one : many);
 const live = (html, name = '') => `<div class="game-live${name ? ' game-' + name : ''}" data-game-live>${html}</div>`;
 
 // Placar de equipes: usado na etapa "Equipes" e como faixa nas telas de ranking.
-export function teamsBoard(state, { compact = false } = {}) {
+export function teamsBoard(state, { compact = false, hostTools = false } = {}) {
   const teams = state.teams || [], best = Math.max(0, ...teams.map(team => team.score));
   return `<div class="team-board${compact ? ' compact' : ''}" style="--teams:${teams.length}">${teams.map(team => `<article class="team-card" style="--team:${esc(team.color)}" data-leading="${best > 0 && team.score === best}" data-mine="${state.me?.team === team.index}">
-    <header><strong>Time ${esc(team.name)}</strong><b>${team.score}<small> pts</small></b></header>
-    ${compact ? '' : `<ul>${team.members.map(member => `<li data-online="${member.online}">${esc(member.name)}</li>`).join('') || '<li class="empty">Aguardando participantes…</li>'}</ul>`}
+    <header>${team.photo ? `<img class="team-photo" src="${esc(team.photo)}" alt="">` : ''}<strong>Time ${esc(team.name)}</strong><b>${team.score}<small> pts</small></b>${hostTools && !compact ? `<details class="team-rename"><summary aria-label="Renomear time" title="Renomear time">✎</summary><span><input type="text" maxlength="24" value="${esc(team.name)}" data-team-rename-input aria-label="Novo nome do time"><button type="button" class="btn secondary small" data-game-do="team-rename" data-team="${team.index}">Salvar</button></span></details>` : ''}</header>
+    ${compact ? '' : `<ul>${team.members.map(member => hostTools ? `<li data-online="${member.online}" data-leader="${Boolean(member.leader)}"><button type="button" class="team-member-pick" data-game-do="team-leader" data-team="${team.index}" data-player="${esc(member.id)}" title="Tornar líder do time" aria-label="Tornar ${esc(member.name)} líder do time">${member.leader ? '👑 ' : ''}${esc(member.name)}</button></li>` : `<li data-online="${member.online}" data-leader="${Boolean(member.leader)}">${member.leader ? '👑 ' : ''}${esc(member.name)}</li>`).join('') || '<li class="empty">Aguardando participantes…</li>'}</ul>`}
   </article>`).join('')}</div>`;
 }
 export const teamStrip = state => state.teams?.length ? `<section class="team-strip" aria-label="Placar das equipes"><h2>Placar das equipes</h2>${teamsBoard(state, { compact: true })}</section>` : '';
@@ -41,10 +41,19 @@ function hostActions(state, buttons, { showNext = true } = {}) {
 function teamsView(state, g, host, player) {
   const mine = state.teams?.find(team => team.index === state.me?.team), picking = g.pick && g.state === 'open';
   // Escolha livre: cada aluno toca no time que quer (pode trocar até o professor fechar).
-  const choose = picking && player ? `<div class="team-pick" style="--teams:${state.teams.length}">${state.teams.map(team => `<button class="team-pick-btn" style="--team:${esc(team.color)}" data-game-send='{"team":${team.index}}' data-mine="${mine?.index === team.index}"><b>Time ${esc(team.name)}</b><small>${plural(team.members.length, 'pessoa', 'pessoas')}</small></button>`).join('')}</div>` : '';
-  const badge = player ? (mine ? `<p class="team-mine" style="--team:${esc(mine.color)}">Você é do <b>Time ${esc(mine.name)}</b></p>` : picking ? '<p class="game-wait">Toque no time que você quer entrar.</p>' : '') : '';
-  return live(badge + choose + teamsBoard(state)) +
-    live(host ? `<p class="game-note">${picking ? 'Os alunos estão escolhendo o time no celular. Quem não escolher entra no time com menos gente.' : 'Os pontos do quiz e das dinâmicas de cada aluno somam para o time.'}</p>${hostActions(state, [picking ? ['end', 'Fechar escolha', 'primary'] : null, ['shuffle', 'Sortear os times']], { showNext: !picking })}` : `<p class="game-note">${picking ? 'Dá para trocar de time até o professor fechar a escolha.' : 'Cada ponto seu soma para o time. Boa sorte!'}</p>`);
+  const choose = picking && player ? `<div class="team-pick" style="--teams:${state.teams.length}">${state.teams.map(team => `<button class="team-pick-btn" style="--team:${esc(team.color)}" data-game-send='{"team":${team.index}}' data-mine="${mine?.index === team.index}">${team.photo ? `<img class="team-pick-photo" src="${esc(team.photo)}" alt="">` : ''}<b>Time ${esc(team.name)}</b><small>${plural(team.members.length, 'pessoa', 'pessoas')}</small></button>`).join('')}</div>` : '';
+  // O líder do time pode trocar o nome e a foto da equipe pelo próprio celular.
+  const leading = player && mine && mine.leader === state.me?.id;
+  const leaderTools = leading ? `<div class="team-leader-tools" style="--team:${esc(mine.color)}" data-leader-team="${mine.index}">
+    <strong>👑 Você lidera o Time ${esc(mine.name)}</strong>
+    <label>Nome do time<input type="text" maxlength="24" value="${esc(mine.name)}" data-team-name></label>
+    <div class="team-leader-row"><button type="button" class="btn secondary small" data-team-photo-button>Escolher foto</button>${mine.photo ? '<button type="button" class="btn secondary small" data-team-photo-clear>Remover foto</button>' : ''}<input type="file" accept="image/png,image/jpeg,image/webp" data-team-photo hidden></div>
+    <button type="button" class="btn primary small" data-team-save>Salvar</button>
+  </div>` : '';
+  const badge = player ? (leading ? '' : mine ? `<p class="team-mine" style="--team:${esc(mine.color)}">Você é do <b>Time ${esc(mine.name)}</b></p>` : picking ? '<p class="game-wait">Toque no time que você quer entrar.</p>' : '') : '';
+  const countControl = host ? `<div class="team-count-control"><label for="team-count-live">Quantos times</label><div class="team-count-row"><select id="team-count-live" data-team-count-select aria-label="Quantos times">${Array.from({ length: 9 }, (_, i) => i + 2).map(n => `<option value="${n}" ${state.teams.length === n ? 'selected' : ''}>${n}</option>`).join('')}</select><button type="button" class="btn secondary small" data-game-do="team-count">Aplicar</button></div><small>Muda na hora: nome, foto e líder dos times que continuam são preservados.</small></div>` : '';
+  return live(badge + choose + leaderTools + teamsBoard(state, { hostTools: host })) +
+    live(host ? `${countControl}<p class="game-note">${picking ? 'Os alunos estão escolhendo o time no celular. Quem não escolher entra no time com menos gente.' : 'Os pontos do quiz e das dinâmicas de cada aluno somam para o time. Toque no nome de um aluno para torná-lo líder: o líder pode trocar o nome e a foto do time no celular dele.'}</p>${hostActions(state, [picking ? ['end', 'Fechar escolha', 'primary'] : null, ['shuffle', 'Sortear os times']], { showNext: !picking })}` : `<p class="game-note">${picking ? 'Dá para trocar de time até o professor fechar a escolha.' : 'Cada ponto seu soma para o time. Boa sorte!'}</p>`);
 }
 
 // Botões de resposta. No celular do aluno (g.bare) vão só as letras: a pergunta fica no telão.

@@ -109,9 +109,9 @@ dialog.online-library-modal::backdrop {
 .online-library-card {
   display: grid;
   gap: 3px;
-  justify-items: start;
+  justify-items: stretch;
   text-align: left;
-  padding: 10px 12px;
+  padding: 8px;
   border-radius: 12px;
   border: 1px solid var(--ui-line, #e8e0ef);
   background: transparent;
@@ -119,6 +119,38 @@ dialog.online-library-modal::backdrop {
   font: inherit;
   cursor: pointer;
   transition: border-color .15s ease;
+}
+.online-library-card-art {
+  display: grid;
+  place-items: center;
+  aspect-ratio: 1 / 1;
+  width: 100%;
+  border-radius: 8px;
+  overflow: hidden;
+  background: #171426;
+  margin-bottom: 4px;
+}
+.online-library-card-art img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+.online-library-art-pending {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  border: 2px solid #ffffff38;
+  border-top-color: #c9b6ff;
+  animation: online-art-spin 0.9s linear infinite;
+}
+.online-library-art-fallback {
+  color: #8f84b8;
+  font-size: 22px;
+  line-height: 1;
+}
+@keyframes online-art-spin {
+  to { transform: rotate(360deg); }
 }
 .online-library-card:hover {
   border-color: var(--ol-accent, #7950b4);

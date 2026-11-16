@@ -18,6 +18,28 @@ export class GameAudio{
   for(let i=0;i<length;i++)data[i]=(Math.random()*2-1)*Math.exp(-i/(length*0.35));
   this._noiseBuffer=buf;this._noiseCtx=ctx;return buf;
  }
+ // Abertura das etapas: arpejo curto estilo chiptune (ré maior brilhante).
+ playStageIntro(){
+  if(!this.context||this.context.state!=='running')return;
+  try{
+   const ctx=this.context,now=ctx.currentTime+0.03,vol=Math.max(.05,Math.min(.2,(this.settings?.volume??.1)*1.5));
+   const notes=[587.33,739.99,880,1174.66],step=.085;
+   notes.forEach((freq,i)=>{
+    const t=now+i*step,osc=ctx.createOscillator(),gain=ctx.createGain();
+    osc.type='square';osc.frequency.setValueAtTime(freq,t);
+    gain.gain.setValueAtTime(.0001,t);gain.gain.linearRampToValueAtTime(vol*(i===3?.9:.66),t+.012);gain.gain.exponentialRampToValueAtTime(.0001,t+.24);
+    osc.connect(gain);gain.connect(ctx.destination);osc.start(t);osc.stop(t+.26);
+    const shine=ctx.createOscillator(),sg=ctx.createGain();
+    shine.type='triangle';shine.frequency.setValueAtTime(freq*2,t+.02);
+    sg.gain.setValueAtTime(.0001,t+.02);sg.gain.linearRampToValueAtTime(vol*.18,t+.03);sg.gain.exponentialRampToValueAtTime(.0001,t+.2);
+    shine.connect(sg);sg.connect(ctx.destination);shine.start(t+.02);shine.stop(t+.22);
+   });
+   const bass=ctx.createOscillator(),bg=ctx.createGain();
+   bass.type='triangle';bass.frequency.setValueAtTime(146.83,now);
+   bg.gain.setValueAtTime(.0001,now);bg.gain.linearRampToValueAtTime(vol*.5,now+.02);bg.gain.exponentialRampToValueAtTime(.0001,now+.5);
+   bass.connect(bg);bg.connect(ctx.destination);bass.start(now);bass.stop(now+.52);
+  }catch{}
+ }
  playDrumrollChunk(duration=0.32,mode='podium',step=0){
   const ctx=this.context;if(!ctx||ctx.state!=='running')return;
   const now=ctx.currentTime+0.015,baseVol=Math.max(.03,Math.min(.22,(this.settings?.volume??.1)*1.4));

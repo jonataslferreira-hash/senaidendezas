@@ -2971,3 +2971,31 @@ dialog.simulation-modal .simulation-modal-foot-tools { display: none; }
 
 
 
+
+/* Equipes: foto do time, coroa do líder, renomear no telão e ferramentas do líder. */
+#app .team-card header .team-photo{width:44px;height:44px;border-radius:12px;object-fit:cover;border:2px solid #ffffff5c;flex:none}
+#app .team-card header{gap:10px}
+#app .team-card ul li[data-leader="true"]{font-weight:700}
+#app .team-member-pick{all:unset;cursor:pointer;font:inherit;color:inherit;width:100%;border-radius:8px;padding:1px 4px;margin:-1px -4px}
+#app .team-member-pick:hover{background:#ffffff22}
+#app .team-member-pick:focus-visible{outline:2px solid #fff}
+#app .team-rename{position:relative}
+#app .team-rename summary{cursor:pointer;list-style:none;opacity:.75;font-size:14px;border:1px solid #ffffff38;border-radius:8px;padding:2px 7px}
+#app .team-rename summary:hover{opacity:1}
+#app .team-rename[open] summary{opacity:1}
+#app .team-rename span{position:absolute;right:0;top:calc(100% + 6px);z-index:5;display:grid;gap:6px;background:#1c1730f2;border:1px solid #ffffff30;padding:8px;border-radius:10px;box-shadow:0 14px 40px #00000070}
+#app .team-rename input{min-width:170px}
+.team-leader-tools{display:grid;gap:10px;justify-items:start;padding:14px 16px;border-radius:16px;border:2px solid var(--team,#7950b4);background:color-mix(in srgb,var(--team,#7950b4) 16%,rgba(0,0,0,.25));margin:10px 0}
+.team-leader-tools strong{color:#fff;font-size:15px}
+.team-leader-tools label{display:grid;gap:4px;font-size:12.5px;color:#e7dcff;width:100%}
+.team-leader-tools input[type=text]{border-radius:8px;border:1px solid #ffffff38;background:#0f0c1cd9;color:#fff;padding:8px 10px;font:inherit}
+.team-leader-row{display:flex;gap:8px;flex-wrap:wrap}
+.team-pick-photo{width:54px;height:54px;border-radius:12px;object-fit:cover;border:2px solid #ffffff52;margin-bottom:4px}
+.stage-ai-field .studio-btn.is-loading{opacity:.6;pointer-events:none}
+
+/* Equipes ao vivo: controle de quantidade de times no telão. */
+.team-count-control{display:grid;gap:7px;justify-items:start;margin:10px 0;padding:12px 14px;border-radius:14px;border:1px solid #ffffff2b;background:#16122799}
+.team-count-control>label{font-size:12.5px;color:#e7dcff;font-weight:650}
+.team-count-row{display:flex;gap:8px;align-items:center}
+.team-count-control select{font:inherit;padding:7px 10px;border-radius:9px;border:1px solid #ffffff38;background:#0f0c1cd9;color:#fff}
+.team-count-control small{font-size:11.5px;color:#c9bdf0}

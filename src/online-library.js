@@ -3,6 +3,7 @@
 // mesmo caminho de um modelo enviado, ficando salvos para funcionar offline.
 import { importModelFiles } from './model-files.js';
 import { ONLINE_MODELS, ONLINE_MODEL_GROUPS, onlineGroupLabel, onlineModelUrl, onlineModelSizeLabel } from './online-catalog.js';
+import { onlinePreview } from './online-preview.js';
 
 const MAX_MODEL_BYTES = 15 * 1024 * 1024;
 const esc = v => String(v ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -46,7 +47,6 @@ export function openOnlineLibrary({ onModel } = {}) {
   dialog.innerHTML = `<form method="dialog" class="online-library-head">
       <div>
         <strong id="online-library-title">Biblioteca online de modelos 3D</strong>
-        <p>Gratuitos e sem cadastro — NASA (domínio público) e Kenney (CC0). Ao usar, o modelo é baixado e fica salvo na aula.</p>
       </div>
       <button type="submit" class="online-library-close" aria-label="Fechar">×</button>
     </form>
@@ -58,7 +58,7 @@ export function openOnlineLibrary({ onModel } = {}) {
       <div class="online-library-grid" role="list"></div>
       <p class="online-library-status" role="status" aria-live="polite"></p>
     </div>
-    <footer class="online-library-foot"><span>${ONLINE_MODELS.length} modelos · servidos pelo GitHub</span><span>NASA 3D Resources (domínio público) · Kenney (CC0)</span></footer>`;
+    <footer class="online-library-foot"><span>${ONLINE_MODELS.length} modelos gratuitos · NASA · Kenney (CC0)</span></footer>`;
   const grid = dialog.querySelector('.online-library-grid');
   const search = dialog.querySelector('.online-library-search');
   const status = dialog.querySelector('.online-library-status');
@@ -67,8 +67,42 @@ export function openOnlineLibrary({ onModel } = {}) {
   const render = () => {
     const items = ONLINE_MODELS.filter(matches);
     grid.innerHTML = items.length
-      ? items.map(m => `<button type="button" class="online-library-card" role="listitem" data-online-model="${esc(m.id)}"><span class="online-library-card-name">${esc(m.name)}</span><span class="online-library-card-meta">${esc(onlineGroupLabel(m.group))} · ${esc(onlineModelSizeLabel(m.bytes))}</span><span class="online-library-card-cta">Baixar e usar</span></button>`).join('')
+      ? items.map(m => `<button type="button" class="online-library-card" role="listitem" data-online-model="${esc(m.id)}"><span class="online-library-card-art" data-online-art><span class="online-library-art-pending" aria-hidden="true"></span></span><span class="online-library-card-name">${esc(m.name)}</span><span class="online-library-card-meta">${esc(onlineGroupLabel(m.group))} · ${esc(onlineModelSizeLabel(m.bytes))}</span><span class="online-library-card-cta">Baixar e usar</span></button>`).join('')
       : '<p class="online-library-empty">Nenhum modelo encontrado.</p>';
+    watchPreviews();
+  };
+  // Gera o GIF giratório de cada card que entra na tela, um por vez.
+  const previewQueue = [];
+  let previewRunning = false;
+  const pumpPreviews = async () => {
+    if (previewRunning) return;
+    previewRunning = true;
+    while (previewQueue.length) {
+      const art = previewQueue.shift();
+      if (!art.isConnected) continue;
+      const card = art.closest('[data-online-model]');
+      const model = byId.get(card?.dataset.onlineModel);
+      if (!model) continue;
+      try {
+        const url = await onlinePreview(model);
+        if (!art.isConnected) continue;
+        art.innerHTML = `<img src="${url}" alt="Prévia girando de ${esc(model.name)}" loading="lazy">`;
+      } catch {
+        if (art.isConnected) art.innerHTML = '<span class="online-library-art-fallback" aria-hidden="true">◈</span>';
+      }
+    }
+    previewRunning = false;
+  };
+  let previewObserver;
+  const watchPreviews = () => {
+    previewObserver?.disconnect();
+    if (!('IntersectionObserver' in window)) { for (const art of grid.querySelectorAll('[data-online-art]')) previewQueue.push(art); pumpPreviews(); return; }
+    previewObserver = new IntersectionObserver(entries => {
+      let queued = false;
+      for (const entry of entries) if (entry.isIntersecting) { previewObserver.unobserve(entry.target); previewQueue.push(entry.target); queued = true; }
+      if (queued) pumpPreviews();
+    }, { root: grid, rootMargin: '200px' });
+    for (const art of grid.querySelectorAll('[data-online-art]')) previewObserver.observe(art);
   };
   render();
   dialog.querySelector('.online-library-filters').addEventListener('click', e => {
@@ -107,7 +141,7 @@ export function openOnlineLibrary({ onModel } = {}) {
       busy = false;
     }
   });
-  dialog.addEventListener('close', () => dialog.remove());
+  dialog.addEventListener('close', () => { previewObserver?.disconnect(); dialog.remove(); });
   document.body.appendChild(dialog);
   dialog.showModal();
   search.focus();
