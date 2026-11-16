@@ -312,6 +312,7 @@ html[data-theme][data-ui-style] #app .designer-inspector:has(.slide-activities[o
 #app .timeline-actions button { min-height:27px; padding:3px 9px; }
 #app .slide-settings-tabs button[aria-pressed=true] { background:color-mix(in srgb,var(--studio-accent) 22%,var(--ui-panel)); color:var(--ui-ink); }
 #app .designer-insert-more { position:relative; flex:none; }
+#app .designer-insert-more.mobile-only-more { display:none; }
 #app .designer-insert-more summary { list-style:none; cursor:pointer; border:1px solid var(--ui-line); border-radius:8px; padding:7px 10px; font-size:11px; }
 #app .designer-insert-more summary::-webkit-details-marker { display:none; }
 #app .designer-insert-more summary::after { content:" ▾"; }
@@ -333,12 +334,10 @@ html[data-theme][data-ui-style] #app .designer-inspector:has(.slide-activities[o
 #app .stage-play .demo-answers { margin-top:8px; }
 @keyframes showcase-light { from{opacity:.45;background-position:0 0} to{opacity:1;background-position:30px 16px} }
 @media(prefers-reduced-motion:reduce){#app .experience-feature::before{animation:none}}
-@media (prefers-reduced-motion:no-preference){
- #app[data-transition=zoom].scene-arrive :is(.document-stage,.slide-panel,.mobile-lesson-content){animation:storage-slide-zoom .46s ease-out both}
- #app[data-transition=rise].scene-arrive :is(.document-stage,.slide-panel,.mobile-lesson-content){animation:storage-slide-rise .42s ease-out both}
- #app[data-transition=wipe].scene-arrive :is(.document-stage,.slide-panel,.mobile-lesson-content){animation:storage-slide-wipe .52s ease-out both}
- #app[data-transition=slide].scene-arrive .mobile-lesson-content{animation:slide-appear .45s cubic-bezier(.2,.8,.2,1) both}
-}
+#app[data-transition=zoom].scene-arrive :is(.document-stage,.slide-panel,.mobile-lesson-content){animation:storage-slide-zoom .52s ease-out both}
+#app[data-transition=rise].scene-arrive :is(.document-stage,.slide-panel,.mobile-lesson-content){animation:storage-slide-rise .48s ease-out both}
+#app[data-transition=wipe].scene-arrive :is(.document-stage,.slide-panel,.mobile-lesson-content){animation:storage-slide-wipe .56s ease-out both}
+#app[data-transition=slide].scene-arrive .mobile-lesson-content{animation:slide-appear .48s cubic-bezier(.2,.8,.2,1) both}
 @keyframes storage-slide-zoom{from{opacity:0;scale:.94}to{opacity:1;scale:1}}
 @keyframes storage-slide-rise{from{opacity:0;translate:0 18px}to{opacity:1;translate:0}}
 @keyframes storage-slide-wipe{from{clip-path:inset(0 100% 0 0)}to{clip-path:inset(0)}}

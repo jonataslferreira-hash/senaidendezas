@@ -130,7 +130,7 @@ test('Quiz revela automaticamente assim que todos os participantes online respon
   assert.equal(room.snapshot().phase, 'reveal');
 });
 
-test('Placar do Quiz isola pontos puros do quiz, exibe torres verticais ao final do quiz e remove botão Sair', () => {
+test('Placar do Quiz isola pontos puros do quiz, exibe torres verticais ao final do quiz e mantém botão Sair', () => {
   let now = 5_000;
   const lesson = makeMultiStageLesson({ withAfterSlide: true });
   const room = new Room('334455', null, () => now, lesson);
@@ -167,7 +167,7 @@ test('Placar do Quiz isola pontos puros do quiz, exibe torres verticais ao final
   assert.equal(roundSnap.ranking[0].name, 'Bia', 'placar geral continua acumulando os 2500 pontos prévios');
 
   const roundHtml = leaderboardMarkup(roundSnap, { header: () => '', host: true, final: false, now });
-  assert.doesNotMatch(roundHtml, /data-action="leave"/, 'botão Sair removido do placar da rodada');
+  assert.match(roundHtml, /data-action="leave"/, 'botão Sair presente no placar da rodada');
   assert.match(roundHtml, /Na liderança[\s\S]*Ana/, 'liderança da rodada usa o ranking puro do quiz');
 
   // Pergunta 2 -> encerra etapa do Quiz (hasNext === true -> RESULTADO DO QUIZ em torres verticais!)
@@ -184,7 +184,7 @@ test('Placar do Quiz isola pontos puros do quiz, exibe torres verticais ao final
   const quizEndHtml = leaderboardMarkup(quizEndSnap, { header: () => '', host: true, final: true, now: now + 10_000 });
   assert.match(quizEndHtml, /RESULTADO DO QUIZ/, 'etapa intermediária do quiz mostra título próprio');
   assert.match(quizEndHtml, /round-towers quiz-end-towers/, 'final do quiz usa torres verticais com personagens');
-  assert.doesNotMatch(quizEndHtml, /data-action="leave"/, 'botão Sair removido do resultado do quiz');
+  assert.match(quizEndHtml, /data-action="leave"/, 'botão Sair presente no resultado do quiz');
   assert.doesNotMatch(quizEndHtml, /data-action="export"/, 'resultado intermediário não polui com botão de PNG');
   assert.match(quizEndHtml, /<em>Ana<\/em> venceu!/, 'vencedora do quiz é Ana pelos pontos puros do quiz');
 });

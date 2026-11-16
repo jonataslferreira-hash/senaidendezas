@@ -37,8 +37,8 @@ html[data-appearance=dark] #app .editor-icon.ai-tool svg{color:#adb4ff}
 .storage-ai-messages [data-role=user]{background:var(--ui-tint);margin-inline-start:14px}
 #app .designer-inspector:has(.storage-ai-inspector) .storage-ai-inspector button{padding:6px 9px}
 
-#app .cover-storage{position:absolute;top:9px;right:9px;display:grid;place-items:center;width:33px;height:33px;border-radius:10px;background:#17182cdd;color:#fff;z-index:3}
-#app .cover-storage svg{width:21px;height:21px}
+#app .cover-storage{position:absolute;top:9px;right:9px;display:inline-flex;align-items:center;justify-content:center;gap:6px;min-width:34px;height:34px;padding-inline:8px;box-sizing:border-box;border-radius:10px;background:#17182ce0;color:#ffffff;z-index:3}
+#app .cover-storage svg{width:19px;height:19px;flex:0 0 19px;color:#ffffff;stroke:#ffffff;stroke-width:1.85;display:block}
 #app .lesson-card-art .ai-card-label{z-index:3;background:#282452e8;color:#f4efff;border-color:#b4a7e8}
 #app .lesson-card-art{isolation:isolate;aspect-ratio:16/9;height:auto}
 #app .lesson-card-art :is(.lesson-cover-image,.slide-cover-mini,.cloud-cover-placeholder){position:absolute;inset:0;width:100%;height:100%;transition:transform .32s ease}
@@ -363,9 +363,9 @@ html[data-motion=reduced] #app :is(button[data-studio-action="storage-ai"], .ai-
 #app .editor-more:not(.editor-download) > summary { min-height:38px; }
 #app .slide-cover-mini .canvas-frame { display:grid; place-items:center; container-type:size; }
 #app .lesson-card-art .slide-cover-mini .slide-canvas { width:min(100%, calc(100cqh * var(--canvas-ratio))); max-height:100%; }
-#app .cover-storage.cover-shared { width:auto; padding-inline:7px; display:flex; gap:5px; }
-#app .cover-storage.cover-generated { width:auto; padding-inline:7px; display:flex; gap:5px; }
-#app .cover-storage.cover-generated svg { flex:0 0 16px; }
+#app .cover-storage.cover-shared { width:auto; padding-inline:8px; display:inline-flex; align-items:center; justify-content:center; gap:6px; }
+#app .cover-storage.cover-generated { width:auto; padding-inline:8px; display:inline-flex; align-items:center; justify-content:center; gap:6px; }
+#app .cover-storage.cover-generated svg { width:19px; height:19px; flex:0 0 19px; }
 @media(min-width:1000px) {
   html[data-theme][data-ui-style] #app .item-toolbar:has(.item-tools) {
     grid-template-columns: max-content minmax(0,1fr);

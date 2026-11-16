@@ -29,7 +29,7 @@ export class Classroom {
     await this.open();
     this.peer.on('connection', conn => this.accept(conn));
     storage.set('sl-mode', { host: true, code: this.code, fromEditor });
-    this.timer = setInterval(() => { const key = () => this.room.data.phase + ':' + (this.room.data.game?.state || '') + ':' + (this.room.data.podiumStep || 0), before = key(); this.room.tick(); if (before !== key()) this.broadcast(); }, 100);
+    this.timer = setInterval(() => { const key = () => this.room.data.phase + ':' + (this.room.data.game?.state || '') + ':' + (this.room.data.game?.round ?? '') + ':' + (this.room.data.podiumStep || 0), before = key(); this.room.tick(); if (before !== key()) this.broadcast(); }, 100);
     this.broadcast();
     return this.code;
   }
