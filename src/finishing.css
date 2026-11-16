@@ -3012,3 +3012,6 @@ dialog.simulation-modal .simulation-modal-foot-tools { display: none; }
 .chat-link-copy strong{font-size:12.5px;line-height:1.3;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .chat-link-copy small{font-size:10.5px;opacity:.7;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .chat-link-copy em{font-style:normal;font-size:10.5px;font-weight:650;color:var(--studio-accent,#7950b4)}
+
+/* Troca de visualização no studio: cross-fade curto do navegador. */
+::view-transition-old(root),::view-transition-new(root){animation-duration:.22s;animation-timing-function:ease}

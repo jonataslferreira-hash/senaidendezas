@@ -260,7 +260,7 @@ html[data-theme][data-ui-style] #app .editor-shell .editor-context [data-account
   to { opacity: 1; transform: none; }
 }
 @media (prefers-reduced-motion: no-preference) {
-  html:not([data-motion=reduced]) #app .editor-shell :is(
+  html:not([data-motion=reduced]) #app[data-view-arrive] .editor-shell :is(
     .editor-outline,
     .editor-form-area,
     .designer-inspector,
@@ -272,19 +272,19 @@ html[data-theme][data-ui-style] #app .editor-shell .editor-context [data-account
   ) {
     animation: editor-panel-enter .26s cubic-bezier(.2,.7,.2,1) both;
   }
-  html:not([data-motion=reduced]) #app .editor-shell .editor-outline { animation-delay: .02s; }
-  html:not([data-motion=reduced]) #app .editor-shell .designer-inspector { animation-delay: .06s; }
-  html:not([data-motion=reduced]) #app .editor-shell .designer-stage-wrap { animation-delay: .04s; }
+  html:not([data-motion=reduced]) #app[data-view-arrive] .editor-shell .editor-outline { animation-delay: .02s; }
+  html:not([data-motion=reduced]) #app[data-view-arrive] .editor-shell .designer-inspector { animation-delay: .06s; }
+  html:not([data-motion=reduced]) #app[data-view-arrive] .editor-shell .designer-stage-wrap { animation-delay: .04s; }
   /* A troca de slide no editor entra pelo palco, junto com o inspetor. */
-  html:not([data-motion=reduced]) #app .editor-shell .designer-stage > .slide-canvas {
+  html:not([data-motion=reduced]) #app[data-view-arrive] .editor-shell .designer-stage > .slide-canvas {
     animation: editor-panel-enter .22s cubic-bezier(.2,.7,.2,1) both;
   }
-  html:not([data-motion=reduced]) #app .editor-shell :is(.designer-layer-row, .outline-item) {
+  html:not([data-motion=reduced]) #app[data-view-arrive] .editor-shell :is(.designer-layer-row, .outline-item) {
     animation: editor-panel-enter .2s cubic-bezier(.2,.7,.2,1) both;
   }
-  html:not([data-motion=reduced]) #app .editor-shell :is(.designer-layer-row, .outline-item):nth-child(n+2) { animation-delay: .02s; }
-  html:not([data-motion=reduced]) #app .editor-shell :is(.designer-layer-row, .outline-item):nth-child(n+4) { animation-delay: .04s; }
-  html:not([data-motion=reduced]) #app .editor-shell :is(.designer-layer-row, .outline-item):nth-child(n+6) { animation-delay: .06s; }
+  html:not([data-motion=reduced]) #app[data-view-arrive] .editor-shell :is(.designer-layer-row, .outline-item):nth-child(n+2) { animation-delay: .02s; }
+  html:not([data-motion=reduced]) #app[data-view-arrive] .editor-shell :is(.designer-layer-row, .outline-item):nth-child(n+4) { animation-delay: .04s; }
+  html:not([data-motion=reduced]) #app[data-view-arrive] .editor-shell :is(.designer-layer-row, .outline-item):nth-child(n+6) { animation-delay: .06s; }
   html:not([data-motion=reduced]) dialog.simulation-modal[open],
   html:not([data-motion=reduced]) dialog.simulation-modal[open] .simulation-modal-stage > .simulation-widget {
     animation: editor-panel-enter .22s cubic-bezier(.2,.7,.2,1) both;
