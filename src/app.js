@@ -1,4 +1,5 @@
 import {studioIcon} from './studio-icons.js';
+import { reconcileCanvas, tagStageSources } from './stage-keep.js';
 import { BUILTIN_MODELS, HARDWARE_MODEL_IDS, modelMeta } from './model-catalog.js';
 import {routeParams} from './editor-route.js';
 import {takePhoto} from './camera-photo.js';
@@ -381,7 +382,9 @@ function keepEditorStage(markup) {
   if (!old.querySelector('img,[data-simulation],[data-canvas-model],iframe,video')) return false;
   const next = document.createElement('template'); next.innerHTML = markup;
   const fresh = next.content.querySelector('.designer-stage-wrap');
-  if (!fresh || fresh.outerHTML !== editorStage.html) return false;
+  if (!fresh) return false;
+  // Referência pré-montagem capturada antes de qualquer nó sair do template.
+  const freshHtml = fresh.outerHTML;
   const chain = (node, top) => { const list = []; for (let item = node; item && item !== top; item = item.parentNode) list.unshift(item); return list; };
   const oldChain = chain(old, app), newChain = chain(fresh, next.content);
   if (oldChain.length !== newChain.length || oldChain.some((node, index) => node.tagName !== newChain[index].tagName)) return false;
@@ -400,6 +403,21 @@ function keepEditorStage(markup) {
     }
     oldParent = keep; newParent = incoming;
   });
+  // Dentro do palco preservado, só os objetos que mudaram são trocados:
+  // imagens, vídeos, modelos 3D e simulações continuam vivos. A lista de
+  // camadas e o restante do wrap são renovados normalmente.
+  const oldStage = old.querySelector('.designer-stage'), freshStage = fresh.querySelector('.designer-stage');
+  if (oldStage && freshStage) {
+    for (const name of oldStage.getAttributeNames()) if (!freshStage.hasAttribute(name)) oldStage.removeAttribute(name);
+    for (const name of freshStage.getAttributeNames()) if (oldStage.getAttribute(name) !== freshStage.getAttribute(name)) oldStage.setAttribute(name, freshStage.getAttribute(name));
+    const oldFrame = oldStage.querySelector('.canvas-frame'), freshFrame = freshStage.querySelector('.canvas-frame');
+    if (oldFrame && freshFrame && oldFrame.className === freshFrame.className) reconcileCanvas(oldFrame, freshFrame);
+    else if (freshFrame) oldStage.replaceChildren(...freshStage.childNodes);
+  }
+  const oldList = old.querySelector('.designer-layer-list'), freshList = fresh.querySelector('.designer-layer-list');
+  if (freshList) oldList ? oldList.replaceWith(freshList) : old.append(freshList);
+  else oldList?.remove();
+  editorStage = { node: old, html: freshHtml };
   return true;
 }
 // Abertura das etapas: cartela animada com o nome da etapa e fanfarra curta.
@@ -487,7 +505,12 @@ function render() {
     const frame = slideMotionKey ? app.querySelector(LIVE_SLIDE) : null;
     liveSlide = frame ? { key: slideMotionKey, node: frame, html: frame.outerHTML } : null;
     const stageFrame = !state ? app.querySelector('.designer-stage-wrap') : null;
-    editorStage = stageFrame ? { node: stageFrame, html: stageFrame.outerHTML } : null;
+    if (stageFrame) {
+      // Voltar de outra visualização (Storage AI, biblioteca, apresentar):
+      // se o palco guardado continua igual, reanexa em vez de remontar.
+      if (editorStage?.node && !editorStage.node.isConnected && editorStage.html === stageFrame.outerHTML) stageFrame.replaceWith(editorStage.node);
+      else { tagStageSources(stageFrame); editorStage = { node: stageFrame, html: stageFrame.outerHTML }; }
+    }
   }
   if (state?.phase === 'lesson') {
     app.insertAdjacentHTML('beforeend', pinnedInvite({ host, demo, state, settings: presenterSettings }));

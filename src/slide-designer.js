@@ -13,6 +13,7 @@ import { MAX_CANVAS_ELEMENTS, canvasFromSlide, newElement, canvasThemes, applyCa
 import {openLayouts, applyOpenLayout} from './open-slide-layouts.js';
 import {slideStylePicker,localLayouts} from './slide-style-picker.js';
 import { canvasMarkup, CanvasModels, esc } from './canvas-view.js';
+import { reconcileCanvas } from './stage-keep.js';
 import { importModelFiles } from './model-files.js';
 import { openOnlineLibrary } from './online-library.js';
 import { modelOptionsMarkup, modelSubject, modelShortName } from './model-catalog.js';
@@ -631,7 +632,16 @@ export class SlideDesigner {
     }
     this.studio.markDirty();
     const stage = this.studio.root.querySelector('.designer-stage');
-    if (stage) { stage.innerHTML = canvasMarkup(s, { editing: true, selected: this.selected, interacting: this.interacting }); const cropping = stage.querySelector('[data-object-id="'+CSS.escape(this.imageEditing)+'"]');if(cropping)cropping.dataset.cropping='true';fillAssetImages(stage);this.simulations.mount(stage); this.models.mount(stage, s); }
+    if (stage) {
+      // Edição de propriedades: só o objeto afetado é trocado no palco;
+      // imagens, modelos 3D e simulações dos demais continuam vivos.
+      const template = document.createElement('template');
+      template.innerHTML = canvasMarkup(s, { editing: true, selected: this.selected, interacting: this.interacting });
+      const freshFrame = template.content.querySelector('.canvas-frame'), currentFrame = stage.querySelector('.canvas-frame');
+      if (freshFrame && currentFrame && currentFrame.className === freshFrame.className) reconcileCanvas(currentFrame, freshFrame);
+      else stage.innerHTML = template.innerHTML;
+      const cropping = stage.querySelector('[data-object-id="'+CSS.escape(this.imageEditing)+'"]');if(cropping)cropping.dataset.cropping='true';fillAssetImages(stage);this.simulations.mount(stage); this.models.mount(stage, s);
+    }
   }
   async change(event) {
     const t = event.target;
