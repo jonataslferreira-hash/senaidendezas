@@ -1,5 +1,5 @@
 import {studioIcon} from './studio-icons.js';
-import { reconcileCanvas, tagStageSources } from './stage-keep.js';
+import { reconcileStageSafely, tagStageSources, setStageCache } from './stage-keep.js';
 import { BUILTIN_MODELS, HARDWARE_MODEL_IDS, modelMeta } from './model-catalog.js';
 import {routeParams} from './editor-route.js';
 import {takePhoto} from './camera-photo.js';
@@ -369,13 +369,16 @@ function keepLiveSlide(markup, key) {
   return true;
 }
 function keepChatEditorStage(content) {
-  const old = editorStage?.node;
-  if (state || !old?.isConnected || app.querySelector('.designer-stage-wrap') !== old) return;
-  if (!old.querySelector('img,[data-simulation],[data-canvas-model],iframe,video')) return;
-  const fresh = content.querySelector('.designer-stage-wrap');
-  if (fresh && fresh.outerHTML === editorStage.html) fresh.replaceWith(old);
+  try {
+    const old = editorStage?.node;
+    if (state || !old?.isConnected || app.querySelector('.designer-stage-wrap') !== old) return;
+    if (!old.querySelector('img,[data-simulation],[data-canvas-model],iframe,video')) return;
+    const fresh = content.querySelector('.designer-stage-wrap');
+    if (fresh && fresh.outerHTML === editorStage.html) fresh.replaceWith(old);
+  } catch { /* sem preservação: o conteúdo novo é aplicado normalmente */ }
 }
 function keepEditorStage(markup) {
+  try {
   const old = editorStage?.node;
   if (state || sharedLoading || sharedError || busy && host) return false;
   if (!old?.isConnected || app.querySelector('.designer-stage-wrap') !== old) return false;
@@ -404,21 +407,17 @@ function keepEditorStage(markup) {
     oldParent = keep; newParent = incoming;
   });
   // Dentro do palco preservado, só os objetos que mudaram são trocados:
-  // imagens, vídeos, modelos 3D e simulações continuam vivos. A lista de
-  // camadas e o restante do wrap são renovados normalmente.
+  // imagens, vídeos, modelos 3D e simulações continuam vivos. A reconciliação
+  // é blindada — qualquer divergência remonta o palco em vez de quebrá-lo.
   const oldStage = old.querySelector('.designer-stage'), freshStage = fresh.querySelector('.designer-stage');
-  if (oldStage && freshStage) {
-    for (const name of oldStage.getAttributeNames()) if (!freshStage.hasAttribute(name)) oldStage.removeAttribute(name);
-    for (const name of freshStage.getAttributeNames()) if (oldStage.getAttribute(name) !== freshStage.getAttribute(name)) oldStage.setAttribute(name, freshStage.getAttribute(name));
-    const oldFrame = oldStage.querySelector('.canvas-frame'), freshFrame = freshStage.querySelector('.canvas-frame');
-    if (oldFrame && freshFrame && oldFrame.className === freshFrame.className) reconcileCanvas(oldFrame, freshFrame);
-    else if (freshFrame) oldStage.replaceChildren(...freshStage.childNodes);
-  }
+  if (oldStage && freshStage) reconcileStageSafely(oldStage, freshStage);
   const oldList = old.querySelector('.designer-layer-list'), freshList = fresh.querySelector('.designer-layer-list');
   if (freshList) oldList ? oldList.replaceWith(freshList) : old.append(freshList);
   else oldList?.remove();
   editorStage = { node: old, html: freshHtml };
+  setStageCache(editorStage);
   return true;
+  } catch { return false; }
 }
 // Abertura das etapas: cartela animada com o nome da etapa e fanfarra curta.
 let introStageKey = '';
@@ -510,7 +509,8 @@ function render() {
       // se o palco guardado continua igual, reanexa em vez de remontar.
       if (editorStage?.node && !editorStage.node.isConnected && editorStage.html === stageFrame.outerHTML) stageFrame.replaceWith(editorStage.node);
       else { tagStageSources(stageFrame); editorStage = { node: stageFrame, html: stageFrame.outerHTML }; }
-    }
+      setStageCache(editorStage);
+    } else if (!state) { editorStage = null; setStageCache(null); }
   }
   if (state?.phase === 'lesson') {
     app.insertAdjacentHTML('beforeend', pinnedInvite({ host, demo, state, settings: presenterSettings }));

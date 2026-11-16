@@ -589,7 +589,10 @@ export class SlideDesigner {
     if (!this.drag) return;
     const {before,stage}=this.drag; this.drag = null;
     stage.removeAttribute('data-guide-x');stage.removeAttribute('data-guide-y');
-    if (JSON.stringify(before) !== JSON.stringify(this.original)) { this.lastTap = null; this.record(before); this.studio.callbacks.render(); }
+    // Fim do arraste: o palco já está correto (o arraste atualizou os estilos
+    // ao vivo); só o inspetor precisa ser renovado. Render completo aqui é o
+    // que fazia "tudo reiniciar" depois de mover um elemento.
+    if (JSON.stringify(before) !== JSON.stringify(this.original)) { this.lastTap = null; this.record(before); this.refreshSelection(); }
   }
   editText(node) {
     const text = node.querySelector('.canvas-text'); if (!text) return;
