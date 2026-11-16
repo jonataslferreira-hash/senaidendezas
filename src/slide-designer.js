@@ -87,6 +87,7 @@ export class SlideDesigner {
   constructor(studio) {
     this.studio = studio;this.simulations=new Simulations();this.fontPicker=new FontPicker(studio); this.selected = ''; this.interacting = ''; this.derived = new Map(); this.histories = new Map(); this.models = new CanvasModels();
     this.previewModels=new CanvasModels();
+    this.ratioLock = true;
     const root = studio.root;
     root.addEventListener('click', event => this.chooseStyle(event));
     for(const [enter,leave] of [['pointerover','pointerout'],['focusin','focusout']]){
@@ -456,8 +457,9 @@ export class SlideDesigner {
         ['replace-image','image','Trocar imagem'],
         ['image-reset','reload','Restaurar enquadramento'],
         ['search-image','search','Pesquisar imagem livre'],
-        ['crop-image','crop',this.imageEditing===e.id?'Concluir enquadramento':'Enquadrar imagem']
-      ].map(([action,icon,label])=>btn(action,studioIcon(icon),`aria-label="${label}" title="${label}" ${action==='crop-image'?`aria-pressed="${this.imageEditing===e.id}"`:''}`)).join('')}</div>
+        ['crop-image','crop',this.imageEditing===e.id?'Concluir enquadramento':'Enquadrar imagem'],
+        ['image-ratio',this.ratioLock?'lock':'unlock','Travar proporção']
+      ].map(([action,icon,label])=>btn(action,studioIcon(icon),`aria-label="${label}" title="${label}" ${action==='crop-image'?`aria-pressed="${this.imageEditing===e.id}"`:''}${action==='image-ratio'?`aria-pressed="${this.ratioLock}"`:''}`)).join('')}</div>
       <label>Ajuste na moldura<select data-element-field="imageFit"><option value="contain">Mostrar inteira</option><option value="cover" ${e.imageFit==='cover'?'selected':''}>Preencher</option><option value="fill" ${e.imageFit==='fill'?'selected':''}>Esticar livremente</option></select></label>
       <div class="image-crop-controls">${btn('image-minus','−','aria-label="Diminuir zoom da imagem"')}<output>${Math.round((e.imageZoom||1)*1000)/10}%</output>${btn('image-plus','+','aria-label="Aumentar zoom da imagem"')}</div>
       ${this.imageEditing===e.id?'<small class="image-crop-hint">Arraste a imagem para mover · Roda do mouse ou puxar o canto inferior para dar zoom.</small>':''}
@@ -530,8 +532,16 @@ export class SlideDesigner {
     if (d.resize) {
       const { w, h } = d.initial;
       const minimum = el.type === 'image' ? .1 : 5;
-      el.w = Math.max(minimum, Math.min(1000, w + dx));
-      el.h = Math.max(minimum, Math.min(1000, h + dy));
+      // Imagem: por padrão a proporção original fica travada; Shift (ou o botão
+      // da barra de ações) libera o esticar/achatar livre da moldura.
+      if (el.type === 'image' && this.ratioLock !== event.shiftKey) {
+        const scale = Math.max(.02, ((w + dx) / w + (h + dy) / h) / 2);
+        el.w = Math.max(minimum, Math.min(1000, w * scale));
+        el.h = Math.max(minimum, Math.min(1000, h * scale));
+      } else {
+        el.w = Math.max(minimum, Math.min(1000, w + dx));
+        el.h = Math.max(minimum, Math.min(1000, h + dy));
+      }
       if(el.type==='text'){el.x=d.initial.x-(el.w-w)/2;el.y=d.initial.y-(el.h-h)/2;}
     }
     else {
@@ -559,6 +569,12 @@ export class SlideDesigner {
     }
     const node = d.stage.querySelector('[data-object-id="' + CSS.escape(el.id) + '"]');
     Object.assign(node.style, { left: el.x + '%', top: el.y + '%', width: el.w + '%', height: el.h + '%' });
+    if (d.resize && el.type === 'image' && !el.imageFit) {
+      // Ao redimensionar com o mouse, a imagem acompanha a moldura: estica e
+      // achata junto, em vez de só dar zoom com faixas vazias ao lado.
+      el.imageFit = 'fill';
+      node.querySelector('img')?.style.setProperty('object-fit', 'fill');
+    }
     this.studio.markDirty();
   }
   up(event) {
@@ -765,6 +781,7 @@ export class SlideDesigner {
       }
       return;
     }
+    if(action==='image-ratio'){this.ratioLock=!this.ratioLock;this.studio.callbacks.render();return;}
     if(['image-plus','image-minus','image-reset'].includes(action)){
       this.mutate(s=>{const image=s.elements.find(item=>item.id===e?.id);if(!image)return;if(action==='image-reset'){image.imageZoom=1;image.imageX=image.imageY=0;}else image.imageZoom=imageZoomValue((image.imageZoom||1)*(action==='image-plus'?1.25:.8));}, true);return;
     }

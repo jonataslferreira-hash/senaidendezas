@@ -34,20 +34,51 @@ export class Classroom {
     return this.code;
   }
   open() {
-    return new Promise((resolve, reject) => {
-      const timeout = setTimeout(() => { this.peer.destroy(); reject(Error('Não foi possível acessar a sinalização. Verifique a internet e tente outra rede.')); }, 15_000);
-      this.peer.once('open', () => { clearTimeout(timeout); this.onStatus('online'); resolve(); });
+    // Falhas transitórias de sinalização (servidor ocupado, oscilação de rede,
+    // sala antiga ainda registrada no servidor) ganham novas chances antes de
+    // virar erro para quem clicou em Apresentar ou Entrar na sala.
+    const transient = new Set(['network', 'server-error', 'socket-error', 'socket-closed', 'ssl-unavailable', 'unavailable-id', 'timeout']);
+    const wait = ms => new Promise(done => setTimeout(done, ms));
+    const attempt = () => new Promise((resolve, reject) => {
+      const timeout = setTimeout(() => { const err = Error('Não foi possível acessar a sinalização. Verifique a internet e tente outra rede.'); err.type = 'timeout'; this.peer.destroy(); reject(err); }, 15_000);
+      let opened = false;
+      const tryReconnect = () => {
+        if (this.stopped || this.peer.destroyed) return;
+        if (this.peer.disconnected) setTimeout(() => { if (!this.stopped && this.peer.disconnected && !this.peer.destroyed) this.peer.reconnect(); }, 1500);
+      };
+      this.peer.once('open', () => { opened = true; clearTimeout(timeout); this.onStatus('online'); resolve(); });
       this.peer.on('error', err => {
-        clearTimeout(timeout);
-        const text = err.type === 'unavailable-id' ? 'Esta sala ainda está conectada em outra aba. Feche a outra aba ou crie uma nova sala.' : err.type === 'peer-unavailable' ? 'Sala não encontrada ou apresentador desconectado. Confira o código.' : 'Falha de conexão. Verifique a internet; a rede pode bloquear WebRTC.';
-        this.onStatus('error', text); reject(Error(text));
+        if (!opened) {
+          clearTimeout(timeout);
+          const text = err.type === 'unavailable-id' ? 'Esta sala ainda está conectada em outra aba. Feche a outra aba ou crie uma nova sala.' : err.type === 'peer-unavailable' ? 'Sala não encontrada ou apresentador desconectado. Confira o código.' : 'Falha de conexão. Verifique a internet; a rede pode bloquear WebRTC.';
+          reject(Object.assign(Error(text), { type: err.type }));
+          return;
+        }
+        // Depois de aberto, falhas transitórias não encerram a sala: a apresentação
+        // continua com quem está conectado e a sinalização reconecta sozinha.
+        if (this.stopped || this.peer.destroyed) return;
+        this.onStatus('reconnecting');
+        tryReconnect();
       });
       this.peer.on('disconnected', () => {
         this.onStatus('reconnecting');
-        if (!this.stopped && !this.peer.destroyed) setTimeout(() => { if (this.peer.disconnected && !this.peer.destroyed) this.peer.reconnect(); }, 1500);
+        tryReconnect();
       });
-      this.peer.on('open', () => this.onStatus('online'));
+      this.peer.on('open', () => { if (opened) this.onStatus('online'); });
     });
+    return (async () => {
+      for (let tries = 0; ; tries++) {
+        try { return await attempt(); }
+        catch (err) {
+          if (tries >= 2 || !transient.has(err.type)) { this.onStatus('error', err.message); throw err; }
+          this.onStatus('reconnecting');
+          await wait(tries ? 1600 : 900);
+          if (this.stopped) throw Error('Conexão encerrada.');
+          try { this.peer.destroy(); } catch { /* peer já encerrado */ }
+          this.peer = this.host ? new Peer(prefix + this.code, options()) : new Peer(options());
+        }
+      }
+    })();
   }
   accept(conn) {
     if (this.connections.size >= 65) { conn.close(); return; }

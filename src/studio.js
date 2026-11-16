@@ -816,7 +816,12 @@ export class Studio {
   save() {
     if (!this.draft) return;
     if (this.groups?.live) { this.groups.live.schedule(); return; }
-    this.draft = this.library.save(this.draft); this.dirty = false;
+    // Persiste sem trocar a referência do draft: substituir por um clone
+    // descolava o editor visual do objeto vivo e fazia edições feitas logo
+    // após um salvamento automático desaparecerem no re-render.
+    this.draft.updatedAt = Date.now();
+    this.library.save(this.draft);
+    this.dirty = false;
   }
   open(id, navigate = true) {
     clearTimeout(this.autoSaveTimer);
