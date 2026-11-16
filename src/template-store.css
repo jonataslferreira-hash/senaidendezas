@@ -8,56 +8,57 @@
 }
 
 .tstore-page {
-  --mx: 52%;
-  --my: 24%;
   --ui-surface: var(--ui-panel, #fff);
   --ui-bg: var(--ui-base, #f4f5f8);
   position: relative;
-  min-height: calc(100vh - 64px);
+  min-height: calc(100dvh - 86px);
   width: 100%;
   max-width: 100%;
-  overflow-x: clip;
+  overflow: clip;
   isolation: isolate;
   color: var(--ui-ink);
 }
 
-/* Fundo líquido duplo interativo (cor do tema do usuário + roxo Storage Lab) */
+/* Fundo líquido duplo interativo (simulação Navier-Stokes em canvas colado à viewport) */
 .tstore-ambient {
-  position: absolute;
-  inset: 0;
+  position: sticky;
+  top: 0;
+  width: 100%;
+  height: 100vh;
+  height: 100dvh;
+  margin-bottom: -100vh;
+  margin-bottom: -100dvh;
   overflow: hidden;
   pointer-events: none;
   z-index: 0;
+  background:
+    radial-gradient(ellipse 68% 64% at 24% 34%, color-mix(in srgb, var(--ui-accent, #2e6cf6) 28%, transparent) 0%, transparent 72%),
+    radial-gradient(ellipse 68% 64% at 78% 66%, rgba(124, 82, 217, 0.28) 0%, transparent 72%);
 }
 
-.tstore-blob {
-  position: absolute;
-  width: min(56vw, 680px);
-  height: min(56vw, 680px);
-  border-radius: 54% 46% 62% 38% / 44% 58% 42% 56%;
-  filter: blur(86px);
-  opacity: 0.22;
-  will-change: transform;
-  transition: left 1.05s cubic-bezier(.16, 1, .3, 1), top 1.05s cubic-bezier(.16, 1, .3, 1);
+.tstore-fluid-canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  filter: blur(3px) saturate(1.16);
+  transform: scale(1.025);
+  transform-origin: center;
+  opacity: 0.96;
+  will-change: contents;
 }
 
-.tstore-blob-user {
-  left: calc(var(--mx) - 24%);
-  top: calc(var(--my) - 18%);
-  background: radial-gradient(circle at 38% 38%, var(--ui-accent, var(--accent, #2e6cf6)) 0%, transparent 72%);
-  animation: tstore-float-a 16s ease-in-out infinite alternate;
+html[data-appearance="dark"] .tstore-ambient,
+:root[data-appearance="dark"] .tstore-ambient {
+  background:
+    radial-gradient(ellipse 68% 64% at 24% 34%, color-mix(in srgb, var(--ui-accent, #60a5fa) 32%, transparent) 0%, transparent 72%),
+    radial-gradient(ellipse 68% 64% at 78% 66%, rgba(139, 92, 246, 0.34) 0%, transparent 72%);
 }
 
-.tstore-blob-brand {
-  left: calc(100% - var(--mx) - 20%);
-  top: calc(var(--my) + 8%);
-  background: radial-gradient(circle at 60% 45%, #7c52d9 0%, #5e39b844 52%, transparent 74%);
-  animation: tstore-float-b 19s ease-in-out infinite alternate;
-}
-
-html[data-appearance="dark"] .tstore-blob,
-:root[data-appearance="dark"] .tstore-blob {
-  opacity: 0.24;
+html[data-appearance="dark"] .tstore-fluid-canvas,
+:root[data-appearance="dark"] .tstore-fluid-canvas {
+  filter: blur(3px) saturate(1.24) brightness(1.04);
+  opacity: 0.98;
 }
 
 html[data-appearance="dark"] .tstore-card,
@@ -65,11 +66,14 @@ html[data-appearance="dark"] .tstore-ext-card,
 html[data-appearance="dark"] .tstore-empty,
 html[data-appearance="dark"] .eshop-rail-card,
 html[data-appearance="dark"] .eshop-description-block {
-  box-shadow: 0 12px 30px rgba(0, 0, 0, .3);
+  background: color-mix(in srgb, var(--ui-panel, #242834) 78%, transparent);
+  backdrop-filter: blur(18px) saturate(140%);
+  box-shadow: 0 12px 30px rgba(0, 0, 0, .34);
 }
 
 html[data-appearance="dark"] .tstore-tabs {
-  background: color-mix(in srgb, var(--ui-soft, #242834) 90%, transparent);
+  background: color-mix(in srgb, var(--ui-soft, #242834) 78%, transparent);
+  backdrop-filter: blur(16px) saturate(135%);
 }
 
 html[data-appearance="dark"] .tstore-tab.is-active {
@@ -83,18 +87,8 @@ html[data-appearance="dark"] .tstore-icon-util.is-active {
   color: var(--ui-accent-ink, #141220);
 }
 
-@keyframes tstore-float-a {
-  0% { transform: translate(-4%, -2%) rotate(0deg) scale(1); }
-  100% { transform: translate(5%, 6%) rotate(18deg) scale(1.08); }
-}
-
-@keyframes tstore-float-b {
-  0% { transform: translate(4%, 2%) rotate(0deg) scale(1.04); }
-  100% { transform: translate(-6%, -5%) rotate(-20deg) scale(0.96); }
-}
-
 @media (prefers-reduced-motion: reduce) {
-  .tstore-blob { animation: none; transition: none; }
+  .tstore-fluid-canvas { filter: blur(4px) saturate(1.1); }
 }
 
 .tstore-shell {
@@ -130,6 +124,7 @@ html[data-appearance="dark"] .tstore-icon-util.is-active {
   letter-spacing: -0.03em;
   line-height: 1.1;
   color: var(--ui-ink);
+  text-shadow: 0 1px 18px color-mix(in srgb, var(--ui-base, #f4f5f8) 84%, transparent);
 }
 
 .tstore-header-tools {
@@ -339,7 +334,10 @@ html[data-appearance="dark"] .tstore-icon-util.is-active {
   gap: 12px;
   margin-bottom: 14px;
   font-size: 13px;
-  color: var(--ui-muted);
+  font-weight: 600;
+  color: var(--ui-ink);
+  opacity: 0.84;
+  text-shadow: 0 1px 12px color-mix(in srgb, var(--ui-base, #f4f5f8) 80%, transparent);
 }
 
 .tstore-clear-btn {
@@ -368,10 +366,10 @@ html[data-appearance="dark"] .tstore-icon-util.is-active {
   flex-direction: column;
   border-radius: 18px;
   overflow: hidden;
-  background: color-mix(in srgb, var(--ui-panel, #fff) 92%, transparent);
-  backdrop-filter: blur(12px);
-  border: 1px solid var(--ui-line);
-  box-shadow: 0 4px 16px rgba(14, 18, 30, .05);
+  background: color-mix(in srgb, var(--ui-panel, #fff) 82%, transparent);
+  backdrop-filter: blur(16px) saturate(135%);
+  border: 1px solid color-mix(in srgb, var(--ui-line) 82%, rgba(255, 255, 255, .36));
+  box-shadow: 0 6px 20px rgba(14, 18, 30, .07);
   transition: transform .2s cubic-bezier(.2, .8, .2, 1), box-shadow .2s ease, border-color .2s ease;
   min-width: 0;
 }
