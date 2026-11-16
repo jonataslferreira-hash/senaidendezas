@@ -255,7 +255,7 @@ html[data-theme][data-ui-style] #app .designer-slide-settings>details[open]>summ
 html[data-theme][data-ui-style] #app .designer-slide-settings .setting-content{display:none;grid-column:1/-1;grid-row:2;min-width:0;padding:10px 0}
 html[data-theme][data-ui-style] #app .designer-slide-settings>details[open]>.setting-content{display:block}
 html[data-theme][data-ui-style] #app .designer-inspector .slide-activities{display:block;position:static;width:100%;margin-top:14px}
-html[data-theme][data-ui-style] #app .designer-image-actions{display:grid!important;grid-template-columns:repeat(4,minmax(0,1fr));gap:5px;width:100%}
+html[data-theme][data-ui-style] #app .designer-image-actions{display:grid!important;grid-template-columns:repeat(5,minmax(0,1fr));gap:5px;width:100%}
 html[data-theme][data-ui-style] #app .designer-image-actions button{min-width:0;width:100%;padding:6px}
 html[data-theme][data-ui-style] #app .slide-settings-tabs{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px}
 html[data-theme][data-ui-style] #app .slide-settings-tabs button{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;height:52px;min-width:0;padding:6px;font-size:16px}

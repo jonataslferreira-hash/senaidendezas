@@ -34,8 +34,13 @@ export class Classroom {
     return this.code;
   }
   open() {
-    return new Promise((resolve, reject) => {
-      const timeout = setTimeout(() => { this.peer.destroy(); reject(Error('Não foi possível acessar a sinalização. Verifique a internet e tente outra rede.')); }, 15_000);
+    // Falhas transitórias de sinalização (servidor ocupado, oscilação de rede,
+    // sala antiga ainda registrada no servidor) ganham novas chances antes de
+    // virar erro para quem clicou em Apresentar ou Entrar na sala.
+    const transient = new Set(['network', 'server-error', 'socket-error', 'socket-closed', 'ssl-unavailable', 'unavailable-id', 'timeout']);
+    const wait = ms => new Promise(done => setTimeout(done, ms));
+    const attempt = () => new Promise((resolve, reject) => {
+      const timeout = setTimeout(() => { const err = Error('Não foi possível acessar a sinalização. Verifique a internet e tente outra rede.'); err.type = 'timeout'; this.peer.destroy(); reject(err); }, 15_000);
       let opened = false;
       const tryReconnect = () => {
         if (this.stopped || this.peer.destroyed) return;
@@ -46,7 +51,7 @@ export class Classroom {
         if (!opened) {
           clearTimeout(timeout);
           const text = err.type === 'unavailable-id' ? 'Esta sala ainda está conectada em outra aba. Feche a outra aba ou crie uma nova sala.' : err.type === 'peer-unavailable' ? 'Sala não encontrada ou apresentador desconectado. Confira o código.' : 'Falha de conexão. Verifique a internet; a rede pode bloquear WebRTC.';
-          this.onStatus('error', text); reject(Error(text));
+          reject(Object.assign(Error(text), { type: err.type }));
           return;
         }
         // Depois de aberto, falhas transitórias não encerram a sala: a apresentação
@@ -61,6 +66,19 @@ export class Classroom {
       });
       this.peer.on('open', () => { if (opened) this.onStatus('online'); });
     });
+    return (async () => {
+      for (let tries = 0; ; tries++) {
+        try { return await attempt(); }
+        catch (err) {
+          if (tries >= 2 || !transient.has(err.type)) { this.onStatus('error', err.message); throw err; }
+          this.onStatus('reconnecting');
+          await wait(tries ? 1600 : 900);
+          if (this.stopped) throw Error('Conexão encerrada.');
+          try { this.peer.destroy(); } catch { /* peer já encerrado */ }
+          this.peer = this.host ? new Peer(prefix + this.code, options()) : new Peer(options());
+        }
+      }
+    })();
   }
   accept(conn) {
     if (this.connections.size >= 65) { conn.close(); return; }

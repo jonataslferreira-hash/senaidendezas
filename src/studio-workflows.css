@@ -354,7 +354,7 @@ html[data-motion=reduced] #app button[data-studio-action="storage-ai"]:is(:hover
 #app .designer-arrange summary::-webkit-details-marker { display:none; }
 #app .designer-arrange summary[data-has-effect=true] { color:var(--ui-accent); }
 #app .designer-arrange .element-animation-panel { position:absolute; z-index:5; inset:calc(100% + 4px) 0 auto; padding:9px 12px; border:1px solid var(--ui-line); border-radius:10px; background:var(--ui-panel); box-shadow:0 8px 20px #0003; }
-#app .designer-image-actions { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:5px; margin-block:8px; }
+#app .designer-image-actions { display:grid; grid-template-columns:repeat(5,minmax(0,1fr)); gap:5px; margin-block:8px; }
 #app .designer-image-actions button { display:grid; place-items:center; min-height:36px; padding:4px; }
 #app .designer-image-background { width:100%; margin-block:6px; }
 #app :is(.designer-image-actions button,.designer-image-background)[aria-pressed=true] { border-color:var(--ui-accent); color:var(--ui-accent); }

@@ -3018,4 +3018,5 @@ dialog.simulation-modal .simulation-modal-foot-tools { display: none; }
 .canvas-image-toolbar button{all:unset;cursor:pointer;display:grid;place-items:center;width:29px;height:27px;border-radius:6px;color:#e6daff}
 .canvas-image-toolbar button:hover{background:#ffffff24}
 .canvas-image-toolbar button:focus-visible{outline:2px solid #c9b6ff}
+.canvas-image-toolbar button[aria-pressed="true"]{background:#7c52d9;color:#fff}
 .canvas-image-toolbar svg{width:15px;height:15px}

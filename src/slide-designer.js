@@ -87,6 +87,7 @@ export class SlideDesigner {
   constructor(studio) {
     this.studio = studio;this.simulations=new Simulations();this.fontPicker=new FontPicker(studio); this.selected = ''; this.interacting = ''; this.derived = new Map(); this.histories = new Map(); this.models = new CanvasModels();
     this.previewModels=new CanvasModels();
+    this.ratioLock = true;
     const root = studio.root;
     root.addEventListener('click', event => this.chooseStyle(event));
     for(const [enter,leave] of [['pointerover','pointerout'],['focusin','focusout']]){
@@ -363,7 +364,7 @@ export class SlideDesigner {
     const slide = this.display();
     if(this.selected!==null&&!slide.elements.some(e => e.id === this.selected)) this.selected = (slide.elements.find(e=>!e.locked)||slide.elements[0])?.id || '';
     const unavailable=[...new Set((slide.importWarnings||[]).map(w=>/^Fonte indisponível neste dispositivo: (.+)\.$/.exec(w)?.[1]).filter(Boolean))];
-    return `<div class="slide-designer">${slide.importWarnings?.length?`<details class="pptx-compatibility"><summary>Compatibilidade do PPTX · ${slide.importWarnings.length} observações</summary><ul>${slide.importWarnings.map(w=>'<li>'+esc(w)+'</li>').join('')}</ul>${unavailable.map(font=>`<div class="pptx-font-replace"><span>“${esc(font)}” não existe aqui. Trocar por:</span><select data-missing-font="${esc(font)}">${['Arial','Verdana','Georgia','Trebuchet MS','Times New Roman'].map(name=>`<option value="${name}">${name}</option>`).join('')}</select>${btn('replace-font','Aplicar fonte',`data-source-font="${esc(font)}"`)}</div>`).join('')}</details>`:''}${showTools?this.toolbarMarkup():''}<div class="designer-workspace ${fieldsOnly ? 'fields-only' : ''}">${fieldsOnly ? '' : `<div class="designer-stage-wrap"><div class="designer-stage" style="--slide-aspect:${slide.sourceType&&slide.pageWidth&&slide.pageHeight?slide.pageWidth/slide.pageHeight:16/9}">${canvasMarkup(slide, { editing: true, selected: this.selected, interacting: this.interacting })}</div><div class="designer-layer-list" id="designer-layers" aria-label="Camadas do slide">${slide.elements.map((e, i) => `<span class="designer-layer-row" data-layer-row="${esc(e.id)}">${btn('select', (i + 1) + ' · ' + esc(e.type === 'text' ? e.text.slice(0, 25) || 'Texto' : e.type === 'model' ? (e.modelLabel || (e.model === 'custom' ? e.customModel?.name || 'Modelo 3D' : modelShortName(e.model))) : e.type === 'shape' ? 'Forma' : e.type === 'simulation' ? experimentName(e) : e.type === 'video' ? 'Vídeo' : 'Imagem'), `data-id="${e.id}" aria-pressed="${e.id === this.selected}"`)}${this.studio.groups.canEdit ? `<span class="layer-grip" data-layer-grip="${esc(e.id)}" title="Arraste para mover a camada" aria-hidden="true">&#8942;</span>` : ''}</span>`).join('')}</div></div>`}
+    return `<div class="slide-designer">${slide.importWarnings?.length?`<details class="pptx-compatibility"><summary>Compatibilidade do PPTX · ${slide.importWarnings.length} observações</summary><ul>${slide.importWarnings.map(w=>'<li>'+esc(w)+'</li>').join('')}</ul>${unavailable.map(font=>`<div class="pptx-font-replace"><span>“${esc(font)}” não existe aqui. Trocar por:</span><select data-missing-font="${esc(font)}">${['Arial','Verdana','Georgia','Trebuchet MS','Times New Roman'].map(name=>`<option value="${name}">${name}</option>`).join('')}</select>${btn('replace-font','Aplicar fonte',`data-source-font="${esc(font)}"`)}</div>`).join('')}</details>`:''}${showTools?this.toolbarMarkup():''}<div class="designer-workspace ${fieldsOnly ? 'fields-only' : ''}">${fieldsOnly ? '' : `<div class="designer-stage-wrap"><div class="designer-stage" style="--slide-aspect:${slide.sourceType&&slide.pageWidth&&slide.pageHeight?slide.pageWidth/slide.pageHeight:16/9}">${canvasMarkup(slide, { editing: true, selected: this.selected, interacting: this.interacting, imageRatioLock: this.ratioLock })}</div><div class="designer-layer-list" id="designer-layers" aria-label="Camadas do slide">${slide.elements.map((e, i) => `<span class="designer-layer-row" data-layer-row="${esc(e.id)}">${btn('select', (i + 1) + ' · ' + esc(e.type === 'text' ? e.text.slice(0, 25) || 'Texto' : e.type === 'model' ? (e.modelLabel || (e.model === 'custom' ? e.customModel?.name || 'Modelo 3D' : modelShortName(e.model))) : e.type === 'shape' ? 'Forma' : e.type === 'simulation' ? experimentName(e) : e.type === 'video' ? 'Vídeo' : 'Imagem'), `data-id="${e.id}" aria-pressed="${e.id === this.selected}"`)}${this.studio.groups.canEdit ? `<span class="layer-grip" data-layer-grip="${esc(e.id)}" title="Arraste para mover a camada" aria-hidden="true">&#8942;</span>` : ''}</span>`).join('')}</div></div>`}
       <aside class="designer-inspector" id="designer-inspector" data-mobile-panel="${this.mobilePanel||''}">${this.inspectorContent()}</aside></div></div>`;
   }
   inspectorContent() {
@@ -458,8 +459,9 @@ export class SlideDesigner {
         ['replace-image','image','Trocar imagem'],
         ['image-reset','reload','Restaurar enquadramento'],
         ['search-image','search','Pesquisar imagem livre'],
-        ['crop-image','crop',this.imageEditing===e.id?'Concluir enquadramento':'Enquadrar imagem']
-      ].map(([action,icon,label])=>btn(action,studioIcon(icon),`aria-label="${label}" title="${label}" ${action==='crop-image'?`aria-pressed="${this.imageEditing===e.id}"`:''}`)).join('')}</div>
+        ['crop-image','crop',this.imageEditing===e.id?'Concluir enquadramento':'Enquadrar imagem'],
+        ['image-ratio',this.ratioLock?'lock':'unlock','Travar proporção']
+      ].map(([action,icon,label])=>btn(action,studioIcon(icon),`aria-label="${label}" title="${label}" ${action==='crop-image'?`aria-pressed="${this.imageEditing===e.id}"`:''}${action==='image-ratio'?`aria-pressed="${this.ratioLock}"`:''}`)).join('')}</div>
       <label>Ajuste na moldura<select data-element-field="imageFit"><option value="contain">Mostrar inteira</option><option value="cover" ${e.imageFit==='cover'?'selected':''}>Preencher</option><option value="fill" ${e.imageFit==='fill'?'selected':''}>Esticar livremente</option></select></label>
       <div class="image-crop-controls">${btn('image-minus','−','aria-label="Diminuir zoom da imagem"')}<output>${Math.round((e.imageZoom||1)*1000)/10}%</output>${btn('image-plus','+','aria-label="Aumentar zoom da imagem"')}</div>
       ${this.imageEditing===e.id?'<small class="image-crop-hint">Arraste a imagem para mover · Roda do mouse ou puxar o canto inferior para dar zoom.</small>':''}
@@ -532,10 +534,16 @@ export class SlideDesigner {
     if (d.resize) {
       const { w, h } = d.initial;
       const minimum = el.type === 'image' ? .1 : 5;
-      el.w = Math.max(minimum, Math.min(1000, w + dx));
-      el.h = Math.max(minimum, Math.min(1000, h + dy));
-      // Shift segura a proporção original durante o redimensionamento.
-      if (event.shiftKey) el.h = Math.max(minimum, Math.min(1000, el.w * (h / w)));
+      // Imagem: por padrão a proporção original fica travada; Shift (ou o botão
+      // da barra de ações) libera o esticar/achatar livre da moldura.
+      if (el.type === 'image' && this.ratioLock !== event.shiftKey) {
+        const scale = Math.max(.02, ((w + dx) / w + (h + dy) / h) / 2);
+        el.w = Math.max(minimum, Math.min(1000, w * scale));
+        el.h = Math.max(minimum, Math.min(1000, h * scale));
+      } else {
+        el.w = Math.max(minimum, Math.min(1000, w + dx));
+        el.h = Math.max(minimum, Math.min(1000, h + dy));
+      }
       if(el.type==='text'){el.x=d.initial.x-(el.w-w)/2;el.y=d.initial.y-(el.h-h)/2;}
     }
     else {
@@ -622,7 +630,7 @@ export class SlideDesigner {
     }
     this.studio.markDirty();
     const stage = this.studio.root.querySelector('.designer-stage');
-    if (stage) { stage.innerHTML = canvasMarkup(s, { editing: true, selected: this.selected, interacting: this.interacting }); const cropping = stage.querySelector('[data-object-id="'+CSS.escape(this.imageEditing)+'"]');if(cropping)cropping.dataset.cropping='true';fillAssetImages(stage);this.simulations.mount(stage); this.models.mount(stage, s); }
+    if (stage) { stage.innerHTML = canvasMarkup(s, { editing: true, selected: this.selected, interacting: this.interacting, imageRatioLock: this.ratioLock }); const cropping = stage.querySelector('[data-object-id="'+CSS.escape(this.imageEditing)+'"]');if(cropping)cropping.dataset.cropping='true';fillAssetImages(stage);this.simulations.mount(stage); this.models.mount(stage, s); }
   }
   async change(event) {
     const t = event.target;
@@ -775,6 +783,7 @@ export class SlideDesigner {
       }
       return;
     }
+    if(action==='image-ratio'){this.ratioLock=!this.ratioLock;this.studio.callbacks.render();return;}
     if(['image-plus','image-minus','image-reset'].includes(action)){
       this.mutate(s=>{const image=s.elements.find(item=>item.id===e?.id);if(!image)return;if(action==='image-reset'){image.imageZoom=1;image.imageX=image.imageY=0;}else image.imageZoom=imageZoomValue((image.imageZoom||1)*(action==='image-plus'?1.25:.8));}, true);return;
     }
