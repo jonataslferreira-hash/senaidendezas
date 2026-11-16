@@ -29,7 +29,7 @@ import { optimizeImage } from './image-optimize.js';
 import { Account } from './auth.js';
 import { studioIcon } from './studio-icons.js';
 import { audioEditor } from './audio-editor.js';
-import { readAudio } from './audio-data.js';
+import { readAudio, applyAudioPlayback } from './audio-data.js';
 import { cloudConfigured, saveCloudLesson, listCloudLessons, readCloudLesson, readCloudCover, deleteCloudLesson } from './cloud-files.js';
 import { storePages, fillAssetAudio } from './assets.js';
 import { LessonLibrary, newLesson, newSlide, newQuestion, clone, validateLesson, imageURL, difficulties, MAX_LESSON_BYTES, totalQuestionCount } from './lessons.js';
@@ -115,8 +115,30 @@ export class Studio {
       if (this.view === 'templates' && this.templateStore.handleClick(e.target, root)) return;
     });
     root.addEventListener('click',async e=>{const b=e.target.closest('[data-record-audio]');if(!b)return;try{const file=await recordAudio();if(file)await this.uploadAudio(file,b.dataset.recordAudio);}catch(error){callbacks.toast(error.message);}});
+    root.addEventListener('click', e => {
+      const preset = e.target.closest('[data-audio-rate-preset]');
+      if (!preset || !this.groups.canEdit) return;
+      const scope = preset.dataset.audioScope, audio = this.audioTarget(scope);
+      if (!audio) return;
+      const rate = Math.max(.5, Math.min(2, Number(preset.dataset.audioRatePreset) || 1));
+      audio.rate = rate;
+      const card = preset.closest('.audio-editor');
+      const range = card?.querySelector('[data-audio-rate]');
+      if (range) range.value = String(rate);
+      this.syncAudioUi(card, scope, audio);
+      this.markDirty();
+    });
     root.addEventListener('input', e => {
       if (this.view === 'templates' && this.templateStore.handleInput(e.target, root)) return;
+      if (e.target.matches('[data-audio-volume],[data-audio-rate]') && this.groups.canEdit) {
+        const scope = e.target.dataset.audioVolume || e.target.dataset.audioRate;
+        const audio = this.audioTarget(scope);
+        if (!audio) return;
+        if (e.target.dataset.audioVolume) audio.volume = Math.max(0, Math.min(1, Number(e.target.value)));
+        else audio.rate = Math.max(.5, Math.min(2, Number(e.target.value) || 1));
+        this.syncAudioUi(e.target.closest('.audio-editor'), scope, audio);
+        return;
+      }
       this.change(e.target);
     });
     root.addEventListener('change', e => {
@@ -137,19 +159,14 @@ export class Studio {
       else if (e.target.matches('[data-audio-volume],[data-audio-loop],[data-audio-rate],[data-audio-continue]')) {
         if (!this.groups.canEdit) return;
         const {audioVolume,audioLoop,audioRate,audioContinue}=e.target.dataset;
-        const audio=this.audioTarget(audioVolume||audioLoop||audioRate||audioContinue);
+        const scope=audioVolume||audioLoop||audioRate||audioContinue;
+        const audio=this.audioTarget(scope);
         if (!audio) return;
-        if (audioVolume) audio.volume=Number(e.target.value);
+        if (audioVolume) audio.volume=Math.max(0,Math.min(1,Number(e.target.value)));
         else if (audioRate) e.target.value=audio.rate=Math.max(.5,Math.min(2,Number(e.target.value)||1));
         else if (audioContinue) audio.continueAcrossSlides=e.target.checked;
         else audio.loop=e.target.checked;
-        const preview = e.target.closest('.audio-editor')?.querySelector('[data-audio-preview]');
-        if (preview) {
-          preview.volume = audio.volume;
-          preview.defaultPlaybackRate = audio.rate || 1;
-          preview.playbackRate = preview.defaultPlaybackRate;
-          preview.loop = audio.loop;
-        }
+        this.syncAudioUi(e.target.closest('.audio-editor'), scope, audio);
         this.markDirty();
       }
       else if(e.target.matches('[data-lesson-cover-file]'))this.chooseLessonCover(e.target.files[0]).catch(error=>callbacks.toast(error.message));
@@ -402,12 +419,33 @@ export class Studio {
     } catch (error) { if(current()){this.cloudLoaded=true;this.cloudMessage=error.message||'Não foi possível consultar as aulas. Clique em Atualizar arquivos para tentar novamente.';this.callbacks.toast(this.cloudMessage);} }
     finally { if(current()){this.cloudBusy = false;if(action==='cloud-refresh'){this.refreshCloudPanel();this.paintSaveButton();const upload=this.root.querySelector('.editor-save-controls [data-studio-action=cloud-save]');if(upload)upload.disabled=!this.groups.canEdit;}else this.callbacks.render();} }
   }
+  syncAudioUi(card, scope, audio) {
+    if (!audio) return;
+    const rate = Math.max(.5, Math.min(2, Number(audio.rate) || 1));
+    const slowed = rate < 0.999;
+    const preview = card?.querySelector('[data-audio-preview]');
+    if (preview) applyAudioPlayback(preview, audio);
+    const volOut = card?.querySelector(`[data-audio-vol-label="${scope}"]`);
+    if (volOut) volOut.textContent = `${Math.round((Number(audio.volume) || 0) * 100)}%`;
+    const rateOut = card?.querySelector(`[data-audio-rate-label="${scope}"]`);
+    if (rateOut) rateOut.textContent = `${rate.toFixed(2).replace(/\.00$/, '').replace(/(\.\d)0$/, '$1').replace('.', ',')}×`;
+    const tag = card?.querySelector(`[data-audio-speed-tag="${scope}"]`);
+    if (tag) tag.textContent = slowed ? 'Slowed · tom grave' : rate > 1.001 ? 'Acelerado' : 'Normal';
+    const speedBlock = card?.querySelector('.audio-speed-block');
+    if (speedBlock) speedBlock.dataset.slowed = String(slowed);
+    for (const chip of card?.querySelectorAll('[data-audio-rate-preset]') || []) {
+      const match = Math.abs(Number(chip.dataset.audioRatePreset) - rate) < 0.01;
+      chip.classList.toggle('active', match);
+      chip.setAttribute('aria-pressed', String(match));
+    }
+  }
   async uploadAudio(file, scope) {
     if (!file) return;
     if(!this.groups.canEdit)return;
     if(scope.startsWith('element:'))this.designer.ensure();
     const draft=this.draft, slide=draft.slides[this.index], target=this.audioOwner(scope);
     if(!target)return;
+    const wasLarge = file.size > 8 * 1024 * 1024;
     const audio=await readAudio(file);
     const [assetId] = await storePages([audio.data]);
     if(this.draft!==draft||!this.groups.canEdit||(!scope.startsWith('quiz')&&(!draft.slides.includes(slide)||(scope.startsWith('element:')&&!slide.elements.includes(target))))){
@@ -416,7 +454,8 @@ export class Studio {
     }
     if(scope.startsWith('element:')&&slide.audio?.trigger===scope)slide.audio=null;
     target[this.audioField(scope)] = { ...audio, ...(scope.startsWith('element:')?{loop:false}:{}), assetId, data: '', ...(scope==='slide'?{trigger:target.audio?.trigger||'auto'}:{}) };if(scope==='quiz-lobby'||scope==='quiz-question'){draft.gameSettings||={};draft.gameSettings[scope==='quiz-lobby'?'lobby':'questions']='custom';}
-    this.markDirty(); this.callbacks.render(); this.callbacks.toast('Áudio adicionado. Use o botão de som ao apresentar.');
+    this.markDirty(); this.callbacks.render();
+    this.callbacks.toast(wasLarge ? 'Áudio comprimido e adicionado com sucesso!' : 'Áudio adicionado. Use o botão de som ao apresentar.');
   }
   brandMarkup() {
     return `<button class="studio-wordmark" data-studio-action="library" aria-label="Storage Lab, biblioteca"><img class="lab-logo" src="${brandUrl}" alt=""><span>storage<span>lab.</span></span></button>`;
@@ -781,10 +820,16 @@ export class Studio {
     for (const preview of this.root.querySelectorAll('[data-audio-preview]')) {
       const track = this.audioTarget(preview.dataset.audioPreview);
       if (!track) continue;
-      preview.volume = track.volume;
-      preview.defaultPlaybackRate = track.rate || 1;
-      preview.playbackRate = preview.defaultPlaybackRate;
-      preview.loop = track.loop;
+      applyAudioPlayback(preview, track);
+      if (!preview.dataset.slowedWired) {
+        preview.dataset.slowedWired = '1';
+        const sync = () => {
+          const latest = this.audioTarget(preview.dataset.audioPreview);
+          if (latest) applyAudioPlayback(preview, latest);
+        };
+        preview.addEventListener('play', sync);
+        preview.addEventListener('loadedmetadata', sync);
+      }
     }
     fillAssetImages(this.root);
     this.watchCloudCovers();

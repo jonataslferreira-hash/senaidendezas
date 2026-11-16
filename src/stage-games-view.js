@@ -112,14 +112,15 @@ function survivalView(state, g, host, player, now) {
     : g.state === 'open' ? (me.choice === null ? '<p class="game-wait">Escolha com cuidado: errou, caiu.</p>' : '<p class="game-wait">Resposta travada. Segura a respiração…</p>')
     : '<p class="sv-safe">Você continua de pé!</p>';
   const roamScale = g.players.length <= 6 ? 1 : g.players.length <= 14 ? .65 : .35;
-  const arena = `<div class="sv-arena" style="--scale:${scale}" data-state="${g.state}" data-crowd="${g.players.length}"><i class="sv-light a"></i><i class="sv-light b"></i>${done && winners.length ? confetti(28) : ''}<div class="sv-crowd">${g.players.map((item, i) => {
+  const showArena = Boolean(host);
+  const arena = showArena ? `<div class="sv-arena" style="--scale:${scale}" data-state="${g.state}" data-crowd="${g.players.length}"><i class="sv-light a"></i><i class="sv-light b"></i>${done && winners.length ? confetti(28) : ''}<div class="sv-crowd">${g.players.map((item, i) => {
     const fell = item.alive ? '' : item.fell === g.round && shown ? 'now' : 'before';
     const dir = i % 2 === 0 ? 1 : -1;
     const roam = Math.round((26 + ((i * 19) % 34)) * roamScale) * dir;
     const roamT = (4.2 + (i % 5) * .85).toFixed(2);
     const roamD = (-((i * 1.13) % 4)).toFixed(2);
     return `<figure class="sv-player" data-fell="${fell}" data-locked="${g.state === 'open' && Boolean(item.locked)}" data-me="${player && item.id === state.me?.id}" data-winner="${done && item.alive}" style="--i:${i};--roam:${roam}px;--roam-t:${roamT}s;--roam-d:${roamD}s">${character(item, i, done && item.alive ? 'win-' + i % 4 : item.alive && ready ? 'idle' : '')}<i class="sv-lock" aria-hidden="true">✓</i><i class="sv-ghost" aria-hidden="true">✕</i><i class="sv-tile" aria-hidden="true"></i><figcaption>${esc(item.name)}</figcaption></figure>`;
-  }).join('') || '<p class="game-wait">Aguardando participantes…</p>'}</div><i class="sv-floor"></i></div>`;
+  }).join('') || '<p class="game-wait">Aguardando participantes…</p>'}</div><i class="sv-floor"></i></div>` : '';
   return live(hud) + live(timerBar(g, now), 'slim') + live(question, 'ask') + live(status) +
     (host ? live(hostActions(state, [ready ? ['next', '▶ Começar', 'primary'] : g.state === 'open' ? ['next', 'Revelar agora'] : g.state === 'reveal' ? ['next', 'Próxima pergunta →', 'primary'] : ['restart', '↻ Jogar de novo']], { showNext: done })) : '') +
     live(arena, 'arena');

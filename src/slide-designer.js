@@ -7,6 +7,7 @@ import {Simulations,simulationMarkup,simulationNames,simulationGroups,simulation
 import {FontPicker,fontButton,loadSlideFonts} from './fonts.js';
 import {presentationSlide} from './slide-display.js';
 import { audioEditor } from './audio-editor.js';
+import { applyAudioPlayback } from './audio-data.js';
 import { optimizeImage } from './image-optimize.js';
 import { MAX_CANVAS_ELEMENTS, canvasFromSlide, newElement, canvasThemes, applyCanvasTheme, slideBackground, normalizeBackground, imageZoomValue } from './canvas-data.js';
 import {openLayouts, applyOpenLayout} from './open-slide-layouts.js';
@@ -380,16 +381,36 @@ export class SlideDesigner {
       <div class="background-gradients" role="group" aria-label="Gradientes prontos">${backgroundGradients.map((preset,index)=>`<button type="button" class="background-gradient" data-background-gradient="${index}" style="--preset:${preset.css}" aria-label="${preset.name}: ${preset.hint}" title="${preset.name} · ${preset.hint}"><span></span></button>`).join('')}</div>`:''}
     </details>`;
   }
-  animationOrder(slide) {
+  animationPanel(slide) {
     const ordered=this.orderedAnimations(slide);
-    return `<details class="designer-timeline" ${this.timelineOpen?'open':''}><summary>${studioIcon('animate')} Animações <span>${ordered.length}</span></summary>
-      ${ordered.length?`<ol>${ordered.map(({effect,index},position)=>{
-        const object=slide.elements.find(element=>element.id===effect.id);
-        const name=object?.type==='text'?object.text.slice(0,44):object?.imageAlt||({image:'Imagem',shape:'Forma',model:'Modelo 3D',video:'Vídeo',simulation:experimentName(object)})[object?.type]||'Elemento';
-        return `<li><div><strong>${esc(name)}</strong><small>${effect.group?'Clique '+effect.group:'Ao entrar'} · ${effect.duration} ms</small></div><div class="timeline-actions">
-          ${btn('animation-up','↑',`data-effect-index="${index}" aria-label="Mover animação para cima" ${position===0?'disabled':''}`)}
-          ${btn('animation-down','↓',`data-effect-index="${index}" aria-label="Mover animação para baixo" ${position===ordered.length-1?'disabled':''}`)}</div></li>`;
-      }).join('')}</ol>`:'<p>Adicione uma animação a um elemento para organizar a ordem aqui.</p>'}</details>`;
+    const transitions=[
+      ['slide','Deslizar'],
+      ['fade','Dissolver'],
+      ['zoom','Aproximar'],
+      ['rise','Subir'],
+      ['wipe','Revelar'],
+      ['iris','Círculo'],
+      ['split','Cortina'],
+      ['flip','Virar página'],
+      ['none','Sem transição']
+    ];
+    const current=slide.transition||'slide';
+    return `<div class="inspector-animations">
+      <div class="inspector-anim-section">
+        <div class="inspector-anim-head"><strong>Transição do slide</strong><small>Ao entrar na apresentação</small></div>
+        <label class="inspector-anim-field"><span class="sr-only">Transição ao entrar neste slide</span><select data-slide-transition aria-label="Transição ao entrar neste slide">${transitions.map(([value,label])=>`<option value="${value}" ${current===value?'selected':''}>${label}</option>`).join('')}</select></label>
+      </div>
+      <div class="inspector-anim-section designer-timeline">
+        <div class="inspector-anim-head"><strong>Animações de elementos</strong><span class="inspector-anim-count">${ordered.length}</span></div>
+        ${ordered.length?`<ol class="inspector-anim-list">${ordered.map(({effect,index},position)=>{
+          const object=slide.elements.find(element=>element.id===effect.id);
+          const name=object?.type==='text'?object.text.slice(0,44):object?.imageAlt||({image:'Imagem',shape:'Forma',model:'Modelo 3D',video:'Vídeo',simulation:experimentName(object)})[object?.type]||'Elemento';
+          return `<li><div><strong>${esc(name)}</strong><small>${effect.group?'Clique '+effect.group:'Ao entrar'} · ${effect.duration} ms</small></div><div class="timeline-actions">
+            ${btn('animation-up','↑',`data-effect-index="${index}" aria-label="Mover animação para cima" ${position===0?'disabled':''}`)}
+            ${btn('animation-down','↓',`data-effect-index="${index}" aria-label="Mover animação para baixo" ${position===ordered.length-1?'disabled':''}`)}</div></li>`;
+        }).join('')}</ol>`:'<p class="inspector-anim-empty">Selecione um elemento no slide para adicionar animações de entrada e organizar a ordem aqui.</p>'}
+      </div>
+    </div>`;
   }
   orderedAnimations(slide) {
     return (slide.animations||[]).map((effect,index)=>({effect,index}))
@@ -398,8 +419,20 @@ export class SlideDesigner {
   settingsMarkup(s) {
     const active=this.settingTab||'';
     const background=this.backgroundControls(s).replace(/^<details[^>]*>[\s\S]*?<\/summary>/,'').replace(/<\/details>$/,'');
-    const panels={background,theme:slideStylePicker('theme',s,{inspector:true})+'<div class="mobile-slide-layout">'+slideStylePicker('layout',s,{inspector:true})+'</div>',audio:audioEditor(s.audio,'slide',s.elements,{expanded:true})};
-    return `<div class="slide-settings-tabs">${[['background','Fundo',`<span class="background-swatch" style="background:${slideBackground(s)}"></span>`],['theme','Tema',studioIcon('palette')],['audio','Áudio','♫']].map(([id,label,icon])=>btn('setting-'+id,icon+'<span>'+label+'</span>',`aria-pressed="${active===id}"`)).join('')}</div>${active?`<div class="slide-setting-panel">${panels[active]}</div>`:''}`;
+    const animCount=(s.animations||[]).length;
+    const panels={
+      background,
+      theme:slideStylePicker('theme',s,{inspector:true})+'<div class="mobile-slide-layout">'+slideStylePicker('layout',s,{inspector:true})+'</div>',
+      audio:audioEditor(s.audio,'slide',s.elements,{expanded:true}),
+      animations:this.animationPanel(s)
+    };
+    const tabs=[
+      ['background','Fundo',`<span class="background-swatch" style="background:${slideBackground(s)}"></span>`],
+      ['theme','Tema',studioIcon('palette')],
+      ['audio','Áudio',`<span class="tab-glyph${s.audio?' is-active':''}" aria-hidden="true">♫</span>`],
+      ['animations','Animações',`${studioIcon('animate')}${animCount?`<em class="tab-badge">${animCount}</em>`:''}`]
+    ];
+    return `<div class="slide-settings-tabs">${tabs.map(([id,label,icon])=>btn('setting-'+id,icon+'<span>'+label+'</span>',`aria-pressed="${active===id}"`)).join('')}</div>${active?`<div class="slide-setting-panel" data-setting-tab="${active}">${panels[active]}</div>`:''}`;
   }
   inspector() {
     const s = this.display(), e = s.elements.find(e => e.id === this.selected);
@@ -411,7 +444,7 @@ export class SlideDesigner {
     const number = (label, key, value, min, max) => `<label>${label}<input type="number" data-element-field="${key}" value="${value}" min="${min}" max="${max}" step="0.5"></label>`;
     if(this.studio.ai.open)return this.studio.ai.inspector(s);
     const layerIdx = e ? s.elements.indexOf(e) : -1;
-    return `${!e ? `${this.settingsMarkup(s)}${this.animationOrder(s)}` : `<div class="designer-selected-heading"><strong>${{ text: 'Caixa de texto', image: 'Imagem', model: 'Modelo 3D', shape: 'Forma',simulation:'Simulação',video:'Vídeo' }[e.type]}</strong><span class="inspector-layer-badge">Camada ${layerIdx + 1}/${s.elements.length}</span></div><div class="designer-arrange" aria-label="Organizar elemento">${[
+    return `${!e ? `${this.settingsMarkup(s)}` : `<div class="designer-selected-heading"><strong>${{ text: 'Caixa de texto', image: 'Imagem', model: 'Modelo 3D', shape: 'Forma',simulation:'Simulação',video:'Vídeo' }[e.type]}</strong><span class="inspector-layer-badge">Camada ${layerIdx + 1}/${s.elements.length}</span></div><div class="designer-arrange" aria-label="Organizar elemento">${[
   ['duplicate', 'duplicate', 'Duplicar elemento'],
   ['forward', 'forward', 'Trazer à frente'],
   ['animation'],
@@ -455,6 +488,10 @@ export class SlideDesigner {
     for (const node of this.studio.root.querySelectorAll('.canvas-editing [data-object-id]')) { node.dataset.selected = String(ids.includes(node.dataset.objectId)); node.dataset.interacting = String(node.dataset.objectId === this.interacting);node.dataset.cropping=String(node.dataset.objectId===this.imageEditing); }
     const inspector = this.studio.root.querySelector('.designer-inspector'); if (inspector && !this.studio.ai.refreshInspectorScope()) { inspector.dataset.mobilePanel=this.mobilePanel||''; inspector.innerHTML = this.inspectorContent(); inspector.classList.remove('selection-arrive'); void inspector.offsetWidth; inspector.classList.add('selection-arrive'); }
     fillAssetAudio(this.studio.root);
+    for (const preview of this.studio.root.querySelectorAll('[data-audio-preview]')) {
+      const track = this.studio.audioTarget(preview.dataset.audioPreview);
+      if (track) applyAudioPlayback(preview, track);
+    }
     for (const button of this.studio.root.querySelectorAll('[data-designer-action="select"]')) button.setAttribute('aria-pressed', String(ids.includes(button.dataset.id)));
   }
   down(event) {
@@ -581,6 +618,13 @@ export class SlideDesigner {
   async change(event) {
     const t = event.target;
     if (!this.studio.groups.canEdit || this.studio.receivingRemote || !this.studio.root.contains(t)) return;
+    if (t.matches('[data-slide-transition]')) {
+      const allowed = ['slide', 'fade', 'zoom', 'rise', 'wipe', 'iris', 'split', 'flip', 'none'];
+      const value = allowed.includes(t.value) ? t.value : 'slide';
+      this.original.transition = value;
+      this.studio.markDirty();
+      return;
+    }
     if(t.dataset.elementAnimation){
       const id=this.selected;
       const field=t.dataset.elementAnimation;
@@ -989,19 +1033,41 @@ export class SlideDesigner {
     document.querySelector('#slide-video-dialog')?.remove();
     const current=targetId?this.display().elements.find(item=>item.id===targetId)?.video||'':'';
     const dialog=document.createElement('dialog');
-    dialog.id='slide-video-dialog';dialog.className='video-dialog';dialog.setAttribute('aria-labelledby','slide-video-title');
-    dialog.innerHTML=`<form method="dialog" novalidate><header><h2 id="slide-video-title">${targetId?'Trocar vídeo':'Inserir vídeo'}</h2><button type="button" data-video-close aria-label="Fechar">×</button></header>
-      <label for="slide-video-url">Link do vídeo</label>
-      <input id="slide-video-url" type="url" inputmode="url" autocomplete="off" placeholder="https://www.youtube.com/watch?v=…" value="${esc(current)}">
-      <p class="video-dialog-hint" data-video-hint>Aceita YouTube, Vimeo ou link direto de arquivo .mp4 / .webm.</p>
-      <div class="video-dialog-preview" data-video-preview hidden></div>
-      <footer><button type="button" class="video-dialog-quiet" data-video-close>Cancelar</button><button type="submit" class="video-dialog-go" disabled>${targetId?'Trocar vídeo':'Inserir no slide'}</button></footer></form>`;
+    dialog.id='slide-video-dialog';dialog.className='video-dialog video-dialog-v2';dialog.setAttribute('aria-labelledby','slide-video-title');
+    dialog.innerHTML=`<form method="dialog" novalidate>
+      <header class="vd-head">
+        <div class="vd-title-wrap">
+          <span class="vd-icon" aria-hidden="true"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2.5" y="4.5" width="19" height="15" rx="3"/><path d="m10 9 5.5 3-5.5 3z" fill="currentColor" stroke="none"/></svg></span>
+          <div>
+            <h2 id="slide-video-title">${targetId?'Trocar vídeo':'Inserir vídeo'}</h2>
+            <p class="vd-subtitle">Adicione um vídeo para tocar diretamente durante a apresentação.</p>
+          </div>
+        </div>
+        <button type="button" class="vd-close" data-video-close aria-label="Fechar">×</button>
+      </header>
+      <div class="vd-body">
+        <div class="vd-pills" aria-label="Fontes compatíveis"><span>YouTube</span><span>Vimeo</span><span>.MP4 / .WebM</span></div>
+        <label class="vd-field" for="slide-video-url">
+          <span>Link do vídeo</span>
+          <div class="vd-input-wrap">
+            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>
+            <input id="slide-video-url" type="url" inputmode="url" autocomplete="off" placeholder="https://www.youtube.com/watch?v=…" value="${esc(current)}">
+          </div>
+        </label>
+        <p class="video-dialog-hint" data-video-hint>Cole um link do YouTube, Vimeo ou arquivo direto .mp4 / .webm.</p>
+        <div class="video-dialog-preview" data-video-preview hidden></div>
+      </div>
+      <footer class="vd-foot">
+        <button type="button" class="video-dialog-quiet" data-video-close>Cancelar</button>
+        <button type="submit" class="video-dialog-go" disabled>${targetId?'Salvar vídeo':'Inserir no slide'}</button>
+      </footer>
+    </form>`;
     const input=dialog.querySelector('input'),hint=dialog.querySelector('[data-video-hint]'),preview=dialog.querySelector('[data-video-preview]'),submit=dialog.querySelector('[type=submit]');
     const check=()=>{
       const value=input.value.trim(),source=videoSource(value);
       submit.disabled=!source;
       hint.dataset.state=source?'ok':value?'error':'';
-      hint.textContent=source?`${source.label} reconhecido.`:value?'Não reconheci esse link. Use um link do YouTube, do Vimeo ou de um arquivo .mp4 / .webm.':'Aceita YouTube, Vimeo ou link direto de arquivo .mp4 / .webm.';
+      hint.textContent=source?`✓ ${source.label} reconhecido e pronto para inserir.`:value?'Não reconheci esse link. Use um endereço do YouTube, Vimeo ou link direto .mp4 / .webm.':'Cole um link do YouTube, Vimeo ou arquivo direto .mp4 / .webm.';
       preview.hidden=!source;
       // Prévia de verdade: dá para assistir e conferir se é o vídeo certo antes de inserir.
       const key=source?source.embed:'';

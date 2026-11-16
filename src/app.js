@@ -5,7 +5,8 @@ import {GameLayout} from './game-layout.js';
 import {GameAudio} from './game-audio.js';
 import {quizMarkup,leaderboardMarkup,animateRanking} from './game-ui.js';
 import { downloadResultsPng } from './results-png.js';
-import { gameMarkup, keepGame, animateRaffle, teamStrip } from './stage-games-view.js';
+import { gameMarkup, keepGame, animateRaffle } from './stage-games-view.js';
+import { applyAudioPlayback } from './audio-data.js';
 import {Simulations} from './simulations.js';
 import {loadSlideFonts} from './fonts.js';
 import {editParticipant,participantPhoto,manageParticipants} from './participant-profile.js';
@@ -408,7 +409,6 @@ function render() {
     if (editDraft) app.insertAdjacentHTML('beforeend', liveEditDialog(editDraft, editError));
   }
   app.dataset.transition = state?.phase === 'lesson' ? activeTransition : 'slide';
-  if (state?.teams && ['leaderboard', 'finished'].includes(state.phase) && !app.querySelector('.team-strip')) app.querySelector('main')?.insertAdjacentHTML('beforeend', teamStrip(state));
   if (state?.phase === 'leaderboard') animateRanking(app, Math.max(0, (Date.now() + timerOffset - (state.resultStartedAt || 0)) / 1000));
   if (state?.game?.type === 'raffle') animateRaffle(app, () => Date.now() + timerOffset);
   if(state&&!app.querySelector('[data-remote-dialog]'))app.insertAdjacentHTML('beforeend','<div data-remote-dialog></div>');
@@ -572,11 +572,10 @@ function resumeSlideTrack() {
   });
 }
 trackPlayer.addEventListener('ended',()=>{if(playingTrack?.track.continueAcrossSlides&&state?.slide>playingTrack.index)updateMusic();});
+trackPlayer.addEventListener('loadedmetadata',()=>{if(playingTrack?.track)applyAudioPlayback(trackPlayer,playingTrack.track);});
 function playSlideTrack(track,key,manual=false) {
-  trackPlayer.volume=track.volume;
-  trackPlayer.loop=track.loop;
   trackPlayer.src=track.data;
-  trackPlayer.playbackRate=track.rate||1;
+  applyAudioPlayback(trackPlayer,track);
   playingTrack={track,key,manual,slideId:slides[state.slide].id,index:state.slide};
   audioBlocked=false;
   resumeSlideTrack();

@@ -92,8 +92,8 @@ test('reorganiza animações de objetos na lateral',async({page})=>{
  await page.locator('#import-slides-file').setInputFiles({name:'animado.pptx',mimeType:'application/vnd.openxmlformats-officedocument.presentationml.presentation',buffer:await pptxFixture(true)});
  await expect(page.locator('.outline-item')).toHaveCount(2);
  await page.locator('.designer-stage-wrap').click({position:{x:3,y:3}});
+ await page.locator('[data-designer-action=setting-animations]').click();
  const timeline=page.locator('.designer-timeline');
- await timeline.locator('summary').click();
  await expect(timeline.locator('li')).not.toHaveCount(0);
  await expect(timeline.locator('li').first()).toContainText('Clique');
  await expect(page.locator('[data-designer-action=setting-theme] svg path')).toHaveAttribute('d', /^M12 3/);
