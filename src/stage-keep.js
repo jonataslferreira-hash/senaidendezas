@@ -23,6 +23,26 @@ export function tagStageSources(scope) {
   for (const node of scope.querySelectorAll('[data-object-id]')) sourceMarkup.set(node, cleanMarkup(node));
 }
 
+// Reconcilia o palco com blindagem: qualquer erro ou divergência faz o palco
+// ser remontado a partir do markup novo (correto; só perde a otimização).
+// Nenhuma situação pode deixar o palco quebrado — no pior caso, remonta.
+export function reconcileStageSafely(oldStage, freshStage) {
+  const remount = () => { oldStage.replaceChildren(...freshStage.childNodes); tagStageSources(oldStage); };
+  try {
+    for (const name of oldStage.getAttributeNames()) if (!freshStage.hasAttribute(name)) oldStage.removeAttribute(name);
+    for (const name of freshStage.getAttributeNames()) if (oldStage.getAttribute(name) !== freshStage.getAttribute(name)) oldStage.setAttribute(name, freshStage.getAttribute(name));
+    const oldFrame = oldStage.querySelector('.canvas-frame'), freshFrame = freshStage.querySelector('.canvas-frame');
+    if (!oldFrame || !freshFrame || oldFrame.className !== freshFrame.className || !reconcileCanvas(oldFrame, freshFrame)) { remount(); return; }
+    // Invariante: o palco reconciliado precisa ter exatamente os objetos do
+    // markup novo, na mesma ordem. Divergiu (qualquer caso imprevisto),
+    // remonta o palco inteiro em vez de deixar a tela quebrada.
+    const objectIds = stage => [...(stage.querySelector('.slide-canvas')?.children || [])].filter(node => node.hasAttribute?.('data-object-id')).map(node => node.dataset.objectId).join('|');
+    if (objectIds(oldStage) !== objectIds(freshStage)) remount();
+  } catch {
+    try { remount(); } catch { /* sem recourse: o render tradicional reconstrói */ }
+  }
+}
+
 export function reconcileCanvas(currentFrame, freshFrame) {
   if (!currentFrame || !freshFrame) return false;
   const curCanvas = currentFrame.querySelector('.slide-canvas');
