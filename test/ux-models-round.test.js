@@ -19,14 +19,15 @@ import { Room } from '../src/room.js';
 import { readAutoSavePreference, writeAutoSavePreference } from '../src/autosave-preference.js';
 import { simulationGroups, simulationMarkup } from '../src/simulations.js';
 
-test('3D Models: exactly 13 builtin models covering all 8 subjects with valid Three.js geometry and part details', () => {
-  assert.equal(BUILTIN_MODELS.length, 13, 'must provide exactly 13 builtin 3D models');
-  assert.equal(new Set(BUILTIN_MODEL_IDS).size, 13, 'all 13 model IDs must be unique');
+test('3D Models: 15 builtin models across Sciences & Tech (no Português/Artes/Matemática) with valid Three.js geometry and part details', () => {
+  assert.equal(BUILTIN_MODELS.length, 15, 'must provide exactly 15 builtin 3D models');
+  assert.equal(new Set(BUILTIN_MODEL_IDS).size, 15, 'all 15 model IDs must be unique');
 
-  const expectedSubjects = ['Tecnologia', 'Física', 'Química', 'Biologia', 'Matemática', 'Geografia', 'Artes', 'Português'];
+  const expectedSubjects = ['Tecnologia', 'Física', 'Química', 'Biologia', 'Geografia'];
   const actualSubjects = modelGroups.map(([s]) => s);
-  for (const subj of expectedSubjects) {
-    assert.ok(actualSubjects.includes(subj), `missing subject in 3D model catalog: ${subj}`);
+  assert.deepEqual(actualSubjects, expectedSubjects, 'only Science & Tech subjects should have 3D models');
+  for (const excluded of ['Português', 'Artes', 'Matemática']) {
+    assert.ok(!actualSubjects.includes(excluded), `should not include 3D models for ${excluded}`);
   }
 
   for (const meta of BUILTIN_MODELS) {
@@ -45,9 +46,7 @@ test('3D Models: exactly 13 builtin models covering all 8 subjects with valid Th
         clickableParts.add(child.userData.part);
         assert.ok(PART_DETAILS[child.userData.part], `missing PART_DETAILS entry for ${meta.id}:${child.userData.part}`);
       }
-      if (child.userData.explodeX || child.userData.explodeY || child.userData.explodeZ) {
-        explodeParts++;
-      }
+      if (child.userData.explodeX || child.userData.explodeY || child.userData.explodeZ) explodeParts++;
     }
     assert.ok(clickableParts.size >= 4, `expected >= 4 clickable educational parts in ${meta.id}, got ${clickableParts.size}`);
     assert.ok(explodeParts >= 8, `expected exploded view offsets in ${meta.id}, got ${explodeParts}`);
@@ -59,7 +58,7 @@ test('3D Models: exactly 13 builtin models covering all 8 subjects with valid Th
   assert.match(optionsHtml, /Meu arquivo\.glb/, 'includes custom model option');
 });
 
-test('3D Models: lessons, canvas-data, and live Room accept all 13 builtin model IDs', () => {
+test('3D Models: lessons, canvas-data, and live Room accept all 15 builtin model IDs', () => {
   for (const id of BUILTIN_MODEL_IDS) {
     const lesson = newLesson('Aula 3D ' + modelName(id));
     const nativeModelSlide = { ...newSlide('Modelo ' + id), kind: 'model', model: id };
@@ -151,10 +150,30 @@ test('Profile auto-save preference and unified cloud save button logic', () => {
   assert.match(wsCss, /\[data-studio-action=cloud-save\]:not\(\.is-unified\)\{display:none\}/, 'keeps unified cloud button visible in mobile bar');
 });
 
-test('Mobile Simulation Lab compresses layout to avoid scroll and prevents controls from collapsing', () => {
+test('Mobile Simulation Lab puts Experimento inline, moves Importar/Base to footer left, hides Cancelar, and prevents controls collapse', () => {
   const finishingCss = fs.readFileSync('src/finishing.css', 'utf8');
+  const designerJs = fs.readFileSync('src/slide-designer.js', 'utf8');
+
+  // Texto "Experimento" na mesma linha do seletor e botões Importar/Base com ícones no footer
+  assert.match(designerJs, /<label class="simulation-modal-select-wrap"><span>Experimento<\/span><select/, 'Experimento label wraps text in span for inline row');
+  assert.match(designerJs, /class="simulation-modal-foot-tools"[\s\S]*data-sim-import[\s\S]*<span>Importar<\/span>[\s\S]*data-sim-template[\s\S]*<span>Base<\/span>/, 'footer includes Importar and Base icon buttons');
 
   // Bloco mobile 44 no final de finishing.css garante precedência absoluta
+  assert.match(
+    finishingCss,
+    /dialog\.simulation-modal \.simulation-modal-select-wrap \{[\s\S]*display: flex;[\s\S]*align-items: center;/,
+    'Experimento label sits on the same line as the select on mobile'
+  );
+  assert.match(
+    finishingCss,
+    /dialog\.simulation-modal \.simulation-modal-actions:has\(\[data-sim-confirm\]\) \[data-sim-cancel\] \{\s*display: none;\s*\}/,
+    'hides Cancelar button in mobile footer to make room for Importar/Base'
+  );
+  assert.match(
+    finishingCss,
+    /dialog\.simulation-modal \.simulation-modal-import-row \{ display: none; \}/,
+    'hides upper import row on mobile to give vertical space to simulator'
+  );
   assert.match(
     finishingCss,
     /dialog\.simulation-modal \.simulation-modal-stage > \.simulation-widget > \.simulation-controls \{[\s\S]*flex: 0 0 auto;[\s\S]*min-height: max-content;[\s\S]*grid-template-columns: repeat\(2, minmax\(0, 1fr\)\)/,

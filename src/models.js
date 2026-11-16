@@ -198,13 +198,16 @@ export class HardwareViewer {
     if (!this.controls) return;
     // Ajusta distância inicial conforme a proporção de cada modelo
     const presets = {
+      cpu: [5.6, 5.0, 6.4],
+      motor: [6.0, 4.0, 6.8],
+      crystal: [5.8, 4.2, 6.4],
+      heart: [5.2, 3.2, 6.2],
+      volcano: [5.8, 4.4, 6.4],
       dna: [6.2, 2.6, 6.8],
       molecule: [5.2, 2.8, 6.4],
       atom: [6.2, 4.4, 6.8],
       earth: [5.4, 3.6, 6.0],
-      prism: [5.6, 3.8, 6.8],
-      color_sphere: [5.8, 4.4, 6.4],
-      story_book: [5.4, 5.2, 6.2]
+      prism: [5.6, 3.8, 6.8]
     };
     const [cx, cy, cz] = presets[this.type] || [6.4, 6.2, 7.6];
     this.camera.position.set(cx, cy, cz);

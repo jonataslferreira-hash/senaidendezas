@@ -15,33 +15,54 @@ export const PART_DETAILS = {
   sata: ['Conector SATA', 'Interface de dados e energia de até 600 MB/s usada em discos 2,5" e 3,5".'],
   nvme: ['Conector M.2 PCIe (M-Key)', 'Barramento direto à placa-mãe que alcança milhares de megabytes por segundo.'],
 
-  // 4: Física — Circuito Elétrico
+  // 4: Tecnologia — Processador (CPU)
+  cpu_pins: ['Contatos LGA dourados', 'Centenas de pontos de contato banhados a ouro que ligam o processador ao soquete da placa-mãe.'],
+  cpu_pcb: ['Substrato multicamadas', 'Placa de fibra de vidro com dezenas de camadas de trilhas microscópicas que alimentam o chip.'],
+  cpu_die: ['Die de silício (Núcleos e Cache)', 'Pastilha de silício com bilhões de transistores organizados em núcleos de processamento e cache L3.'],
+  cpu_smd: ['Capacitores SMD de filtragem', 'Microcomponentes que estabilizam a tensão elétrica de altíssima frequência que entra nos núcleos.'],
+  cpu_ihs: ['Espalhador térmico (IHS)', 'Tampa metálica de cobre niquelado que protege o silício e distribui o calor para o cooler.'],
+  cpu_cooler: ['Dissipador e heatpipes', 'Aletas de alumínio e tubos de cobre que absorvem o calor do IHS e o dissipam para o ar.'],
+
+  // 5: Física — Circuito Elétrico
   battery: ['Fonte de tensão (9V)', 'Fornece a diferença de potencial (tensão U) que impulsiona os elétrons pelo circuito.'],
   wire: ['Condutores de cobre', 'Fios de baixa resistência que conduzem a corrente elétrica (I) da fonte até os componentes.'],
   switch: ['Interruptor', 'Abre ou fecha o caminho da corrente elétrica, ligando ou desligando o circuito com segurança.'],
   resistor: ['Resistor (Lei de Ohm)', 'Limita a corrente elétrica (R = U / I). Suas faixas coloridas indicam o valor em Ohms (Ω).'],
   bulb: ['Lâmpada incandescente', 'Transforma energia elétrica em luz e calor quando a corrente percorre o filamento interno.'],
 
-  // 5: Física — Prisma Óptico
+  // 6: Física — Prisma Óptico
   prism: ['Prisma de vidro óptico', 'Desvia cada cor da luz em um ângulo diferente porque o índice de refração varia com a frequência.'],
   emitter: ['Fonte de luz branca', 'Emite luz policromática, formada pela sobreposição de todas as cores do espectro visível.'],
   spectrum: ['Espectro disperso', 'Separação da luz branca nas 7 faixas do arco-íris: o vermelho desvia menos e o violeta desvia mais.'],
   prism_base: ['Base óptica graduada', 'Suporte de laboratório que mantém o prisma alinhado no ângulo ideal de incidência.'],
 
-  // 6: Química — Átomo de Bohr
+  // 7: Física — Motor Elétrico DC
+  motor_stator: ['Ímãs do estator (Polos N e S)', 'Criam um campo magnético fixo que interage com a corrente da bobina gerando força de rotação.'],
+  motor_coil: ['Rotor e bobina de cobre', 'Enrolamentos de fio condutor que viram eletroímãs ao receber corrente elétrica (Força de Lorentz).'],
+  motor_commutator: ['Comutador bipartido', 'Anel de cobre dividido que inverte o sentido da corrente a cada meia volta mantendo o giro contínuo.'],
+  motor_brushes: ['Escovas de grafite e terminais', 'Fazem contato deslizante com o comutador levando energia da fonte até o rotor giratório.'],
+  motor_shaft: ['Eixo motor e polia', 'Transmite a energia mecânica de rotação produzida no interior do motor para o trabalho externo.'],
+
+  // 8: Química — Átomo de Bohr
   nucleus: ['Núcleo atômico', 'Região central superdensa formada por prótons (+) e nêutrons (sem carga), concentrando a massa do átomo.'],
   orbit_k: ['Camada K (n = 1)', 'Nível de energia mais próximo do núcleo, comportando até 2 elétrons.'],
   orbit_l: ['Camada L (n = 2)', 'Segundo nível eletrônico em torno do núcleo, comportando até 8 elétrons.'],
   orbit_m: ['Camada M (n = 3)', 'Camada mais externa (valência), responsável pelas ligações químicas com outros átomos.'],
   electron: ['Elétrons (−)', 'Partículas de carga negativa que ocupam níveis definidos de energia na eletrosfera.'],
 
-  // 7: Química — Molécula de Água (H₂O)
+  // 9: Química — Molécula de Água (H₂O)
   oxygen: ['Átomo de Oxigênio (δ⁻)', 'Altamente eletronegativo, atrai os elétrons da ligação para perto de si e cria o polo negativo.'],
   hydrogen: ['Átomos de Hidrogênio (δ⁺)', 'Compartilham 1 elétron cada com o oxigênio, formando os polos positivos da molécula.'],
   bond: ['Ligações covalentes (104,5°)', 'Compartilhamento de pares de elétrons; o ângulo de 104,5° torna a água uma molécula polar.'],
   lone_pair: ['Pares de elétrons livres', 'Dois pares não ligantes no oxigênio que repelem as ligações e encurvam a geometria da água.'],
 
-  // 8: Biologia — Célula Animal
+  // 10: Química — Rede Cristalina (Sal NaCl)
+  crystal_na: ['Cátions de Sódio (Na⁺)', 'Átomos de sódio que cederam 1 elétron, ficando menores e com carga positiva (+1).'],
+  crystal_cl: ['Ânions de Cloreto (Cl⁻)', 'Átomos de cloro que ganharam 1 elétron, ficando maiores e com carga negativa (−1).'],
+  crystal_bonds: ['Atrações iônicas (3D)', 'Forças eletrostáticas intensas entre cargas opostas que conferem alto ponto de fusão ao sal.'],
+  crystal_cell: ['Célula unitária cúbica', 'Menor bloco repetitivo do retículo cristalino, explicando o formato cúbico dos grãos de sal.'],
+
+  // 11: Biologia — Célula Animal
   cell_membrane: ['Membrana plasmática', 'Película semipermeável que envolve a célula e controla a entrada e saída de substâncias.'],
   cytoplasm: ['Citoplasma', 'Meio gelatinoso onde ficam mergulhadas as organelas e ocorrem diversas reações químicas.'],
   cell_nucleus: ['Núcleo e nucléolo', 'Centro de comando celular que protege o DNA e coordena a produção de proteínas.'],
@@ -49,19 +70,21 @@ export const PART_DETAILS = {
   golgi: ['Complexo de Golgi', 'Empacota, modifica e distribui proteínas e lipídios para dentro ou fora da célula.'],
   er_rough: ['Retículo endoplasmático', 'Rede de membranas com ribossomos que sintetiza e transporta proteínas recém-formadas.'],
 
-  // 9: Biologia — Dupla Hélice de DNA
+  // 12: Biologia — Dupla Hélice de DNA
   dna_strand_a: ['Fita açúcar-fosfato (5′→3′)', 'Coluna vertebral estrutural composta por desoxirribose e grupos fosfato alternados.'],
   dna_strand_b: ['Fita complementar (3′→5′)', 'Corre em sentido antiparalelo, garantindo estabilidade e fidelidade na replicação genética.'],
   dna_bases: ['Bases nitrogenadas (A-T / C-G)', 'Degraus do código genético: Adenina sempre pareia com Timina, e Citosina sempre com Guanina.'],
   dna_hbonds: ['Pontes de hidrogênio', 'Ligações suaves no centro que mantêm as duas fitas unidas e permitem abri-las na replicação.'],
 
-  // 10: Matemática — Sólidos Geométricos
-  poly_dodeca: ['Dodecaedro regular', 'Poliedro de Platão com 12 faces pentagonais, 20 vértices e 30 arestas (V − A + F = 2).'],
-  poly_cube: ['Cubo (Hexaedro)', 'Possui 6 faces quadradas, 8 vértices e 12 arestas; a diagonal interna mede a·√3.'],
-  poly_pyramid: ['Pirâmide quadrangular', 'Base quadrada ligada a um único vértice superior; seu volume é (Área da base × altura) / 3.'],
-  poly_grid: ['Plano de referência', 'Malha cartesiana usada para medir projeções, áreas de base e coordenadas espaciais.'],
+  // 13: Biologia — Coração Humano
+  heart_ventricles: ['Ventrículos e miocárdio', 'Câmaras inferiores musculares que bombeiam sangue para os pulmões (direito) e para todo o corpo (esquerdo).'],
+  heart_atria: ['Átrios direito e esquerdo', 'Câmaras superiores que recebem o sangue das veias e o conduzem para os ventrículos.'],
+  heart_aorta: ['Artéria Aorta e arco aórtico', 'Maior artéria do corpo humano: distribui sangue rico em oxigênio do ventrículo esquerdo aos tecidos.'],
+  heart_pulmonary: ['Artéria pulmonar', 'Leva sangue rico em CO₂ do ventrículo direito até os pulmões para realizar a hematose.'],
+  heart_vena_cava: ['Veias cavas (superior e inferior)', 'Trazem o sangue venoso de volta da cabeça, braços, tronco e pernas para o átrio direito.'],
+  heart_valves: ['Válvulas cardíacas', 'Estruturas internas (mitral e tricúspide) que impedem o refluxo garantindo o fluxo em sentido único.'],
 
-  // 11: Geografia — Planeta Terra
+  // 14: Geografia — Planeta Terra
   earth_crust: ['Crosta terrestre e oceanos', 'Camada rochosa mais externa onde vivemos, coberta por continentes e cerca de 71% de água.'],
   earth_atmosphere: ['Atmosfera', 'Camada gasosa que protege o planeta da radiação solar, regula a temperatura e permite a vida.'],
   earth_mantle: ['Manto terrestre', 'Camada intermediária espessa de rocha quente e viscosa cujas correntes movem as placas tectônicas.'],
@@ -69,19 +92,13 @@ export const PART_DETAILS = {
   earth_inner_core: ['Núcleo interno sólido', 'Esfera metálica altíssima em temperatura (~5.500 °C), mantida sólida pela pressão extrema.'],
   earth_axis: ['Eixo de inclinação (23,5°)', 'Inclinação axial da Terra responsável pela alternância das quatro estações do ano.'],
 
-  // 12: Artes — Esfera Cromática
-  color_wheel: ['Círculo cromático (12 matizes)', 'Organiza cores primárias, secundárias e terciárias revelando harmonias complementares e análogas.'],
-  color_value: ['Eixo de luminosidade', 'Escala acromática do branco puro ao preto profundo que controla o brilho e o contraste das cores.'],
-  color_triad: ['Tríade harmônica', 'Triângulo equilátero que conecta três cores equidistantes para composições equilibradas e vibrantes.'],
-  color_satellites: ['Síntese aditiva e subtrativa', 'Compara cores-luz (RGB das telas) com cores-pigmento (CMY da pintura e impressão).'],
-
-  // 13: Português — Livro e Estrutura Narrativa
-  book_cover: ['Capa e gênero textual', 'Apresenta título, contexto e expectativas do leitor sobre o gênero literário ou didático.'],
-  book_pages: ['Texto e narrador', 'O foco narrativo (1ª ou 3ª pessoa) conduz o olhar do leitor pelo tempo e espaço da história.'],
-  book_intro: ['Situação inicial e conflito', 'Apresenta personagens, cenário e o acontecimento que rompe o equilíbrio e move o enredo.'],
-  book_climax: ['Clímax narrativo', 'Ponto mais alto de tensão da história, onde o conflito principal atinge sua decisão decisiva.'],
-  book_ending: ['Desfecho e conclusão', 'Mostra as consequências do clímax e amarra os fios narrativos encerrando a obra.'],
-  book_arc: ['Arco de tensão narrativa', 'Curva que ilustra o ritmo da narrativa: exposição, complicação, clímax e desfecho.']
+  // 15: Geografia — Vulcão em Corte Transversal
+  volcano_crust: ['Crosta e camadas rochosas', 'Base litosférica estratificada atravessada pelo magma sob alta pressão vindo do manto.'],
+  volcano_chamber: ['Câmara magmática', 'Reservatório subterrâneo de rocha fundida, gases dissolvidos e cristais em altíssima temperatura.'],
+  volcano_cone: ['Cone estratovulcânico', 'Montanha formada ao longo de erupções sucessivas por camadas alternadas de lava solidificada e cinzas.'],
+  volcano_conduit: ['Chaminé principal e dique lateral', 'Conduto vertical e ramificações por onde o magma ascende da câmara até a superfície.'],
+  volcano_lava: ['Cratera e derrame de lava', 'Abertura no topo de onde o magma emerge como lava incandescente escorrendo pelas encostas.'],
+  volcano_plume: ['Pluma de cinzas e gases', 'Coluna vulcânica de vapor d’água, CO₂, SO₂ e fragmentos piroclásticos lançados na atmosfera.']
 };
 
 function makeMaterial(color, roughness = 0.42, metalness = 0.25, extra = {}) {
@@ -156,29 +173,58 @@ function platterTexture() {
   });
 }
 
-function bookPageTexture(titleText, lines) {
-  return makeCanvasTexture(512, 640, (ctx, w, h) => {
-    ctx.fillStyle = '#f8f3e6';
+function cpuDieTexture() {
+  return makeCanvasTexture(512, 512, (ctx, w, h) => {
+    const grad = ctx.createLinearGradient(0, 0, w, h);
+    grad.addColorStop(0, '#1e293b');
+    grad.addColorStop(0.5, '#3b2f7a');
+    grad.addColorStop(1, '#0f766e');
+    ctx.fillStyle = grad;
     ctx.fillRect(0, 0, w, h);
-    ctx.strokeStyle = '#dfd4bc';
-    ctx.lineWidth = 6;
-    ctx.strokeRect(18, 18, w - 36, h - 36);
-    ctx.fillStyle = '#4c3575';
-    ctx.font = '700 32px Georgia, serif';
-    ctx.fillText(titleText, 48, 86);
-    ctx.fillStyle = '#b9a892';
-    ctx.fillRect(48, 106, w - 96, 3);
-    ctx.fillStyle = '#6c6375';
-    for (let i = 0; i < lines; i++) {
-      const y = 148 + i * 32;
-      const rw = (i % 4 === 3) ? w * 0.56 : w - 104;
-      ctx.fillRect(48, y, rw, 10);
+    // Grade de 8 núcleos + blocos de cache L3 gravados no silício
+    const pad = 26;
+    const cols = 4, rows = 2;
+    const cw = (w - pad * 2 - 18 * (cols - 1)) / cols;
+    const ch = 152;
+    for (let r = 0; r < rows; r++) {
+      for (let c = 0; c < cols; c++) {
+        const x = pad + c * (cw + 18);
+        const y = pad + r * (ch + 20);
+        ctx.fillStyle = 'rgba(148, 163, 255, 0.22)';
+        ctx.fillRect(x, y, cw, ch);
+        ctx.strokeStyle = 'rgba(224, 231, 255, 0.55)';
+        ctx.lineWidth = 3;
+        ctx.strokeRect(x, y, cw, ch);
+        ctx.fillStyle = 'rgba(255,255,255,0.28)';
+        for (let l = 16; l < ch - 14; l += 16) ctx.fillRect(x + 12, y + l, cw - 24, 5);
+      }
     }
+    // Faixa inferior de cache L3 compartilhado e controlador de memória
+    ctx.fillStyle = 'rgba(56, 189, 248, 0.28)';
+    ctx.fillRect(pad, h - 118, w - pad * 2, 90);
+    ctx.strokeStyle = 'rgba(186, 230, 253, 0.65)';
+    ctx.lineWidth = 3;
+    ctx.strokeRect(pad, h - 118, w - pad * 2, 90);
+  });
+}
+
+function volcanoStrataTexture() {
+  return makeCanvasTexture(512, 512, (ctx, w, h) => {
+    const bands = ['#4a3728', '#2d2420', '#6b4c35', '#3d302a', '#573f2e', '#261f1d', '#73533a'];
+    const bandH = h / bands.length;
+    bands.forEach((col, i) => {
+      ctx.fillStyle = col;
+      ctx.fillRect(0, i * bandH, w, bandH + 2);
+      ctx.fillStyle = 'rgba(255,255,255,0.06)';
+      for (let x = 0; x < w; x += 24) {
+        ctx.fillRect(x, i * bandH + ((x * 7) % 14), 14, 4);
+      }
+    });
   });
 }
 
 /**
- * Helper de construção compartilhado entre todos os 13 modelos.
+ * Helper de construção compartilhado entre todos os 15 modelos.
  * Cada malha recebe `basePos` e `explode` ([dx, dy, dz]) para o modo explodido 3D suave.
  */
 function createBuilder(group) {
@@ -759,38 +805,258 @@ function buildDNA(b) {
   }
 }
 
-function buildPolyhedra(b) {
-  const baseMat = makeMaterial(0x1e2538, 0.55, 0.25);
-  const dodecaMat = makeMaterial(0x8b5cf6, 0.22, 0.30, { transparent: true, opacity: 0.74 });
-  const cubeMat = makeMaterial(0x06b6d4, 0.24, 0.28, { transparent: true, opacity: 0.68 });
-  const pyrMat = makeMaterial(0xf59e0b, 0.25, 0.28, { transparent: true, opacity: 0.72 });
-  const diagMat = makeMaterial(0xf43f5e, 0.2, 0.2, { emissive: 0xe11d48, emissiveIntensity: 0.65 });
+function buildCPU(b) {
+  const gold = makeMaterial(0xeab308, 0.22, 0.94);
+  const pcbTex = pcbTexture('#0c5446', '#d9b555');
+  const pcbMat = makeMaterial(0x115e4e, 0.42, 0.22, pcbTex ? { map: pcbTex } : {});
+  const dieTex = cpuDieTexture();
+  const dieMat = makeMaterial(0x818cf8, 0.14, 0.85, dieTex ? { map: dieTex, emissive: 0x312e81, emissiveIntensity: 0.25 } : {});
+  const smdMat = makeMaterial(0xc89a5b, 0.35, 0.72);
+  const ihsMat = makeMaterial(0xd8dde8, 0.22, 0.90);
+  const pasteMat = makeMaterial(0x94a3b8, 0.48, 0.32);
+  const aluMat = makeMaterial(0xbec6d6, 0.30, 0.86);
+  const copperMat = makeMaterial(0xd97742, 0.24, 0.92);
 
-  // Base cartesiana graduada
-  b.box(0, -1.05, 0, 5.2, 0.14, 3.6, baseMat, 'poly_grid', -0.35);
-  for (let x = -2.2; x <= 2.21; x += 0.55) {
-    b.box(x, -0.975, 0, 0.018, 0.01, 3.4, makeMaterial(0x475569, 0.5, 0.1), 'poly_grid', -0.35);
+  // 1) Matriz de contatos dourados LGA na face inferior do processador
+  b.box(0, -0.82, 0, 3.05, 0.06, 3.05, makeMaterial(0x0b3b32, 0.5, 0.2), 'cpu_pins', -1.25);
+  for (let gx = -1.28; gx <= 1.29; gx += 0.32) {
+    for (let gz = -1.28; gz <= 1.29; gz += 0.32) {
+      if (Math.abs(gx) < 0.45 && Math.abs(gz) < 0.45) continue; // cavidade central de capacitores
+      b.box(gx, -0.87, gz, 0.18, 0.04, 0.18, gold, 'cpu_pins', -1.25);
+    }
   }
-  for (let z = -1.5; z <= 1.51; z += 0.5) {
-    b.box(0, -0.975, z, 5.0, 0.01, 0.018, makeMaterial(0x475569, 0.5, 0.1), 'poly_grid', -0.35);
+
+  // 2) Substrato PCB multicamadas verde-esmeralda com triângulo dourado de alinhamento
+  b.box(0, -0.66, 0, 3.35, 0.22, 3.35, pcbMat, 'cpu_pcb', -0.45);
+  b.box(-1.42, -0.54, 1.42, 0.26, 0.02, 0.26, gold, 'cpu_pcb', -0.45, { ry: Math.PI / 4 });
+
+  // 3) Capacitores SMD de filtragem ao redor do silício
+  for (let i = -3; i <= 3; i++) {
+    b.box(i * 0.30, -0.49, 1.22, 0.13, 0.09, 0.07, smdMat, 'cpu_smd', 0.10);
+    b.box(i * 0.30, -0.49, -1.22, 0.13, 0.09, 0.07, smdMat, 'cpu_smd', 0.10);
   }
 
-  // 1) Dodecaedro regular central com arestas iluminadas
-  const dodecaGeo = new THREE.DodecahedronGeometry(0.95);
-  b.addMesh(dodecaGeo, dodecaMat, { x: 0, y: 0.12, z: -0.15, part: 'poly_dodeca', explode: [0, 1.15, -0.35] });
-  b.edges(dodecaGeo, 0xfde047, { x: 0, y: 0.12, z: -0.15, part: 'poly_dodeca', explode: [0, 1.15, -0.35] });
+  // 4) Die de silício espelhado multicore (8 núcleos + cache L3)
+  b.box(0, -0.46, 0, 1.56, 0.18, 1.24, dieMat, 'cpu_die', 0.45);
+  b.box(0, -0.365, 0, 1.50, 0.015, 1.18, makeMaterial(0x38bdf8, 0.12, 0.5, { transparent: true, opacity: 0.26 }), 'cpu_die', 0.45);
+  b.label('8-CORE · L3', 0, -0.35, 0, 1.38, 0.45, '#e0f2fe', { part: 'cpu_die', fontSize: 34 });
 
-  // 2) Cubo à esquerda com diagonal espacial interna destacada
-  const cubeGeo = new THREE.BoxGeometry(1.22, 1.22, 1.22);
-  b.addMesh(cubeGeo, cubeMat, { x: -1.78, y: -0.36, z: 0.35, ry: 0.35, part: 'poly_cube', explode: [-0.75, 0.65, 0.45] });
-  b.edges(cubeGeo, 0xbae6fd, { x: -1.78, y: -0.36, z: 0.35, ry: 0.35, part: 'poly_cube', explode: [-0.75, 0.65, 0.45] });
-  b.tube([[-2.32, -0.92, -0.18], [-1.24, 0.20, 0.88]], 0.036, diagMat, 'poly_cube', 0, { explode: [-0.75, 0.65, 0.45] });
+  // 5) Espalhador térmico (IHS) de cobre niquelado chanfrado + pasta térmica
+  b.box(0, -0.18, 0, 2.75, 0.22, 2.75, ihsMat, 'cpu_ihs', 1.35);
+  b.box(0, -0.02, 0, 2.25, 0.14, 2.25, ihsMat, 'cpu_ihs', 1.35);
+  b.label('STORAGE CPU', 0, 0.06, -0.35, 1.95, 1.35, '#334155', { part: 'cpu_ihs', fontSize: 34 });
+  b.label('5.2 GHz · 8C/16T', 0, 0.06, 0.32, 1.95, 1.35, '#475569', { part: 'cpu_ihs', fontSize: 28 });
+  // Camada de pasta térmica entre IHS e dissipador
+  b.cyl(0, 0.10, 0, 0.72, 0.03, pasteMat, 'cpu_ihs', 1.80);
 
-  // 3) Pirâmide quadrangular à direita com eixo de altura interno
-  const pyrGeo = new THREE.ConeGeometry(0.92, 1.56, 4);
-  b.addMesh(pyrGeo, pyrMat, { x: 1.78, y: -0.20, z: 0.28, ry: Math.PI / 4, part: 'poly_pyramid', explode: [0.75, 0.75, 0.40] });
-  b.edges(pyrGeo, 0xfef08a, { x: 1.78, y: -0.20, z: 0.28, ry: Math.PI / 4, part: 'poly_pyramid', explode: [0.75, 0.75, 0.40] });
-  b.cyl(1.78, -0.20, 0.28, 0.035, 1.52, diagMat, 'poly_pyramid', 0, { explode: [0.75, 0.75, 0.40] });
+  // 6) Bloco dissipador aletado com heatpipes de cobre
+  b.box(0, 0.24, 0, 2.55, 0.18, 2.55, copperMat, 'cpu_cooler', 2.35);
+  for (let fin = -5; fin <= 5; fin++) {
+    b.box(fin * 0.24, 0.88, 0, 0.055, 1.12, 2.52, aluMat, 'cpu_cooler', 2.35);
+  }
+  for (const hz of [-0.72, 0, 0.72]) {
+    b.tube(
+      [[-1.38, 0.24, hz], [-1.32, 1.48, hz], [0, 1.54, hz], [1.32, 1.48, hz], [1.38, 0.24, hz]],
+      0.085,
+      copperMat,
+      'cpu_cooler',
+      2.35
+    );
+  }
+}
+
+function buildMotor(b) {
+  const baseMat = makeMaterial(0x1f2638, 0.50, 0.45);
+  const northMat = makeMaterial(0xdc2626, 0.34, 0.25);
+  const southMat = makeMaterial(0x2563eb, 0.34, 0.25);
+  const copperMat = makeMaterial(0xd97736, 0.24, 0.90);
+  const ironMat = makeMaterial(0x64748b, 0.38, 0.82);
+  const steelMat = makeMaterial(0xdde3f0, 0.18, 0.95);
+  const graphiteMat = makeMaterial(0x272b36, 0.72, 0.20);
+  const goldMat = makeMaterial(0xeab308, 0.25, 0.92);
+
+  // Base de bancada de laboratório
+  b.box(0, -1.32, 0, 5.2, 0.22, 3.2, baseMat, 'motor_stator', -0.45);
+
+  // Ímãs permanentes do estator (Norte vermelho à esquerda, Sul azul à direita)
+  b.box(-1.62, 0.12, 0, 0.62, 2.15, 2.05, northMat, 'motor_stator', 0, { explode: [-1.15, 0, 0] });
+  b.box(-1.18, 0.86, 0, 0.42, 0.68, 2.05, northMat, 'motor_stator', 0, { explode: [-1.15, 0, 0] });
+  b.box(-1.18, -0.62, 0, 0.42, 0.68, 2.05, northMat, 'motor_stator', 0, { explode: [-1.15, 0, 0] });
+  b.label('N', -1.62, 1.24, 0, 0.95, 0, '#fecaca', { part: 'motor_stator', explode: [-1.15, 0, 0], fontSize: 56 });
+
+  b.box(1.62, 0.12, 0, 0.62, 2.15, 2.05, southMat, 'motor_stator', 0, { explode: [1.15, 0, 0] });
+  b.box(1.18, 0.86, 0, 0.42, 0.68, 2.05, southMat, 'motor_stator', 0, { explode: [1.15, 0, 0] });
+  b.box(1.18, -0.62, 0, 0.42, 0.68, 2.05, southMat, 'motor_stator', 0, { explode: [1.15, 0, 0] });
+  b.label('S', 1.62, 1.24, 0, 0.95, 0, '#bfdbfe', { part: 'motor_stator', explode: [1.15, 0, 0], fontSize: 56 });
+
+  // Eixo central de aço + mancal traseiro + hélice/polia frontal
+  b.cyl(0, 0.12, 0.15, 0.12, 4.45, steelMat, 'motor_shaft', 0, { rx: Math.PI / 2, explode: [0, 0, -0.65] });
+  b.box(0, -0.58, -1.78, 0.56, 1.32, 0.20, ironMat, 'motor_shaft', 0, { explode: [0, 0, -0.95] });
+  b.cyl(0, 0.12, -2.02, 0.54, 0.24, steelMat, 'motor_shaft', 0, { rx: Math.PI / 2, explode: [0, 0, -1.15] });
+  // Pás indicadoras de rotação no eixo traseiro
+  for (let k = 0; k < 3; k++) {
+    const a = (k / 3) * Math.PI * 2;
+    b.box(Math.cos(a) * 0.52, 0.12 + Math.sin(a) * 0.52, -2.16, 0.62, 0.16, 0.05, goldMat, 'motor_shaft', 0, {
+      rz: a, explode: [0, 0, -1.15]
+    });
+  }
+
+  // Núcleo laminado e bobina de cobre do rotor no centro do campo magnético
+  b.box(0, 0.12, -0.25, 1.15, 0.24, 1.75, ironMat, 'motor_coil', 0, { explode: [0, 0.65, 0] });
+  for (let i = -3; i <= 3; i++) {
+    const z = -0.25 + i * 0.22;
+    b.torus(0, 0.12, z, 0.58, 0.068, copperMat, 'motor_coil', 0, { explode: [0, 0.65, 0] });
+  }
+  b.tube(
+    [[-0.58, 0.12, 0.58], [-0.58, 0.12, -1.05], [0.58, 0.12, -1.05], [0.58, 0.12, 0.58]],
+    0.075,
+    copperMat,
+    'motor_coil',
+    0,
+    { explode: [0, 0.65, 0] }
+  );
+
+  // Comutador bipartido de cobre (duas metades separadas por fenda isolante)
+  const commA = new THREE.CylinderGeometry(0.32, 0.32, 0.54, 24, 1, false, 0.12, Math.PI - 0.24);
+  const commB = new THREE.CylinderGeometry(0.32, 0.32, 0.54, 24, 1, false, Math.PI + 0.12, Math.PI - 0.24);
+  b.addMesh(commA, goldMat, { x: 0, y: 0.12, z: 1.25, rx: Math.PI / 2, part: 'motor_commutator', explode: [0, 0, 0.85] });
+  b.addMesh(commB, copperMat, { x: 0, y: 0.12, z: 1.25, rx: Math.PI / 2, part: 'motor_commutator', explode: [0, 0, 0.85] });
+
+  // Escovas de grafite e terminais (+) e (−) pressionando o comutador
+  for (const side of [-1, 1]) {
+    b.box(side * 0.54, 0.12, 1.25, 0.42, 0.24, 0.34, graphiteMat, 'motor_brushes', 0, { explode: [side * 0.85, 0, 0.85] });
+    b.box(side * 0.88, -0.56, 1.25, 0.16, 1.38, 0.24, side < 0 ? northMat : southMat, 'motor_brushes', 0, { explode: [side * 0.85, 0, 0.85] });
+    b.cyl(side * 0.88, -1.05, 1.56, 0.11, 0.22, goldMat, 'motor_brushes', 0, { explode: [side * 0.85, 0, 0.85] });
+  }
+}
+
+function buildCrystal(b) {
+  const naMat = makeMaterial(0xa78bfa, 0.18, 0.68, { emissive: 0x5b21b6, emissiveIntensity: 0.22 });
+  const clMat = makeMaterial(0x10b981, 0.20, 0.28, { emissive: 0x065f46, emissiveIntensity: 0.24 });
+  const bondMat = makeMaterial(0xdbeafe, 0.28, 0.62);
+
+  const step = 1.08;
+  // Malha cúbica 3x3x3 alternada (estrutura sal-gema NaCl)
+  for (let ix = -1; ix <= 1; ix++) {
+    for (let iy = -1; iy <= 1; iy++) {
+      for (let iz = -1; iz <= 1; iz++) {
+        const isNa = ((ix + iy + iz + 6) % 2) === 0;
+        const x = ix * step, y = iy * step, z = iz * step;
+        b.sphere(x, y, z, isNa ? 0.26 : 0.38, isNa ? naMat : clMat, isNa ? 'crystal_na' : 'crystal_cl', 0, {
+          segs: 20,
+          explode: [ix * 0.52, iy * 0.52, iz * 0.52]
+        });
+
+        // Ligações iônicas ao longo dos eixos +X, +Y e +Z
+        if (ix < 1) {
+          b.cyl(x + step / 2, y, z, 0.042, step - 0.34, bondMat, 'crystal_bonds', 0, {
+            rz: Math.PI / 2, segs: 10, explode: [(ix + 0.5) * 0.52, iy * 0.52, iz * 0.52]
+          });
+        }
+        if (iy < 1) {
+          b.cyl(x, y + step / 2, z, 0.042, step - 0.34, bondMat, 'crystal_bonds', 0, {
+            segs: 10, explode: [ix * 0.52, (iy + 0.5) * 0.52, iz * 0.52]
+          });
+        }
+        if (iz < 1) {
+          b.cyl(x, y, z + step / 2, 0.042, step - 0.34, bondMat, 'crystal_bonds', 0, {
+            rx: Math.PI / 2, segs: 10, explode: [ix * 0.52, iy * 0.52, (iz + 0.5) * 0.52]
+          });
+        }
+      }
+    }
+  }
+
+  // Caixa aramada da célula unitária cúbica destacando a simetria do cristal
+  const cellGeo = new THREE.BoxGeometry(step * 2, step * 2, step * 2);
+  b.edges(cellGeo, 0xfacc15, { part: 'crystal_cell', opacity: 0.95, explode: [0, 0.65, 0] });
+  b.label('Na⁺ · Cl⁻  (NaCl)', 0, -1.72, 0.95, 2.2, -0.35, '#a7f3d0', { rx: 0, part: 'crystal_cell', fontSize: 34 });
+}
+
+function buildHeart(b) {
+  const ventLeftMat = makeMaterial(0xc81e3a, 0.38, 0.14, { emissive: 0x6b0f1e, emissiveIntensity: 0.22 });
+  const ventRightMat = makeMaterial(0xa61c3c, 0.40, 0.14, { emissive: 0x4c0d24, emissiveIntensity: 0.18 });
+  const atriumLeftMat = makeMaterial(0xe11d48, 0.35, 0.15);
+  const atriumRightMat = makeMaterial(0x3b82f6, 0.38, 0.15);
+  const aortaMat = makeMaterial(0xef4444, 0.30, 0.18, { emissive: 0x7f1d1d, emissiveIntensity: 0.2 });
+  const pulmMat = makeMaterial(0x6366f1, 0.32, 0.16);
+  const venaMat = makeMaterial(0x1d4ed8, 0.34, 0.18);
+  const valveMat = makeMaterial(0xfef3c7, 0.32, 0.12, { emissive: 0xd97706, emissiveIntensity: 0.18 });
+  const coronaryMat = makeMaterial(0xf87171, 0.30, 0.20);
+
+  // Ventrículo esquerdo (mais espesso, forma o ápice inclinado) + Ventrículo direito
+  const lv = b.sphere(0.42, -0.45, 0.04, 1.05, ventLeftMat, 'heart_ventricles', 0, {
+    segs: 28, explode: [0.55, -0.45, 0]
+  });
+  lv.scale.set(0.88, 1.32, 0.86);
+  lv.rotation.z = 0.22;
+
+  const rv = b.sphere(-0.42, -0.32, 0.18, 0.92, ventRightMat, 'heart_ventricles', 0, {
+    segs: 28, explode: [-0.55, -0.35, 0.25]
+  });
+  rv.scale.set(0.86, 1.18, 0.80);
+  rv.rotation.z = -0.18;
+
+  // Artéria coronária descendente anterior percorrendo o sulco interventricular
+  b.tube(
+    [[0.02, 0.42, 0.88], [-0.04, -0.05, 0.96], [0.14, -0.68, 0.82], [0.24, -1.25, 0.46]],
+    0.052,
+    coronaryMat,
+    'heart_ventricles',
+    0,
+    { explode: [0, -0.35, 0.55] }
+  );
+
+  // Átrio Direito (recebe sangue venoso) e Átrio Esquerdo (recebe sangue arterial)
+  const ra = b.sphere(-0.78, 0.58, 0.05, 0.64, atriumRightMat, 'heart_atria', 0, {
+    segs: 24, explode: [-0.88, 0.52, 0]
+  });
+  ra.scale.set(0.95, 0.88, 0.85);
+  const la = b.sphere(0.68, 0.64, -0.18, 0.60, atriumLeftMat, 'heart_atria', 0, {
+    segs: 24, explode: [0.85, 0.56, -0.25]
+  });
+  la.scale.set(0.95, 0.86, 0.84);
+
+  // Válvulas cardíacas (tricúspide e mitral) no plano entre átrios e ventrículos (reveladas no modo explodido!)
+  b.torus(-0.44, 0.22, 0.08, 0.24, 0.06, valveMat, 'heart_valves', 0, { rx: Math.PI / 2, explode: [-0.24, 0.12, 0.28] });
+  b.cyl(-0.44, 0.22, 0.08, 0.22, 0.05, valveMat, 'heart_valves', 0, { explode: [-0.24, 0.12, 0.28] });
+  b.torus(0.42, 0.22, -0.06, 0.24, 0.06, valveMat, 'heart_valves', 0, { rx: Math.PI / 2, explode: [0.24, 0.12, -0.22] });
+  b.cyl(0.42, 0.22, -0.06, 0.22, 0.05, valveMat, 'heart_valves', 0, { explode: [0.24, 0.12, -0.22] });
+
+  // Arco da Artéria Aorta + 3 ramos superiores (braquiocefálico, carótida e subclávia)
+  b.tube(
+    [[0.12, 0.52, -0.04], [0.02, 1.38, -0.08], [0.46, 1.82, -0.18], [0.92, 1.46, -0.36], [0.82, 0.12, -0.68]],
+    0.24,
+    aortaMat,
+    'heart_aorta',
+    0,
+    { segs: 42, explode: [0.25, 1.15, -0.25] }
+  );
+  b.cyl(0.16, 2.02, -0.12, 0.09, 0.52, aortaMat, 'heart_aorta', 0, { rz: 0.16, explode: [0.25, 1.15, -0.25] });
+  b.cyl(0.42, 2.08, -0.18, 0.08, 0.52, aortaMat, 'heart_aorta', 0, { rz: -0.04, explode: [0.25, 1.15, -0.25] });
+  b.cyl(0.68, 2.00, -0.26, 0.08, 0.48, aortaMat, 'heart_aorta', 0, { rz: -0.24, explode: [0.25, 1.15, -0.25] });
+
+  // Tronco da Artéria Pulmonar em T saindo do ventrículo direito
+  b.tube(
+    [[-0.24, 0.28, 0.46], [-0.14, 1.08, 0.36], [0.58, 1.16, 0.12], [1.28, 1.08, 0.02]],
+    0.18,
+    pulmMat,
+    'heart_pulmonary',
+    0,
+    { explode: [-0.22, 0.72, 0.72] }
+  );
+  b.tube(
+    [[-0.14, 1.08, 0.36], [-0.82, 1.12, 0.24], [-1.34, 1.06, 0.10]],
+    0.16,
+    pulmMat,
+    'heart_pulmonary',
+    0,
+    { explode: [-0.22, 0.72, 0.72] }
+  );
+
+  // Veia Cava Superior e Inferior ligadas ao átrio direito
+  b.cyl(-0.88, 1.38, -0.05, 0.20, 1.25, venaMat, 'heart_vena_cava', 0, { rz: 0.08, explode: [-1.15, 0.65, -0.15] });
+  b.cyl(-0.78, -0.95, -0.35, 0.19, 1.15, venaMat, 'heart_vena_cava', 0, { rz: -0.06, explode: [-1.05, -0.65, -0.35] });
 }
 
 function buildEarth(b) {
@@ -848,111 +1114,95 @@ function buildEarth(b) {
   b.sphere(0, 0, 0, 1.94, atmoMat, 'earth_atmosphere', 0, { segs: 32, explode: [-0.45, 0.45, -0.35] });
 }
 
-function buildColorSphere(b) {
-  const gold = makeMaterial(0xfacc15, 0.25, 0.88);
+function buildVolcano(b) {
+  const strataTex = volcanoStrataTexture();
+  const crustBottomMat = makeMaterial(0x3f2e24, 0.72, 0.08);
+  const crustMidMat = makeMaterial(0x5c4333, 0.68, 0.08);
+  const coneMat = makeMaterial(0x4c3a32, 0.78, 0.06, strataTex ? { map: strataTex, side: THREE.DoubleSide } : { side: THREE.DoubleSide });
+  const magmaMat = makeMaterial(0xff5a1f, 0.22, 0.12, { emissive: 0xea380c, emissiveIntensity: 0.92 });
+  const lavaMat = makeMaterial(0xfb923c, 0.25, 0.14, { emissive: 0xf97316, emissiveIntensity: 0.75 });
+  const ashMat = makeMaterial(0x94a3b8, 0.85, 0.04, { transparent: true, opacity: 0.72 });
 
-  // 12 matizes vivos ao redor do círculo cromático em 3D
-  const count = 12;
-  const wheelR = 1.68;
-  for (let i = 0; i < count; i++) {
-    const hue = i / count;
-    const col = new THREE.Color().setHSL(hue, 0.88, 0.52);
-    const angle = hue * Math.PI * 2;
-    const x = Math.cos(angle) * wheelR;
-    const z = Math.sin(angle) * wheelR;
-    const mat = makeMaterial(col.getHex(), 0.26, 0.16, { emissive: col.getHex(), emissiveIntensity: 0.18 });
-    b.box(x, 0, z, 0.68, 0.38, 0.52, mat, 'color_wheel', 0, {
-      ry: -angle,
-      explode: [Math.cos(angle) * 0.65, 0, Math.sin(angle) * 0.65]
-    });
-  }
+  // Base litosférica em camadas sedimentares (corte 3/4 para expor a câmara magmática!)
+  const crustLower = new THREE.CylinderGeometry(2.35, 2.45, 0.46, 36, 1, false, Math.PI * 0.5, Math.PI * 1.5);
+  b.addMesh(crustLower, crustBottomMat, { y: -1.32, part: 'volcano_crust', explode: [-0.35, -0.55, -0.35] });
+  const crustUpper = new THREE.CylinderGeometry(2.25, 2.35, 0.42, 36, 1, false, Math.PI * 0.5, Math.PI * 1.5);
+  b.addMesh(crustUpper, crustMidMat, { y: -0.88, part: 'volcano_crust', explode: [-0.35, -0.25, -0.35] });
 
-  // Eixo vertical de luminosidade (do branco puro ao preto profundo em 7 discos)
-  for (let k = 0; k < 7; k++) {
-    const lum = k / 6;
-    const c = new THREE.Color().setHSL(0, 0, 0.08 + lum * 0.88);
-    const y = -1.35 + k * 0.45;
-    b.cyl(0, y, 0, 0.34, 0.32, makeMaterial(c.getHex(), 0.35, 0.15), 'color_value', 0, {
-      explode: [0, (lum - 0.5) * 1.45, 0]
-    });
-  }
-
-  // Triângulo equilátero dourado conectando a tríade primária
-  const triPts = [0, 4, 8, 0].map(idx => {
-    const a = (idx / 12) * Math.PI * 2;
-    return [Math.cos(a) * 1.38, 0.32, Math.sin(a) * 1.38];
+  // Câmara magmática incandescente subterrânea
+  const chamber = b.sphere(0, -1.08, 0, 0.96, magmaMat, 'volcano_chamber', 0, {
+    segs: 26, explode: [0.25, -0.68, 0.25]
   });
-  b.tube(triPts, 0.048, gold, 'color_triad', 0.95);
+  chamber.scale.set(1.32, 0.62, 1.32);
 
-  // Esferas satélites RGB (topo) e CMY (base) ilustrando luz vs pigmento
-  const rgbCols = [0xff2d2d, 0x22c55e, 0x2563eb];
-  const cmyCols = [0x06b6d4, 0xec4899, 0xfacc15];
-  for (let i = 0; i < 3; i++) {
-    const a = (i / 3) * Math.PI * 2;
-    b.sphere(Math.cos(a) * 0.95, 1.12, Math.sin(a) * 0.95, 0.24, makeMaterial(rgbCols[i], 0.18, 0.2, { emissive: rgbCols[i], emissiveIntensity: 0.35 }), 'color_satellites', 1.25);
-    b.sphere(Math.cos(a + Math.PI / 3) * 0.95, -1.12, Math.sin(a + Math.PI / 3) * 0.95, 0.24, makeMaterial(cmyCols[i], 0.30, 0.15), 'color_satellites', -0.95);
-  }
-}
+  // Cone estratovulcânico em corte aberto de 270° revelando as camadas de cinzas e lava
+  const coneGeo = new THREE.CylinderGeometry(0.46, 2.15, 2.15, 36, 1, false, Math.PI * 0.5, Math.PI * 1.5);
+  b.addMesh(coneGeo, coneMat, { y: 0.38, part: 'volcano_cone', explode: [-0.55, 0.42, -0.55] });
 
-function buildStoryBook(b) {
-  const coverMat = makeMaterial(0x4c2f85, 0.42, 0.22);
-  const gold = makeMaterial(0xebb744, 0.24, 0.90);
-  const pageEdgeMat = makeMaterial(0xefe6d2, 0.65, 0.04);
-  const leftPageTex = bookPageTexture('Capítulo I', 12);
-  const rightPageTex = bookPageTexture('Clímax', 12);
-  const leftPageMat = makeMaterial(0xfbf7ec, 0.72, 0.02, leftPageTex ? { map: leftPageTex } : {});
-  const rightPageMat = makeMaterial(0xfbf7ec, 0.72, 0.02, rightPageTex ? { map: rightPageTex } : {});
-  const ribbonMat = makeMaterial(0xe11d48, 0.45, 0.10);
+  // Fatia removível de 90° do cone (no modo explodido afasta-se mostrando todo o interior!)
+  const coneWedge = new THREE.CylinderGeometry(0.46, 2.15, 2.15, 18, 1, false, 0, Math.PI * 0.5);
+  b.addMesh(coneWedge, coneMat, { y: 0.38, part: 'volcano_cone', explode: [1.28, 0.45, 1.25] });
 
-  // Capa dura aberta em V suave + lombada dourada
-  b.box(-1.26, -0.42, 0, 2.42, 0.12, 3.35, coverMat, 'book_cover', -0.55, { rz: -0.09 });
-  b.box(1.26, -0.42, 0, 2.42, 0.12, 3.35, coverMat, 'book_cover', -0.55, { rz: 0.09 });
-  b.cyl(0, -0.52, 0, 0.18, 3.38, gold, 'book_cover', -0.55, { rx: Math.PI / 2 });
-
-  // Blocos de páginas esquerda e direita com textura tipografada
-  b.box(-1.18, -0.22, 0, 2.24, 0.26, 3.12, [pageEdgeMat, pageEdgeMat, leftPageMat, pageEdgeMat, pageEdgeMat, pageEdgeMat], 'book_pages', 0.10, { rz: -0.07 });
-  b.box(1.18, -0.22, 0, 2.24, 0.26, 3.12, [pageEdgeMat, pageEdgeMat, rightPageMat, pageEdgeMat, pageEdgeMat, pageEdgeMat], 'book_pages', 0.10, { rz: 0.07 });
-
-  // Fita marcadora vermelha saindo da lombada
-  b.tube([[0, -0.08, -1.52], [0.06, -0.06, 1.56], [0.16, -0.46, 2.12]], 0.055, ribbonMat, 'book_pages', 0.25);
-
-  // Blocos 3D dos pilares da estrutura narrativa pairando sobre o livro
-  const pillars = [
-    { x: -1.35, y: 0.42, z: 0.55, h: 0.58, col: 0x38bdf8, part: 'book_intro', txt: 'INÍCIO', lift: 0.95 },
-    { x: -0.48, y: 0.62, z: -0.35, h: 0.96, col: 0x8b5cf6, part: 'book_intro', txt: 'CONFLITO', lift: 1.20 },
-    { x: 0.48, y: 0.96, z: -0.35, h: 1.62, col: 0xf43f5e, part: 'book_climax', txt: 'CLÍMAX', lift: 1.55 },
-    { x: 1.35, y: 0.52, z: 0.55, h: 0.78, col: 0x10b981, part: 'book_ending', txt: 'DESFECHO', lift: 1.05 }
-  ];
-  for (const p of pillars) {
-    const mat = makeMaterial(p.col, 0.25, 0.22, { transparent: true, opacity: 0.86, emissive: p.col, emissiveIntensity: 0.22 });
-    b.box(p.x, p.y, p.z, 0.68, p.h, 0.68, mat, p.part, p.lift);
-    b.label(p.txt, p.x, p.y + p.h / 2 + 0.08, p.z, 0.95, p.lift, '#ffffff', { part: p.part, fontSize: 34 });
-  }
-
-  // Arco dourado de tensão narrativa ligando os 4 momentos da história
+  // Chaminé principal central + dique lateral (chaminé secundária)
+  b.cyl(0, 0.28, 0, 0.24, 2.48, magmaMat, 'volcano_conduit', 0, { rTop: 0.32, rBot: 0.22, explode: [0, 0.35, 0] });
   b.tube(
-    [[-1.35, 0.78, 0.55], [-0.48, 1.18, -0.35], [0.48, 1.84, -0.35], [1.35, 0.98, 0.55]],
-    0.055,
-    gold,
-    'book_arc',
-    1.65
+    [[0.05, -0.25, 0.05], [0.68, 0.08, 0.52], [1.24, 0.26, 0.95]],
+    0.11,
+    magmaMat,
+    'volcano_conduit',
+    0,
+    { explode: [0.42, 0.25, 0.42] }
   );
+
+  // Lago de lava na cratera + dois rios de lava escorrendo pelas encostas
+  b.cyl(0, 1.44, 0, 0.42, 0.10, lavaMat, 'volcano_lava', 0.85);
+  b.tube(
+    [[0.22, 1.46, -0.18], [0.68, 0.96, -0.55], [1.18, 0.25, -0.88], [1.76, -0.58, -1.16]],
+    0.09,
+    lavaMat,
+    'volcano_lava',
+    0,
+    { explode: [0.45, 0.65, -0.45] }
+  );
+  b.tube(
+    [[-0.25, 1.46, 0.14], [-0.72, 0.88, 0.52], [-1.32, 0.12, 0.88], [-1.88, -0.58, 1.05]],
+    0.085,
+    lavaMat,
+    'volcano_lava',
+    0,
+    { explode: [-0.45, 0.65, 0.45] }
+  );
+
+  // Pluma de cinzas e gases vulcânicos subindo em camadas acima da cratera
+  const puffs = [
+    [0, 1.88, 0, 0.36],
+    [0.24, 2.24, -0.12, 0.48],
+    [-0.28, 2.38, 0.16, 0.44],
+    [0.06, 2.66, 0.04, 0.56],
+    [0.52, 2.74, -0.22, 0.40],
+    [-0.46, 2.78, 0.22, 0.38]
+  ];
+  for (const [px, py, pz, r] of puffs) {
+    b.sphere(px, py, pz, r, ashMat, 'volcano_plume', 1.45, { segs: 16 });
+  }
 }
 
 export const MODEL_BUILDERS = {
   ssd: buildSSD,
   hdd: buildHDD,
   nvme: buildNVMe,
+  cpu: buildCPU,
   circuit: buildCircuit,
   prism: buildPrism,
+  motor: buildMotor,
   atom: buildAtom,
   molecule: buildMolecule,
+  crystal: buildCrystal,
   cell: buildCell,
   dna: buildDNA,
-  polyhedra: buildPolyhedra,
+  heart: buildHeart,
   earth: buildEarth,
-  color_sphere: buildColorSphere,
-  story_book: buildStoryBook
+  volcano: buildVolcano
 };
 
 export function buildBuiltinModel(group, type) {

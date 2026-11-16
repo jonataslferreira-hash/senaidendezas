@@ -2723,6 +2723,7 @@ dialog.storage-image-search.image-replacement .image-inline-search button svg{wi
 }
 
 /* 44. Laboratório de simulações no celular: compacto, sem rolagem e sem controles esmagados */
+dialog.simulation-modal .simulation-modal-foot-tools { display: none; }
 @media (max-width: 760px) {
   dialog.simulation-modal[open] {
     width: min(calc(100vw - 12px), 540px);
@@ -2730,9 +2731,9 @@ dialog.storage-image-search.image-replacement .image-inline-search button svg{wi
     max-height: 96dvh;
     border-radius: 16px;
   }
-  dialog.simulation-modal .simulation-modal-head { padding: 8px 12px; gap: 8px; }
-  dialog.simulation-modal .simulation-modal-head h2 { font-size: 16px; line-height: 1.15; }
-  dialog.simulation-modal .simulation-modal-head button { width: 30px; height: 30px; min-height: 30px; }
+  dialog.simulation-modal .simulation-modal-head { padding: 7px 10px; gap: 8px; }
+  dialog.simulation-modal .simulation-modal-head strong { font-size: 15px; line-height: 1.15; }
+  dialog.simulation-modal .simulation-modal-head button { width: 28px; height: 28px; min-height: 28px; }
   dialog.simulation-modal .simulation-modal-body {
     grid-template-columns: 1fr;
     grid-template-rows: auto minmax(0, 1fr);
@@ -2742,29 +2743,37 @@ dialog.storage-image-search.image-replacement .image-inline-search button svg{wi
     order: -1;
     border-right: 0;
     border-bottom: 1px solid var(--ui-line);
-    padding: 6px 10px;
-    gap: 5px;
+    padding: 5px 10px;
+    gap: 3px;
   }
   dialog.simulation-modal .simulation-modal-select-wrap {
-    display: grid;
-    grid-template-columns: auto minmax(0, 1fr);
+    display: flex;
     align-items: center;
     gap: 8px;
+    width: 100%;
+    margin: 0;
   }
-  dialog.simulation-modal .simulation-modal-select-wrap span { font-size: 11px; white-space: nowrap; }
-  dialog.simulation-modal .simulation-modal-select { min-height: 34px; padding: 4px 8px; font-size: 12.5px; }
+  dialog.simulation-modal .simulation-modal-select-wrap > span {
+    font-size: 11.5px;
+    font-weight: 700;
+    white-space: nowrap;
+    flex: none;
+  }
+  dialog.simulation-modal .simulation-modal-select {
+    flex: 1 1 auto;
+    min-width: 0;
+    width: 100%;
+    min-height: 32px;
+    padding: 3px 8px;
+    font-size: 12.5px;
+  }
   dialog.simulation-modal .simulation-modal-filters,
-  dialog.simulation-modal .simulation-modal-catalog > .simulation-modal-list { display: none; }
-  dialog.simulation-modal .simulation-modal-import { padding-top: 2px; border-top: 0; gap: 4px; }
-  dialog.simulation-modal .simulation-modal-import-row { gap: 6px; }
-  dialog.simulation-modal .simulation-modal-import-row button {
-    min-height: 30px;
-    height: auto;
-    padding: 4px 6px;
-    font-size: 10.5px;
-  }
+  dialog.simulation-modal .simulation-modal-catalog > .simulation-modal-list,
+  dialog.simulation-modal .simulation-modal-import-row { display: none; }
+  dialog.simulation-modal .simulation-modal-import { padding: 0; border-top: 0; gap: 0; }
+  dialog.simulation-modal .simulation-modal-import:has(> p:empty) { display: none; }
   dialog.simulation-modal .simulation-modal-stage {
-    padding: 8px 10px;
+    padding: 7px 10px;
     overflow: hidden;
     display: flex;
     flex-direction: column;
@@ -2795,8 +2804,8 @@ dialog.storage-image-search.image-replacement .image-inline-search button svg{wi
     flex: 1 1 0;
     width: 100%;
     height: 100%;
-    min-height: 108px;
-    max-height: 205px;
+    min-height: 118px;
+    max-height: 245px;
   }
   dialog.simulation-modal .simulation-modal-stage > .simulation-widget > .simulation-controls {
     flex: 0 0 auto;
@@ -2879,20 +2888,61 @@ dialog.storage-image-search.image-replacement .image-inline-search button svg{wi
     overflow: hidden;
   }
   dialog.simulation-modal .simulation-modal-foot {
-    padding: 7px 10px;
+    display: flex;
+    flex-wrap: nowrap;
+    align-items: center;
+    justify-content: space-between;
+    padding: 6px 10px;
     gap: 6px;
   }
   dialog.simulation-modal .simulation-modal-current { display: none; }
+  dialog.simulation-modal .simulation-modal-foot-tools {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    flex: none;
+  }
+  dialog.simulation-modal .simulation-foot-tool {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 4px;
+    min-height: 36px;
+    padding: 0 8px;
+    border: 1px solid var(--ui-line);
+    border-radius: 10px;
+    background: var(--ui-soft);
+    color: var(--ui-ink);
+    font: inherit;
+    font-size: 11px;
+    font-weight: 650;
+    white-space: nowrap;
+    cursor: pointer;
+  }
+  dialog.simulation-modal .simulation-foot-tool svg {
+    width: 13px;
+    height: 13px;
+    flex: none;
+  }
   dialog.simulation-modal .simulation-modal-actions {
-    width: 100%;
-    display: grid;
-    grid-template-columns: 1fr 1.35fr;
-    gap: 8px;
+    width: auto;
+    flex: 1 1 auto;
+    min-width: 0;
+    margin-left: 0;
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 6px;
+  }
+  dialog.simulation-modal .simulation-modal-actions:has([data-sim-confirm]) [data-sim-cancel] {
+    display: none;
   }
   dialog.simulation-modal .simulation-modal-actions button {
+    flex: 1 1 auto;
     min-height: 36px;
     padding: 6px 10px;
     font-size: 12.5px;
+    white-space: nowrap;
   }
   dialog.simulation-modal .simulation-modal-custom > .simulation-widget { min-height: 0; }
   /* Simulações fora do modal no celular (slide/aula do aluno) */
@@ -2914,7 +2964,7 @@ dialog.storage-image-search.image-replacement .image-inline-search button svg{wi
     grid-column: 1 / -1;
   }
 }
-/* Faixa rolável horizontal para os 13 modelos 3D no painel do explorador */
+/* Faixa rolável horizontal para os 15 modelos 3D no painel do explorador */
 .model-panel .model-tabs { max-width: calc(100% - 28px); overflow-x: auto; scrollbar-width: thin; flex-wrap: nowrap; }
 .model-panel .model-tab { flex: none; white-space: nowrap; }
 

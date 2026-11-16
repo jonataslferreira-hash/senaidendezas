@@ -1121,13 +1121,13 @@ export class SlideDesigner {
       <div class="simulation-modal-body">
         <section class="simulation-modal-stage" aria-live="polite"></section>
         <aside class="simulation-modal-catalog">
-          <label class="simulation-modal-select-wrap">Experimento<select class="simulation-modal-select" aria-label="Escolher experimento"></select></label>
+          <label class="simulation-modal-select-wrap"><span>Experimento</span><select class="simulation-modal-select" aria-label="Escolher experimento"></select></label>
           <div class="simulation-modal-filters" role="tablist" aria-label="Filtrar por disciplina">${filtersMarkup}</div>
           <div class="simulation-modal-list" role="listbox" aria-label="Experimentos"></div>
           ${canEdit?`<div class="simulation-modal-import"><div class="simulation-modal-import-row"><button type="button" data-sim-import>${studioIcon('upload')}<span>Importar experimento</span></button><button type="button" data-sim-template>${studioIcon('download')}<span>Baixar modelo para IA</span></button></div><input type="file" accept=".html,.htm,.txt,text/html,text/plain" hidden><p role="status" data-sim-import-status></p></div>`:''}
         </aside>
       </div>
-      <footer class="simulation-modal-foot"><span class="simulation-modal-current"></span><div class="simulation-modal-actions"><button type="button" class="studio-btn quiet" data-sim-cancel>${canEdit?'Cancelar':'Fechar'}</button>${canEdit?`<button type="button" class="studio-btn studio-launch" data-sim-confirm>${targetId?'Aplicar no slide':'Inserir no slide'}</button>`:''}</div></footer>`;
+      <footer class="simulation-modal-foot"><span class="simulation-modal-current"></span>${canEdit?`<div class="simulation-modal-foot-tools"><button type="button" class="studio-btn quiet simulation-foot-tool" data-sim-import title="Importar experimento">${studioIcon('upload')}<span>Importar</span></button><button type="button" class="studio-btn quiet simulation-foot-tool" data-sim-template title="Baixar modelo para IA">${studioIcon('download')}<span>Base</span></button></div>`:''}<div class="simulation-modal-actions"><button type="button" class="studio-btn quiet" data-sim-cancel>${canEdit?'Cancelar':'Fechar'}</button>${canEdit?`<button type="button" class="studio-btn studio-launch" data-sim-confirm>${targetId?'Aplicar no slide':'Inserir no slide'}</button>`:''}</div></footer>`;
     const stage=dialog.querySelector('.simulation-modal-stage');
     const current=dialog.querySelector('.simulation-modal-current');
     const list=dialog.querySelector('.simulation-modal-list');
