@@ -27,6 +27,7 @@ import storageAiIconUrl from './assets/storage-ai.svg';
 import { Showcase, showcaseMarkup, deviceArt } from './showcase.js';
 import { optimizeImage } from './image-optimize.js';
 import { Account } from './auth.js';
+import { readAutoSavePreference } from './profile.js';
 import { studioIcon } from './studio-icons.js';
 import { audioEditor } from './audio-editor.js';
 import { readAudio, applyAudioPlayback } from './audio-data.js';
@@ -39,8 +40,10 @@ import { createTemplateStore } from './template-store.js';
 import { archiveImportedPages, fillAssetImages, hydrateLesson, removePageAssets } from './assets.js';
 const assetImage = (slide, cls = '') => `<img class="${cls}" ${slide.image ? `src="${esc(slide.image)}"` : `data-asset-id="${esc(slide.assetId)}"`} alt="${esc(slide.imageAlt || slide.title)}">`;
 import { HardwareViewer } from './models.js';
+import { BUILTIN_MODELS, modelOptionsMarkup, modelShortName } from './model-catalog.js';
 import { SlideDesigner } from './slide-designer.js';
 import { importModelFiles } from './model-files.js';
+import { openOnlineLibrary } from './online-library.js';
 import { lessonAssetIds } from './assets.js';
 import './designer.css';
 const esc = value => String(value ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -65,6 +68,11 @@ export class Studio {
     this.gameSettingsOpen = false; this.metaExpanded = false; this.visualMode = false; this.designer = new SlideDesigner(this); this.stages = new StageEditor(this); this.ai=new StorageAI(this); this.cloudCovers=new Map();
     this.importDialog = false; this.importing = null; this.importError = '';
     this.cloudItems = []; this.cloudBusy = false; this.cloudMessage = '';this.cloudLoaded=false;this.cloudRequest=0;
+    this.autoSaveTimer = 0; this.autoSaveCloudPending = false;
+    document.addEventListener('autosave-preference-changed', () => {
+      if (this.autoSaveEnabled() && this.view === 'editor' && this.draft && this.needsSave()) this.scheduleAutoSave(300);
+      if (this.view === 'editor') this.callbacks.render();
+    });
     root.addEventListener('account-changed', () => { this.cloudRequest++;this.cloudCovers.clear();this.cloudItems=[];this.cloudBusy=false;this.cloudMessage='';this.cloudLoaded=false;this.refreshCloudPanel();if(this.view==='library'&&this.account.user)this.cloudAction('cloud-refresh',{}); });
     try { this.library = new LessonLibrary(); }
     catch {
@@ -335,14 +343,53 @@ export class Studio {
     this.callbacks.toast(this.groups.live?'Aula salva no grupo e no dispositivo.':this.hasCloudCopy()?'Aula salva neste dispositivo. Use “Nuvem” para atualizar a cópia online.':'Aula salva neste dispositivo.');
     this.callbacks.render();
   }
+  autoSaveEnabled() {
+    return readAutoSavePreference(this.account.user);
+  }
+  scheduleAutoSave(delay = 1100) {
+    if (!this.autoSaveEnabled() || this.view !== 'editor' || !this.draft || !this.groups.canEdit) return;
+    clearTimeout(this.autoSaveTimer);
+    this.autoSaveTimer = setTimeout(() => { this.autoSaveTimer = 0; this.runAutoSave(); }, delay);
+  }
+  async runAutoSave() {
+    if (!this.autoSaveEnabled() || this.view !== 'editor' || !this.draft || !this.groups.canEdit) return;
+    const draftId = this.draft.id;
+    try {
+      if (this.dirty) {
+        await this.saveLocalEditor();
+        if (this.draft?.id !== draftId) return;
+      }
+      if (this.hasCloudCopy() && cloudConfigured && this.account.user && this.needsSave()) {
+        if (this.cloudBusy) {
+          this.autoSaveCloudPending = true;
+          return;
+        }
+        await this.cloudAction('cloud-save', {}, { silent: true });
+      }
+      const status = document.querySelector('.save-state');
+      if (status && !this.dirty) {
+        status.textContent = 'Salvo automaticamente';
+        status.classList.remove('unsaved');
+      }
+    } catch (error) {
+      this.callbacks.toast(error?.message || 'Não foi possível salvar automaticamente.');
+    }
+  }
   editorSaveControls() {
-    // Dois botões sempre à vista: salvar aqui e salvar na nuvem. Sem menu.
-    const linked=this.hasCloudCopy(), canEdit=this.groups.canEdit, disabled=!canEdit||this.cloudBusy?'disabled':'';
-    const dirty=this.dirty;
-    const label=this.cloudBusy?'Salvando…':dirty?'Salvar':'Salvo';
-    return `<div class="editor-save-controls">${cloudConfigured?button('cloud-save',studioIcon('cloud')+'<span>Nuvem</span>','quiet editor-cloud-save '+(linked&&!this.needsSave()?'is-saved':''),
-      `aria-label="Salvar na nuvem" title="${linked?'Enviar esta versão para a nuvem':'Guardar uma cópia na nuvem'}" ${disabled}`):''}${button('save',studioIcon('download')+label,'quiet '+(dirty?'':'is-saved'),
-      `aria-label="Salvar neste dispositivo" title="Salvar neste dispositivo" ${disabled||(!dirty?'disabled':'')}`)}</div>`;
+    if (this.autoSaveEnabled()) return '';
+    const linked = this.hasCloudCopy(), canEdit = this.groups.canEdit, disabled = !canEdit || this.cloudBusy ? 'disabled' : '';
+    const dirty = this.dirty, needs = this.needsSave();
+    // Quando a aula já tem cópia na nuvem, unifica em um único botão de nuvem
+    // que salva simultaneamente neste dispositivo e na nuvem.
+    if (linked && cloudConfigured) {
+      const label = this.cloudBusy ? 'Salvando…' : needs ? 'Salvar' : 'Salvo';
+      return `<div class="editor-save-controls is-unified-cloud">${button('cloud-save', studioIcon('cloud') + '<span>' + label + '</span>', 'quiet editor-cloud-save is-unified ' + (needs ? '' : 'is-saved'),
+        `aria-label="Salvar neste dispositivo e na nuvem" title="Salvar neste dispositivo e na nuvem" ${disabled || (!needs ? 'disabled' : '')}`)}</div>`;
+    }
+    const label = this.cloudBusy ? 'Salvando…' : dirty ? 'Salvar' : 'Salvo';
+    return `<div class="editor-save-controls">${cloudConfigured ? button('cloud-save', studioIcon('cloud') + '<span>Nuvem</span>', 'quiet editor-cloud-save ' + (linked && !needs ? 'is-saved' : ''),
+      `aria-label="Salvar na nuvem" title="Guardar uma cópia na nuvem" ${disabled}`) : ''}${button('save', studioIcon('download') + label, 'quiet ' + (dirty ? '' : 'is-saved'),
+      `aria-label="Salvar neste dispositivo" title="Salvar neste dispositivo" ${disabled || (!dirty ? 'disabled' : '')}`)}</div>`;
   }
   needsSave() {
     if(this.dirty)return true;
@@ -350,6 +397,7 @@ export class Studio {
     return Boolean(link&&this.draft.updatedAt>link.savedAt);
   }
   paintSaveButton() {
+    if (this.autoSaveEnabled()) return;
     for(const button of this.root.querySelectorAll('.editor-save-controls [data-studio-action=save]')){
       const dirty=this.dirty;
       button.classList.toggle('is-saved',!dirty);
@@ -357,16 +405,27 @@ export class Studio {
       const label=this.cloudBusy?'Salvando…':dirty?'Salvar':'Salvo';
       if(button.textContent!==label)button.innerHTML=studioIcon('download')+label;
     }
-    for(const button of this.root.querySelectorAll('.editor-save-controls [data-studio-action=cloud-save]'))button.classList.toggle('is-saved',this.hasCloudCopy()&&!this.needsSave());
+    const needs = this.needsSave(), linked = this.hasCloudCopy();
+    for(const button of this.root.querySelectorAll('.editor-save-controls [data-studio-action=cloud-save]')){
+      if (button.classList.contains('is-unified')) {
+        button.classList.toggle('is-saved', !needs);
+        button.disabled = !this.groups.canEdit || this.cloudBusy || !needs;
+        const label = this.cloudBusy ? 'Salvando…' : needs ? 'Salvar' : 'Salvo';
+        if (button.textContent !== label) button.innerHTML = studioIcon('cloud') + '<span>' + label + '</span>';
+      } else {
+        button.classList.toggle('is-saved', linked && !needs);
+      }
+    }
   }
-  async cloudAction(action, target) {
+  async cloudAction(action, target, options = {}) {
+    const silent = Boolean(options?.silent);
     if (this.cloudBusy) return;
     if (action==='cloud-delete-dialog') {
       const item=this.cloudItems.find(file=>file.path===target.dataset.cloudPath);
       if(item){this.dialog={type:'cloud-delete',item,uid:this.account.user?.id};this.callbacks.render();}
       return;
     }
-    if (!this.account.user) { this.account.show('login'); return; }
+    if (!this.account.user) { if (!silent) this.account.show('login'); return; }
     const uid = this.account.user.id,request=++this.cloudRequest,current=()=>this.cloudRequest===request&&this.account.user?.id===uid; this.cloudBusy = true; this.cloudMessage = ''; this.refreshCloudPanel();
     const saveButtons=this.root.querySelectorAll('.editor-save-controls button');
     if(action!=='cloud-refresh')for(const button of saveButtons)button.disabled=true;
@@ -376,14 +435,14 @@ export class Studio {
         if(!current())return;
         const lesson = validateLesson(await hydrateLesson(this.draft, true), { draft: true });
         if(!current())return;
-        this.callbacks.toast('Enviando aula e arquivos para sua conta…');
+        if(!silent)this.callbacks.toast('Salvando aula neste dispositivo e na nuvem…');
         const {thumbnailFor}=await import('./cover-render.js');
         const cover=await thumbnailFor(lesson).catch(()=>'');
         if(!current())return;
         const stored = await saveCloudLesson(this.account.client, lesson, cover);
         if(!current())return;this.linkCloud(lesson.id,stored.path);
         try{const items=await listCloudLessons(this.account.client);if(!current())return;this.cloudItems=items;this.cloudLoaded=true;this.cloudMessage=items.length?`${items.length} ${items.length===1?'aula':'aulas'} nesta conta.`:'Aula enviada. Atualize os arquivos para conferir a lista.';}catch{if(!current())return;this.cloudLoaded=true;this.cloudMessage='A aula foi salva, mas a lista não pôde ser atualizada. Clique em Atualizar arquivos.';}
-        this.callbacks.toast(stored.coverSynced===false?'Aula salva. A capa da lista na nuvem aguarda a atualização do Worker.':stored.compressed ? 'Aula salva na nuvem. Compressão economizou ' + Math.round((1 - stored.bytes / stored.originalBytes) * 100) + '%.' : 'Aula e arquivos salvos na nuvem.');
+        if(!silent)this.callbacks.toast(stored.coverSynced===false?'Aula salva neste dispositivo e na nuvem. A capa da lista aguarda a atualização do Worker.':stored.compressed ? 'Aula salva neste dispositivo e na nuvem. Compressão economizou ' + Math.round((1 - stored.bytes / stored.originalBytes) * 100) + '%.' : 'Aula salva neste dispositivo e na nuvem.');
       } else if (action === 'cloud-refresh') {
         const refreshGroups=this.groups.refresh().catch(()=>{});
         const items = await listCloudLessons(this.account.client).finally(()=>refreshGroups);
@@ -417,7 +476,22 @@ export class Studio {
         if(action==='cloud-present')await this.launch(saved,false,false);else if(action==='cloud-cover')this.openCoverDialog(saved);else this.open(saved.id);
       }
     } catch (error) { if(current()){this.cloudLoaded=true;this.cloudMessage=error.message||'Não foi possível consultar as aulas. Clique em Atualizar arquivos para tentar novamente.';this.callbacks.toast(this.cloudMessage);} }
-    finally { if(current()){this.cloudBusy = false;if(action==='cloud-refresh'){this.refreshCloudPanel();this.paintSaveButton();const upload=this.root.querySelector('.editor-save-controls [data-studio-action=cloud-save]');if(upload)upload.disabled=!this.groups.canEdit;}else this.callbacks.render();} }
+    finally {
+      if(current()){
+        this.cloudBusy = false;
+        const pendingAuto = this.autoSaveCloudPending;
+        this.autoSaveCloudPending = false;
+        if(action==='cloud-refresh' || silent){
+          this.refreshCloudPanel();
+          this.paintSaveButton();
+          const upload=this.root.querySelector('.editor-save-controls [data-studio-action=cloud-save]');
+          if(upload)upload.disabled=!this.groups.canEdit || (upload.classList.contains('is-unified') && !this.needsSave());
+        } else {
+          this.callbacks.render();
+        }
+        if (pendingAuto && this.autoSaveEnabled()) this.scheduleAutoSave(450);
+      }
+    }
   }
   syncAudioUi(card, scope, audio) {
     if (!audio) return;
@@ -587,7 +661,7 @@ export class Studio {
     if (s.kind === 'document') return this.documentEditor(s);
     return `${this.itemToolbar('slide', this.index, this.draft.slides.length)}<div class="editor-field"><label for="slide-kind">Formato do slide</label><select id="slide-kind" data-scope="slide" data-field="kind">${[['text', 'Texto e ideias'], ['image', 'Imagem e explicação'], ['model', 'Modelo 3D interativo']].map(([v, label]) => `<option value="${v}" ${s.kind === v ? 'selected' : ''}>${label}</option>`).join('')}</select></div>
       ${field('Título do slide', 'title', s.title, 'slide', { attributes: 'maxlength="200"' })}${field('Etiqueta', 'tag', s.tag, 'slide', { attributes: 'maxlength="160" placeholder="Ex.: O ponto de partida"' })}${field('Introdução', 'intro', s.intro, 'slide', { textarea: true })}${field('Ideias principais', 'points', s.points.join('\n'), 'slide', { textarea: true, hint: 'Uma ideia por linha. Até 12 tópicos.' })}
-      ${s.kind === 'model' ? `<div class="editor-field"><label for="slide-model">Modelo para explorar</label><select id="slide-model" data-scope="slide" data-field="model">${[['ssd', 'SSD SATA'], ['hdd', 'HDD'], ['nvme', 'SSD M.2 NVMe'], ['custom', 'Meu modelo enviado']].map(([v, label]) => `<option value="${v}" ${s.model === v ? 'selected' : ''}>${label}</option>`).join('')}</select><small>Use um modelo da biblioteca ou envie um modelo próprio.</small>${button('upload-native-model', '↑ Enviar modelo GLB / GLTF / OBJ', 'quiet')}<input type="file" id="native-model-files" accept=".glb,.gltf,.obj,.mtl,.bin,.png,.jpg,.jpeg,.webp,.gif,.ktx2" multiple hidden>${s.customModel ? `<small>${esc(s.customModel.name)}</small>` : ''}<small>GLB é mais prático. Em OBJ/GLTF, selecione também MTL, BIN e texturas. Até 15 MB no total.</small><div class="native-model-preview"></div></div>` : ''}
+      ${s.kind === 'model' ? `<div class="editor-field"><label for="slide-model">Modelo para explorar</label><select id="slide-model" data-scope="slide" data-field="model">${modelOptionsMarkup(s.model, { customLabel: s.customModel?.name || 'Meu modelo enviado' })}</select><small>Use um dos ${BUILTIN_MODELS.length} modelos da biblioteca ou envie um modelo próprio.</small>${button('upload-native-model', '↑ Enviar modelo GLB / GLTF / OBJ', 'quiet')}${button('online-library-model', '⤓ Biblioteca online', 'quiet')}<input type="file" id="native-model-files" accept=".glb,.gltf,.obj,.mtl,.bin,.png,.jpg,.jpeg,.webp,.gif,.ktx2" multiple hidden>${s.customModel ? `<small>${esc(s.customModel.name)}</small>` : ''}<small>GLB é mais prático. Em OBJ/GLTF, selecione também MTL, BIN e texturas. Até 15 MB no total. A biblioteca online baixa modelos gratuitos de NASA e Kenney (CC0).</small><div class="native-model-preview"></div></div>` : ''}
       ${s.kind === 'image' ? `<div class="image-editor">${field('Link da imagem', 'image', s.image.startsWith('data:') ? '' : s.image, 'slide', { type: 'url', attributes: 'placeholder="https://..."', hint: s.image.startsWith('data:') ? 'Imagem incorporada ao arquivo da aula.' : 'Use um link HTTPS ou carregue uma imagem abaixo.' })}<label class="upload-image" for="slide-image-file">↑ Carregar imagem do computador</label><input id="slide-image-file" type="file" accept="image/png,image/jpeg,image/webp,image/gif" hidden>${field('Descrição da imagem', 'imageAlt', s.imageAlt, 'slide', { attributes: 'maxlength="500"', hint: 'Descreva o que a turma deve observar. Também ajuda quem usa leitor de tela.' })}${s.image || s.assetId ? button('clear-image', 'Remover imagem', 'link') : ''}</div>` : ''}
       ${field('Destaque', 'callout', s.callout, 'slide', { textarea: true })}${s.comparison ? button('clear-comparison', 'Remover comparação HDD × SSD deste slide', 'link') : ''}<details class="editor-details" ${s.prompt ? 'open' : ''}><summary>↗ Pergunta para discutir com a turma</summary>${field('Pergunta de discussão', 'prompt', s.prompt, 'slide', { textarea: true })}${field('Explicação da discussão', 'answer', s.answer, 'slide', { textarea: true })}</details><details class="editor-details"><summary>▤ Roteiro do apresentador</summary>${field('Notas só para o professor', 'note', s.note, 'slide', { textarea: true, hint: 'As notas não são enviadas aos celulares dos alunos.' })}</details>`;
   }
@@ -608,7 +682,7 @@ export class Studio {
     if (s.kind === 'document') return `<div class="mini-slide mini-imported"><span>${esc(s.sourceType.toUpperCase())} · ${esc(s.title)}</span>${assetImage(s)}</div>`;
     let media = '';
     try { if (s.kind === 'image' && (s.image || s.assetId)) media = assetImage(s); } catch { media = '<p>Adicione uma imagem válida.</p>'; }
-    return `<div class="mini-slide"><span>${esc(s.tag || 'SUA AULA')}</span><h3>${esc(s.title || 'Título do slide')}</h3>${media}${s.kind === 'model' ? `<div class="mini-model">◇<small>${s.model === 'custom' ? esc(s.customModel?.name || 'Envie seu modelo') : { ssd: 'SSD SATA', hdd: 'HDD', nvme: 'SSD NVMe' }[s.model]}</small></div>` : ''}<p>${esc(s.intro)}</p><ul>${s.points.map(p => `<li>${esc(p)}</li>`).join('')}</ul>${s.prompt ? `<blockquote>${esc(s.prompt)}</blockquote>` : ''}</div>`;
+    return `<div class="mini-slide"><span>${esc(s.tag || 'SUA AULA')}</span><h3>${esc(s.title || 'Título do slide')}</h3>${media}${s.kind === 'model' ? `<div class="mini-model">◇<small>${s.model === 'custom' ? esc(s.customModel?.name || 'Envie seu modelo') : esc(modelShortName(s.model))}</small></div>` : ''}<p>${esc(s.intro)}</p><ul>${s.points.map(p => `<li>${esc(p)}</li>`).join('')}</ul>${s.prompt ? `<blockquote>${esc(s.prompt)}</blockquote>` : ''}</div>`;
   }
   // O diálogo novo (busca, link, colar) vive em cover-picker.js; aqui só salvamos o resultado.
   async openCoverDialog(lesson) {
@@ -722,7 +796,12 @@ export class Studio {
   markDirty() {
     this.dirty = true; this.paintSaveButton(); this.groups?.live?.schedule();
     const status = document.querySelector('.save-state');
-    if (status) { status.textContent = 'Alterações não salvas'; status.classList.add('unsaved'); }
+    if (this.autoSaveEnabled()) {
+      if (status) { status.textContent = 'Salvando automaticamente…'; status.classList.add('unsaved'); }
+      this.scheduleAutoSave();
+    } else if (status) {
+      status.textContent = 'Alterações não salvas'; status.classList.add('unsaved');
+    }
   }
   save() {
     if (!this.draft) return;
@@ -730,6 +809,9 @@ export class Studio {
     this.draft = this.library.save(this.draft); this.dirty = false;
   }
   open(id, navigate = true) {
+    clearTimeout(this.autoSaveTimer);
+    this.autoSaveTimer = 0;
+    this.autoSaveCloudPending = false;
     this.scrollEditorTop = true;
     this.draft = clone(this.library.lessons.find(l => l.id === id));
     this.blockId=''; this.index = 0; this.questionIndex = 0; this.tab = 'slides'; this.visualMode = true; this.designer.selected = ''; this.dirty = false; this.view = 'editor';
@@ -901,6 +983,16 @@ export class Studio {
     if (!model || this.draft.slides[this.index] !== slide) return;
     slide.model = 'custom'; slide.customModel = model; this.markDirty(); this.callbacks.render();
   }
+  openOnlineModelLibrary() {
+    const slide = this.draft.slides[this.index];
+    if (!slide) return;
+    openOnlineLibrary({
+      onModel: model => {
+        if (!model || !this.draft.slides.includes(slide)) return;
+        slide.model = 'custom'; slide.customModel = model; this.markDirty(); this.callbacks.render();
+      }
+    });
+  }
   async action(action, target) {
     if (action === 'mobile-actions' || action === 'close-mobile-actions') {
       const toggle = this.root.querySelector('.mobile-editor-actions');
@@ -1017,6 +1109,7 @@ export class Studio {
       this.markDirty(); }
     else if (action === 'toggle-visual') { this.visualMode = !this.visualMode; this.designer.interacting = ''; }
     else if (action === 'upload-native-model') { this.root.querySelector('#native-model-files').click(); return; }
+    else if (action === 'online-library-model') { this.openOnlineModelLibrary(); return; }
     else if (action === 'restore-demo') { const l = this.library.restoreDemo(); this.open(l.id); }
     else if (action === 'edit') {if(await this.groups.openForLesson(id))return;this.open(id);}
     else if (action === 'save') { await this.saveEditor(); return; }

@@ -4,6 +4,7 @@ import { createUuid } from './uuid.js';
 import { shapeFields } from './shapes.js';
 import { validateAudio } from './audio-data.js';
 import { validateCustomModel } from './model-files.js';
+import { isValidModelId } from './model-catalog.js';
 import { openSlideThemes } from './open-slide-themes.js';
 import { communitySlideThemes } from './open-community-themes.js';
 import { studioSlideThemes } from './studio-slide-themes.js';
@@ -122,7 +123,7 @@ export function normalizeElements(elements, draft, validateImage) {
         imageCredit: String(e.imageCredit || '').slice(0, 120)
       } : {}),
       ...(e.type === 'video' ? { video: validVideo(e.video) } : {}),
-      ...(assetId ? { assetId } : {}), model: ['ssd', 'hdd', 'nvme', 'custom'].includes(e.model) ? e.model : 'ssd', customModel, modelLabel: typeof e.modelLabel === 'string' ? e.modelLabel.slice(0, 120) : '', modelDescription:typeof e.modelDescription==='string'?e.modelDescription.slice(0,500):'', modelDetailsHidden:Boolean(e.modelDetailsHidden), ...(e.type==='shape'?shapeFields(e):{}), ...(e.audio?{audio:validateAudio(e.audio)}:{}), locked: Boolean(e.locked) };
+      ...(assetId ? { assetId } : {}), model: isValidModelId(e.model) ? e.model : 'ssd', customModel, modelLabel: typeof e.modelLabel === 'string' ? e.modelLabel.slice(0, 120) : '', modelDescription:typeof e.modelDescription==='string'?e.modelDescription.slice(0,500):'', modelDetailsHidden:Boolean(e.modelDetailsHidden), ...(e.type==='shape'?shapeFields(e):{}), ...(e.audio?{audio:validateAudio(e.audio)}:{}), locked: Boolean(e.locked) };
   });
 }
 export function canvasFromSlide(slide) {

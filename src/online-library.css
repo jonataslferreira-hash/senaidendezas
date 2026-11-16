@@ -1,0 +1,180 @@
+/* Biblioteca online de modelos 3D — modal com busca, filtros e cards. */
+dialog.online-library-modal {
+  width: min(880px, calc(100vw - 24px));
+  max-width: calc(100vw - 24px);
+  max-height: 90dvh;
+  margin: auto;
+  padding: 0;
+  border: 1px solid var(--ui-line, #e8e0ef);
+  border-radius: min(22px, max(8px, var(--ui-radius, 18px)));
+  background: var(--ui-panel, #fff);
+  color: var(--ui-ink, #1f1b2d);
+  box-shadow: 0 28px 90px #00000048;
+  overflow: hidden;
+  box-sizing: border-box;
+}
+dialog.online-library-modal[open] {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr) auto;
+}
+dialog.online-library-modal::backdrop {
+  background: #0d101b8c;
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+}
+.online-library-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 16px 18px 12px;
+  margin: 0;
+  border-bottom: 1px solid var(--ui-line, #e8e0ef);
+}
+.online-library-head strong {
+  font-size: clamp(18px, 2.2vw, 24px);
+  letter-spacing: -.3px;
+  line-height: 1.15;
+}
+.online-library-head p {
+  margin: 4px 0 0;
+  font-size: 13px;
+  line-height: 1.4;
+  color: var(--studio-muted, #847590);
+  max-width: 60ch;
+}
+.online-library-close {
+  flex: none;
+  width: 34px;
+  height: 34px;
+  min-height: 34px;
+  border-radius: 10px;
+  border: 1px solid var(--ui-line, #e8e0ef);
+  background: transparent;
+  color: inherit;
+  font-size: 20px;
+  line-height: 1;
+  cursor: pointer;
+}
+.online-library-body {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  gap: 10px;
+  min-height: 0;
+  padding: 12px 18px;
+}
+.online-library-tools {
+  display: grid;
+  gap: 8px;
+}
+.online-library-search {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 9px 12px;
+  border-radius: 10px;
+  border: 1px solid var(--ui-line, #e8e0ef);
+  background: var(--ui-panel, #fff);
+  color: inherit;
+  font: inherit;
+}
+.online-library-filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.online-library-filter {
+  border: 1px solid var(--ui-line, #e8e0ef);
+  background: transparent;
+  color: inherit;
+  border-radius: 999px;
+  padding: 5px 12px;
+  font: inherit;
+  font-size: 12.5px;
+  cursor: pointer;
+}
+.online-library-filter[aria-selected="true"] {
+  border-color: var(--ol-accent, #7950b4);
+  background: var(--ol-accent, #7950b4);
+  color: #fff;
+}
+.online-library-grid {
+  min-height: 140px;
+  overflow-y: auto;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(168px, 1fr));
+  gap: 8px;
+  align-content: start;
+  padding: 2px;
+}
+.online-library-card {
+  display: grid;
+  gap: 3px;
+  justify-items: start;
+  text-align: left;
+  padding: 10px 12px;
+  border-radius: 12px;
+  border: 1px solid var(--ui-line, #e8e0ef);
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+  transition: border-color .15s ease;
+}
+.online-library-card:hover {
+  border-color: var(--ol-accent, #7950b4);
+}
+.online-library-card-name {
+  font-weight: 600;
+  font-size: 13.5px;
+  line-height: 1.25;
+}
+.online-library-card-meta {
+  font-size: 11.5px;
+  color: var(--studio-muted, #847590);
+}
+.online-library-card-cta {
+  margin-top: 4px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--ol-accent, #7950b4);
+}
+.online-library-card.is-loading {
+  opacity: .55;
+  pointer-events: none;
+}
+.online-library-empty {
+  grid-column: 1 / -1;
+  margin: 0;
+  color: var(--studio-muted, #847590);
+  font-size: 13px;
+}
+.online-library-status {
+  min-height: 18px;
+  margin: 0;
+  font-size: 12.5px;
+  color: var(--studio-muted, #847590);
+}
+.online-library-status.is-error {
+  color: #c0392b;
+}
+.online-library-foot {
+  display: flex;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 6px 14px;
+  padding: 10px 18px;
+  border-top: 1px solid var(--ui-line, #e8e0ef);
+  font-size: 11.5px;
+  color: var(--studio-muted, #847590);
+}
+@media (max-width: 640px) {
+  .online-library-grid {
+    grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  }
+  .online-library-head p {
+    display: none;
+  }
+  .online-library-foot span:last-child {
+    display: none;
+  }
+}

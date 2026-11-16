@@ -1,4 +1,5 @@
 import {studioIcon} from './studio-icons.js';
+import { BUILTIN_MODELS, HARDWARE_MODEL_IDS, modelMeta } from './model-catalog.js';
 import {routeParams} from './editor-route.js';
 import {takePhoto} from './camera-photo.js';
 import {GameLayout} from './game-layout.js';
@@ -31,6 +32,7 @@ import { canvasMarkup, CanvasModels } from './canvas-view.js';
 import { Studio } from './studio.js';
 import './studio.css';
 import './documents.css';
+import './online-library.css';
 import { lobbyMarkup } from './lobby.js';
 import './quiz-party.css';
 let activeLesson = demoLesson();
@@ -222,10 +224,18 @@ function header() {
 }
 function modelPanel(landing = false) {
   const custom = state && slides[state.slide]?.customModel;
-  const choices = [['ssd', 'SSD SATA'], ['hdd', 'HDD'], ['nvme', 'SSD NVMe'], ...(custom ? [['custom', 'Meu modelo']] : [])];
-  return `<section class="model-panel ${landing ? 'hero-model' : ''}" aria-label="Explorador de hardware em 3D">
-    <div class="model-heading"><span class="eyebrow">${icon('cube')} HARDWARE EXPLORER</span><span class="live-pill">3D INTERATIVO</span></div>
-    <div class="model-tabs" role="group" aria-label="Escolher modelo">${choices.map(([type, label]) => `<button class="model-tab ${localModel === type ? 'active' : ''}" data-model="${type}" aria-pressed="${localModel === type}" ${state && !host && type !== state.model ? 'disabled title="O professor escolhe o modelo deste slide"' : ''}>${label}</button>`).join('')}</div>
+  const activeId = localModel || 'ssd';
+  const activeMeta = modelMeta(activeId);
+  const baseChoices = landing
+    ? BUILTIN_MODELS.map(m => [m.id, m.shortName])
+    : HARDWARE_MODEL_IDS.includes(activeId)
+      ? HARDWARE_MODEL_IDS.map(id => [id, modelMeta(id).shortName])
+      : [[activeId, activeMeta.shortName], ...HARDWARE_MODEL_IDS.map(id => [id, modelMeta(id).shortName])];
+  const choices = [...baseChoices, ...(custom ? [['custom', 'Meu modelo']] : [])];
+  const headingLabel = landing ? 'EXPLORADOR 3D · 13 MODELOS' : `${activeMeta.subject.toUpperCase()} · 3D`;
+  return `<section class="model-panel ${landing ? 'hero-model' : ''}" aria-label="Explorador de modelos em 3D">
+    <div class="model-heading"><span class="eyebrow">${icon('cube')} ${esc(headingLabel)}</span><span class="live-pill">3D INTERATIVO</span></div>
+    <div class="model-tabs" role="group" aria-label="Escolher modelo">${choices.map(([type, label]) => `<button class="model-tab ${localModel === type ? 'active' : ''}" data-model="${type}" aria-pressed="${localModel === type}" ${state && !host && type !== state.model ? 'disabled title="O professor escolhe o modelo deste slide"' : ''}>${esc(label)}</button>`).join('')}</div>
     <div id="viewer-slot"></div>
     <div class="model-actions"><button ${localModel === 'custom' ? 'hidden' : ''} class="subtle-btn ${localExploded ? 'selected' : ''}" data-action="explode" aria-pressed="${localExploded}">${icon('layers')} ${localExploded ? 'Fechar modelo' : 'Abrir modelo'}</button><button class="icon-btn" data-action="reset-model" aria-label="Restaurar câmera">${icon('refresh')}</button></div>
     <span class="model-footnote">Modelo didático · proporções e componentes simplificados</span>

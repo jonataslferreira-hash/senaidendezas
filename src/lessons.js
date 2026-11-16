@@ -5,6 +5,7 @@ import {validateGameSettings} from './game-settings.js';
 import { slides, defaultQuestions } from './content.js';
 import { compactLesson } from './assets.js';
 import { validateCustomModel } from './model-files.js';
+import { isValidModelId } from './model-catalog.js';
 import { canvasThemes, colorValue, normalizeElements, normalizeBackground } from './canvas-data.js';
 import { validateAudio } from './audio-data.js';
 import { openLayouts } from './open-slide-layouts.js';
@@ -82,12 +83,12 @@ export function validateLesson(input, { draft = false } = {}) {
     if (!draft && s.kind === 'image' && !image) throw Error('Adicione a imagem do slide ' + (i + 1) + '.');
     if (!draft && s.kind === 'image' && !text(s.imageAlt, 500).trim()) throw Error('Descreva a imagem do slide ' + (i + 1) + ' para os alunos.');
     const customModel = validateCustomModel(s.customModel, draft);
-    if (s.kind === 'model' && !['ssd', 'hdd', 'nvme', 'custom'].includes(s.model)) throw Error('Escolha um modelo 3D válido no slide ' + (i + 1) + '.');
+    if (s.kind === 'model' && !isValidModelId(s.model)) throw Error('Escolha um modelo 3D válido no slide ' + (i + 1) + '.');
     if (!draft && s.kind === 'model' && s.model === 'custom' && !customModel) throw Error('Envie o modelo 3D do slide ' + (i + 1) + '.');
     const elements = s.kind === 'canvas' ? normalizeElements(s.elements, draft, imageURL) : [];
     return { id: text(s.id, 100) || uid(), kind: s.kind, title, mobileFocus: s.mobileFocus==='text'||s.mobileFocus==='auto'||/^element:[a-zA-Z0-9_-]{1,100}$/.test(s.mobileFocus||'')?s.mobileFocus:'auto', audio: validateAudio(s.audio), tag: text(s.tag, 160), intro: text(s.intro), points: Array.isArray(s.points) ? s.points.slice(0, 12).map(p => text(p, 1000)) : [],
       importWarnings:Array.isArray(s.importWarnings)?s.importWarnings.slice(0,40).map(w=>text(w,240)):[],animations:Array.isArray(s.animations)?s.animations.slice(0,100).filter(a=>a&&typeof a.id==='string'&&['appear','fadeIn','fadeOut','floatIn','flyIn','flyOut','splitIn','wipeIn','zoomIn'].includes(a.effect)).map(a=>({id:text(a.id,100),group:Math.max(0,Math.min(100,Math.floor(Number(a.group)||0))),effect:a.effect,duration:Math.max(1,Math.min(30000,Number(a.duration)||500)),delay:Math.max(0,Math.min(120000,Number(a.delay)||0)),direction:text(a.direction,30),orientation:text(a.orientation,30)})):[],poll: validatePoll(s.poll, draft), ...(s.game ? { game: validateGame(s.game, draft) } : {}), interaction: ['teacher','sims','models'].includes(s.interaction) ? s.interaction : 'free', transition: ['slide', 'fade', 'zoom', 'rise', 'wipe', 'iris', 'split', 'flip', 'none'].includes(s.transition) ? s.transition : 'slide',
-      callout: text(s.callout, 1000), note: text(s.note), prompt: text(s.prompt, 1000), answer: text(s.answer, 3000), comparison: Boolean(s.comparison), model: ['ssd', 'hdd', 'nvme', 'custom'].includes(s.model) ? s.model : 'ssd', customModel, image, imageAlt: text(s.imageAlt, 500), elements, visualTheme: typeof s.visualTheme==='string'&&Object.hasOwn(canvasThemes,s.visualTheme)?s.visualTheme:'', background: colorValue(s.background, '#171324'), backgroundFill:normalizeBackground(s.backgroundFill), layout:['title','split','spotlight'].includes(s.layout)||openLayouts.has(s.layout)?s.layout:'',
+      callout: text(s.callout, 1000), note: text(s.note), prompt: text(s.prompt, 1000), answer: text(s.answer, 3000), comparison: Boolean(s.comparison), model: isValidModelId(s.model) ? s.model : 'ssd', customModel, image, imageAlt: text(s.imageAlt, 500), elements, visualTheme: typeof s.visualTheme==='string'&&Object.hasOwn(canvasThemes,s.visualTheme)?s.visualTheme:'', background: colorValue(s.background, '#171324'), backgroundFill:normalizeBackground(s.backgroundFill), layout:['title','split','spotlight'].includes(s.layout)||openLayouts.has(s.layout)?s.layout:'',
       ...(assetId ? { assetId } : {}), sourceType: ['pdf', 'pptx'].includes(s.sourceType) ? s.sourceType : '', pageWidth: Math.max(1, Math.min(8000, Number(s.pageWidth) || 1600)), pageHeight: Math.max(1, Math.min(8000, Number(s.pageHeight) || 900)) };
   });
   result.questions = input.questions.map((q, i) => {
