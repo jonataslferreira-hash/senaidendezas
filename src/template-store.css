@@ -41,8 +41,8 @@
   width: 100%;
   height: 100%;
   pointer-events: none;
-  filter: blur(3px) saturate(1.16);
-  transform: scale(1.025);
+  filter: blur(5px) saturate(1.18);
+  transform: scale(1.04);
   transform-origin: center;
   opacity: 0.96;
   will-change: contents;
@@ -57,7 +57,7 @@ html[data-appearance="dark"] .tstore-ambient,
 
 html[data-appearance="dark"] .tstore-fluid-canvas,
 :root[data-appearance="dark"] .tstore-fluid-canvas {
-  filter: blur(3px) saturate(1.24) brightness(1.04);
+  filter: blur(5px) saturate(1.26) brightness(1.04);
   opacity: 0.98;
 }
 
@@ -88,7 +88,7 @@ html[data-appearance="dark"] .tstore-icon-util.is-active {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .tstore-fluid-canvas { filter: blur(4px) saturate(1.1); }
+  .tstore-fluid-canvas { filter: blur(6px) saturate(1.1); }
 }
 
 .tstore-shell {

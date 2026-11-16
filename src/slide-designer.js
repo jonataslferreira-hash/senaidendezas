@@ -129,6 +129,8 @@ export class SlideDesigner {
       // Segurar o próprio nome da camada também arrasta (mouse/caneta).
       const layerRow = event.target.closest('#designer-layers [data-layer-row]');
       if (layerRow && event.pointerType !== 'touch') { this.dragLayer(event, layerRow, false); return; }
+      // Barra de ações da imagem selecionada: o clique no botão não inicia arraste.
+      if (event.target.closest('.canvas-image-toolbar')) return;
       this.down(event);
     });
     root.addEventListener('pointermove', e => this.move(e));
@@ -532,6 +534,8 @@ export class SlideDesigner {
       const minimum = el.type === 'image' ? .1 : 5;
       el.w = Math.max(minimum, Math.min(1000, w + dx));
       el.h = Math.max(minimum, Math.min(1000, h + dy));
+      // Shift segura a proporção original durante o redimensionamento.
+      if (event.shiftKey) el.h = Math.max(minimum, Math.min(1000, el.w * (h / w)));
       if(el.type==='text'){el.x=d.initial.x-(el.w-w)/2;el.y=d.initial.y-(el.h-h)/2;}
     }
     else {
@@ -559,6 +563,12 @@ export class SlideDesigner {
     }
     const node = d.stage.querySelector('[data-object-id="' + CSS.escape(el.id) + '"]');
     Object.assign(node.style, { left: el.x + '%', top: el.y + '%', width: el.w + '%', height: el.h + '%' });
+    if (d.resize && el.type === 'image' && !el.imageFit) {
+      // Ao redimensionar com o mouse, a imagem acompanha a moldura: estica e
+      // achata junto, em vez de só dar zoom com faixas vazias ao lado.
+      el.imageFit = 'fill';
+      node.querySelector('img')?.style.setProperty('object-fit', 'fill');
+    }
     this.studio.markDirty();
   }
   up(event) {

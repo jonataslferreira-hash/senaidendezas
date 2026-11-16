@@ -36,17 +36,30 @@ export class Classroom {
   open() {
     return new Promise((resolve, reject) => {
       const timeout = setTimeout(() => { this.peer.destroy(); reject(Error('Não foi possível acessar a sinalização. Verifique a internet e tente outra rede.')); }, 15_000);
-      this.peer.once('open', () => { clearTimeout(timeout); this.onStatus('online'); resolve(); });
+      let opened = false;
+      const tryReconnect = () => {
+        if (this.stopped || this.peer.destroyed) return;
+        if (this.peer.disconnected) setTimeout(() => { if (!this.stopped && this.peer.disconnected && !this.peer.destroyed) this.peer.reconnect(); }, 1500);
+      };
+      this.peer.once('open', () => { opened = true; clearTimeout(timeout); this.onStatus('online'); resolve(); });
       this.peer.on('error', err => {
-        clearTimeout(timeout);
-        const text = err.type === 'unavailable-id' ? 'Esta sala ainda está conectada em outra aba. Feche a outra aba ou crie uma nova sala.' : err.type === 'peer-unavailable' ? 'Sala não encontrada ou apresentador desconectado. Confira o código.' : 'Falha de conexão. Verifique a internet; a rede pode bloquear WebRTC.';
-        this.onStatus('error', text); reject(Error(text));
+        if (!opened) {
+          clearTimeout(timeout);
+          const text = err.type === 'unavailable-id' ? 'Esta sala ainda está conectada em outra aba. Feche a outra aba ou crie uma nova sala.' : err.type === 'peer-unavailable' ? 'Sala não encontrada ou apresentador desconectado. Confira o código.' : 'Falha de conexão. Verifique a internet; a rede pode bloquear WebRTC.';
+          this.onStatus('error', text); reject(Error(text));
+          return;
+        }
+        // Depois de aberto, falhas transitórias não encerram a sala: a apresentação
+        // continua com quem está conectado e a sinalização reconecta sozinha.
+        if (this.stopped || this.peer.destroyed) return;
+        this.onStatus('reconnecting');
+        tryReconnect();
       });
       this.peer.on('disconnected', () => {
         this.onStatus('reconnecting');
-        if (!this.stopped && !this.peer.destroyed) setTimeout(() => { if (this.peer.disconnected && !this.peer.destroyed) this.peer.reconnect(); }, 1500);
+        tryReconnect();
       });
-      this.peer.on('open', () => this.onStatus('online'));
+      this.peer.on('open', () => { if (opened) this.onStatus('online'); });
     });
   }
   accept(conn) {

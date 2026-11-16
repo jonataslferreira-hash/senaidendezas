@@ -798,6 +798,18 @@ export function mountCatalogFluid({ page, canvas, existingSim = null }) {
   let destroyed = false;
 
   const pointers = new Map();
+  // Movimento automático: sem toque, o líquido continua fluindo sozinho,
+  // como uma lâmpada de lava em marcha lenta.
+  let lastInputAt = 0;
+  let nextAutoAt = 0;
+
+  function autoDrift(ts) {
+    if (ts - lastInputAt < 2600 || ts < nextAutoAt) return;
+    nextAutoAt = ts + 1400;
+    const t = ts / 1000;
+    sim.applyRipple(0.5 + 0.36 * Math.sin(t * 0.21), 0.5 + 0.3 * Math.cos(t * 0.16), 0.34);
+    sim.applyRipple(0.5 + 0.3 * Math.sin(t * 0.12 + 2.1), 0.48 + 0.32 * Math.sin(t * 0.18 + 1.2), 0.26);
+  }
 
   function syncCanvasSize() {
     const r = canvas.getBoundingClientRect();
@@ -840,6 +852,7 @@ export function mountCatalogFluid({ page, canvas, existingSim = null }) {
 
   function onPointerMove(event) {
     if (destroyed || isReducedMotion()) return;
+    lastInputAt = performance.now();
     const pos = toNormalized(event.clientX, event.clientY);
     const id = event.pointerId ?? 0;
     if (!pos) {
@@ -861,6 +874,7 @@ export function mountCatalogFluid({ page, canvas, existingSim = null }) {
 
   function onPointerDown(event) {
     if (destroyed || isReducedMotion()) return;
+    lastInputAt = performance.now();
     const pos = toNormalized(event.clientX, event.clientY);
     if (!pos) return;
     pointers.set(event.pointerId ?? 0, pos);
@@ -883,6 +897,8 @@ export function mountCatalogFluid({ page, canvas, existingSim = null }) {
     }
     const dt = lastTs ? (ts - lastTs) / 1000 : 1 / 60;
     lastTs = ts;
+    if (!lastInputAt) lastInputAt = ts;
+    autoDrift(ts);
     sim.step(dt);
     drawFrame();
     rafId = requestAnimationFrame(tick);
