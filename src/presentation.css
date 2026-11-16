@@ -34,3 +34,15 @@
 .presentation-quiz{display:none!important}#app.is-presenting .presentation-quiz{display:inline-flex!important}
 #app.is-presenting .lesson-layout>.model-panel>#viewer-slot{flex:1;min-height:0;display:flex;flex-direction:column}
 #app.is-presenting[data-qr-corner="tl"] .presentation-toolbar,#app.is-presenting[data-qr-corner="tr"] .presentation-toolbar{top:auto;bottom:14px}
+
+/* Abertura das etapas: cartela animada por cima da apresentação. */
+.stage-intro{position:fixed;inset:0;z-index:90;pointer-events:none;display:grid;place-items:center;background:radial-gradient(circle at 50% 42%,#1b1630e0,#0b0918f2 72%);animation:stage-intro-veil 2.1s ease forwards}
+.stage-intro-card{display:grid;justify-items:center;gap:12px;padding:36px 58px;border-radius:26px;border:1px solid #ffffff2e;background:#221b3de0;box-shadow:0 34px 90px #00000085;animation:stage-intro-card .75s cubic-bezier(.2,.9,.25,1.18) both}
+.stage-intro-icon{display:grid;place-items:center;width:94px;height:94px;border-radius:50%;color:#efe6ff;font-size:50px;background:radial-gradient(circle,#7950b4e0,#4c357f90);box-shadow:0 0 0 8px #7950b426,inset 0 0 24px #00000042;animation:stage-intro-pop 1s cubic-bezier(.2,.9,.3,1.35) both}
+.stage-intro-card strong{font-size:clamp(26px,4.6vw,46px);line-height:1.05;color:#fff;letter-spacing:.05em;text-transform:uppercase;text-shadow:0 6px 30px #0009;animation:stage-intro-text .85s ease both}
+.stage-intro-sub{font-size:14px;color:#cdbdf0;text-align:center;max-width:46ch;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;animation:stage-intro-text 1s ease both}
+@keyframes stage-intro-veil{0%{opacity:0}12%{opacity:1}70%{opacity:1}100%{opacity:0}}
+@keyframes stage-intro-card{0%{transform:scale(.55) translateY(26px);opacity:0;filter:blur(10px)}60%{filter:blur(0)}100%{transform:scale(1) translateY(0);opacity:1;filter:blur(0)}}
+@keyframes stage-intro-pop{0%{transform:scale(.2) rotate(-30deg);opacity:0}55%{transform:scale(1.18) rotate(4deg);opacity:1}100%{transform:scale(1) rotate(0)}}
+@keyframes stage-intro-text{0%{letter-spacing:.4em;opacity:0}100%{letter-spacing:.05em;opacity:1}}
+@media(prefers-reduced-motion:reduce){.stage-intro,.stage-intro-card,.stage-intro-icon,.stage-intro-card strong{animation:none}.stage-intro{background:#0b0918f2}}

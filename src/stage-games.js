@@ -22,7 +22,7 @@ export const gameHints = {
   tug: 'Dois lados respondem por rodadas; quem acerta mais puxa a corda',
   race: 'Cada acerto faz o boneco correr. Resposta rápida vai mais longe'
 };
-export const teamPalette = [['Azul', '#3b82f6'], ['Laranja', '#f97316'], ['Verde', '#22c55e'], ['Rosa', '#ec4899']];
+export const teamPalette = [['Azul', '#3b82f6'], ['Laranja', '#f97316'], ['Verde', '#22c55e'], ['Rosa', '#ec4899'], ['Roxo', '#a855f7'], ['Ciano', '#06b6d4'], ['Amarelo', '#eab308'], ['Vermelho', '#ef4444']];
 export const SURVIVAL_POINTS = 500;
 export const FLASH_POINTS = 500, CHALLENGE_FIRST = 500, CHALLENGE_POINTS = 300, TUG_POINTS = 200;
 export const TUG_ROUNDS = 12, TUG_VARIANTS = 3, TUG_QUESTIONS_PER_PLAYER = 3, TUG_HIT = 100, TUG_PULL_MS = 5800, TUG_BETWEEN_MS = 2200;
@@ -48,7 +48,7 @@ export function validateGame(game, draft = false, simulationIds = null) {
   if (game == null || typeof game !== 'object' || !isGameType(game.type)) return null;
   const result = { type: game.type, text: text(game.text, 300) };
   if (!draft && !result.text.trim()) throw Error('Escreva o enunciado da etapa "' + gameNames[game.type] + '".');
-  if (game.type === 'teams') { result.count = Math.max(2, Math.min(4, Math.floor(Number(game.count) || 2))); result.pick = Boolean(game.pick); }
+  if (game.type === 'teams') { result.count = Math.max(2, Math.min(8, Math.floor(Number(game.count) || 2))); result.pick = Boolean(game.pick); }
   const questionList = (label, source = game.questions, max = 25) => {
     const list = (Array.isArray(source) ? source : []).slice(0, max).filter(q => q && typeof q === 'object').map((q, index) => {
       const options = (Array.isArray(q.options) ? q.options : []).slice(0, 4).map(o => text(o, 200));
@@ -145,7 +145,7 @@ export function settleTeams(room) {
 }
 export function formTeams(room, count, random = Math.random) {
   const d = room.data;
-  d.teams = teamPalette.slice(0, Math.max(2, Math.min(4, count))).map(([name, color]) => ({ name, color }));
+  d.teams = teamPalette.slice(0, Math.max(2, Math.min(8, count))).map(([name, color]) => ({ name, color }));
   const players = [...d.players];
   for (let i = players.length - 1; i > 0; i--) { const j = Math.floor(random() * (i + 1)); [players[i], players[j]] = [players[j], players[i]]; }
   players.forEach((player, index) => { player.team = index % d.teams.length; });
@@ -155,7 +155,7 @@ export function teamScores(room) {
   if (!d.teams?.length) return null;
   return d.teams.map((team, index) => {
     const members = d.players.filter(p => p.team === index);
-    return { ...team, index, score: members.reduce((sum, p) => sum + (p.score || 0) + (p.bonus || 0), 0), members: members.map(p => ({ id: p.id, name: p.name, avatar: p.avatar, online: p.online })) };
+    return { ...team, index, score: members.reduce((sum, p) => sum + (p.score || 0) + (p.bonus || 0), 0), members: members.map(p => ({ id: p.id, name: p.name, avatar: p.avatar, online: p.online, leader: team.leader === p.id })) };
   });
 }
 
@@ -207,6 +207,16 @@ export function gameControl(room, value, random = Math.random) {
     game.state = 'done'; game.resultStartedAt = room.now(); return;
   }
   if (game.type === 'teams' && action === 'shuffle') { d.teamPick = false; formTeams(room, config.count, random); game.state = 'done'; return; }
+  if (game.type === 'teams' && action === 'team-rename') {
+    const team = d.teams?.[Number(value?.team)], name = String(value?.name || '').trim().slice(0, 24);
+    if (team && name) team.name = name;
+    return;
+  }
+  if (game.type === 'teams' && action === 'team-leader') {
+    const team = d.teams?.[Number(value?.team)], id = String(value?.player || '');
+    if (team && d.players.some(p => p.id === id && p.team === Number(value?.team))) team.leader = team.leader === id ? undefined : id;
+    return;
+  }
   if (game.type === 'tug' && action === 'next') {
     if (game.state === 'done' || game.state === 'pull') throw Error('Esta rodada já terminou.');
     if (game.state === 'ready') {
@@ -395,6 +405,19 @@ export function gameInput(room, playerId, payload) {
     return;
   }
   if (game.type === 'teams') {
+    const custom = payload.teamCustom;
+    if (custom && typeof custom === 'object') {
+      const index = Number(custom.team), team = d.teams?.[index];
+      if (!team) throw Error('Time não encontrado.');
+      if (team.leader !== player.id) throw Error('Só o líder do time pode mudar o nome e a foto.');
+      if (custom.name !== undefined) { const name = String(custom.name).trim().slice(0, 24); if (name) team.name = name; }
+      if (custom.photo !== undefined) {
+        const photo = String(custom.photo);
+        if (photo === '') delete team.photo;
+        else if (/^data:image\/(?:png|jpeg|webp);base64,/.test(photo) && photo.length <= 30000) team.photo = photo;
+      }
+      return;
+    }
     const team = payload.team;
     if (!d.teamPick || !Number.isInteger(team) || team < 0 || team >= (d.teams?.length || 0)) throw Error('Não dá para escolher o time agora.');
     player.team = team; return;

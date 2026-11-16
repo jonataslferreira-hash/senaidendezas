@@ -67,6 +67,8 @@ pronto com mais de 100 modelos 3D gratuitos, com busca e filtros por tema:
   os anos iniciais, alimentos para educação alimentar e máquinas de cerco
   (catapulta, trabuco) para história e física.
 
+Cada card mostra uma **prévia do modelo girando em 3D** (um GIF curto gerado no próprio navegador na primeira visualização e guardado em cache), para conferir antes de usar.
+
 Tudo sem cadastro, sem chave de API e sem custo — as fontes são o repositório
 oficial [NASA 3D Resources](https://github.com/nasa/NASA-3D-Resources)
 (domínio público) e coleções [Kenney](https://kenney.nl) licenciadas em CC0,
@@ -265,6 +267,10 @@ sua própria quota total de armazenamento. Se salvar falhar, a interface
 informa o problema e permite exportar o rascunho em JSON.
 
 ## Aula ao vivo e quiz
+
+- **Equipes:** até **8 times** (Azul, Laranja, Verde, Rosa, Roxo, Ciano, Amarelo e Vermelho). No telão, o professor toca no nome de um aluno para torná-lo **líder do time** — o líder pode trocar o **nome** e a **foto da equipe** pelo próprio celular, e as mudanças aparecem para todo mundo.
+- **Abertura das etapas:** cada etapa (equipes, jogos, enquete, quiz) entra com uma cartela animada e uma fanfarra curta estilo chiptune.
+- **Storage AI nas etapas:** nas etapas com perguntas (Relâmpago, Sobrevivência, Corrida e Cabo de guerra), o botão **Gerar perguntas com o Storage AI** escreve perguntas sobre o conteúdo real dos slides da aula.
 
 O professor coordena a sala no próprio navegador usando **PeerJS/WebRTC**.
 O GitHub Pages hospeda os arquivos; a sinalização pública PeerJS ajuda a
