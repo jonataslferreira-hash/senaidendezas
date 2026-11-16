@@ -1,5 +1,7 @@
 import {studioIcon} from './studio-icons.js';
 import { reconcileStageSafely, tagStageSources, setStageCache } from './stage-keep.js';
+import { SiteTour, shouldOfferTour } from './tour.js';
+import './tour.css';
 import { BUILTIN_MODELS, HARDWARE_MODEL_IDS, modelMeta } from './model-catalog.js';
 import {routeParams} from './editor-route.js';
 import {takePhoto} from './camera-photo.js';
@@ -212,6 +214,9 @@ const qrCache = new Map();
 const params = routeParams();
 let codeDraft = (params.get('s') || '').replace(/\D/g, '').slice(0, 6);
 const studio = new Studio(app, { render, toast, joinForm, preview, remoteAction:(name,value)=>{if(name==='sim')remoteInteract(value);else action(name);}, present: (lesson,startIndex,fromEditor) => connectSession({host:true,lesson,startIndex,fromEditor}) });
+const tour = new SiteTour(studio);
+document.addEventListener('start-tour', () => tour.start());
+queueMicrotask(() => { if (shouldOfferTour() && !state && studio.view === 'library') tour.offer(); });
 if (codeDraft) studio.view = 'join';
 
 function toast(message) {
@@ -454,18 +459,8 @@ let lastStudioView = null;
 function render() {
   const arrive = !state && !sharedLoading && !sharedError && !(busy && host) && lastStudioView !== null && lastStudioView !== studio.view;
   if (!state && arrive) app.dataset.viewArrive = '1'; else delete app.dataset.viewArrive;
-  const transition = arrive && !document.hidden && document.documentElement.dataset.motion !== 'reduced'
-    && !matchMedia('(prefers-reduced-motion: reduce)').matches && typeof document.startViewTransition === 'function';
-  const run = () => { applyRender(); lastStudioView = state ? null : studio.view; };
-  if (transition) {
-    try {
-      // Direção da puxada: avançar para outra visualização entra pela
-      // direita; voltar ao editor entra pela esquerda, como "voltar".
-      document.documentElement.dataset.viewDir = studio.view === 'editor' ? 'back' : 'fwd';
-      document.startViewTransition(run); return;
-    } catch { /* sem transição: aplica direto */ }
-  }
-  run();
+  applyRender();
+  lastStudioView = state ? null : studio.view;
 }
 function applyRender() {
   // Em sala ao vivo (slides, quiz e jogos) animações e transições definidas na aula sempre tocam, exceto se o usuário escolher "reduzido" no perfil.
