@@ -54,6 +54,7 @@ export class Account {
       else if (action === 'diagnostics') this.measurePerformance();
       else if (action === 'copy-diagnostics') navigator.clipboard.writeText(JSON.stringify(this.diagnostics,null,2)).catch(()=>{});
       else if (action === 'logout') this.logout();
+      else if (action === 'restart-tour') { this.close(); document.dispatchEvent(new CustomEvent('start-tour')); }
       else if (action === 'remove-photo') this.settings.removePhoto();
       else this.show(action === 'open' ? (this.user ? 'account' : 'login') : action);
     });
@@ -103,7 +104,7 @@ export class Account {
       ${password ? `<label for="account-password">${['recovery', 'password'].includes(mode) ? 'Nova senha' : 'Senha'}</label><input id="account-password" name="password" type="password" autocomplete="${mode === 'login' ? 'current-password' : 'new-password'}" ${mode === 'login' ? '' : 'minlength="8"'} maxlength="128" required ${this.busy ? 'disabled' : ''}>${mode !== 'login' ? '<small>Use pelo menos 8 caracteres.</small>' : ''}` : ''}
       ${mode === 'password' ? '<label for="account-password-confirm">Repita a nova senha</label><input id="account-password-confirm" name="password_confirm" type="password" autocomplete="new-password" minlength="8" maxlength="128" required>' : ''}
       ${this.error ? `<p class="account-error" role="alert">${esc(this.error)}</p>` : ''}${this.message ? `<p class="account-message" role="status">${esc(this.message)}</p>` : ''}
-      ${mode === 'account' ? '<button type="button" class="studio-btn quiet" data-account-action="logout">Sair da conta</button>' : `<button class="studio-btn accent" type="submit" ${this.busy||this.settings.photo.processing ? 'disabled' : ''}>${this.busy ? 'Aguarde…' : mode === 'profile' ? 'Salvar perfil' : labels[mode]}</button>`}
+      ${mode === 'account' ? '<div class="account-bottom-row"><button type="button" class="studio-btn quiet" data-account-action="restart-tour">✦ Rever tour</button><button type="button" class="studio-btn quiet" data-account-action="logout">Sair da conta</button></div>' : `<button class="studio-btn accent" type="submit" ${this.busy||this.settings.photo.processing ? 'disabled' : ''}>${this.busy ? 'Aguarde…' : mode === 'profile' ? 'Salvar perfil' : labels[mode]}</button>`}
       <footer>${mode === 'login' ? '<button type="button" data-account-action="signup">Criar conta</button><button type="button" data-account-action="forgot">Esqueci minha senha</button>' : ['signup', 'forgot'].includes(mode) ? '<button type="button" data-account-action="login">Voltar para entrar</button>' : mode === 'password' ? '<button type="button" data-account-action="account">← Minha conta</button>' : ''}</footer>
       </form></dialog>`;
   }

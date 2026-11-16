@@ -162,7 +162,14 @@ export class SiteTour {
     const highlight = this.nodes.querySelector('[data-tour-highlight]');
     const bubble = this.nodes.querySelector('[data-tour-bubble]');
     const mobile = matchMedia('(max-width: 740px)').matches;
-    if (!this.target) { highlight.style.display = 'none'; bubble.classList.toggle('sheet', mobile); return; }
+    bubble.style.left = bubble.style.top = '';
+    if (!this.target) {
+      highlight.style.display = 'none';
+      // Sem alvo (boas-vindas/despedida): flutuando no topo do celular,
+      // centralizada no desktop.
+      bubble.className = mobile ? 'tour-bubble float pos-top' : 'tour-bubble centered';
+      return;
+    }
     const pad = 8;
     const rect = this.target.getBoundingClientRect();
     highlight.style.display = 'block';
@@ -170,10 +177,16 @@ export class SiteTour {
       left: Math.max(6, rect.left - pad) + 'px', top: Math.max(6, rect.top - pad) + 'px',
       width: Math.min(innerWidth - 12, rect.width + pad * 2) + 'px', height: Math.min(innerHeight - 12, rect.height + pad * 2) + 'px',
     });
-    if (mobile) { bubble.classList.add('sheet'); return; }
-    bubble.classList.remove('sheet');
+    if (mobile) {
+      // Bolha flutuante compacta no canto OPOSTO ao elemento destacado:
+      // a Kuro nunca tampa o que está sendo explicado.
+      const below = rect.top < innerHeight * .5;
+      const right = rect.left + rect.width / 2 < innerWidth / 2;
+      bubble.className = 'tour-bubble float ' + (below ? 'pos-bottom' : 'pos-top') + (right ? ' side-right' : ' side-left');
+      return;
+    }
     const space = rect.top > innerHeight * .55 ? 'above' : 'below';
-    bubble.classList.toggle('above', space === 'above');
+    bubble.className = 'tour-bubble' + (space === 'above' ? ' above' : '');
     const left = Math.min(Math.max(12, rect.left + rect.width / 2 - 170), innerWidth - 352);
     bubble.style.left = left + 'px';
     bubble.style.top = space === 'above' ? Math.max(12, rect.top - 16 - 210) + 'px' : Math.min(innerHeight - 230, rect.bottom + 16) + 'px';

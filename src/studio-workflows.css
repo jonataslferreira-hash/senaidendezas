@@ -1,4 +1,14 @@
 .library-actions{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+/* Celular: ações da biblioteca lado a lado em uma única linha (texto curto,
+   tamanho normal; sem quebrar o resto). */
+@media(max-width:600px){
+  .library-section-title .library-actions{display:flex;flex-wrap:nowrap;gap:6px;width:100%}
+  .library-section-title .library-actions .studio-btn{flex:1 1 0;min-width:0;display:inline-flex;align-items:center;justify-content:center;gap:6px;white-space:nowrap;overflow:hidden}
+  .library-section-title .library-actions .studio-btn>span{min-width:0;overflow:hidden;text-overflow:ellipsis}
+  .library-section-title .library-actions .editor-icon{flex:0 0 auto}
+}
+.account-bottom-row{display:flex;gap:8px;align-items:center;justify-content:space-between}
+.account-bottom-row .studio-btn{min-width:0}
 #app .studio-btn.storage-ai-primary,.storage-ai-primary{
   display:inline-flex;align-items:center;justify-content:center;gap:8px;
   background:#1b202b!important;color:#ffffff!important;
