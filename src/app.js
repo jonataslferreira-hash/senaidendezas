@@ -338,12 +338,50 @@ function shareDialog() {
 // conteúdo dele não mudou, o quadro do slide fica onde está e só o resto é trocado.
 const LIVE_SLIDE = '.canvas-frame.canvas-presenting';
 let liveSlide = null;
+// Palco do editor preservado entre renders: evita que salvar ou abrir
+// diálogos reconstruam o canvas (imagens, modelos 3D e simulações piscando).
+let editorStage = null;
 function keepLiveSlide(markup, key) {
   const old = liveSlide?.node;
   if (!key || liveSlide?.key !== key || !old?.isConnected || app.querySelector(LIVE_SLIDE) !== old || !old.querySelector('iframe,video,audio,[data-simulation],[data-canvas-model]')) return false;
   const next = document.createElement('template'); next.innerHTML = markup;
   const fresh = next.content.querySelector(LIVE_SLIDE);
   if (!fresh || fresh.outerHTML !== liveSlide.html) return false;
+  const chain = (node, top) => { const list = []; for (let item = node; item && item !== top; item = item.parentNode) list.unshift(item); return list; };
+  const oldChain = chain(old, app), newChain = chain(fresh, next.content);
+  if (oldChain.length !== newChain.length || oldChain.some((node, index) => node.tagName !== newChain[index].tagName)) return false;
+  let oldParent = app, newParent = next.content;
+  oldChain.forEach((keep, index) => {
+    const incoming = newChain[index];
+    for (const child of [...oldParent.childNodes]) if (child !== keep) child.remove();
+    let before = true;
+    for (const child of [...newParent.childNodes]) {
+      if (child === incoming) { before = false; continue; }
+      if (before) oldParent.insertBefore(child, keep); else oldParent.append(child);
+    }
+    if (keep !== old) {
+      for (const name of keep.getAttributeNames()) if (!incoming.hasAttribute(name)) keep.removeAttribute(name);
+      for (const name of incoming.getAttributeNames()) if (keep.getAttribute(name) !== incoming.getAttribute(name)) keep.setAttribute(name, incoming.getAttribute(name));
+    }
+    oldParent = keep; newParent = incoming;
+  });
+  return true;
+}
+function keepChatEditorStage(content) {
+  const old = editorStage?.node;
+  if (state || !old?.isConnected || app.querySelector('.designer-stage-wrap') !== old) return;
+  if (!old.querySelector('img,[data-simulation],[data-canvas-model],iframe,video')) return;
+  const fresh = content.querySelector('.designer-stage-wrap');
+  if (fresh && fresh.outerHTML === editorStage.html) fresh.replaceWith(old);
+}
+function keepEditorStage(markup) {
+  const old = editorStage?.node;
+  if (state || sharedLoading || sharedError || busy && host) return false;
+  if (!old?.isConnected || app.querySelector('.designer-stage-wrap') !== old) return false;
+  if (!old.querySelector('img,[data-simulation],[data-canvas-model],iframe,video')) return false;
+  const next = document.createElement('template'); next.innerHTML = markup;
+  const fresh = next.content.querySelector('.designer-stage-wrap');
+  if (!fresh || fresh.outerHTML !== editorStage.html) return false;
   const chain = (node, top) => { const list = []; for (let item = node; item && item !== top; item = item.parentNode) list.unshift(item); return list; };
   const oldChain = chain(old, app), newChain = chain(fresh, next.content);
   if (oldChain.length !== newChain.length || oldChain.some((node, index) => node.tagName !== newChain[index].tagName)) return false;
@@ -435,16 +473,21 @@ function render() {
     const next = document.createElement('template');
     next.innerHTML = markup;
     next.content.querySelectorAll(chatSlots).forEach(slot=>slot.remove());
+    keepChatEditorStage(next.content);
     for (const child of [...app.children]) if (!child.matches(chatSlots)) child.remove();
     app.prepend(next.content);
     studio.chat.paint();
     studio.social.paint();
   } else if (keepGame(app, markup, state)) {
     liveSlide = null;
+  } else if (keepEditorStage(markup)) {
+    liveSlide = null;
   } else if (!keepLiveSlide(markup, slideMotionKey)) {
     app.innerHTML = markup;
     const frame = slideMotionKey ? app.querySelector(LIVE_SLIDE) : null;
     liveSlide = frame ? { key: slideMotionKey, node: frame, html: frame.outerHTML } : null;
+    const stageFrame = !state ? app.querySelector('.designer-stage-wrap') : null;
+    editorStage = stageFrame ? { node: stageFrame, html: stageFrame.outerHTML } : null;
   }
   if (state?.phase === 'lesson') {
     app.insertAdjacentHTML('beforeend', pinnedInvite({ host, demo, state, settings: presenterSettings }));
