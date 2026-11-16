@@ -4,6 +4,34 @@
 // A escolha de ver (ou pular) o tour fica salva: não enche o saco de novo.
 // (O CSS do tour é importado pelo app.js — aqui o módulo fica puro para testes.)
 
+// Trilha do tour, hospedada pelo usuário (catbox) — toca baixinha e em slow.
+const TOUR_THEME_URL = 'https://files.catbox.moe/ox6yi0.mp3';
+
+// Mascote Kuro em SVG por partes: orelhas, olhos, boca e braço são elementos
+// separados, cada um com sua animação (CSS em tour.css). A boca ganha vida
+// quando a narração está tocando (classe "talking").
+export const kuroMascot = `<svg class="kuro" viewBox="0 0 120 120" aria-hidden="true">
+  <ellipse class="kuro-body" cx="60" cy="96" rx="21" ry="15" fill="#ffffff" stroke="#8d6bb8" stroke-width="2.5"/>
+  <g class="kuro-arm"><ellipse cx="86" cy="92" rx="6.5" ry="10" fill="#ffffff" stroke="#8d6bb8" stroke-width="2.5"/></g>
+  <g class="kuro-head">
+    <g class="kuro-ear kuro-ear-l"><rect x="32" y="8" width="15" height="36" rx="7.5" fill="#cdb4f6" stroke="#8d6bb8" stroke-width="2.5"/></g>
+    <g class="kuro-ear kuro-ear-r"><rect x="73" y="8" width="15" height="36" rx="7.5" fill="#cdb4f6" stroke="#8d6bb8" stroke-width="2.5"/></g>
+    <circle cx="60" cy="58" r="34" fill="#cdb4f6" stroke="#8d6bb8" stroke-width="2.5"/>
+    <g class="kuro-skull"><circle cx="60" cy="35" r="6.5" fill="#f5c0dd"/><circle cx="57.4" cy="34.4" r="1.3" fill="#7c5aa8"/><circle cx="62.6" cy="34.4" r="1.3" fill="#7c5aa8"/></g>
+    <ellipse cx="60" cy="67" rx="23" ry="19" fill="#ffffff"/>
+    <g class="kuro-eyes">
+      <ellipse cx="51" cy="64" rx="4.2" ry="5.6" fill="#b9529e"/><circle cx="52.3" cy="62.2" r="1.4" fill="#ffffff"/>
+      <ellipse cx="69" cy="64" rx="4.2" ry="5.6" fill="#b9529e"/><circle cx="70.3" cy="62.2" r="1.4" fill="#ffffff"/>
+    </g>
+    <ellipse cx="42" cy="72" rx="4.5" ry="2.8" fill="#f7c9e4"/><ellipse cx="78" cy="72" rx="4.5" ry="2.8" fill="#f7c9e4"/>
+    <g class="kuro-mouth">
+      <path class="kuro-smile" d="M52 74 Q60 81 68 74" fill="none" stroke="#a3568f" stroke-width="2.6" stroke-linecap="round"/>
+      <path d="M63.5 76.5 l2.8 4.2 l2.8 -4.2 z" fill="#ffffff" stroke="#cfa9e0" stroke-width="1"/>
+      <ellipse class="kuro-mouth-open" cx="60" cy="77" rx="5" ry="4" fill="#7c3f6b"/>
+    </g>
+  </g>
+</svg>`;
+
 export const TOUR_STORAGE_KEY = 'sl-tour';
 
 export function shouldOfferTour(storage = localStorage) {
@@ -75,7 +103,7 @@ export class SiteTour {
       <div class="tour-highlight" data-tour-highlight></div>
       <div class="tour-bubble" role="dialog" aria-label="Tour do Storage Lab" data-tour-bubble>
         <div class="tour-mascot-row">
-          <img class="tour-mascot" src="/tour-mascot.png" alt="" width="56" height="56">
+          <span class="tour-mascot" aria-hidden="true">${kuroMascot}</span>
           <div class="tour-heading"><strong data-tour-title></strong><span class="tour-guide">Kuro · guia do Storage Lab</span></div>
           <button type="button" class="tour-sound" data-tour-sound aria-label="Ativar ou silenciar a voz" title="Ativar ou silenciar a voz">🔊</button>
         </div>
@@ -160,7 +188,7 @@ export class SiteTour {
   startMusic() {
     if (this.music) return;
     try {
-      const audio = new Audio('/tour-theme.mp3');
+      const audio = new Audio(TOUR_THEME_URL);
       audio.loop = true;
       audio.volume = 0.2;      // baixinho de fundo
       audio.playbackRate = 0.92; // em slow, como pedido
@@ -174,11 +202,16 @@ export class SiteTour {
     try {
       const clip = new Audio(`/tour/step-${String(index + 1).padStart(2, '0')}.mp3`);
       clip.volume = 0.9;
-      clip.play().catch(() => {});
       this.voice = clip;
+      clip.play().then(() => {
+        const mascot = this.nodes?.querySelector('.kuro');
+        if (!mascot) return;
+        mascot.classList.add('talking');
+        clip.onended = () => mascot.classList.remove('talking');
+      }).catch(() => {});
     } catch { /* sem voz nesta etapa */ }
   }
-  stopVoice() { if (this.voice) { this.voice.pause(); this.voice = null; } }
+  stopVoice() { if (this.voice) { this.voice.onended = null; this.voice.pause(); this.voice = null; } this.nodes?.querySelector('.kuro')?.classList.remove('talking'); }
 
   stop(reason = 'done') {
     markTourSeen(undefined, reason);

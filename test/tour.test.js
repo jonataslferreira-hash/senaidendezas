@@ -1,7 +1,7 @@
 // Tour de boas-vindas: persistência da escolha e forma das etapas.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { shouldOfferTour, markTourSeen, tourSteps, TOUR_STORAGE_KEY } from '../src/tour.js';
+import { shouldOfferTour, markTourSeen, tourSteps, TOUR_STORAGE_KEY, kuroMascot } from '../src/tour.js';
 
 const storage = () => { const data = new Map(); return { getItem: k => data.get(k) ?? null, setItem: (k, v) => data.set(k, v), data }; };
 
@@ -33,4 +33,11 @@ test('etapas cobrem as abas da tela inicial', () => {
   const targets = tourSteps.map(s => s.target || '').join(' ');
   for (const expected of ['[data-library-grid]', '.create-import-card', '.storage-ai-primary', '#join-form', '.shared-library'])
     assert.ok(targets.includes(expected), `cobre ${expected}`);
+});
+
+test('mascote Kuro é um SVG com partes separadas e animáveis', () => {
+  assert.ok(kuroMascot.includes('<svg'), 'é SVG');
+  for (const part of ['kuro-ear-l', 'kuro-ear-r', 'kuro-eyes', 'kuro-mouth', 'kuro-mouth-open', 'kuro-arm', 'kuro-head'])
+    assert.ok(kuroMascot.includes(part), `parte ${part} presente e nomeada`);
+  assert.ok(!kuroMascot.includes('<img'), 'vetor, não imagem raster');
 });
