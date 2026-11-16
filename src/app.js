@@ -454,7 +454,9 @@ let lastStudioView = null;
 function render() {
   const arrive = !state && !sharedLoading && !sharedError && !(busy && host) && lastStudioView !== null && lastStudioView !== studio.view;
   if (!state && arrive) app.dataset.viewArrive = '1'; else delete app.dataset.viewArrive;
-  const transition = arrive && !document.hidden && document.documentElement.dataset.motion !== 'reduced'
+  // A puxada só ao entrar no editor (o "voltar"); trocar para qualquer outra
+  // visualização é instantâneo — animar abas deixou a entrada estranha.
+  const transition = arrive && studio.view === 'editor' && !document.hidden && document.documentElement.dataset.motion !== 'reduced'
     && !matchMedia('(prefers-reduced-motion: reduce)').matches && typeof document.startViewTransition === 'function';
   const run = () => { applyRender(); lastStudioView = state ? null : studio.view; };
   if (transition) {
