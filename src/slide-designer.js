@@ -535,7 +535,10 @@ export class SlideDesigner {
       // Imagem: por padrão a proporção original fica travada; Shift (ou o botão
       // da barra de ações) libera o esticar/achatar livre da moldura.
       if (el.type === 'image' && this.ratioLock !== event.shiftKey) {
-        const scale = Math.max(.02, ((w + dx) / w + (h + dy) / h) / 2);
+        // O eixo dominante do arraste manda na escala: o canto da imagem
+        // acompanha o mouse em vez de crescer pela metade da velocidade.
+        const sx = (w + dx) / w, sy = (h + dy) / h;
+        const scale = Math.abs(sx - 1) >= Math.abs(sy - 1) ? sx : sy;
         el.w = Math.max(minimum, Math.min(1000, w * scale));
         el.h = Math.max(minimum, Math.min(1000, h * scale));
       } else {
@@ -569,7 +572,7 @@ export class SlideDesigner {
     }
     const node = d.stage.querySelector('[data-object-id="' + CSS.escape(el.id) + '"]');
     Object.assign(node.style, { left: el.x + '%', top: el.y + '%', width: el.w + '%', height: el.h + '%' });
-    if (d.resize && el.type === 'image' && !el.imageFit) {
+    if (d.resize && el.type === 'image' && (!el.imageFit || el.imageFit === 'contain')) {
       // Ao redimensionar com o mouse, a imagem acompanha a moldura: estica e
       // achata junto, em vez de só dar zoom com faixas vazias ao lado.
       el.imageFit = 'fill';

@@ -106,7 +106,7 @@ export class LiveDocument {
     if(!this.current())return;
     if(this.studio.designer.drag || this.studio.designer.cropPointers?.size || this.composing){clearTimeout(this.queueTimer);this.queueTimer=setTimeout(()=>this.drain(),60);return;}
     await this.ensurePortable();if(!this.current())return;this.flush();const caret=this.captureCaret();
-    try{for(const data of this.queue.splice(0))Y.applyUpdate(this.doc,decode(data),'remote');this.project(caret);}
+    try{const queued=this.queue.splice(0);for(const data of queued)Y.applyUpdate(this.doc,decode(data),'remote');if(queued.length)this.project(caret);}
     catch{this.status='Uma alteração não pôde ser aplicada. Recarregue a aula do grupo.';this.paint();}
   }
   captureCaret(){
@@ -161,7 +161,7 @@ export class LiveDocument {
     clearTimeout(this.saveTimer);await this.ensurePortable();this.flush();
     for(let attempt=0;attempt<4;attempt++){
       if(!this.current())throw Error('A conta mudou.');
-      if(await this.syncRemote()){this.mirrorLibrary();this.savedVersion=this.version;this.studio.dirty=false;this.status='Salvo no grupo';this.paint();return;}
+      if(await this.syncRemote(true)){this.mirrorLibrary();this.savedVersion=this.version;this.studio.dirty=false;this.status='Salvo no grupo';this.paint();return;}
       validateLesson(readLesson(this.doc),{draft:true});const version=this.version;
       const revision=await putSnapshot(this.client,this.row.group_id,{format:'sl-yjs-v1',state:encode(Y.encodeStateAsUpdate(this.doc))});
       if(!this.current())throw Error('A conta mudou.');
