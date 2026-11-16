@@ -1,4 +1,5 @@
 import { createUuid } from './uuid.js';
+import { stageCache } from './stage-keep.js';
 import {avatarContent} from './player-avatar.js';
 import {StorageAI} from './storage-ai.js';
 import {cropLessonCover,projectFields} from './lesson-cover.js';
@@ -935,7 +936,7 @@ export class Studio {
       this.root.querySelector('#rename-lesson').value=this.dialog.form.title;
       this.root.querySelector('#rename-description').value=this.dialog.form.description;
     }
-    if (this.view === 'editor' && this.tab === 'slides') this.designer.afterRender(); else this.designer.models.mount(null, null);
+    if (this.view === 'editor' && this.tab === 'slides') this.designer.afterRender(); else if (!stageCache()?.node) this.designer.models.mount(null, null); // palco em cache: modelos 3D ficam vivos para reanexo
     this.stages.afterRender();
     this.designer.simulations.mountStatic(this.root);
     const slot = this.root.querySelector('.native-model-preview');

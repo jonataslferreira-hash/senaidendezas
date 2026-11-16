@@ -1,5 +1,5 @@
 import {studioIcon} from './studio-icons.js';
-import { reconcileCanvas, tagStageSources } from './stage-keep.js';
+import { reconcileCanvas, tagStageSources, setStageCache } from './stage-keep.js';
 import { BUILTIN_MODELS, HARDWARE_MODEL_IDS, modelMeta } from './model-catalog.js';
 import {routeParams} from './editor-route.js';
 import {takePhoto} from './camera-photo.js';
@@ -418,6 +418,7 @@ function keepEditorStage(markup) {
   if (freshList) oldList ? oldList.replaceWith(freshList) : old.append(freshList);
   else oldList?.remove();
   editorStage = { node: old, html: freshHtml };
+  setStageCache(editorStage);
   return true;
 }
 // Abertura das etapas: cartela animada com o nome da etapa e fanfarra curta.
@@ -510,7 +511,8 @@ function render() {
       // se o palco guardado continua igual, reanexa em vez de remontar.
       if (editorStage?.node && !editorStage.node.isConnected && editorStage.html === stageFrame.outerHTML) stageFrame.replaceWith(editorStage.node);
       else { tagStageSources(stageFrame); editorStage = { node: stageFrame, html: stageFrame.outerHTML }; }
-    }
+      setStageCache(editorStage);
+    } else if (!state) { editorStage = null; setStageCache(null); }
   }
   if (state?.phase === 'lesson') {
     app.insertAdjacentHTML('beforeend', pinnedInvite({ host, demo, state, settings: presenterSettings }));

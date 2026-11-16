@@ -8,8 +8,19 @@
 // markup novo é imune a essas mutações.
 const sourceMarkup = new WeakMap();
 
+// Atributos que mudam a cada interação (seleção, modo de recorte) e não podem
+// contar como "objeto mudou": senão toda seleção remontaria o elemento.
+const VOLATILE = / data-(?:selected|interacting|cropping)="[^"]*"/g;
+const cleanMarkup = node => node.outerHTML.replace(VOLATILE, '');
+
+// Palco guardado para reanexo. O studio consulta para não descartar modelos 3D
+// vivos quando a edição só sai da tela por um momento (Storage AI, biblioteca).
+let cachedStage = null;
+export function stageCache() { return cachedStage; }
+export function setStageCache(entry) { cachedStage = entry; }
+
 export function tagStageSources(scope) {
-  for (const node of scope.querySelectorAll('[data-object-id]')) sourceMarkup.set(node, node.outerHTML);
+  for (const node of scope.querySelectorAll('[data-object-id]')) sourceMarkup.set(node, cleanMarkup(node));
 }
 
 export function reconcileCanvas(currentFrame, freshFrame) {
@@ -25,9 +36,17 @@ export function reconcileCanvas(currentFrame, freshFrame) {
   const byId = new Map([...curCanvas.children].filter(isObject).map(node => [node.dataset.objectId, node]));
   for (const fresh of freshObjects) {
     const id = fresh.dataset.objectId, cur = byId.get(id);
-    if (cur && sourceMarkup.get(cur) === fresh.outerHTML) continue; // idêntico: mantém o nó vivo
-    sourceMarkup.set(fresh, fresh.outerHTML);
+    if (cur && sourceMarkup.get(cur) === cleanMarkup(fresh)) {
+      // Idêntico: mantém o nó vivo e só sincroniza os atributos voláteis.
+      for (const name of ['data-selected', 'data-interacting', 'data-cropping']) {
+        const value = fresh.getAttribute(name);
+        if (value === null) cur.removeAttribute(name); else cur.setAttribute(name, value);
+      }
+      continue;
+    }
+    sourceMarkup.set(fresh, cleanMarkup(fresh));
     if (cur) cur.replaceWith(fresh); // mudou: troca só este objeto
+    else curCanvas.append(fresh); // objeto novo entra no palco
     byId.delete(id);
   }
   for (const leftover of byId.values()) leftover.remove(); // objetos removidos
