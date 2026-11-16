@@ -225,14 +225,17 @@ dialog.simulation-modal .simulation-modal-stage > .simulation-widget > .simulati
 dialog.simulation-modal .simulation-modal-stage > .simulation-widget > .simulation-challenge { grid-area: challenge; }
 dialog.simulation-modal .simulation-modal-stage > .simulation-widget > [data-sim-play] { grid-area: play; }
 dialog.simulation-modal .simulation-modal-stage > .simulation-widget > small { grid-area: note; }
-/* Controle compacto: − [barra] + na mesma linha do valor. */
-dialog.simulation-modal .simulation-controls label:has(> .simulation-adj) { grid-template-columns: auto minmax(0, 1fr) auto; gap: 4px 8px; }
-dialog.simulation-modal .simulation-controls label:has(> .simulation-adj) > output { grid-column: 3; grid-row: 1; }
-dialog.simulation-modal .simulation-controls label > .simulation-adj { display: contents; }
-dialog.simulation-modal .simulation-controls label > .simulation-adj button { grid-row: 2; min-height: 28px; width: 30px; padding: 0; }
-dialog.simulation-modal .simulation-controls label > .simulation-adj button:first-child { grid-column: 1; }
-dialog.simulation-modal .simulation-controls label > .simulation-adj button:last-child { grid-column: 3; }
-dialog.simulation-modal .simulation-controls label > input[type=range] { grid-column: 2; grid-row: 2; align-self: center; }
+/* Controle compacto: nome + valor na linha 1; barra + botões −/+ na linha 2. */
+dialog.simulation-modal .simulation-controls label:has(> input[type=range]) {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 4px 8px;
+}
+dialog.simulation-modal .simulation-controls label:has(> input[type=range]) > output { grid-column: 2; grid-row: 1; }
+dialog.simulation-modal .simulation-controls label:has(> input[type=range]) > input[type=range] { grid-column: 1; grid-row: 2; width: 100%; min-width: 0; margin: 0; align-self: center; }
+dialog.simulation-modal .simulation-controls label:has(> input[type=range]) > .simulation-adj { grid-column: 2; grid-row: 2; display: flex; gap: 5px; }
+dialog.simulation-modal .simulation-controls label > .simulation-adj button { min-height: 28px; width: 28px; min-width: 28px; padding: 0; }
 .simulation-widget .simulation-controls label.simulation-text { display: grid; grid-template-columns: minmax(0, 1fr); gap: 4px; }
 .simulation-widget .simulation-controls label.simulation-text > textarea { grid-column: 1; }
 .simulation-widget .simulation-text textarea {
@@ -242,18 +245,6 @@ dialog.simulation-modal .simulation-controls label > input[type=range] { grid-co
 dialog.simulation-modal .simulation-text textarea { min-height: 96px; font-size: 13px; }
 .slide-canvas .simulation-widget .simulation-text textarea { padding: .4cqw .6cqw; border-radius: .5cqw; font-size: .95cqw; }
 .simulation-widget [data-sim-play][aria-pressed=true] { background: #7dd3fc; color: #082f49; }
-@media (max-width: 760px) {
-  dialog.simulation-modal[open] { height: 94dvh; }
-  dialog.simulation-modal .simulation-modal-body { grid-template-columns: 1fr; grid-template-rows: auto minmax(0, 1fr); overflow: auto; }
-  dialog.simulation-modal .simulation-modal-catalog { order: -1; border-right: 0; border-bottom: 1px solid var(--ui-line); }
-  dialog.simulation-modal .simulation-modal-select-wrap { display: grid; }
-  dialog.simulation-modal .simulation-modal-filters { display: none; }
-  dialog.simulation-modal .simulation-modal-stage { overflow: auto; }
-  dialog.simulation-modal .simulation-modal-stage > .simulation-widget {
-    display: flex; height: auto; overflow: visible;
-  }
-  dialog.simulation-modal .simulation-modal-stage > .simulation-widget > svg { height: auto; min-height: 180px; }
-}
 
 /* Os menus do cabeçalho (Baixar, Salvar, Compartilhar) abriam atrás do palco. */
 #app .editor-shell .editor-heading { position: relative; z-index: 42; }
@@ -2730,6 +2721,203 @@ dialog.storage-image-search.image-replacement .image-inline-search button svg{wi
   #app .grand-finale .place-1 .final-tower{height:clamp(76px,17dvh,132px)}
   #app .grand-finale .place-3 .final-tower{height:clamp(42px,10dvh,78px)}
 }
+
+/* 44. Laboratório de simulações no celular: compacto, sem rolagem e sem controles esmagados */
+@media (max-width: 760px) {
+  dialog.simulation-modal[open] {
+    width: min(calc(100vw - 12px), 540px);
+    height: 96dvh;
+    max-height: 96dvh;
+    border-radius: 16px;
+  }
+  dialog.simulation-modal .simulation-modal-head { padding: 8px 12px; gap: 8px; }
+  dialog.simulation-modal .simulation-modal-head h2 { font-size: 16px; line-height: 1.15; }
+  dialog.simulation-modal .simulation-modal-head button { width: 30px; height: 30px; min-height: 30px; }
+  dialog.simulation-modal .simulation-modal-body {
+    grid-template-columns: 1fr;
+    grid-template-rows: auto minmax(0, 1fr);
+    overflow: hidden;
+  }
+  dialog.simulation-modal .simulation-modal-catalog {
+    order: -1;
+    border-right: 0;
+    border-bottom: 1px solid var(--ui-line);
+    padding: 6px 10px;
+    gap: 5px;
+  }
+  dialog.simulation-modal .simulation-modal-select-wrap {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr);
+    align-items: center;
+    gap: 8px;
+  }
+  dialog.simulation-modal .simulation-modal-select-wrap span { font-size: 11px; white-space: nowrap; }
+  dialog.simulation-modal .simulation-modal-select { min-height: 34px; padding: 4px 8px; font-size: 12.5px; }
+  dialog.simulation-modal .simulation-modal-filters,
+  dialog.simulation-modal .simulation-modal-catalog > .simulation-modal-list { display: none; }
+  dialog.simulation-modal .simulation-modal-import { padding-top: 2px; border-top: 0; gap: 4px; }
+  dialog.simulation-modal .simulation-modal-import-row { gap: 6px; }
+  dialog.simulation-modal .simulation-modal-import-row button {
+    min-height: 30px;
+    height: auto;
+    padding: 4px 6px;
+    font-size: 10.5px;
+  }
+  dialog.simulation-modal .simulation-modal-stage {
+    padding: 8px 10px;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+  }
+  dialog.simulation-modal .simulation-modal-stage > .simulation-widget {
+    display: flex;
+    flex-direction: column;
+    flex: 1 1 0;
+    height: 100%;
+    min-height: 0;
+    overflow: hidden;
+    padding: 9px 10px;
+    gap: 6px;
+    border-radius: 13px;
+  }
+  dialog.simulation-modal .simulation-modal-stage > .simulation-widget > header {
+    flex: none;
+    font-size: 12px;
+    line-height: 1.15;
+    gap: 6px;
+  }
+  dialog.simulation-modal .simulation-modal-stage > .simulation-widget > header > span {
+    font-size: 9px;
+    padding: 2px 6px;
+  }
+  dialog.simulation-modal .simulation-modal-stage > .simulation-widget > svg {
+    flex: 1 1 0;
+    width: 100%;
+    height: 100%;
+    min-height: 108px;
+    max-height: 205px;
+  }
+  dialog.simulation-modal .simulation-modal-stage > .simulation-widget > .simulation-controls {
+    flex: 0 0 auto;
+    min-height: max-content;
+    overflow: visible;
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 5px 8px;
+    align-items: end;
+  }
+  dialog.simulation-modal .simulation-modal-stage > .simulation-widget > .simulation-controls > label {
+    min-width: 0;
+    font-size: 10.5px;
+    line-height: 1.15;
+    gap: 2px 5px;
+  }
+  dialog.simulation-modal .simulation-modal-stage > .simulation-widget > .simulation-controls > label:only-child,
+  dialog.simulation-modal .simulation-modal-stage > .simulation-widget > .simulation-controls > label:nth-child(3):last-child,
+  dialog.simulation-modal .simulation-modal-stage > .simulation-widget > .simulation-controls > .simulation-actions,
+  dialog.simulation-modal .simulation-modal-stage > .simulation-widget > .simulation-controls > .simulation-toggles,
+  dialog.simulation-modal .simulation-modal-stage > .simulation-widget > .simulation-controls > label.simulation-text {
+    grid-column: 1 / -1;
+  }
+  dialog.simulation-modal .simulation-modal-stage > .simulation-widget > .simulation-controls label:has(> input[type=range]) {
+    gap: 2px 4px;
+  }
+  dialog.simulation-modal .simulation-modal-stage > .simulation-widget > .simulation-controls label > output {
+    font-size: 10.5px;
+    white-space: nowrap;
+  }
+  dialog.simulation-modal .simulation-modal-stage > .simulation-widget > .simulation-controls label:has(> input[type=range]) > .simulation-adj {
+    gap: 3px;
+  }
+  dialog.simulation-modal .simulation-modal-stage > .simulation-widget > .simulation-controls label > .simulation-adj button {
+    width: 22px;
+    min-width: 22px;
+    min-height: 22px;
+    height: 22px;
+    border-radius: 6px;
+    font-size: 13px;
+  }
+  dialog.simulation-modal .simulation-modal-stage > .simulation-widget > .simulation-controls select {
+    margin-top: 2px;
+    padding: 3px 6px;
+    min-height: 28px;
+    font-size: 11px;
+  }
+  dialog.simulation-modal .simulation-modal-stage > .simulation-widget > .simulation-controls .simulation-actions {
+    gap: 4px;
+  }
+  dialog.simulation-modal .simulation-modal-stage > .simulation-widget > .simulation-controls .simulation-actions > span {
+    font-size: 10px;
+  }
+  dialog.simulation-modal .simulation-modal-stage > .simulation-widget > .simulation-controls .simulation-actions button {
+    min-height: 25px;
+    padding: 3px 6px;
+    font-size: 10.5px;
+    border-radius: 7px;
+  }
+  dialog.simulation-modal .simulation-modal-stage > .simulation-widget > .simulation-result {
+    flex: none;
+    margin: 0;
+    font-size: 11px;
+    line-height: 1.26;
+  }
+  dialog.simulation-modal .simulation-modal-stage > .simulation-widget > [data-sim-play] {
+    flex: none;
+    min-height: 31px;
+    padding: 4px 10px;
+    font-size: 11.5px;
+    font-weight: 650;
+  }
+  dialog.simulation-modal .simulation-modal-stage > .simulation-widget > small {
+    flex: none;
+    font-size: 9.5px;
+    line-height: 1.2;
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+    overflow: hidden;
+  }
+  dialog.simulation-modal .simulation-modal-foot {
+    padding: 7px 10px;
+    gap: 6px;
+  }
+  dialog.simulation-modal .simulation-modal-current { display: none; }
+  dialog.simulation-modal .simulation-modal-actions {
+    width: 100%;
+    display: grid;
+    grid-template-columns: 1fr 1.35fr;
+    gap: 8px;
+  }
+  dialog.simulation-modal .simulation-modal-actions button {
+    min-height: 36px;
+    padding: 6px 10px;
+    font-size: 12.5px;
+  }
+  dialog.simulation-modal .simulation-modal-custom > .simulation-widget { min-height: 0; }
+  /* Simulações fora do modal no celular (slide/aula do aluno) */
+  .mobile-lesson-content > .simulation-widget { min-height: 0; padding: 10px; gap: 6px; overflow: hidden; }
+  .mobile-lesson-content > .simulation-widget > svg { min-height: 120px; max-height: 195px; flex: 0 1 auto; }
+  .mobile-lesson-content > .simulation-widget > .simulation-controls {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 5px 8px;
+    flex: 0 0 auto;
+    min-height: max-content;
+  }
+  .mobile-lesson-content > .simulation-widget > .simulation-controls > label:only-child,
+  .mobile-lesson-content > .simulation-widget > .simulation-controls > .simulation-actions { grid-column: 1 / -1; }
+}
+/* Quando o botão unificado de nuvem fica no drawer de ações no celular, ocupa as 2 colunas limpinho */
+@media (max-width: 900px) {
+  html[data-ui-style] body #app .editor-shell #editor-actions .editor-save-controls.is-unified-cloud > .studio-btn {
+    grid-column: 1 / -1;
+  }
+}
+/* Faixa rolável horizontal para os 13 modelos 3D no painel do explorador */
+.model-panel .model-tabs { max-width: calc(100% - 28px); overflow-x: auto; scrollbar-width: thin; flex-wrap: nowrap; }
+.model-panel .model-tab { flex: none; white-space: nowrap; }
+
 
 
 

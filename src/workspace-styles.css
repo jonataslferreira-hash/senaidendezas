@@ -166,7 +166,7 @@ html[data-theme][data-ui-style=arcade] #app :is(.studio-wordmark,.editor-title,.
   html[data-ui-style] body #app .editor-shell .mobile-activity-list{display:inline-flex}
   html[data-ui-style] body #app .editor-shell .mobile-primary-actions :is(.studio-btn,.editor-icon),
   html[data-ui-style] body #app .editor-shell .mobile-activity-list{height:40px;min-height:40px;min-width:36px;padding:0 7px;justify-content:center}
-  #app .editor-shell .mobile-primary-actions [data-studio-action=cloud-save]{display:none}
+  #app .editor-shell .mobile-primary-actions [data-studio-action=cloud-save]:not(.is-unified){display:none}
   html[data-ui-style] body #app .editor-shell .mobile-editor-actions{height:40px;min-height:40px;min-width:36px}
   html[data-ui-style] body #app .editor-shell .editor-top-actions > :is(.ai-tool,.studio-launch){display:none}
   html[data-ui-style] body #app .editor-shell .visual-workspace:has(.mobile-slide-previews) .editor-outline{display:none}

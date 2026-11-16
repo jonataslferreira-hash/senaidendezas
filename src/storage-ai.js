@@ -11,6 +11,7 @@ import {requestedGames,withGameQuestions,takeGameQuestions,addGameStages,GAME_QU
 import {stageIcon} from './stage-games-view.js';
 import {coverFromImage} from './lesson-cover.js';
 import {canvasMarkup,CanvasModels,esc} from './canvas-view.js';
+import {isBuiltinModel,modelName} from './model-catalog.js';
 import {createSlideModel,createSlideSound} from './storage-ai-media.js';
 import {AI_PHOTO_LIMIT,AI_SLIDE_LIMIT,aiPalettes,aiThemes} from './storage-ai-options.js';
 import {canAttachPhoto,prepareSlidePhotos} from './storage-ai-photos.js';
@@ -165,7 +166,7 @@ async function buildLesson(result,count,photos,onSlide,activities={},imageDefaul
     const query=imageDefault?normalizeImageQuery(cleanSlideText(spec?.imageSearch,120)||cleanSlideText(spec?.title,120)):'';
     const wantsOnlineImage=query&&!placements[index].length;
     const images=Array.from({length:wantsOnlineImage?1:placements[index].length},()=>({data:'',alt:''}));
-    const model=spec?.model3D||['hdd','ssd','nvme'].includes(spec?.model)?{}:null;
+    const model=spec?.model3D||isBuiltinModel(spec?.model)?{}:null;
     const planned=composeAISlide({spec:styledSpec(spec),index,title:text(spec?.title,130),body:text(spec?.body,430),images,model,previous:plannedPrevious});
     plannedPrevious=planned;
     const frame=planned.elements.find(element=>element.type==='image');
@@ -210,9 +211,8 @@ async function buildLesson(result,count,photos,onSlide,activities={},imageDefaul
     const title=cleanSlideText(spec?.title,130),body=cleanSlideText(spec?.body,430);
     if(!title||!body)throw Error('Um slide ficou sem conteúdo. Tente gerar novamente.');
     const customModel=await createSlideModel(spec.model3D);
-    const type=customModel?'custom':['hdd','ssd','nvme'].includes(spec.model)?spec.model:'';
-    const model=type?{model:type,customModel,modelLabel:customModel?.name||
-      ({hdd:'Disco rígido (HDD)',nvme:'SSD NVMe',ssd:'SSD SATA'}[type])}:null;
+    const type=customModel?'custom':isBuiltinModel(spec.model)?spec.model:'';
+    const model=type?{model:type,customModel,modelLabel:customModel?.name||modelName(type)}:null;
     const images=placements[i].map(index=>({index,data:photos[index]}));
     const webImage=foundImages.get(i);
     if(webImage)images.push(webImage);
@@ -364,7 +364,7 @@ async function applyEdit(slide,result,target,photos=[],onStatus=()=>{}) {
       if(item.type==='model'){
         const customModel=await createSlideModel(item.model3D);
         if(customModel)Object.assign(element,{model:'custom',customModel,modelLabel:customModel.name});
-        else if(['hdd','ssd','nvme'].includes(item.model))element.model=item.model;
+        else if(isBuiltinModel(item.model))element.model=item.model;
         else continue;
       }
       update(element,item);slide.elements.push(element);count++;

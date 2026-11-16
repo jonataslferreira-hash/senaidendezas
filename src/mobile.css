@@ -57,9 +57,15 @@ html[data-appearance=light] #app[data-role=student] .callout p{color:#6d5287}
   html body #app .editor-shell .studio-editor{padding:0 0 calc(88px + env(safe-area-inset-bottom));max-width:100%;min-height:100dvh}
   html body #app .editor-shell .editor-heading{position:sticky;top:0;z-index:32;margin:0;padding:8px 12px;min-height:56px;display:flex!important;flex-direction:row!important;align-items:center!important;justify-content:space-between;gap:10px!important;flex-wrap:nowrap!important;background:color-mix(in srgb,var(--ui-panel,#ffffff) 86%,transparent);border-bottom:1px solid var(--ui-line,#ffffff12);backdrop-filter:blur(18px) saturate(160%)}
   html body #app .editor-shell .editor-heading>div:first-child{flex-wrap:nowrap;justify-content:flex-start!important;gap:8px;min-width:0;flex:1}
-  html body #app .editor-shell .editor-heading-hint{display:none}
+  html body #app .editor-shell .editor-heading-meta,
+  html body #app .editor-shell .editor-heading-hint{display:none!important}
   html body #app .editor-shell .editor-back{flex:0 0 36px;width:36px;min-height:36px;padding:6px;border-radius:12px}
-  html body #app .editor-shell .editor-title{font-size:14px;max-width:100%;min-width:0;letter-spacing:-.2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  html body #app .editor-shell .editor-title-block{min-width:0;flex:1 1 0;gap:0}
+  html body #app .editor-shell .editor-title{
+    font-size:13.5px;line-height:1.22;max-width:100%;min-width:0;letter-spacing:-.2px;
+    white-space:normal;overflow-wrap:break-word;word-break:normal;text-wrap:balance;
+    display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;overflow:hidden;text-overflow:ellipsis;
+  }
   html body #app .editor-shell .editor-context{display:flex;align-items:center;gap:6px;margin:0;padding:0;border:0;background:none;flex:0 0 auto;min-width:0}
   html body #app .editor-shell .editor-context>[data-editor-music]{display:none}
   html body #app .editor-shell .editor-context .studio-account-button{padding:7px 11px;border:1px solid var(--ui-line,#e8e0ef);background:var(--ui-panel,#ffffff);border-radius:11px;min-height:36px;max-width:none;font-size:11px;font-weight:650;line-height:1;white-space:nowrap;display:inline-flex;align-items:center;gap:6px}
@@ -111,8 +117,9 @@ html[data-appearance=light] #app[data-role=student] .callout p{color:#6d5287}
   html body #app .editor-shell .designer-toolbar .slide-designer button,#app .editor-shell .designer-toolbar button{min-height:40px;padding:8px 11px;border-radius:11px;font-size:11px;white-space:nowrap;display:inline-flex;align-items:center;gap:5px}
   html body #app .editor-shell .designer-toolbar select{min-height:40px;max-width:126px;font-size:11px;border-radius:11px}
   html body #app .editor-shell .designer-insert-more{position:relative}
-  html body #app .editor-shell .designer-insert-more>div{position:absolute;bottom:calc(100% + 10px);left:0;z-index:50;display:flex;flex-direction:column;gap:5px;min-width:190px;padding:8px;border:1px solid var(--ui-line,#e8e0ef);border-radius:14px;background:var(--ui-panel,#ffffff);box-shadow:0 18px 44px #2b143f33}
-  html body #app .editor-shell .designer-insert-more>div button{width:100%;justify-content:flex-start}
+  html body #app .editor-shell .designer-insert-more>div{position:absolute;bottom:calc(100% + 10px);left:0;z-index:50;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px;min-width:220px;padding:8px;border:1px solid var(--ui-line,#e8e0ef);border-radius:14px;background:var(--ui-panel,#ffffff);box-shadow:0 18px 44px #2b143f33}
+  html body #app .editor-shell .designer-insert-more>div button{width:100%;min-width:0;min-height:42px;padding:8px 10px;justify-content:flex-start;gap:7px;font-size:12px;border-radius:10px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  html body #app .editor-shell .designer-insert-more>div button>span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
   html body #app .editor-shell .item-toolbar:has(.designer-insert-more[open]){backdrop-filter:none}
   html body #app .editor-shell .designer-insert-more[open]>div{
     position:fixed;
@@ -127,7 +134,7 @@ html[data-appearance=light] #app[data-role=student] .callout p{color:#6d5287}
 }
 @media(max-width:600px){
   html body #app .editor-shell .editor-heading{min-height:52px;padding:7px 10px}
-  html body #app .editor-shell .editor-title{font-size:13px}
+  html body #app .editor-shell .editor-title{font-size:12.5px;line-height:1.2}
   html body #app .editor-shell .editor-command-row{padding:6px 10px}
   html body #app .editor-shell .editor-tabs button{font-size:11px;padding:6px 9px}
   html body #app .editor-shell .editor-outline{padding:6px 10px}
@@ -348,11 +355,18 @@ html[data-appearance=light] #app[data-role=student] .callout p{color:#6d5287}
   }
   html[data-ui-style] body #app .editor-shell .designer-toolbar :is(.desktop-history,.desktop-insert-label),
   html[data-ui-style] body #app .editor-shell .designer-toolbar>:is([data-designer-action=video],[data-designer-action=model],[data-designer-action=simulation]),
-  html[data-ui-style] body #app .editor-shell .designer-toolbar>.slide-style-picker{display:none}
+  html[data-ui-style] body #app .editor-shell .designer-toolbar[data-selection-type=""]>:is([data-designer-action=video],[data-designer-action=model],[data-designer-action=simulation]),
+  html[data-ui-style] body #app .editor-shell .designer-toolbar>.slide-style-picker{display:none!important}
   html[data-ui-style] body #app .editor-shell .designer-insert-more.mobile-only-more{display:block}
   html[data-ui-style] body #app .editor-shell .designer-insert-more summary>.mobile-action-label{display:inline}
   html[data-ui-style] body #app .editor-shell .designer-insert-more>summary{min-height:44px;display:flex;align-items:center;padding:0 8px}
-  html[data-ui-style] body #app .editor-shell .designer-insert-more[open]>div{z-index:45;bottom:calc(116px + env(safe-area-inset-bottom))}
+  html[data-ui-style] body #app .editor-shell .designer-insert-more[open]>div{
+    z-index:45;
+    bottom:calc(116px + env(safe-area-inset-bottom));
+    display:grid;
+    grid-template-columns:repeat(2,minmax(0,1fr));
+    gap:6px;
+  }
   #app .mobile-history{display:flex;gap:4px}
   #app .mobile-slide-layout{display:block;margin-top:8px}
   html[data-ui-style] body #app .editor-shell .editor-outline .outline-actions>button{width:30px;min-width:30px}
@@ -383,7 +397,7 @@ html[data-appearance=light] #app[data-role=student] .callout p{color:#6d5287}
   html[data-ui-style] body #app .editor-shell .designer-toolbar .designer-insert-more .mobile-action-label{
     white-space:nowrap;
   }
-  html[data-ui-style] body #app .editor-shell .designer-toolbar[data-selection-type=""]>button:not(.desktop-history),
+  html[data-ui-style] body #app .editor-shell .designer-toolbar[data-selection-type=""]>:is(.mobile-inspector-open,[data-designer-action=add-text],[data-designer-action=image],[data-designer-action=shape]),
   html[data-ui-style] body #app .editor-shell .designer-insert-more summary .mobile-action-label{
     display:flex;flex-direction:column;justify-content:center;align-items:center;gap:3px;
     font-size:10px;line-height:1.15;

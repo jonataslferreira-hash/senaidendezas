@@ -4,6 +4,7 @@ import {tickGame,isGameType,startGame,syncGameJoin,gameControl,gameInput,gameSna
 import {isPhotoAvatar} from './player-avatar.js';
 import { avatars, defaultQuestions } from './content.js';
 import { demoLesson, validateLesson } from './lessons.js';
+import { isBuiltinModel } from './model-catalog.js';
 
 export const questions = defaultQuestions;
 
@@ -79,7 +80,7 @@ export class Room {
       if (!this.slides[d.slide].poll) throw Error('Adicione uma enquete a este slide no editor.');
       d.phase = 'poll'; d.pollId = newToken(); d.votes = {};
     } else if (action === 'close-poll' && d.phase === 'poll') d.phase = 'poll-results';
-    else if (action === 'model' && d.phase === 'lesson' && (['hdd', 'ssd', 'nvme'].includes(value) || value === 'custom' && this.slides[d.slide].customModel)) d.model = value;
+    else if (action === 'model' && d.phase === 'lesson' && (isBuiltinModel(value) || value === 'custom' && this.slides[d.slide].customModel)) d.model = value;
     else if (action === 'explode' && d.phase === 'lesson') d.exploded = Boolean(value);
     else if (action === 'quiz' && d.phase === 'lesson') {
       if(this.blocks){

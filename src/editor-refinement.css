@@ -314,3 +314,35 @@ html[data-theme][data-ui-style] #app .editor-shell .editor-heading-hint {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+html[data-theme][data-ui-style] #app .editor-shell .editor-title-block:not(:has(.editor-heading-meta:not(:empty))) .editor-title,
+html[data-theme][data-ui-style] #app .editor-shell .editor-title-block:has(.editor-heading-meta:empty) .editor-title {
+  white-space: normal;
+  overflow-wrap: break-word;
+  word-break: normal;
+  text-wrap: balance;
+  line-height: 1.22;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
+}
+@media (max-width: 900px) {
+  html[data-theme][data-ui-style] #app .editor-shell .editor-title-block {
+    gap: 0;
+  }
+  html[data-theme][data-ui-style] #app .editor-shell .editor-heading-meta {
+    display: none;
+    min-height: 0;
+  }
+  html[data-theme][data-ui-style] #app .editor-shell .editor-title {
+    white-space: normal;
+    overflow-wrap: break-word;
+    word-break: normal;
+    text-wrap: balance;
+    line-height: 1.2;
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+    overflow: hidden;
+  }
+}

@@ -1,13 +1,18 @@
-// Simulação interativa de dois líquidos miscíveis (Navier-Stokes 2D / Stable Fluids)
-// para o fundo do Catálogo de Apresentações: passar o mouse empurra, cria redemoinhos
-// e mistura os dois líquidos como passar a mão na água.
+// Simulação interativa de dois líquidos IMISCÍVEIS (não-juntáveis, como água e óleo /
+// lâmpada líquida) com Navier-Stokes 2D + separação de fase conservativa (50% / 50%).
+// Passar o mouse empurra, deforma e separa gotas/bolhas sem jamais misturar as duas cores.
 
 const BRAND_PURPLE_RGB = [124, 82, 217]; // #7c52d9 — roxo Storage Lab
-const CONTRAST_AQUA_RGB = [20, 184, 212]; // #14b8d4 — par de alto contraste quando o tema do usuário já é roxo
+const CONTRAST_AQUA_RGB = [20, 184, 212]; // #14b8d4 — par de alto contraste se o tema do usuário já for roxo
 const DEFAULT_USER_RGB = [46, 108, 246]; // #2e6cf6 — fallback azul vibrante
 
 function clamp(v, lo, hi) {
   return v < lo ? lo : v > hi ? hi : v;
+}
+
+function smoothstep(edge0, edge1, x) {
+  const t = clamp((x - edge0) / (edge1 - edge0), 0, 1);
+  return t * t * (3 - 2 * t);
 }
 
 export function rgbToHsl(r, g, b) {
@@ -110,19 +115,17 @@ function probeColorWithCanvas(cssColor) {
 
 function tuneLiquidRgb(rgb, dark) {
   const [h, s, l] = rgbToHsl(rgb[0], rgb[1], rgb[2]);
-  // Evita líquidos cinzentos/apagados mantendo o matiz escolhido pelo usuário
-  const sat = s < 0.14 ? 0.78 : clamp(Math.max(s * 1.18, dark ? 0.72 : 0.70), 0.65, 0.96);
+  const sat = s < 0.14 ? 0.78 : clamp(Math.max(s * 1.18, dark ? 0.74 : 0.72), 0.68, 0.96);
   const hue = s < 0.14 ? 214 : h;
-  const lig = dark ? clamp(l, 0.50, 0.64) : clamp(l, 0.48, 0.60);
+  const lig = dark ? clamp(l, 0.50, 0.64) : clamp(l, 0.48, 0.59);
   return hslToRgb(hue, sat, lig);
 }
 
 /**
- * Resolve as cores dos dois líquidos:
+ * Resolve as cores puras dos dois líquidos imiscíveis:
  *  - Líquido A: cor do tema do usuário (--ui-accent)
  *  - Líquido B: roxo Storage Lab (#7c52d9), ou um par luminoso de alto contraste
- *    quando o tema do usuário já for roxo/violeta para os 2 líquidos continuarem
- *    claramente separáveis e visíveis na mistura.
+ *    se o tema do usuário já for roxo/violeta.
  */
 export function resolveCatalogLiquidColors(pageEl) {
   const rootEl = typeof document !== 'undefined' ? document.documentElement : null;
@@ -166,23 +169,14 @@ export function resolveCatalogLiquidColors(pageEl) {
   }
   const colorB = tuneLiquidRgb(baseB, dark);
 
-  // Calcula cor intermediária perceptualmente viva na zona de mistura dos 2 líquidos
-  const [hA, sA, lA] = rgbToHsl(colorA[0], colorA[1], colorA[2]);
-  const [hB, sB, lB] = rgbToHsl(colorB[0], colorB[1], colorB[2]);
-  let dh = ((hB - hA + 540) % 360) - 180;
-  const hMid = (hA + dh * 0.5 + 360) % 360;
-  const sMid = clamp(Math.max(sA, sB) * 1.06, 0.74, 0.98);
-  const lMid = clamp((lA + lB) * 0.5 + (dark ? 0.04 : 0.02), dark ? 0.52 : 0.48, dark ? 0.68 : 0.62);
-  const colorMix = hslToRgb(hMid, sMid, lMid);
-
-  return { dark, colorA, colorB, colorMix };
+  return { dark, colorA, colorB };
 }
 
 /**
- * Motor físico Navier-Stokes 2D (Stable Fluids + Vorticidade + MacCormack)
- * para dois líquidos miscíveis em uma grade W × H.
+ * Motor físico de dois líquidos IMISCÍVEIS (campo de fase phi ∈ [-1, +1])
+ * com Navier-Stokes 2D incompressível, tensão superficial e conservação exata 50% / 50%.
  */
-export function createFluidSimulation({ cols = 104, rows = 60 } = {}) {
+export function createFluidSimulation({ cols = 108, rows = 62 } = {}) {
   const W = Math.max(24, Math.round(cols));
   const H = Math.max(18, Math.round(rows));
   const stride = W + 2;
@@ -196,19 +190,16 @@ export function createFluidSimulation({ cols = 104, rows = 60 } = {}) {
   const div = new Float32Array(size);
   const curl = new Float32Array(size);
 
-  let dyeA = new Float32Array(size);
-  let dyeA0 = new Float32Array(size);
-  let dyeB = new Float32Array(size);
-  let dyeB0 = new Float32Array(size);
+  // phi = +1 -> 100% Líquido A (tema do usuário)
+  // phi = -1 -> 100% Líquido B (roxo Storage Lab)
+  let phi = new Float32Array(size);
+  let phi0 = new Float32Array(size);
   const tmp1 = new Float32Array(size);
   const tmp2 = new Float32Array(size);
+  const lap = new Float32Array(size);
   const ripple = new Float32Array(size);
 
   let time = 0;
-
-  function idx(i, j) {
-    return i + j * stride;
-  }
 
   function setBounds(mode, x) {
     for (let i = 1; i <= W; i++) {
@@ -232,7 +223,6 @@ export function createFluidSimulation({ cols = 104, rows = 60 } = {}) {
       for (let i = 1; i <= W; i++) {
         const k = row + i;
         div[k] = -0.5 * ((velU[k + 1] - velU[k - 1]) + (velV[k + stride] - velV[k - stride]));
-        // Warm-start suavizado para convergência mais limpa
         p[k] *= 0.62;
       }
     }
@@ -262,7 +252,7 @@ export function createFluidSimulation({ cols = 104, rows = 60 } = {}) {
     setBounds(2, velV);
   }
 
-  function applyVorticity(velU, velV, dt, strength = 6.2) {
+  function applyVorticity(velU, velV, dt, strength = 3.2) {
     for (let j = 1; j <= H; j++) {
       const row = j * stride;
       for (let i = 1; i <= W; i++) {
@@ -281,10 +271,8 @@ export function createFluidSimulation({ cols = 104, rows = 60 } = {}) {
         const dx = Math.abs(curl[k + 1]) - Math.abs(curl[k - 1]);
         const dy = Math.abs(curl[k + stride]) - Math.abs(curl[k - stride]);
         const len = Math.hypot(dx, dy) + 1e-5;
-        const nx = dx / len;
-        const ny = dy / len;
-        velU[k] += ny * c * strength * dt;
-        velV[k] -= nx * c * strength * dt;
+        velU[k] += (dy / len) * c * strength * dt;
+        velV[k] -= (dx / len) * c * strength * dt;
       }
     }
     setBounds(1, velU);
@@ -325,8 +313,6 @@ export function createFluidSimulation({ cols = 104, rows = 60 } = {}) {
     setBounds(mode, dst);
   }
 
-  // Advecção MacCormack com clamp local: preserva espirais, filamentos e
-  // fronteiras nítidas dos dois líquidos sem virar um borradão cinza.
   function advectMacCormack(dst, src, velU, velV, dt) {
     advectBilinear(0, tmp1, src, velU, velV, dt, 1.0);
     advectBilinear(0, tmp2, tmp1, velU, velV, -dt, 1.0);
@@ -359,41 +345,93 @@ export function createFluidSimulation({ cols = 104, rows = 60 } = {}) {
         const hi = Math.max(v00, v10, v01, v11);
 
         const corrected = tmp1[k] + 0.5 * (src[k] - tmp2[k]);
-        dst[k] = corrected < lo ? lo : corrected > hi ? hi : corrected;
+        dst[k] = clamp(corrected < lo ? lo : corrected > hi ? hi : corrected, -1, 1);
       }
     }
     setBounds(0, dst);
   }
 
-  // Perfil alvo dos dois líquidos bem puros e claramente separáveis:
-  // Líquido A (tema do usuário) e Líquido B (roxo Storage Lab) divididos por uma
-  // fronteira orgânica em S, com variação natural de espessura/translucidez.
-  function targetPools(nx, ny, phase) {
-    const wave =
-      (nx - 0.5) * 1.55 +
-      (ny - 0.5) * 0.58 +
-      0.19 * Math.sin(ny * Math.PI * 2.1 + phase) +
-      0.11 * Math.cos(nx * Math.PI * 2.2 - phase * 0.7);
-    // Transição firme para ambos os líquidos começarem bem puros e reconhecíveis
-    const split = 1 / (1 + Math.exp(wave * 11.0));
+  // Separação de fase conservativa (Allen-Cahn isotrópico 9-pontos + tensão superficial):
+  // 1) Mantém os dois líquidos estritamente imiscíveis (fronteira fina, lisa e sem serrilhado);
+  // 2) Tensão superficial arredonda gotas/bolhas como água e óleo / lâmpada líquida;
+  // 3) Conservação global exata mantém 50% Líquido A e 50% Líquido B em todos os frames!
+  function enforceImmisciblePhase(dt) {
+    // 1. Laplaciano isotrópico de 9 pontos (elimina serrilhado diagonal e cria gotas perfeitamente redondas)
+    const tension = 34.0 * dt;
+    for (let j = 1; j <= H; j++) {
+      const row = j * stride;
+      const rUp = row - stride;
+      const rDn = row + stride;
+      for (let i = 1; i <= W; i++) {
+        const k = row + i;
+        const ortho = phi[k - 1] + phi[k + 1] + phi[rUp + i] + phi[rDn + i];
+        const diag = phi[rUp + i - 1] + phi[rUp + i + 1] + phi[rDn + i - 1] + phi[rDn + i + 1];
+        const l = (4 * ortho + diag) * 0.05 - phi[k];
+        lap[k] = l;
+        // Força capilar puxa filamentos finos para formar gotas/bolhas arredondadas
+        const gx = 0.5 * (phi[k + 1] - phi[k - 1]);
+        const gy = 0.5 * (phi[rDn + i] - phi[rUp + i]);
+        u[k] += l * gx * tension;
+        v[k] += l * gy * tension;
+      }
+    }
 
-    // Variação orgânica de profundidade/espessura do líquido na superfície
-    const thickness =
-      0.86 +
-      0.22 * Math.sin(nx * Math.PI * 2.3 + ny * Math.PI * 1.4 + phase * 0.9) +
-      0.12 * Math.cos(nx * Math.PI * 3.1 - ny * Math.PI * 2.6);
+    // 2. Re-agrupamento de fase (impede difusão/mistura das cores, suavizando a curvatura)
+    const mobility = 11.5 * dt;
+    const eps2 = 2.35;
+    let sumPhi = 0;
+    let interfaceWeight = 0;
 
-    // Duas gotas/línguas extras bem definidas nas pontas opostas para os 2 líquidos
-    // dialogarem por toda a área visível do catálogo
-    const dropA = Math.exp(-(((nx - 0.84) ** 2) / 0.022 + ((ny - 0.16) ** 2) / 0.036));
-    const dropB = Math.exp(-(((nx - 0.16) ** 2) / 0.022 + ((ny - 0.84) ** 2) / 0.036));
+    for (let j = 1; j <= H; j++) {
+      const row = j * stride;
+      for (let i = 1; i <= W; i++) {
+        const k = row + i;
+        const c = phi[k];
+        const next = clamp(c + mobility * (c * (1 - c * c) + eps2 * lap[k]), -1, 1);
+        phi0[k] = next;
+        sumPhi += next;
+        interfaceWeight += Math.max(0.015, 1 - next * next);
+      }
+    }
 
-    const pureA = clamp(split + dropA * 0.92 - dropB * 0.88, 0, 1);
-    const pureB = clamp(1 - pureA, 0, 1);
+    // 3. Correção exata de conservação de massa -> garante 50.0% A e 50.0% B sempre!
+    const correction = interfaceWeight > 1e-4 ? sumPhi / interfaceWeight : 0;
+    for (let j = 1; j <= H; j++) {
+      const row = j * stride;
+      for (let i = 1; i <= W; i++) {
+        const k = row + i;
+        const c = phi0[k];
+        const w = Math.max(0.015, 1 - c * c);
+        phi[k] = clamp(c - correction * w, -1, 1);
+      }
+    }
+    setBounds(0, phi);
+  }
 
-    const a = clamp(pureA * thickness * 1.08, 0.015, 1.2);
-    const b = clamp(pureB * thickness * 1.08, 0.015, 1.2);
-    return [a, b];
+  // Perfil inicial perfeitamente antissimétrico (50% exato de cada líquido):
+  // duas grandes massas orgânicas em S + bolhas livres simétricas (estilo lâmpada líquida).
+  function initialPhaseField(nx, ny) {
+    // Onda central perfeitamente antissimétrica em torno de (0.5, 0.5)
+    const dx = nx - 0.5;
+    const dy = ny - 0.5;
+    const wave = -dx * 1.65 - dy * 0.42 + 0.14 * Math.sin(dy * Math.PI * 2.2);
+    let val = Math.tanh(wave * 11.0);
+
+    // Par simétrico de bolhas livres (uma gota de A no lado B, uma gota idêntica de B no lado A)
+    const aspect = W / H;
+    const blob = (cx, cy, r) => {
+      const d = Math.hypot((nx - cx) * aspect, ny - cy);
+      return smoothstep(r + 0.04, r - 0.04, d);
+    };
+
+    // Bolhas maiores + bolhinhas irmãs perfeitamente espelhadas (soma total = 0!)
+    const bA1 = blob(0.76, 0.26, 0.135);
+    const bB1 = blob(0.24, 0.74, 0.135);
+    const bA2 = blob(0.84, 0.68, 0.085);
+    const bB2 = blob(0.16, 0.32, 0.085);
+
+    val = clamp(val + (bA1 + bA2) * 2.0 - (bB1 + bB2) * 2.0, -1, 1);
+    return val;
   }
 
   function applyPointerStroke(x0, y0, x1, y1, { strength = 1, radiusScale = 1, isDown = false } = {}) {
@@ -403,21 +441,18 @@ export function createFluidSimulation({ cols = 104, rows = 60 } = {}) {
     if (!Number.isFinite(dist) || dist < 1e-5 || dist > 0.42) return;
 
     const steps = Math.max(1, Math.min(20, Math.ceil(dist * Math.max(W, H) * 1.45)));
-    const baseRadius = Math.max(4.6, W * 0.058) * radiusScale * (isDown ? 1.22 : 1);
+    const baseRadius = Math.max(4.6, W * 0.058) * radiusScale * (isDown ? 1.24 : 1);
     const invTwoSigma2 = 1 / (2 * baseRadius * baseRadius);
 
-    // Empurrão sedoso calibrado: forte o suficiente para abrir caminho e enrolar
-    // faixas dos dois líquidos sem criar aliasing de grade
-    const speedBoost = clamp(dist * 14, 0.45, 1.85);
-    const gain = (isDown ? 190 : 142) * strength;
-    const pushU = clamp((dx / steps) * W * gain * speedBoost, -42, 42);
-    const pushV = clamp((dy / steps) * H * gain * speedBoost, -42, 42);
+    const speedBoost = clamp(dist * 14, 0.48, 1.9);
+    const gain = (isDown ? 195 : 150) * strength;
+    const pushU = clamp((dx / steps) * W * gain * speedBoost, -44, 44);
+    const pushV = clamp((dy / steps) * H * gain * speedBoost, -44, 44);
 
     const dirX = dx / dist;
     const dirY = dy / dist;
-    const swirlGain = clamp(dist * 24, 0.25, 2.1) * strength * (isDown ? 1.25 : 1);
-
-    const rCells = Math.ceil(baseRadius * 2.5);
+    const swirlGain = clamp(dist * 22, 0.22, 1.9) * strength * (isDown ? 1.2 : 1);
+    const rCells = Math.ceil(baseRadius * 2.4);
 
     for (let s = 1; s <= steps; s++) {
       const f = s / steps;
@@ -438,18 +473,15 @@ export function createFluidSimulation({ cols = 104, rows = 60 } = {}) {
           if (w < 0.01) continue;
           const k = row + i;
 
-          // Empurrão principal da mão na água
           u[k] += pushU * w;
           v[k] += pushV * w;
 
-          // Enrolamento hidrodinâmico nas bordas do rastro (dipolo lateral)
           const side = (rx * (-dirY) + ry * dirX) / baseRadius;
           const wake = Math.exp(-d2 / (1.4 * baseRadius * baseRadius));
           u[k] += (-ry / baseRadius) * side * swirlGain * wake;
           v[k] += (rx / baseRadius) * side * swirlGain * wake;
 
-          // Marola luminosa temporária na superfície tocada
-          ripple[k] = Math.min(1.4, ripple[k] + w * (0.22 + speedBoost * 0.16));
+          ripple[k] = Math.min(1.4, ripple[k] + w * (0.24 + speedBoost * 0.16));
         }
       }
     }
@@ -477,18 +509,19 @@ export function createFluidSimulation({ cols = 104, rows = 60 } = {}) {
         if (ring < 0.01) continue;
         const k = row + i;
         const radial = 18 * strength * ring;
-        const spin = 10 * strength * ring;
+        const spin = 9 * strength * ring;
         u[k] += ((rx / d) * radial - (ry / d) * spin);
         v[k] += ((ry / d) * radial + (rx / d) * spin);
-        ripple[k] = Math.min(1.8, ripple[k] + ring * 0.9);
+        ripple[k] = Math.min(1.8, ripple[k] + ring * 0.85);
       }
     }
   }
 
   function applyGentleCurrents(dt) {
-    // Brisa/maré muito lenta para manter os 2 líquidos respirando vivos mesmo em repouso
-    const t = time * 0.34;
-    const amp = 0.85 * dt;
+    // Corrente de convecção muito suave (efeito lâmpada líquida viva mesmo sem mexer)
+    const t = time * 0.36;
+    const amp = 1.05 * dt;
+    const rippleDecay = Math.exp(-dt * 2.8);
     for (let j = 1; j <= H; j++) {
       const ny = (j - 0.5) / H;
       const row = j * stride;
@@ -499,29 +532,6 @@ export function createFluidSimulation({ cols = 104, rows = 60 } = {}) {
         const fy = Math.cos(nx * Math.PI * 2.0 - t * 0.85) * Math.sin(ny * Math.PI * 1.5 + t * 0.5);
         u[k] += fx * amp;
         v[k] += fy * amp;
-      }
-    }
-  }
-
-  function replenishEdges(dt) {
-    // Reposição ultra-lenta concentrada nas margens externas para que os dois líquidos
-    // nunca se diluam num tom único permanente após minutos mexendo, mas preservando
-    // completamente os redemoinhos e misturas no centro por dezenas de segundos.
-    const phase = time * 0.08;
-    const rippleDecay = Math.exp(-dt * 2.6);
-    for (let j = 1; j <= H; j++) {
-      const ny = (j - 0.5) / H;
-      const edgeY = Math.max(0, Math.abs(ny - 0.5) * 2 - 0.62) / 0.38;
-      const row = j * stride;
-      for (let i = 1; i <= W; i++) {
-        const nx = (i - 0.5) / W;
-        const edgeX = Math.max(0, Math.abs(nx - 0.5) * 2 - 0.62) / 0.38;
-        const edge = Math.max(edgeX, edgeY);
-        const rate = (0.0022 + edge * edge * 0.055) * dt;
-        const k = row + i;
-        const [ta, tb] = targetPools(nx, ny, phase);
-        dyeA[k] += (ta - dyeA[k]) * rate;
-        dyeB[k] += (tb - dyeB[k]) * rate;
         ripple[k] *= rippleDecay;
       }
     }
@@ -532,11 +542,10 @@ export function createFluidSimulation({ cols = 104, rows = 60 } = {}) {
     time += dt;
 
     applyGentleCurrents(dt);
-    applyVorticity(u, v, dt, 4.8);
+    applyVorticity(u, v, dt, 3.2);
     project(u, v, 14);
 
-    // Advecção da velocidade com inércia realista e sedosa de água
-    const velDamping = Math.pow(0.978, dt * 60);
+    const velDamping = Math.pow(0.976, dt * 60);
     advectBilinear(1, u0, u, u, v, dt, velDamping);
     advectBilinear(2, v0, v, u, v, dt, velDamping);
     [u, u0] = [u0, u];
@@ -544,21 +553,18 @@ export function createFluidSimulation({ cols = 104, rows = 60 } = {}) {
 
     project(u, v, 14);
 
-    // Limita velocidade máxima para manter filamentos lisos e sem serrilhado
     for (let k = 0; k < size; k++) {
-      if (u[k] > 52) u[k] = 52;
-      else if (u[k] < -52) u[k] = -52;
-      if (v[k] > 52) v[k] = 52;
-      else if (v[k] < -52) v[k] = -52;
+      if (u[k] > 50) u[k] = 50;
+      else if (u[k] < -50) u[k] = -50;
+      if (v[k] > 50) v[k] = 50;
+      else if (v[k] < -50) v[k] = -50;
     }
 
-    // Advecção MacCormack dos dois líquidos
-    advectMacCormack(dyeA0, dyeA, u, v, dt);
-    advectMacCormack(dyeB0, dyeB, u, v, dt);
-    [dyeA, dyeA0] = [dyeA0, dyeA];
-    [dyeB, dyeB0] = [dyeB0, dyeB];
+    // Advecção MacCormack do campo de fase seguida de separação imiscível + conservação 50/50
+    advectMacCormack(phi0, phi, u, v, dt);
+    [phi, phi0] = [phi0, phi];
 
-    replenishEdges(dt);
+    enforceImmisciblePhase(dt);
   }
 
   function seed() {
@@ -577,89 +583,108 @@ export function createFluidSimulation({ cols = 104, rows = 60 } = {}) {
       const row = j * stride;
       for (let i = 1; i <= W; i++) {
         const nx = (i - 0.5) / W;
-        const [a, b] = targetPools(nx, ny, 0.25);
-        dyeA[row + i] = a;
-        dyeB[row + i] = b;
+        phi[row + i] = initialPhaseField(nx, ny);
       }
     }
-    setBounds(0, dyeA);
-    setBounds(0, dyeB);
+    setBounds(0, phi);
 
-    // Duas ondulações iniciais bem gentis na fronteira central: mantém os 2 líquidos
-    // bem puros e visíveis de cada lado, já com uma curva viva convidando a mexer!
-    applyPointerStroke(0.38, 0.34, 0.57, 0.42, { strength: 0.42, radiusScale: 1.25 });
-    applyPointerStroke(0.62, 0.66, 0.43, 0.58, { strength: 0.42, radiusScale: 1.25 });
-    for (let s = 0; s < 10; s++) step(1 / 60);
+    // Pequeno relaxamento inicial para suavizar os meniscos preservando exatamente 50% / 50%
+    for (let s = 0; s < 6; s++) enforceImmisciblePhase(1 / 60);
+    u.fill(0);
+    v.fill(0);
     ripple.fill(0);
   }
 
   function renderToImageData(imageData, palette) {
     const data = imageData.data;
-    const { dark, colorA, colorB, colorMix } = palette;
+    const { dark, colorA, colorB } = palette;
     const aR = colorA[0], aG = colorA[1], aB = colorA[2];
     const bR = colorB[0], bG = colorB[1], bB = colorB[2];
-    const mR = colorMix[0], mG = colorMix[1], mB = colorMix[2];
 
-    // Presença forte e nítida dos dois líquidos nos dois modos (claro e escuro)
-    const minAlpha = dark ? 0.24 : 0.20;
-    const maxAlpha = dark ? 0.72 : 0.60;
-    const specBoost = dark ? 36 : 30;
-    const shadowDepth = dark ? 18 : 14;
+    // Pré-suaviza uma cópia rasa da fase (tmp1) para normais 3D macias sem alterar phi
+    for (let j = 1; j <= H; j++) {
+      const row = j * stride;
+      const rUp = row - stride;
+      const rDn = row + stride;
+      for (let i = 1; i <= W; i++) {
+        const k = row + i;
+        tmp1[k] = (
+          phi[k] * 4 +
+          phi[k - 1] + phi[k + 1] + phi[rUp + i] + phi[rDn + i]
+        ) * 0.125;
+      }
+    }
+    setBounds(0, tmp1);
+
+    const bodyAlpha = dark ? 0.56 : 0.48;
+    const edgeAlphaBoost = dark ? 0.18 : 0.16;
+    const rimSpec = dark ? 112 : 96;
+    const rimShadow = dark ? 34 : 24;
 
     let ptr = 0;
     for (let j = 1; j <= H; j++) {
+      const ny = (j - 0.5) / H;
       const row = j * stride;
       for (let i = 1; i <= W; i++) {
+        const nx = (i - 0.5) / W;
         const k = row + i;
-        const a = clamp(dyeA[k], 0, 1.35);
-        const b = clamp(dyeB[k], 0, 1.35);
-        const total = a + b + 1e-4;
-        const wa = a / total;
-        const wb = b / total;
+        const c = phi[k];
+        const cs = tmp1[k];
 
-        // Mistura perceptual concentrada exatamente na interface onde os 2 líquidos se fundem,
-        // mantendo os filamentos puros de A e B bem distintos dentro dos redemoinhos!
-        const rawMix = clamp(4 * wa * wb, 0, 1);
-        const mixFactor = rawMix * Math.sqrt(rawMix);
-        const linR = aR * wa + bR * wb;
-        const linG = aG * wa + bG * wb;
-        const linB = aB * wa + bB * wb;
-        const mixWeight = mixFactor * 0.44;
-        let r = linR * (1 - mixWeight) + mR * mixWeight;
-        let g = linG * (1 - mixWeight) + mG * mixWeight;
-        let bl = linB * (1 - mixWeight) + mB * mixWeight;
+        // Fronteira anti-aliased limpa: cor A pura de um lado e cor B pura do outro (zero mistura)
+        const isA = smoothstep(-0.22, 0.22, c);
+        let r = bR + (aR - bR) * isA;
+        let g = bG + (aG - bG) * isA;
+        let bl = bB + (aB - bB) * isA;
 
-        // Normal suave da superfície líquida (relevo de ondas + esteira da mão)
-        const gx = (dyeA[k + 1] - dyeA[k - 1]) - (dyeB[k + 1] - dyeB[k - 1]) + (u[k + 1] - u[k - 1]) * 0.038;
-        const gy = (dyeA[k + stride] - dyeA[k - stride]) - (dyeB[k + stride] - dyeB[k - stride]) + (v[k + stride] - v[k - stride]) * 0.038;
-        const sheen = clamp(gx * -0.58 + gy * -0.81, -0.78, 0.78);
-        const speed = Math.hypot(u[k], v[k]);
-        const waveGlint = clamp(ripple[k] * 0.28 + Math.min(speed * 0.014, 0.26), 0, 0.54);
-
-        if (sheen > 0) {
-          const lift = sheen * specBoost;
-          r += lift;
-          g += lift;
-          bl += lift;
+        // Volume líquido suave interno (efeito profundidade de lâmpada de óleo/água)
+        const glowWave = 0.5 + 0.5 * Math.sin(nx * 3.1 - ny * 2.4 + time * 0.35);
+        const volLight = (glowWave - 0.45) * 0.16;
+        if (volLight > 0) {
+          r += (255 - r) * volLight;
+          g += (255 - g) * volLight;
+          bl += (255 - bl) * volLight;
         } else {
-          const dip = sheen * shadowDepth;
-          r += dip;
-          g += dip;
-          bl += dip;
+          const d = 1 + volLight * 0.7;
+          r *= d; g *= d; bl *= d;
         }
 
-        // Brilho de marola/luz onde a mão acabou de agitar a água
+        // Menisco 3D (tensão superficial): normal suave nas bordas arredondadas das gotas
+        const gx = 0.5 * (tmp1[k + 1] - tmp1[k - 1]);
+        const gy = 0.5 * (tmp1[k + stride] - tmp1[k - stride]);
+        const gradMag = Math.hypot(gx, gy);
+        const meniscus = Math.exp(-(cs * cs) / 0.20) * clamp(gradMag * 1.9, 0, 1);
+
+        // Iluminação de topo-esquerdo nas gotas + leve sombra no verso do menisco
+        const invG = gradMag > 1e-4 ? 1 / gradMag : 0;
+        const ndotl = (gx * -0.58 + gy * -0.81) * invG;
+        const rimLight = ndotl * meniscus;
+
+        // Especular vítreo brilhante na crista iluminada da gota
+        const spec = Math.pow(Math.max(0, ndotl), 2.2) * meniscus;
+        if (rimLight > 0) {
+          const boost = (rimLight * rimSpec + spec * 70) / 255;
+          r += (255 - r) * clamp(boost, 0, 0.52);
+          g += (255 - g) * clamp(boost, 0, 0.52);
+          bl += (255 - bl) * clamp(boost, 0, 0.52);
+        } else {
+          const darken = 1 + rimLight * (rimShadow / 100);
+          r *= darken;
+          g *= darken;
+          bl *= darken;
+        }
+
+        // Reflexo suave de marola onde o ponteiro passou recentemente
+        const speed = Math.hypot(u[k], v[k]);
+        const waveGlint = clamp(ripple[k] * 0.24 + Math.min(speed * 0.011, 0.18), 0, 0.42);
         if (waveGlint > 0.01) {
-          const highlight = waveGlint * (dark ? 48 : 54);
-          r += (255 - r) * (highlight / 255);
-          g += (255 - g) * (highlight / 255);
-          bl += (255 - bl) * (highlight / 255);
+          const glint = waveGlint * (dark ? 0.18 : 0.22);
+          r += (255 - r) * glint;
+          g += (255 - g) * glint;
+          bl += (255 - bl) * glint;
         }
 
-        // Contraste sutil nas cristas/fronteiras dos dois líquidos (volume de tinta na água)
-        const density = clamp((total - 0.14) / 0.98, 0, 1);
-        const ridge = Math.abs(sheen) * 0.12 + mixFactor * 0.06 + waveGlint * 0.12;
-        const alpha = clamp(minAlpha + density * (maxAlpha - minAlpha) + ridge, 0, 0.78);
+        const alpha = clamp(bodyAlpha + glowWave * 0.05 + meniscus * edgeAlphaBoost + waveGlint * 0.08, 0.30, 0.82);
 
         data[ptr] = r < 0 ? 0 : r > 255 ? 255 : r | 0;
         data[ptr + 1] = g < 0 ? 0 : g > 255 ? 255 : g | 0;
@@ -671,29 +696,30 @@ export function createFluidSimulation({ cols = 104, rows = 60 } = {}) {
   }
 
   function stats() {
-    let sumA = 0;
-    let sumB = 0;
-    let mixSum = 0;
+    let countA = 0;
+    let countB = 0;
+    let interfaceCells = 0;
+    let phiSum = 0;
     let kinetic = 0;
     let curlEnergy = 0;
     let finite = true;
-    const count = W * H;
+    const total = W * H;
 
     for (let j = 1; j <= H; j++) {
       const row = j * stride;
       for (let i = 1; i <= W; i++) {
         const k = row + i;
-        const a = dyeA[k];
-        const b = dyeB[k];
+        const c = phi[k];
         const uk = u[k];
         const vk = v[k];
-        if (!Number.isFinite(a) || !Number.isFinite(b) || !Number.isFinite(uk) || !Number.isFinite(vk)) {
+        if (!Number.isFinite(c) || !Number.isFinite(uk) || !Number.isFinite(vk)) {
           finite = false;
         }
-        sumA += a;
-        sumB += b;
-        const tot = a + b + 1e-4;
-        mixSum += (4 * a * b) / (tot * tot);
+        phiSum += c;
+        if (c > 0) countA++;
+        else countB++;
+        // Células realmente intermediárias (misturadas) — em líquidos imiscíveis deve ser mínimo!
+        if (Math.abs(c) < 0.35) interfaceCells++;
         kinetic += uk * uk + vk * vk;
         curlEnergy += Math.abs(curl[k]);
       }
@@ -703,11 +729,12 @@ export function createFluidSimulation({ cols = 104, rows = 60 } = {}) {
       cols: W,
       rows: H,
       finite,
-      meanA: sumA / count,
-      meanB: sumB / count,
-      mixRatio: mixSum / count,
-      kineticEnergy: kinetic / count,
-      curlEnergy: curlEnergy / count
+      shareA: countA / total,
+      shareB: countB / total,
+      meanPhi: phiSum / total,
+      interfaceRatio: interfaceCells / total,
+      kineticEnergy: kinetic / total,
+      curlEnergy: curlEnergy / total
     };
   }
 
@@ -722,8 +749,7 @@ export function createFluidSimulation({ cols = 104, rows = 60 } = {}) {
     applyRipple,
     renderToImageData,
     stats,
-    // Expostos apenas para inspeção/teste
-    getFields: () => ({ u, v, dyeA, dyeB, curl, ripple, stride, W, H })
+    getFields: () => ({ u, v, phi, curl, ripple, stride, W, H })
   };
 }
 
@@ -739,9 +765,8 @@ function isReducedMotion() {
 }
 
 /**
- * Conecta a simulação de 2 líquidos ao <canvas> do Catálogo de Apresentações.
- * Permite reaproveitar `existingSim` entre re-renders do catálogo para que os
- * líquidos nunca deem saltos ao trocar abas/filtros.
+ * Conecta a simulação de 2 líquidos imiscíveis ao <canvas> do Catálogo.
+ * Mantém `existingSim` vivo entre re-renders para os líquidos nunca saltarem ao filtrar.
  */
 export function mountCatalogFluid({ page, canvas, existingSim = null }) {
   if (!page || !canvas || typeof canvas.getContext !== 'function') {
@@ -755,8 +780,8 @@ export function mountCatalogFluid({ page, canvas, existingSim = null }) {
   const w0 = Math.max(320, rect0.width || window.innerWidth || 1200);
   const h0 = Math.max(240, rect0.height || window.innerHeight || 720);
   const aspect = clamp(h0 / w0, 0.42, 1.45);
-  const targetCols = w0 < 680 ? 78 : 108;
-  const targetRows = clamp(Math.round(targetCols * aspect), 44, 84);
+  const targetCols = w0 < 680 ? 88 : 128;
+  const targetRows = clamp(Math.round(targetCols * aspect), 52, 92);
 
   const sim = existingSim || createFluidSimulation({ cols: targetCols, rows: targetRows });
 

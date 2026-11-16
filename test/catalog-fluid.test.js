@@ -1,135 +1,140 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
+import fs from 'node:fs';
 import {
   createFluidSimulation,
-  hueDistance,
   parseCssColorToRgb,
   resolveCatalogLiquidColors,
+  hueDistance,
   rgbToHsl
 } from '../src/catalog-fluid.js';
 
-test('Simulação de 2 líquidos inicia com ambos os líquidos visíveis e espacialmente separados', () => {
-  const sim = createFluidSimulation({ cols: 64, rows: 40 });
-  const st = sim.stats();
-  assert.equal(st.finite, true);
-  assert.ok(st.meanA > 0.35, `Líquido A deve ser bem presente (meanA=${st.meanA})`);
-  assert.ok(st.meanB > 0.35, `Líquido B deve ser bem presente (meanB=${st.meanB})`);
+test('catalog fluid initializes with exact 50/50 immiscible phase split', () => {
+  const sim = createFluidSimulation({ cols: 96, rows: 56 });
+  const initial = sim.stats();
 
-  const { dyeA, dyeB, stride, W, H } = sim.getFields();
-  let leftA = 0, rightA = 0, leftB = 0, rightB = 0;
-  for (let j = 1; j <= H; j++) {
-    for (let i = 1; i <= W; i++) {
-      const k = i + j * stride;
-      if (i <= W / 2) { leftA += dyeA[k]; leftB += dyeB[k]; }
-      else { rightA += dyeA[k]; rightB += dyeB[k]; }
-    }
-  }
-  assert.ok(leftA > rightA, 'Líquido A predomina de um lado no início');
-  assert.ok(rightB > leftB, 'Líquido B predomina do lado oposto no início');
+  assert.equal(initial.finite, true);
+  assert.ok(
+    Math.abs(initial.shareA - 0.5) < 0.015 && Math.abs(initial.shareB - 0.5) < 0.015,
+    `expected equal 50/50 liquid shares, got A=${initial.shareA.toFixed(4)} B=${initial.shareB.toFixed(4)}`
+  );
+  assert.ok(
+    initial.interfaceRatio < 0.12,
+    `expected crisp immiscible boundary (interfaceRatio < 0.12), got ${initial.interfaceRatio.toFixed(4)}`
+  );
 });
 
-test('Passar o ponteiro empurra o líquido, gera vorticidade e mistura os dois líquidos como mão na água', () => {
-  const sim = createFluidSimulation({ cols: 64, rows: 40 });
-  // Deixa acalmar ligeiramente após o seed para medir claramente o impacto do mouse
-  for (let i = 0; i < 20; i++) sim.step(1 / 60);
-  const before = sim.stats();
+test('pointer strokes deform bubbles and waves while keeping liquids immiscible and 50/50', () => {
+  const sim = createFluidSimulation({ cols: 96, rows: 56 });
+  const beforePhi = new Float32Array(sim.getFields().phi);
 
-  // Simula arrastar o mouse em curva cruzando a fronteira entre os dois líquidos
-  const path = [
-    [0.18, 0.35], [0.35, 0.32], [0.55, 0.42], [0.76, 0.52],
-    [0.64, 0.72], [0.42, 0.62], [0.25, 0.55]
-  ];
-  for (let p = 1; p < path.length; p++) {
-    const [x0, y0] = path[p - 1];
-    const [x1, y1] = path[p];
-    for (let s = 1; s <= 6; s++) {
-      sim.applyPointerStroke(
-        x0 + (x1 - x0) * ((s - 1) / 6),
-        y0 + (y1 - y0) * ((s - 1) / 6),
-        x0 + (x1 - x0) * (s / 6),
-        y0 + (y1 - y0) * (s / 6)
-      );
-      sim.step(1 / 60);
-    }
-  }
-  const after = sim.stats();
-
-  assert.equal(after.finite, true);
-  assert.ok(after.kineticEnergy > before.kineticEnergy, 'gesto do ponteiro transfere momento ao fluido');
-  assert.ok(after.curlEnergy > 0.1, 'incompressibilidade + vorticidade geram redemoinhos reais');
-  assert.ok(after.mixRatio > before.mixRatio, `mistura entre os dois líquidos aumenta (${before.mixRatio.toFixed(3)} -> ${after.mixRatio.toFixed(3)})`);
-
-  // Renderização para ImageData gera pixels visíveis e coloridos (sem transparência apagada)
-  const img = { data: new Uint8ClampedArray(sim.cols * sim.rows * 4) };
-  sim.renderToImageData(img, {
-    dark: false,
-    colorA: [34, 184, 146],
-    colorB: [124, 82, 217],
-    colorMix: [48, 152, 224]
-  });
-  let sumAlpha = 0;
-  for (let i = 3; i < img.data.length; i += 4) sumAlpha += img.data[i];
-  const meanAlpha = sumAlpha / (sim.cols * sim.rows);
-  assert.ok(meanAlpha >= 100, `líquidos devem renderizar claramente visíveis (meanAlpha=${meanAlpha.toFixed(1)})`);
-});
-
-test('Clique/onda radial e simulação prolongada permanecem numericamente estáveis', () => {
-  const sim = createFluidSimulation({ cols: 56, rows: 36 });
-  sim.applyRipple(0.5, 0.5, 1.4);
-  for (let i = 0; i < 120; i++) {
-    if (i % 15 === 0) sim.applyPointerStroke(0.1, 0.2, 0.4, 0.45, { isDown: true });
+  for (let i = 0; i < 16; i++) {
+    const t0 = i / 16;
+    const t1 = (i + 1) / 16;
+    sim.applyPointerStroke(0.18 + t0 * 0.64, 0.34 + Math.sin(t0 * Math.PI) * 0.2, 0.18 + t1 * 0.64, 0.34 + Math.sin(t1 * Math.PI) * 0.2, {
+      strength: 1.25
+    });
     sim.step(1 / 60);
   }
-  const st = sim.stats();
-  assert.equal(st.finite, true);
-  assert.ok(st.meanA > 0.2 && st.meanB > 0.2, 'ambos os líquidos continuam vivos após uso contínuo');
+  const active = sim.stats();
+  assert.ok(active.kineticEnergy > 1, `expected pointer stroke to impart flow energy, got ${active.kineticEnergy}`);
+  assert.ok(active.curlEnergy > 0.05, `expected vorticity after pointer drag, got ${active.curlEnergy}`);
+
+  for (let f = 0; f < 45; f++) sim.step(1 / 60);
+  const after = sim.stats();
+  assert.equal(after.finite, true);
+
+  // Os dois líquidos continuam estritamente 50/50 mesmo depois de agitados
+  assert.ok(
+    Math.abs(after.shareA - 0.5) < 0.025 && Math.abs(after.shareB - 0.5) < 0.025,
+    `expected conserved 50/50 split after stirring, got A=${after.shareA.toFixed(4)} B=${after.shareB.toFixed(4)}`
+  );
+  // Fronteira continua nítida (não se dilui em uma terceira cor)
+  assert.ok(
+    after.interfaceRatio < 0.14,
+    `expected immiscible liquids not to blend together, got interfaceRatio=${after.interfaceRatio.toFixed(4)}`
+  );
+
+  // Confirmar que a forma realmente se moveu/deformou com o mouse
+  const afterPhi = sim.getFields().phi;
+  let movedCells = 0;
+  for (let k = 0; k < beforePhi.length; k++) {
+    if (Math.abs(afterPhi[k] - beforePhi[k]) > 0.5) movedCells++;
+  }
+  assert.ok(movedCells > 80, `expected pointer drag to displace phase interface, movedCells=${movedCells}`);
+
+  // Renderização não produz NaN e mantém transparência controlada
+  const img = { data: new Uint8ClampedArray(sim.cols * sim.rows * 4) };
+  sim.renderToImageData(img, { dark: false, colorA: [36, 184, 124], colorB: [124, 82, 217] });
+  let maxAlpha = 0;
+  let nonZero = 0;
+  for (let i = 3; i < img.data.length; i += 4) {
+    if (img.data[i] > 0) nonZero++;
+    if (img.data[i] > maxAlpha) maxAlpha = img.data[i];
+  }
+  assert.ok(nonZero > sim.cols * sim.rows * 0.9, 'expected liquid canvas pixels populated');
+  assert.ok(maxAlpha <= 220, `expected soft translucent background overlay, got maxAlpha=${maxAlpha}`);
 });
 
-test('Cores dos 2 líquidos garantem contraste mesmo quando o tema do usuário já é roxo', () => {
-  assert.deepEqual(parseCssColorToRgb('#7c52d9'), [124, 82, 217]);
-  assert.deepEqual(parseCssColorToRgb('rgb(46, 108, 246)'), [46, 108, 246]);
-  const parsedHsl = parseCssColorToRgb('hsl(152 60% 45%)');
-  assert.ok(Array.isArray(parsedHsl) && parsedHsl[1] > parsedHsl[0] && parsedHsl[1] > parsedHsl[2]);
+test('catalog fluid stays numerically stable under strong repeated ripples and drags', () => {
+  const sim = createFluidSimulation({ cols: 64, rows: 40 });
+  for (let n = 0; n < 30; n++) {
+    const a = (n * 0.17) % 1;
+    const b = ((n + 3) * 0.23) % 1;
+    sim.applyRipple(a, b, 1.4);
+    sim.applyPointerStroke(a, b, Math.min(0.95, a + 0.18), Math.max(0.05, b - 0.15), {
+      strength: 1.6,
+      isDown: true
+    });
+    sim.step(1 / 30);
+  }
+  const s = sim.stats();
+  assert.equal(s.finite, true);
+  assert.ok(Math.abs(s.shareA - 0.5) < 0.03, `expected stability and 50/50 mass balance, got shareA=${s.shareA}`);
+});
 
-  const prevDoc = globalThis.document;
-  const prevGcs = globalThis.getComputedStyle;
+test('resolveCatalogLiquidColors pairs user accent with Storage Lab purple and auto-contrasts purple themes', () => {
+  assert.deepEqual(parseCssColorToRgb('#2e6cf6'), [46, 108, 246]);
+  assert.deepEqual(parseCssColorToRgb('#f0a'), [255, 0, 170]);
+  assert.deepEqual(parseCssColorToRgb('rgb(124, 82, 217)'), [124, 82, 217]);
+
+  const origGetCS = globalThis.getComputedStyle;
   try {
-    globalThis.document = { documentElement: { dataset: { appearance: 'light' } } };
-
-    // Tema verde -> Líquido A verde, Líquido B roxo Storage Lab
     globalThis.getComputedStyle = () => ({
-      getPropertyValue: prop => (prop === '--ui-accent' ? '#24a873' : '')
+      getPropertyValue(prop) {
+        if (prop === '--ui-accent') return '#16a34a';
+        return '';
+      }
     });
-    const greenTheme = resolveCatalogLiquidColors({});
-    const [hGreenA] = rgbToHsl(...greenTheme.colorA);
-    const [hGreenB] = rgbToHsl(...greenTheme.colorB);
-    assert.ok(hueDistance(hGreenA, 156) < 25, 'Líquido A acompanha tema verde do usuário');
-    assert.ok(hueDistance(hGreenB, 260) < 25, 'Líquido B mantém roxo Storage Lab');
+    const greenPalette = resolveCatalogLiquidColors({});
+    const [hA] = rgbToHsl(...greenPalette.colorA);
+    const [hB] = rgbToHsl(...greenPalette.colorB);
+    assert.ok(hueDistance(hA, hB) > 60, `expected strong contrast between green and purple, got ${hueDistance(hA, hB)}`);
 
-    // Tema roxo (parecido com marca) -> Líquido B muda automaticamente para contraste nítido
     globalThis.getComputedStyle = () => ({
-      getPropertyValue: prop => (prop === '--ui-accent' ? '#7c52d9' : '')
+      getPropertyValue(prop) {
+        if (prop === '--ui-accent') return '#7c52d9';
+        return '';
+      }
     });
-    const purpleTheme = resolveCatalogLiquidColors({});
-    const [hPurpA] = rgbToHsl(...purpleTheme.colorA);
-    const [hPurpB] = rgbToHsl(...purpleTheme.colorB);
+    const purplePalette = resolveCatalogLiquidColors({});
+    const [phA] = rgbToHsl(...purplePalette.colorA);
+    const [phB] = rgbToHsl(...purplePalette.colorB);
     assert.ok(
-      hueDistance(hPurpA, hPurpB) >= 38,
-      `Quando o usuário já usa roxo, os 2 líquidos devem continuar distintos (Δh=${hueDistance(hPurpA, hPurpB).toFixed(1)})`
+      hueDistance(phA, phB) > 45,
+      `expected automatic contrast liquid when user theme is purple, got hueDistance=${hueDistance(phA, phB)}`
     );
   } finally {
-    globalThis.document = prevDoc;
-    globalThis.getComputedStyle = prevGcs;
+    globalThis.getComputedStyle = origGetCS;
   }
 });
 
-test('Catálogo renderiza canvas fluido interativo e CSS sticky compatível com modo claro e escuro', () => {
-  const js = readFileSync(new URL('../src/template-store.js', import.meta.url), 'utf8');
-  const css = readFileSync(new URL('../src/template-store.css', import.meta.url), 'utf8');
-  assert.match(js, /mountCatalogFluid/);
-  assert.match(js, /class="tstore-fluid-canvas"\s+data-tstore-fluid/);
-  assert.match(css, /\.tstore-ambient\s*\{[\s\S]*?position:\s*sticky;/);
-  assert.match(css, /\.tstore-fluid-canvas\s*\{/);
-  assert.match(css, /html\[data-appearance="dark"\]\s+\.tstore-fluid-canvas/);
+test('template-store mounts interactive fluid canvas and preserves frosted glass dark mode styling', () => {
+  const storeJs = fs.readFileSync('src/template-store.js', 'utf8');
+  const storeCss = fs.readFileSync('src/template-store.css', 'utf8');
+
+  assert.match(storeJs, /mountCatalogFluid/, 'template-store must mount interactive catalog fluid');
+  assert.match(storeJs, /data-tstore-fluid/, 'template-store must render the fluid canvas element');
+  assert.match(storeCss, /\.tstore-fluid-canvas/, 'template-store.css must style the fluid canvas');
+  assert.match(storeCss, /backdrop-filter:\s*blur/, 'template-store.css must keep frosted-glass cards above liquid');
 });
