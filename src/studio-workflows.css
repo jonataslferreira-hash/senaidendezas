@@ -318,7 +318,7 @@ html[data-appearance=dark] .storage-ai-page {
 .ai-page-heading { display: flex; align-items: start; justify-content: space-between; flex-wrap: wrap; gap: 8px 14px; animation: ai-message-in .65s .08s cubic-bezier(.2,.8,.2,1) both; }
 .ai-page-heading h1 { font-size: clamp(24px, 4vw, 48px); line-height: 1.1; margin: 5px 0; }
 .ai-page-heading p { opacity: .8; margin: 0; }
-.storage-ai-page form { display: flex; flex: 1; flex-direction: column; min-height: 0; animation: ai-message-in .7s .18s cubic-bezier(.2,.8,.2,1) both; }
+.storage-ai-page form { display: flex; flex: 1; flex-direction: column; min-height: 0; }
 .storage-ai-page .ai-create-log { flex: 1; min-height: 0; max-height: none; margin: 0; padding: clamp(8px, 2vw, 24px) 2px; }
 .storage-ai-page .ai-create-log p { font-size: 15px; padding: 12px 16px; animation: ai-message-in .24s ease-out both; }
 @keyframes ai-message-in { from { opacity:0; transform:translateY(8px); } to { opacity:1; transform:translateY(0); } }
