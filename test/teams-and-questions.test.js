@@ -5,10 +5,10 @@ import { teamPalette, defaultGame } from '../src/stage-games.js';
 import { dedupeQuestions } from '../src/question-dedupe.js';
 import { gameNames } from '../src/stage-games.js';
 
-test('equipes aceitam até 8 times com cores e nomes distintos', () => {
-  assert.equal(teamPalette.length, 8);
-  assert.equal(new Set(teamPalette.map(([, color]) => color)).size, 8, 'cores devem ser únicas');
-  assert.equal(new Set(teamPalette.map(([name]) => name)).size, 8, 'nomes devem ser únicos');
+test('equipes aceitam até 10 times com cores e nomes distintos', () => {
+  assert.equal(teamPalette.length, 10);
+  assert.equal(new Set(teamPalette.map(([, color]) => color)).size, 10, 'cores devem ser únicas');
+  assert.equal(new Set(teamPalette.map(([name]) => name)).size, 10, 'nomes devem ser únicos');
   assert.equal(defaultGame('teams').count, 2);
 });
 

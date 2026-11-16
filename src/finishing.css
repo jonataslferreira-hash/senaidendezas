@@ -2992,3 +2992,10 @@ dialog.simulation-modal .simulation-modal-foot-tools { display: none; }
 .team-leader-row{display:flex;gap:8px;flex-wrap:wrap}
 .team-pick-photo{width:54px;height:54px;border-radius:12px;object-fit:cover;border:2px solid #ffffff52;margin-bottom:4px}
 .stage-ai-field .studio-btn.is-loading{opacity:.6;pointer-events:none}
+
+/* Equipes ao vivo: controle de quantidade de times no telão. */
+.team-count-control{display:grid;gap:7px;justify-items:start;margin:10px 0;padding:12px 14px;border-radius:14px;border:1px solid #ffffff2b;background:#16122799}
+.team-count-control>label{font-size:12.5px;color:#e7dcff;font-weight:650}
+.team-count-row{display:flex;gap:8px;align-items:center}
+.team-count-control select{font:inherit;padding:7px 10px;border-radius:9px;border:1px solid #ffffff38;background:#0f0c1cd9;color:#fff}
+.team-count-control small{font-size:11.5px;color:#c9bdf0}

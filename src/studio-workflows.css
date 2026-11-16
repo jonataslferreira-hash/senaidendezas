@@ -327,7 +327,7 @@ html[data-appearance=dark] .storage-ai-page {
 .ai-input-area input[type=number] { width: 65px; margin-left: 6px; padding: 6px; background: var(--ui-soft); color: var(--ui-ink); border: 1px solid var(--ui-line); border-radius: 8px; }
 .ai-input-area input[hidden], .ai-input-area [role=status]:empty { display: none; }
 .ai-input-area [role=status] { margin: 6px 0 0; font-size: 13px; }
-#app :is(button[data-studio-action="storage-ai"], .ai-tool):is(:hover,:focus-visible) {
+#app button[data-studio-action="storage-ai"]:is(:hover,:focus-visible), #app .ai-tool:not(.studio-btn):is(:hover,:focus-visible) {
   color: #fff !important;
   background: linear-gradient(115deg,#1956bd,#6236b7,#174fbe) !important;
   background-size: 220% 100% !important;
@@ -341,10 +341,10 @@ html[data-appearance=dark] .storage-ai-page {
 @media(prefers-reduced-motion:reduce) {
   html:not([data-motion=normal]) :is(.storage-ai-page,.ai-page-heading,.storage-ai-page form,.storage-ai-page .ai-create-log p),
   html:not([data-motion=normal]) .storage-ai-page::before,
-  html:not([data-motion=normal]) #app :is(button[data-studio-action="storage-ai"], .ai-tool):is(:hover,:focus-visible) { animation:none; }
+  html:not([data-motion=normal]) #app button[data-studio-action="storage-ai"]:is(:hover,:focus-visible), #app .ai-tool:not(.studio-btn):is(:hover,:focus-visible) { animation:none; }
 }
 html[data-motion=reduced] .storage-ai-page,html[data-motion=reduced] .storage-ai-page::before,html[data-motion=reduced] .ai-page-heading,html[data-motion=reduced] .storage-ai-page form,html[data-motion=reduced] .storage-ai-page .ai-create-log p,
-html[data-motion=reduced] #app :is(button[data-studio-action="storage-ai"], .ai-tool):is(:hover,:focus-visible) { animation:none; }
+html[data-motion=reduced] #app button[data-studio-action="storage-ai"]:is(:hover,:focus-visible), #app .ai-tool:not(.studio-btn):is(:hover,:focus-visible) { animation:none; }
 .editor-download summary { min-width: 38px; padding-inline: 9px; }
 #app .designer-arrange { position:relative; display:grid; grid-template-columns:repeat(6,minmax(0,1fr)); gap:4px; margin-block:8px; }
 #app .designer-arrange .element-animation { margin:0; padding:0; border:0; }
@@ -808,3 +808,16 @@ html[data-motion=reduced] #app .ai-instant-button.is-active{animation:none}
   #app .join-card-head{gap:11px;margin-bottom:12px}
   #app .join-card-mark{width:38px;height:38px;border-radius:11px}
 }
+
+/* Botão do Storage AI no editor: a mesma aurora animada da página da IA. */
+#app .studio-btn.ai-tool { position: relative; overflow: hidden; isolation: isolate; border: 1px solid #ffffff2b; background: #141830; color: #fff; }
+#app .studio-btn.ai-tool svg, html[data-appearance=dark] #app .studio-btn.ai-tool svg { color: #fff; }
+#app .studio-btn.ai-tool::before, #app .studio-btn.ai-tool::after { content: ''; position: absolute; inset: -55%; z-index: -1; pointer-events: none; }
+#app .studio-btn.ai-tool::before { background: radial-gradient(ellipse 44% 25% at 37% 43%, #74a9ffa3, transparent), radial-gradient(ellipse 39% 23% at 68% 58%, #ba94f7ad, transparent); animation: ai-aurora-drift 9s ease-in-out infinite; }
+#app .studio-btn.ai-tool::after { background: radial-gradient(ellipse 40% 19% at 55% 56%, #a5edfb8a, transparent), radial-gradient(ellipse 30% 26% at 78% 49%, #793fbe96, transparent); animation: ai-aurora-drift 13s -4s ease-in-out infinite reverse; }
+#app .studio-btn.ai-tool[aria-pressed="true"] { box-shadow: 0 0 0 2px #ba94f780; }
+#app .studio-btn.ai-tool:disabled { filter: saturate(.45) brightness(.82); }
+@media (prefers-reduced-motion: reduce) {
+  html:not([data-motion=normal]) #app .studio-btn.ai-tool::before, html:not([data-motion=normal]) #app .studio-btn.ai-tool::after { animation: none; }
+}
+html[data-motion=reduced] #app .studio-btn.ai-tool::before, html[data-motion=reduced] #app .studio-btn.ai-tool::after { animation: none; }

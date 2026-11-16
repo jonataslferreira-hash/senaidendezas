@@ -666,6 +666,7 @@ app.addEventListener('click', event => {
   if (!button || button.disabled || !state?.game) return;
   if (button.dataset.gameDo === 'team-rename') { if (host) control('game', { do: 'team-rename', team: Number(button.dataset.team), name: button.closest('.team-rename')?.querySelector('[data-team-rename-input]')?.value || '' }); return; }
   if (button.dataset.gameDo === 'team-leader') { if (host) control('game', { do: 'team-leader', team: Number(button.dataset.team), player: button.dataset.player || '' }); return; }
+  if (button.dataset.gameDo === 'team-count') { if (host) control('game', { do: 'team-count', count: Number(button.closest('.team-count-control')?.querySelector('[data-team-count-select]')?.value) || 2 }); return; }
   if (button.dataset.gameDo) { control('game', { do: button.dataset.gameDo, id: button.dataset.id }); return; }
   if (button.hasAttribute('data-challenge-send')) {
     const values = [...app.querySelectorAll('[data-challenge-sim] :is([data-param],[data-sim-select],[data-sim-text],[data-sim-toggle])')].map(field => field.dataset.simToggle !== undefined ? field.dataset.value || '0' : String(field.value).slice(0, 80));

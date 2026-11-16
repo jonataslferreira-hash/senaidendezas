@@ -268,7 +268,7 @@ informa o problema e permite exportar o rascunho em JSON.
 
 ## Aula ao vivo e quiz
 
-- **Equipes:** até **8 times** (Azul, Laranja, Verde, Rosa, Roxo, Ciano, Amarelo e Vermelho). No telão, o professor toca no nome de um aluno para torná-lo **líder do time** — o líder pode trocar o **nome** e a **foto da equipe** pelo próprio celular, e as mudanças aparecem para todo mundo.
+- **Equipes:** até **10 times** (Azul, Laranja, Verde, Rosa, Roxo, Ciano, Amarelo, Vermelho, Lima e Magenta). A quantidade é definida no editor e **também pode ser mudada pelo apresentador na hora**, preservando nome, foto e líder dos times que continuam. No telão, o professor toca no nome de um aluno para torná-lo **líder do time** — o líder pode trocar o **nome** e a **foto da equipe** pelo próprio celular, e as mudanças aparecem para todo mundo.
 - **Abertura das etapas:** cada etapa (equipes, jogos, enquete, quiz) entra com uma cartela animada e uma fanfarra curta estilo chiptune.
 - **Storage AI nas etapas:** nas etapas com perguntas (Relâmpago, Sobrevivência, Corrida e Cabo de guerra), o botão **Gerar perguntas com o Storage AI** escreve perguntas sobre o conteúdo real dos slides da aula.
 
