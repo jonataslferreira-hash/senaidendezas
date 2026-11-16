@@ -53,6 +53,28 @@ Os arquivos são armazenados localmente no IndexedDB. O JSON exportado inclui
 os arquivos do modelo para levar a aula a outro computador. Os alunos recebem
 o modelo da aula pelo convite, sem precisar enviá-lo novamente.
 
+## Biblioteca online de modelos
+
+Ao lado do envio de arquivo, o botão **Biblioteca online** abre um catálogo
+pronto com mais de 100 modelos 3D gratuitos, com busca e filtros por tema:
+
+- **Espaço e Astronomia · Foguetes e Missões · Marte e Rovers · Terra e
+  Clima** — modelos oficiais da NASA (domínio público): telescópios Hubble e
+  James Webb, Saturno V, Estação Espacial Internacional, rover Perseverance,
+  helicóptero Ingenuity, satélites de clima e mais.
+- **Natureza e Plantas · Animais · Alimentos · Idade Média** — modelos CC0 do
+  Kenney: árvores, flores e plantações para montar ecossistemas, animais para
+  os anos iniciais, alimentos para educação alimentar e máquinas de cerco
+  (catapulta, trabuco) para história e física.
+
+Tudo sem cadastro, sem chave de API e sem custo — as fontes são o repositório
+oficial [NASA 3D Resources](https://github.com/nasa/NASA-3D-Resources)
+(domínio público) e coleções [Kenney](https://kenney.nl) licenciadas em CC0,
+servidas pelo GitHub. Ao clicar em **Baixar e usar**, o modelo é baixado no
+navegador e passa a fazer parte da aula como um modelo enviado: funciona
+offline depois, viaja no arquivo exportado e chega aos alunos pelo convite.
+A primeira vez precisa de internet; o resto da aula, não.
+
 ## Criar e apresentar
 
 1. Na biblioteca, clique em **Nova aula** ou edite a demonstração.

@@ -32,6 +32,7 @@ import { canvasMarkup, CanvasModels } from './canvas-view.js';
 import { Studio } from './studio.js';
 import './studio.css';
 import './documents.css';
+import './online-library.css';
 import { lobbyMarkup } from './lobby.js';
 import './quiz-party.css';
 let activeLesson = demoLesson();

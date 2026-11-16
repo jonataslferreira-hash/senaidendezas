@@ -40,9 +40,10 @@ import { createTemplateStore } from './template-store.js';
 import { archiveImportedPages, fillAssetImages, hydrateLesson, removePageAssets } from './assets.js';
 const assetImage = (slide, cls = '') => `<img class="${cls}" ${slide.image ? `src="${esc(slide.image)}"` : `data-asset-id="${esc(slide.assetId)}"`} alt="${esc(slide.imageAlt || slide.title)}">`;
 import { HardwareViewer } from './models.js';
-import { modelOptionsMarkup, modelShortName } from './model-catalog.js';
+import { BUILTIN_MODELS, modelOptionsMarkup, modelShortName } from './model-catalog.js';
 import { SlideDesigner } from './slide-designer.js';
 import { importModelFiles } from './model-files.js';
+import { openOnlineLibrary } from './online-library.js';
 import { lessonAssetIds } from './assets.js';
 import './designer.css';
 const esc = value => String(value ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -660,7 +661,7 @@ export class Studio {
     if (s.kind === 'document') return this.documentEditor(s);
     return `${this.itemToolbar('slide', this.index, this.draft.slides.length)}<div class="editor-field"><label for="slide-kind">Formato do slide</label><select id="slide-kind" data-scope="slide" data-field="kind">${[['text', 'Texto e ideias'], ['image', 'Imagem e explicação'], ['model', 'Modelo 3D interativo']].map(([v, label]) => `<option value="${v}" ${s.kind === v ? 'selected' : ''}>${label}</option>`).join('')}</select></div>
       ${field('Título do slide', 'title', s.title, 'slide', { attributes: 'maxlength="200"' })}${field('Etiqueta', 'tag', s.tag, 'slide', { attributes: 'maxlength="160" placeholder="Ex.: O ponto de partida"' })}${field('Introdução', 'intro', s.intro, 'slide', { textarea: true })}${field('Ideias principais', 'points', s.points.join('\n'), 'slide', { textarea: true, hint: 'Uma ideia por linha. Até 12 tópicos.' })}
-      ${s.kind === 'model' ? `<div class="editor-field"><label for="slide-model">Modelo para explorar</label><select id="slide-model" data-scope="slide" data-field="model">${modelOptionsMarkup(s.model, { customLabel: s.customModel?.name || 'Meu modelo enviado' })}</select><small>Use um dos 13 modelos da biblioteca ou envie um modelo próprio.</small>${button('upload-native-model', '↑ Enviar modelo GLB / GLTF / OBJ', 'quiet')}<input type="file" id="native-model-files" accept=".glb,.gltf,.obj,.mtl,.bin,.png,.jpg,.jpeg,.webp,.gif,.ktx2" multiple hidden>${s.customModel ? `<small>${esc(s.customModel.name)}</small>` : ''}<small>GLB é mais prático. Em OBJ/GLTF, selecione também MTL, BIN e texturas. Até 15 MB no total.</small><div class="native-model-preview"></div></div>` : ''}
+      ${s.kind === 'model' ? `<div class="editor-field"><label for="slide-model">Modelo para explorar</label><select id="slide-model" data-scope="slide" data-field="model">${modelOptionsMarkup(s.model, { customLabel: s.customModel?.name || 'Meu modelo enviado' })}</select><small>Use um dos ${BUILTIN_MODELS.length} modelos da biblioteca ou envie um modelo próprio.</small>${button('upload-native-model', '↑ Enviar modelo GLB / GLTF / OBJ', 'quiet')}${button('online-library-model', '⤓ Biblioteca online', 'quiet')}<input type="file" id="native-model-files" accept=".glb,.gltf,.obj,.mtl,.bin,.png,.jpg,.jpeg,.webp,.gif,.ktx2" multiple hidden>${s.customModel ? `<small>${esc(s.customModel.name)}</small>` : ''}<small>GLB é mais prático. Em OBJ/GLTF, selecione também MTL, BIN e texturas. Até 15 MB no total. A biblioteca online baixa modelos gratuitos de NASA e Kenney (CC0).</small><div class="native-model-preview"></div></div>` : ''}
       ${s.kind === 'image' ? `<div class="image-editor">${field('Link da imagem', 'image', s.image.startsWith('data:') ? '' : s.image, 'slide', { type: 'url', attributes: 'placeholder="https://..."', hint: s.image.startsWith('data:') ? 'Imagem incorporada ao arquivo da aula.' : 'Use um link HTTPS ou carregue uma imagem abaixo.' })}<label class="upload-image" for="slide-image-file">↑ Carregar imagem do computador</label><input id="slide-image-file" type="file" accept="image/png,image/jpeg,image/webp,image/gif" hidden>${field('Descrição da imagem', 'imageAlt', s.imageAlt, 'slide', { attributes: 'maxlength="500"', hint: 'Descreva o que a turma deve observar. Também ajuda quem usa leitor de tela.' })}${s.image || s.assetId ? button('clear-image', 'Remover imagem', 'link') : ''}</div>` : ''}
       ${field('Destaque', 'callout', s.callout, 'slide', { textarea: true })}${s.comparison ? button('clear-comparison', 'Remover comparação HDD × SSD deste slide', 'link') : ''}<details class="editor-details" ${s.prompt ? 'open' : ''}><summary>↗ Pergunta para discutir com a turma</summary>${field('Pergunta de discussão', 'prompt', s.prompt, 'slide', { textarea: true })}${field('Explicação da discussão', 'answer', s.answer, 'slide', { textarea: true })}</details><details class="editor-details"><summary>▤ Roteiro do apresentador</summary>${field('Notas só para o professor', 'note', s.note, 'slide', { textarea: true, hint: 'As notas não são enviadas aos celulares dos alunos.' })}</details>`;
   }
@@ -982,6 +983,16 @@ export class Studio {
     if (!model || this.draft.slides[this.index] !== slide) return;
     slide.model = 'custom'; slide.customModel = model; this.markDirty(); this.callbacks.render();
   }
+  openOnlineModelLibrary() {
+    const slide = this.draft.slides[this.index];
+    if (!slide) return;
+    openOnlineLibrary({
+      onModel: model => {
+        if (!model || !this.draft.slides.includes(slide)) return;
+        slide.model = 'custom'; slide.customModel = model; this.markDirty(); this.callbacks.render();
+      }
+    });
+  }
   async action(action, target) {
     if (action === 'mobile-actions' || action === 'close-mobile-actions') {
       const toggle = this.root.querySelector('.mobile-editor-actions');
@@ -1098,6 +1109,7 @@ export class Studio {
       this.markDirty(); }
     else if (action === 'toggle-visual') { this.visualMode = !this.visualMode; this.designer.interacting = ''; }
     else if (action === 'upload-native-model') { this.root.querySelector('#native-model-files').click(); return; }
+    else if (action === 'online-library-model') { this.openOnlineModelLibrary(); return; }
     else if (action === 'restore-demo') { const l = this.library.restoreDemo(); this.open(l.id); }
     else if (action === 'edit') {if(await this.groups.openForLesson(id))return;this.open(id);}
     else if (action === 'save') { await this.saveEditor(); return; }

@@ -14,6 +14,7 @@ import {openLayouts, applyOpenLayout} from './open-slide-layouts.js';
 import {slideStylePicker,localLayouts} from './slide-style-picker.js';
 import { canvasMarkup, CanvasModels, esc } from './canvas-view.js';
 import { importModelFiles } from './model-files.js';
+import { openOnlineLibrary } from './online-library.js';
 import { modelOptionsMarkup, modelSubject, modelShortName } from './model-catalog.js';
 import { storePages, fillAssetImages, fillAssetAudio } from './assets.js';
 import { searchImageChoices, importImageChoice, verifyTransparentChoice, mayBeTransparent } from './storage-ai-image-search.js';
@@ -462,7 +463,7 @@ export class SlideDesigner {
       ${this.imageEditing===e.id?'<small class="image-crop-hint">Arraste a imagem para mover · Roda do mouse ou puxar o canto inferior para dar zoom.</small>':''}
       <div class="designer-position-grid">${number('Deslocamento X (%)','imageX',e.imageX||0,'','')}${number('Deslocamento Y (%)','imageY',e.imageY||0,'','')}</div>
       <label>Descrição da imagem<input data-element-field="imageAlt" value="${esc(e.imageAlt)}"></label>${e.imageSource||e.imageLicense?`<p class="designer-image-credit"><strong>Créditos</strong> ${esc([e.imageCredit,e.imageLicense].filter(Boolean).join(' · '))}${e.imageSource?`<a href="${esc(e.imageSource)}" target="_blank" rel="noopener noreferrer">Ver origem</a>`:''}</p>`:''}` : ''}
-      ${e.type === 'model' ? `<label>Modelo · ${esc(e.model === 'custom' ? 'Personalizado' : modelSubject(e.model))}<select data-element-field="model" aria-label="Modelo do elemento">${modelOptionsMarkup(e.model, { customLabel: e.customModel?.name || 'Meu modelo enviado' })}</select></label><label>Nome do modelo<input data-element-field="modelLabel" maxlength="120" value="${esc(e.modelLabel||'')}" placeholder="${esc(e.model==='custom'?e.customModel?.name||'Modelo 3D':modelShortName(e.model))}"></label><label>Descrição do modelo<textarea data-element-field="modelDescription" maxlength="500" placeholder="Descrição ao explorar o modelo">${esc(e.modelDescription||'')}</textarea></label><label class="model-details-toggle"><input type="checkbox" data-element-field="modelDetailsHidden" ${e.modelDetailsHidden?'checked':''}> Mostrar somente o modelo 3D</label><div class="designer-model-actions">${btn('replace-model', '↑ Enviar GLB / GLTF / OBJ')}${btn('interact', this.interacting === e.id ? 'Voltar à edição' : 'Explorar o modelo')}</div>` : ''}
+      ${e.type === 'model' ? `<label>Modelo · ${esc(e.model === 'custom' ? 'Personalizado' : modelSubject(e.model))}<select data-element-field="model" aria-label="Modelo do elemento">${modelOptionsMarkup(e.model, { customLabel: e.customModel?.name || 'Meu modelo enviado' })}</select></label><label>Nome do modelo<input data-element-field="modelLabel" maxlength="120" value="${esc(e.modelLabel||'')}" placeholder="${esc(e.model==='custom'?e.customModel?.name||'Modelo 3D':modelShortName(e.model))}"></label><label>Descrição do modelo<textarea data-element-field="modelDescription" maxlength="500" placeholder="Descrição ao explorar o modelo">${esc(e.modelDescription||'')}</textarea></label><label class="model-details-toggle"><input type="checkbox" data-element-field="modelDetailsHidden" ${e.modelDetailsHidden?'checked':''}> Mostrar somente o modelo 3D</label><div class="designer-model-actions">${btn('replace-model', '↑ Enviar GLB / GLTF / OBJ')}${btn('online-library-model', '⤓ Biblioteca online')}${btn('interact', this.interacting === e.id ? 'Voltar à edição' : 'Explorar o modelo')}</div>` : ''}
       ${e.type==='video'?`<p class="designer-video-note">${esc(videoSource(e.video)?.label||'Sem vídeo')} · o vídeo toca na apresentação; aqui aparece só a capa.</p><div class="designer-simulation-actions">${btn('change-video','Trocar link do vídeo')}</div>`:''}
       ${e.type==='simulation'?`<label>Disciplina: ${esc(experimentSubject(e))}<select data-element-field="simulation" aria-label="Tipo de simulação">${isCustomExperiment(e)?`<option value="custom" selected>Importado · ${esc(e.customSim.name)}</option>`:''}${simulationGroups.map(([subject,items])=>`<optgroup label="${esc(subject)}">${items.map(([id,name])=>`<option value="${id}" ${e.simulation===id?'selected':''}>${esc(name)}</option>`).join('')}</optgroup>`).join('')}</select></label><div class="designer-simulation-actions">${btn('interact',this.interacting===e.id?'Voltar à edição':'Experimentar no slide')}${btn('preview-simulation','Abrir laboratório')}</div>`:''}${e.type === 'shape' ? `<div class="designer-type-settings"><label>Cor da forma<input type="color" data-element-field="background" value="${e.background}"></label><label>Cor da borda<input type="color" data-element-field="borderColor" value="${e.borderColor||'#ffffff'}"></label></div>
       <div class="designer-type-settings">${number('Largura da borda','borderWidth',e.borderWidth||0,0,40)}${!['ellipse','icon'].includes(e.shapeType)?number('Curvatura','cornerRadius',e.cornerRadius??5,0,100):''}</div>` : ''}
@@ -666,6 +667,16 @@ export class SlideDesigner {
       this.mutate(s => { let e = s.elements.find(e => e.id === targetId && e.type === 'model'); if (!e) { if (s.elements.filter(e => e.type === 'model').length >= 2) throw Error('Use até dois modelos por slide.'); e = newElement('model'); s.elements.push(e); } e.model = 'custom'; e.customModel = model; this.selected = e.id; }); this.replaceId = null;
     }
   }
+  openOnlineModel() {
+    const sourceSlide = this.original, targetId = this.replaceId;
+    openOnlineLibrary({
+      onModel: model => {
+        if (!model || sourceSlide !== this.original) return;
+        this.mutate(s => { let e = s.elements.find(e => e.id === targetId && e.type === 'model'); if (!e) { if (s.elements.filter(e => e.type === 'model').length >= 2) throw Error('Use até dois modelos por slide.'); e = newElement('model'); s.elements.push(e); } e.model = 'custom'; e.customModel = model; this.selected = e.id; });
+        this.replaceId = null;
+      }
+    });
+  }
   closeMobileInspector() {
     this.mobilePanel = '';
     const root = this.studio.root;
@@ -762,6 +773,7 @@ export class SlideDesigner {
     if (action === 'image') { this.openImageReplacement(); return; }
     if (action === 'model') { this.mutate(s => { if (s.elements.length >= MAX_CANVAS_ELEMENTS) throw Error(`Use até ${MAX_CANVAS_ELEMENTS} elementos no slide.`); if (s.elements.filter(item => item.type === 'model').length >= 2) throw Error('Use até dois modelos por slide.'); const model = newElement('model'); s.elements.push(model); this.selected = model.id; }); return; }
     if (action === 'replace-model') { this.replaceId = e?.id; this.studio.root.querySelector('#designer-model-files').click(); return; }
+    if (action === 'online-library-model') { this.replaceId = e?.id; this.openOnlineModel(); return; }
     if (action === 'interact') { this.interacting = this.interacting === e.id ? '' : e.id; this.refreshSelection(); return; }
     if (action === 'undo' || action === 'redo') {
       clearTimeout(this.cropWheelTimer);this.cropWheelBefore=null;
