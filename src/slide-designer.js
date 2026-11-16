@@ -350,10 +350,10 @@ export class SlideDesigner {
       </div>
       <button type="button" class="mobile-inspector-open" data-designer-action="mobile-inspector-open" aria-controls="designer-inspector" aria-expanded="false">${studioIcon('settings')}<span>Ajustes</span></button>
       ${btn('undo', '↶', `class="desktop-history" aria-label="Desfazer" ${h.undo.length ? '' : 'disabled'}`)}${btn('redo', '↷', `class="desktop-history" aria-label="Refazer" ${h.redo.length ? '' : 'disabled'}`)}
-      <span></span>${btn('add-text', studioIcon('text')+'<span>Texto</span>')}${btn('image', studioIcon('image')+'<span>Imagem</span>')}${btn('shape', studioIcon('shape')+'<span>Forma</span>')}${btn('video', studioIcon('video')+'<span>Vídeo</span>')}<details class="designer-insert-more"><summary><span class="desktop-insert-label">Inserir mais</span><span class="mobile-action-label">${studioIcon('more')}<span>Mais</span></span></summary><div><div class="mobile-history">
+      <span></span>${btn('add-text', studioIcon('text')+'<span>Texto</span>')}${btn('image', studioIcon('image')+'<span>Imagem</span>')}${btn('shape', studioIcon('shape')+'<span>Forma</span>')}${btn('video', studioIcon('video')+'<span>Vídeo</span>')}${btn('model', studioIcon('model')+'<span>Modelo 3D</span>')}${btn('simulation', studioIcon('simulation')+'<span>Simulação</span>')}<details class="designer-insert-more mobile-only-more"><summary><span class="mobile-action-label">${studioIcon('more')}<span>Mais</span></span></summary><div><div class="mobile-history">
         ${btn('undo', '↶ Desfazer', h.undo.length ? '' : 'disabled')}${btn('redo', '↷ Refazer', h.redo.length ? '' : 'disabled')}
         ${btn('mobile-layers','Camadas', 'aria-controls="designer-layers" aria-expanded="false"')}
-      </div>${btn('icon', '⊞ Ícones de objetos')}${btn('model', '◇ Modelo 3D')}${btn('simulation','⚗ Simulação')}${btn('browse-images',studioIcon('search')+' Buscar imagens')}</div></details>
+      </div>${btn('video', studioIcon('video')+' Vídeo')}${btn('model', studioIcon('model')+' Modelo 3D')}${btn('simulation', studioIcon('simulation')+' Simulação')}</div></details>
       ${slideStylePicker('theme',slide)}${slideStylePicker('layout',slide)}
       <input type="file" id="designer-image-file" accept="image/png,image/jpeg,image/webp,image/gif" hidden><input type="file" id="designer-model-files" accept=".glb,.gltf,.obj,.mtl,.bin,.png,.jpg,.jpeg,.webp,.gif,.ktx2" multiple hidden>
     </div>`;
@@ -806,6 +806,8 @@ export class SlideDesigner {
     dialog.innerHTML = `<form method="dialog" class="image-search-head"><strong>${targetId ? 'Trocar imagem' : 'Adicionar imagem'}</strong><button aria-label="Fechar">×</button></form>
       <button type="button" class="image-drop-zone" data-image-device>${studioIcon('upload')}<strong>Abrir galeria</strong><span>Arraste ou cole uma imagem aqui</span></button><input type="file" accept="image/png,image/jpeg,image/webp,image/gif" hidden>
       <form class="image-search-form"><input name="url" type="url" aria-label="Link HTTPS da imagem" placeholder="https://…" required><button>Usar link</button></form>
+      <div class="image-modal-divider" aria-hidden="true"><span>ou pesquise na web</span></div>
+      <form class="image-inline-search" role="search"><input name="query" type="search" aria-label="Pesquisar imagem na web" placeholder="Pesquisar imagem (ex.: sistema solar, célula…)" autocomplete="off"><button type="submit">${studioIcon('search')}<span>Pesquisar</span></button></form>
       <div class="image-import-preview" hidden><img alt="Prévia da imagem"><button type="button">Usar esta imagem</button></div><p role="status"></p>`;
     const picker = dialog.querySelector('input[type=file]');
     const status = dialog.querySelector('[role=status]');
@@ -818,6 +820,13 @@ export class SlideDesigner {
     };
     dialog.querySelector('[data-image-device]').onclick = () => picker.click();
     picker.onchange = () => importFile(picker.files[0]);
+    const searchForm = dialog.querySelector('.image-inline-search');
+    searchForm.onsubmit = event => {
+      event.preventDefault();
+      const q = searchForm.elements.query.value.trim();
+      dialog.close();
+      this.openImageSearch(targetId, q);
+    };
     const linkForm = dialog.querySelector('.image-search-form');
     dialog.addEventListener('dragover', event => event.preventDefault());
     dialog.addEventListener('drop', event => {
@@ -880,7 +889,7 @@ export class SlideDesigner {
     dialog.showModal();
     if (initialUrl) { linkForm.elements.url.value = initialUrl; linkForm.requestSubmit(); }
   }
-  openImageSearch(targetId){
+  openImageSearch(targetId, initialQuery = ''){
     document.querySelector('#storage-image-search')?.remove();
     const dialog=document.createElement('dialog');dialog.id='storage-image-search';dialog.className='image-finder';dialog.setAttribute('aria-labelledby','image-finder-title');
     const accent=getComputedStyle(this.studio.root.querySelector('.designer-inspector')||this.studio.root).getPropertyValue('--studio-accent').trim();
@@ -1027,6 +1036,7 @@ export class SlideDesigner {
     });
     dialog.addEventListener('close',()=>{token++;for(const url of urls.splice(0))URL.revokeObjectURL(url);dialog.remove();});
     form.addEventListener('submit',event=>{event.preventDefault();startSearch();});
+    if(initialQuery){input.value=initialQuery;startSearch();}
     input.focus();
   }
   openVideoDialog(targetId=null){
@@ -1036,17 +1046,10 @@ export class SlideDesigner {
     dialog.id='slide-video-dialog';dialog.className='video-dialog video-dialog-v2';dialog.setAttribute('aria-labelledby','slide-video-title');
     dialog.innerHTML=`<form method="dialog" novalidate>
       <header class="vd-head">
-        <div class="vd-title-wrap">
-          <span class="vd-icon" aria-hidden="true"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2.5" y="4.5" width="19" height="15" rx="3"/><path d="m10 9 5.5 3-5.5 3z" fill="currentColor" stroke="none"/></svg></span>
-          <div>
-            <h2 id="slide-video-title">${targetId?'Trocar vídeo':'Inserir vídeo'}</h2>
-            <p class="vd-subtitle">Adicione um vídeo para tocar diretamente durante a apresentação.</p>
-          </div>
-        </div>
+        <h2 id="slide-video-title">${targetId?'Trocar vídeo':'Inserir vídeo'}</h2>
         <button type="button" class="vd-close" data-video-close aria-label="Fechar">×</button>
       </header>
       <div class="vd-body">
-        <div class="vd-pills" aria-label="Fontes compatíveis"><span>YouTube</span><span>Vimeo</span><span>.MP4 / .WebM</span></div>
         <label class="vd-field" for="slide-video-url">
           <span>Link do vídeo</span>
           <div class="vd-input-wrap">

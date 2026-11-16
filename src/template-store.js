@@ -1,6 +1,7 @@
 import { canvasMarkup, esc } from './canvas-view.js';
 import { presentationSlide } from './slide-display.js';
 import { canvasThemes } from './canvas-data.js';
+import { mountCatalogFluid } from './catalog-fluid.js';
 import {
   deckTemplates,
   templateCategories as deckCategories,
@@ -77,7 +78,7 @@ function themeChoicesFor(deck) {
 }
 
 function ambientMarkup() {
-  return `<div class="tstore-ambient" aria-hidden="true"><span class="tstore-blob tstore-blob-user"></span><span class="tstore-blob tstore-blob-brand"></span></div>`;
+  return `<div class="tstore-ambient" aria-hidden="true"><canvas class="tstore-fluid-canvas" data-tstore-fluid></canvas></div>`;
 }
 
 export function createTemplateStore({ render, useDeck, downloadDeckPptx, onRouteChange }) {
@@ -95,9 +96,9 @@ export function createTemplateStore({ render, useDeck, downloadDeckPptx, onRoute
   };
 
   let observer = null;
-  let boundRoot = null;
-  let pointerHandler = null;
-  let rafId = 0;
+  let fluidController = null;
+  let persistentSim = null;
+  let boundCanvas = null;
 
   function filtered() {
     return searchDecks({
@@ -381,32 +382,23 @@ export function createTemplateStore({ render, useDeck, downloadDeckPptx, onRoute
   }
 
   function unbindPointer() {
-    if (boundRoot && pointerHandler) boundRoot.removeEventListener('pointermove', pointerHandler);
-    if (rafId) { cancelAnimationFrame(rafId); rafId = 0; }
-    boundRoot = null;
-    pointerHandler = null;
+    fluidController?.destroy();
+    fluidController = null;
+    boundCanvas = null;
   }
 
   function bindPointer(root) {
-    unbindPointer();
     const page = root?.querySelector('[data-template-store]');
-    if (!page) return;
-    boundRoot = page;
-    let targetX = 50, targetY = 26;
-    pointerHandler = event => {
-      if (event.pointerType === 'touch') return;
-      const rect = page.getBoundingClientRect();
-      if (!rect.width || !rect.height) return;
-      targetX = Math.max(4, Math.min(96, ((event.clientX - rect.left) / rect.width) * 100));
-      targetY = Math.max(4, Math.min(96, ((event.clientY - rect.top) / rect.height) * 100));
-      if (rafId) return;
-      rafId = requestAnimationFrame(() => {
-        rafId = 0;
-        page.style.setProperty('--mx', `${targetX.toFixed(1)}%`);
-        page.style.setProperty('--my', `${targetY.toFixed(1)}%`);
-      });
-    };
-    page.addEventListener('pointermove', pointerHandler, { passive: true });
+    const canvas = page?.querySelector('[data-tstore-fluid]');
+    if (!page || !canvas) {
+      unbindPointer();
+      return;
+    }
+    if (canvas === boundCanvas && fluidController) return;
+    unbindPointer();
+    boundCanvas = canvas;
+    fluidController = mountCatalogFluid({ page, canvas, existingSim: persistentSim });
+    persistentSim = fluidController.sim;
   }
 
   function updateResultsOnly(root) {
@@ -580,6 +572,7 @@ export function createTemplateStore({ render, useDeck, downloadDeckPptx, onRoute
     unmount: () => {
       disconnectObserver();
       unbindPointer();
+      persistentSim = null;
     },
     openDetail,
     openCatalog,

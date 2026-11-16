@@ -70,7 +70,7 @@ export class Room {
       if (changedModel) { d.model = next.slides[d.slide].model; d.exploded = false; }
     } else if(action==='game'){gameControl(this,value);
     } else if(action==='kick'){this.kick(value);
-    } else if(action==='ranking'&&d.phase==='reveal'){d.phase=d.questionIndex+1===this.questions.length?'finished':'leaderboard';d.resultScope='quiz';d.resultStartedAt=this.now();d.podiumRevealed=false;d.podiumStep=0;d.victory=Math.floor(Math.random()*4);
+    } else if(action==='ranking'&&d.phase==='reveal'){d.phase=d.questionIndex+1===this.questions.length?'finished':'leaderboard';d.resultScope='quiz';d.resultStartedAt=this.now();d.podiumRevealed=false;d.podiumStep=0;d.victory=Math.floor(Math.random()*5);
     } else if(action==='podium-all'&&d.phase==='finished'){d.podiumRevealed=true;d.podiumStep=4;
     } else if(action==='animation'&&d.phase==='lesson'){const max=Math.max(0,...(this.slides[d.slide].animations||[]).map(a=>a.group||0));d.animationStep=Math.max(0,Math.min(max,Math.floor(Number(value)||0)));
     } else if (action === 'slide' && d.phase === 'lesson' && Number.isInteger(value) && value >= 0 && value < this.slides.length) {
@@ -103,8 +103,8 @@ export class Room {
     } else if (action === 'reveal' && d.phase === 'question') this.reveal();
     else if (action === 'next' && ['reveal','leaderboard'].includes(d.phase)) {
       if (d.questionIndex + 1 < this.questions.length) this.startQuestion(d.questionIndex + 1);
-      else {d.phase = 'finished';d.resultScope='quiz';d.resultStartedAt=this.now();d.podiumRevealed=false;d.podiumStep=0;d.victory=Math.floor(Math.random()*4);}
-    } else if (action === 'finish' && d.phase === 'lesson') { d.phase = 'finished'; d.resultScope = 'overall'; d.resultStartedAt = this.now(); d.podiumRevealed = false; d.podiumStep = 0; d.victory = Math.floor(Math.random() * 4); }
+      else {d.phase = 'finished';d.resultScope='quiz';d.resultStartedAt=this.now();d.podiumRevealed=false;d.podiumStep=0;d.victory=Math.floor(Math.random()*5);}
+    } else if (action === 'finish' && d.phase === 'lesson') { d.phase = 'finished'; d.resultScope = 'overall'; d.resultStartedAt = this.now(); d.podiumRevealed = false; d.podiumStep = 0; d.victory = Math.floor(Math.random() * 5); }
     else if (action === 'lesson' && ['lobby', 'countdown', 'reveal','leaderboard', 'finished', 'poll', 'poll-results', 'game'].includes(d.phase)) {if(this.blocks&&(['quiz','poll'].includes(this.blocks[d.blockIndex||0].type)||isGameType(this.blocks[d.blockIndex||0].type))){if(!['lobby','countdown'].includes(d.phase)&&(d.blockIndex||0)+1<this.blocks.length)this.enterBlock((d.blockIndex||0)+1);else{const first=this.blocks.findIndex(b=>b.type==='slides');if(first>=0)this.enterBlock(first);else d.phase='finished';}}else{d.phase = 'lesson'; d.questionIndex = -1;} }
     else throw Error('Esta ação não está disponível agora.');
   }

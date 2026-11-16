@@ -29,7 +29,7 @@ export class PageMotion {
     parent.classList.add('slide-transition-stack');
     incoming.classList.add('incoming-slide');
     const { offsetLeft, offsetTop, offsetWidth, offsetHeight } = incoming;
-    Object.assign(snapshot.style, { left: `${offsetLeft}px`, top: `${offsetTop}px`, width: `${offsetWidth}px`, height: `${offsetHeight}px` });
+    Object.assign(snapshot.style, { left: `${offsetLeft}px`, top: `${offsetTop}px`, width: `${offsetWidth}px`, height: `${offsetHeight}px`, margin: '0' });
     incoming.after(snapshot);
     const finish = () => {
       snapshot.remove();
@@ -46,14 +46,16 @@ export class PageMotion {
   }
   mount(root, { key, kind, slide = 0 }) {
     const changed = this.lastKey !== key, reduced = motionBlocked();
-    root.classList.remove('scene-arrive');
     root.dataset.scene = kind;
-    if (changed && !reduced) {
-      root.dataset.slideDirection = slide < (this.lastSlide || 0) ? 'backward' : 'forward';
-      // Force reflow so consecutive slide transitions restart CSS keyframe animations reliably on every client.
-      void root.offsetWidth;
-      root.classList.add('scene-arrive');
-      clearTimeout(this.timer); this.timer = setTimeout(() => root.classList.remove('scene-arrive'), 1000);
+    if (changed) {
+      root.classList.remove('scene-arrive');
+      if (!reduced) {
+        root.dataset.slideDirection = slide < (this.lastSlide || 0) ? 'backward' : 'forward';
+        // Force reflow so consecutive slide transitions restart CSS keyframe animations reliably on every client.
+        void root.offsetWidth;
+        root.classList.add('scene-arrive');
+        clearTimeout(this.timer); this.timer = setTimeout(() => root.classList.remove('scene-arrive'), 1000);
+      }
     }
     const next = new Set();
     for (const player of root.querySelectorAll('[data-lobby-player]')) {

@@ -2310,9 +2310,17 @@ dialog.video-dialog.video-dialog-v2 .video-dialog-go:disabled{opacity:.42;cursor
   transition:border-color .15s,background .15s,transform .12s;
 }
 #app .audio-editor-v2 .audio-source-btn:hover{border-color:var(--ui-accent);transform:translateY(-1px)}
-#app .audio-editor-v2 .audio-source-btn.is-primary{
-  background:var(--ui-accent);color:var(--ui-accent-ink,#fff);border-color:transparent;
+html[data-theme][data-ui-style] #app .studio-shell .designer-inspector label.audio-source-btn,
+html[data-appearance=dark] .studio-shell .designer-inspector label.audio-source-btn{
+  color:var(--ui-ink);margin:0;display:inline-flex;font-size:12px;line-height:1.2;
 }
+html[data-theme][data-ui-style] #app .studio-shell .designer-inspector label.audio-source-btn.is-primary,
+html[data-appearance=dark] .studio-shell .designer-inspector label.audio-source-btn.is-primary,
+#app .audio-editor-v2 .audio-source-btn.is-primary,
+#app .audio-editor-v2 .audio-source-btn.is-primary>span{
+  background:var(--ui-accent);color:var(--ui-accent-ink,#ffffff)!important;border-color:transparent;
+}
+#app .audio-editor-v2 .audio-source-btn.is-primary>span{background:transparent}
 #app .audio-editor-v2 .audio-source-btn input[type=file]{position:absolute;inset:0;opacity:0;cursor:pointer;width:100%}
 #app .audio-editor-v2 .audio-format-hint{margin:0;font-size:10.5px;line-height:1.4;color:var(--ui-muted)}
 #app .audio-editor-v2 .audio-loaded-card{
@@ -2369,5 +2377,359 @@ dialog.video-dialog.video-dialog-v2 .video-dialog-go:disabled{opacity:.42;cursor
 #app .designer-notes>summary{padding:10px 12px;font-size:12px;font-weight:700}
 #app .designer-notes[open]{padding-bottom:10px}
 #app .designer-notes[open]>label{margin:8px 12px 0!important}
+
+/* 43. QA Rodada 16: busca inline em Adicionar imagem, cabeçalhos sem duplicação, Relâmpago por equipes + mobile, Sobrevivência sem barra e 5 animações, Cabo de Guerra com mãos na frente da corda e puxada suave, 5 comemorações variadas e Placar Final renovado */
+
+/* 43.1 Busca inline na janela "Adicionar imagem" */
+dialog.storage-image-search.image-replacement .image-modal-divider{
+  display:flex;align-items:center;gap:10px;margin:10px 0 8px;font-size:11px;font-weight:700;
+  color:var(--ui-muted,#8a849c);text-transform:uppercase;letter-spacing:.08em;
+}
+dialog.storage-image-search.image-replacement .image-modal-divider::before,
+dialog.storage-image-search.image-replacement .image-modal-divider::after{
+  content:'';flex:1;height:1px;background:var(--ui-line,rgba(148,148,170,.24));
+}
+dialog.storage-image-search.image-replacement .image-inline-search{
+  display:flex;gap:8px;align-items:stretch;
+}
+dialog.storage-image-search.image-replacement .image-inline-search input{
+  flex:1 1 auto;min-width:0;padding:9px 11px;border-radius:10px;
+  border:1.5px solid var(--ui-line,rgba(148,148,170,.28));
+  background:var(--ui-soft,rgba(148,148,170,.08));color:inherit;font:inherit;font-size:13px;
+}
+dialog.storage-image-search.image-replacement .image-inline-search input:focus{
+  outline:none;border-color:var(--ui-accent,#7c5cf0);
+  box-shadow:0 0 0 3px color-mix(in srgb,var(--ui-accent,#7c5cf0) 20%,transparent);
+}
+dialog.storage-image-search.image-replacement .image-inline-search button{
+  display:inline-flex;align-items:center;gap:6px;padding:0 14px;min-height:38px;
+  border-radius:10px;border:0;background:var(--ui-accent,#7c5cf0);color:var(--ui-accent-ink,#fff);
+  font:inherit;font-size:12.5px;font-weight:750;cursor:pointer;white-space:nowrap;
+}
+dialog.storage-image-search.image-replacement .image-inline-search button svg{width:14px;height:14px}
+
+/* 43.2 Cabeçalho limpo sem duplicar o nome do jogo */
+#app .game-head-row.game-head-single{gap:12px}
+#app .game-hero-title{
+  display:inline-flex;align-items:center;justify-content:center;gap:10px;
+  margin:0;font-size:clamp(24px,4.4vh,42px);line-height:1.1;letter-spacing:-.02em;
+}
+#app .game-hero-icon{
+  display:inline-grid;place-items:center;width:1.15em;height:1.15em;border-radius:12px;
+  background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.18);
+  font-size:.78em;flex:none;
+}
+#app .game-hero-icon svg{width:70%;height:70%}
+
+/* 43.3 Relâmpago: pódio por equipes + correção de sobreposição no celular (sem transform:scale + margin negativa) */
+#app .flash-podium-slot:not(.team-podium-slot) .game-character{
+  --character-scale:.72;
+  width:calc(92px * var(--character-scale));
+  height:calc(145px * var(--character-scale));
+  transform:none;margin:0 auto 4px;flex:none;
+}
+#app .flash-podium.flash-podium-teams{width:min(860px,100%);margin:0 auto}
+#app .flash-podium.flash-podium-teams[data-count="1"]{grid-template-columns:minmax(0,300px);justify-content:center}
+#app .flash-podium.flash-podium-teams[data-count="1"] .place-1{grid-column:1}
+#app .flash-podium.flash-podium-teams[data-count="2"]{grid-template-columns:repeat(2,minmax(0,300px));justify-content:center}
+#app .flash-podium.flash-podium-teams[data-count="2"] .place-2{grid-column:1}
+#app .flash-podium.flash-podium-teams[data-count="2"] .place-1{grid-column:2}
+#app .flash-podium-slot.team-podium-slot{max-width:270px;gap:3px}
+#app .flash-podium-slot.team-podium-slot .team-podium-crew{
+  display:flex;align-items:flex-end;justify-content:center;gap:0;margin:0 auto 4px;max-width:100%;
+}
+#app .flash-podium-slot.team-podium-slot .team-podium-member{display:inline-flex;margin:0 -6px}
+#app .flash-podium-slot.team-podium-slot .team-podium-member .game-character{
+  --character-scale:var(--crew-scale,.58);
+  width:calc(92px * var(--crew-scale,.58));
+  height:calc(145px * var(--crew-scale,.58));
+  transform:none;margin:0;flex:none;
+}
+#app .flash-podium-slot .flash-team-members{
+  color:rgba(255,255,255,.78);font-weight:600;font-size:11.5px;line-height:1.25;
+  max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;display:block;
+}
+@media (max-width:760px){
+  #app .flash-podium{gap:8px;min-height:0}
+  #app .flash-podium-slot:not(.team-podium-slot) .game-character{
+    --character-scale:.48;
+    width:calc(92px * var(--character-scale));
+    height:calc(145px * var(--character-scale));
+    transform:none;margin:0 auto 2px;
+  }
+  #app .flash-podium-slot.team-podium-slot .team-podium-member{margin:0 -8px}
+  #app .flash-podium-slot.team-podium-slot .team-podium-member .game-character{
+    --character-scale:calc(var(--crew-scale,.48) * .72);
+    width:calc(92px * var(--crew-scale,.48) * .72);
+    height:calc(145px * var(--crew-scale,.48) * .72);
+    transform:none;margin:0;
+  }
+  #app .flash-podium-slot>strong{font-size:14px}
+  #app .flash-podium-slot>span{font-size:12.5px}
+  #app .flash-podium-slot .flash-team-members{font-size:10.5px}
+}
+
+/* 43.4 Sobrevivência: sem barra branca, nome acima sem cortes, mais perto do chão e 5 animações variadas */
+#app .game-stage[data-game-type="survival"] .sv-arena{
+  padding:20px clamp(16px,4vw,56px) 0;overflow:visible;
+}
+#app .game-stage[data-game-type="survival"] .sv-crowd{
+  min-height:clamp(196px,29dvh,290px);
+  padding:16px 18px 0;
+  align-items:flex-end;
+  gap:calc(10px + 18px * var(--scale)) calc(18px + 26px * var(--scale));
+}
+#app .game-stage[data-game-type="survival"] .sv-floor{
+  height:24px;margin:-6px -2% 0;
+  background:radial-gradient(ellipse at 50% 20%,rgba(255,255,255,.28),rgba(255,255,255,.04) 72%,transparent 100%);
+}
+#app .sv-player{
+  width:auto;min-width:calc(92px * var(--scale) + 12px);gap:4px;justify-items:center;align-items:end;
+}
+#app .sv-player .sv-actor{position:relative;display:grid;place-items:end center}
+#app .sv-player figcaption{
+  order:-1;max-width:calc(112px * var(--scale) + 46px);
+  font-size:clamp(12px,calc(13px * var(--scale) + 2px),16px);
+  font-weight:750;line-height:1.22;text-align:center;color:#fff;
+  white-space:normal;overflow:visible;text-overflow:clip;word-break:break-word;
+  padding:2px 8px;border-radius:999px;background:rgba(15,23,42,.38);
+  text-shadow:0 1px 4px rgba(0,0,0,.45);margin-bottom:2px;
+}
+#app .sv-player[data-winner="true"]::before{top:calc(-22px * var(--scale) - 24px)}
+#app .sv-player .sv-lock{top:2px;right:-4px}
+/* 5 animações variadas e suaves para os personagens vivos na Sobrevivência */
+#app .game-stage[data-game-type="survival"] .sv-player[data-fell=""]:not([data-locked="true"]):not([data-winner="true"]) .game-character{
+  animation:sv-anim-0 2.6s ease-in-out infinite;animation-delay:calc(var(--i) * -320ms);transform-origin:50% 100%;
+}
+#app .game-stage[data-game-type="survival"] .sv-player[data-sv-anim="1"][data-fell=""]:not([data-locked="true"]):not([data-winner="true"]) .game-character{
+  animation:sv-anim-1 3.1s ease-in-out infinite;animation-delay:calc(var(--i) * -410ms);
+}
+#app .game-stage[data-game-type="survival"] .sv-player[data-sv-anim="2"][data-fell=""]:not([data-locked="true"]):not([data-winner="true"]) .game-character{
+  animation:sv-anim-2 2.8s cubic-bezier(.35,0,.35,1) infinite;animation-delay:calc(var(--i) * -290ms);
+}
+#app .game-stage[data-game-type="survival"] .sv-player[data-sv-anim="3"][data-fell=""]:not([data-locked="true"]):not([data-winner="true"]) .game-character{
+  animation:sv-anim-3 2.3s ease-in-out infinite;animation-delay:calc(var(--i) * -370ms);
+}
+#app .game-stage[data-game-type="survival"] .sv-player[data-sv-anim="4"][data-fell=""]:not([data-locked="true"]):not([data-winner="true"]) .game-character{
+  animation:sv-anim-4 3.4s ease-in-out infinite;animation-delay:calc(var(--i) * -460ms);
+}
+@keyframes sv-anim-0{
+  0%,100%{transform:translateY(0) scale(1,1) rotate(0deg)}
+  30%{transform:translateY(-8%) scale(.97,1.04) rotate(-2.5deg)}
+  60%{transform:translateY(0) scale(1.03,.97) rotate(1.5deg)}
+  82%{transform:translateY(-4%) scale(.99,1.02) rotate(2.5deg)}
+}
+@keyframes sv-anim-1{
+  0%,100%{transform:translateY(0) rotate(-3.5deg)}
+  25%{transform:translateY(-5%) rotate(0deg)}
+  50%{transform:translateY(0) rotate(3.5deg)}
+  75%{transform:translateY(-6%) rotate(0deg)}
+}
+@keyframes sv-anim-2{
+  0%,100%{transform:translateY(0) scale(1)}
+  18%{transform:translateY(1%) scale(1.05,.94)}
+  42%{transform:translateY(-13%) scale(.96,1.06) rotate(-2deg)}
+  62%{transform:translateY(0) scale(1.03,.97)}
+  80%{transform:translateY(-3%) rotate(2deg)}
+}
+@keyframes sv-anim-3{
+  0%,100%{transform:translateY(0) scale(1,1)}
+  50%{transform:translateY(-6%) scale(.98,1.03) rotate(1.8deg)}
+}
+@keyframes sv-anim-4{
+  0%,100%{transform:translateY(0) rotate(0deg)}
+  22%{transform:translateY(-2%) rotate(-4.5deg)}
+  45%{transform:translateY(-7%) rotate(0deg)}
+  70%{transform:translateY(-2%) rotate(4.5deg)}
+  88%{transform:translateY(0) rotate(0deg)}
+}
+
+/* 43.5 Cabo de Guerra: corpo atrás da corda, mãos segurando na frente, placar oculto no suspense e puxada super suave */
+#app .tug-names strong.tug-hidden-score{opacity:.68;font-size:clamp(18px,2.8vh,26px);letter-spacing:.04em}
+#app .tug-meter[data-hidden="true"]{position:relative}
+#app .tug-meter[data-hidden="true"] i.a{width:50%!important;transition:width .7s ease}
+#app .tug-meter[data-hidden="true"]::after{
+  content:'';position:absolute;inset:0;
+  background:linear-gradient(90deg,transparent 0%,rgba(255,255,255,.22) 50%,transparent 100%);
+  animation:tug-meter-shimmer 2.4s ease-in-out infinite;pointer-events:none;
+}
+@keyframes tug-meter-shimmer{from{transform:translateX(-100%)}to{transform:translateX(100%)}}
+
+/* Camadas corretas: corpo (z:1) atrás da corda (z:3), mãos agarradas (z:5) na frente da corda! */
+#app .tug-team{z-index:auto}
+#app .tug-puller{z-index:auto}
+#app .tug-puller .game-character{
+  position:relative;z-index:1;
+  animation:tug-lean-smooth-l 1.35s ease-in-out infinite alternate;
+  animation-delay:calc(var(--i) * -190ms);
+}
+#app .tug-team.right .tug-puller .game-character{animation-name:tug-lean-smooth-r}
+#app .tug-team:not([data-result="won"]):not([data-result="lost"]) .tug-puller .character-arm{opacity:0}
+#app .tug-cord{z-index:3}
+#app .tug-cord::before{animation:tug-cord-smooth .95s ease-in-out infinite alternate}
+#app .tug-flag{animation:tug-flag-smooth 1.2s ease-in-out infinite alternate}
+
+/* Mãos em primeiro plano segurando a corda */
+#app .tug-puller .tug-grip-hands{
+  position:absolute;left:50%;bottom:calc(145px * var(--s) * .52 - 5px);
+  transform:translateX(-50%);
+  display:flex;align-items:center;justify-content:center;gap:calc(14px * var(--s));
+  z-index:5;pointer-events:none;
+  animation:tug-hands-l 1.35s ease-in-out infinite alternate;
+  animation-delay:calc(var(--i) * -190ms);
+}
+#app .tug-team.right .tug-puller .tug-grip-hands{animation-name:tug-hands-r}
+#app .tug-puller .tug-grip-hands i{
+  display:block;
+  width:calc(14px * var(--s) + 4px);
+  height:calc(12px * var(--s) + 4px);
+  border-radius:999px;
+  background:radial-gradient(circle at 35% 30%,color-mix(in srgb,var(--team,#38bdf8) 55%,#fff),var(--team,#38bdf8));
+  border:2px solid rgba(15,23,42,.55);
+  box-shadow:0 2px 5px rgba(0,0,0,.38);
+}
+#app .tug-team:is([data-result="won"],[data-result="lost"]) .tug-grip-hands{opacity:0;transition:opacity .25s ease}
+#app .tug-puller .tug-puller-prog{position:relative;z-index:6}
+
+@keyframes tug-lean-smooth-l{
+  from{transform:rotate(-13deg) translate(0,0)}
+  to{transform:rotate(-21deg) translate(-3%,1%)}
+}
+@keyframes tug-lean-smooth-r{
+  from{transform:rotate(13deg) translate(0,0)}
+  to{transform:rotate(21deg) translate(3%,1%)}
+}
+@keyframes tug-hands-l{
+  from{transform:translate(-42%,0)}
+  to{transform:translate(-56%,1.5px)}
+}
+@keyframes tug-hands-r{
+  from{transform:translate(-58%,0)}
+  to{transform:translate(-44%,1.5px)}
+}
+@keyframes tug-cord-smooth{
+  from{transform:translateY(-1px)}
+  to{transform:translateY(1.2px)}
+}
+@keyframes tug-flag-smooth{
+  from{transform:rotate(-5deg)}
+  to{transform:rotate(5deg)}
+}
+
+/* Puxada final de 5.8s: tensão dramática, suave e fluida (nunca trêmula/rápida) */
+#app .tug-scene[data-state="pull"] .tug-group{
+  transition:none;
+  animation:tug-final-smooth 5.8s cubic-bezier(.42,0,.28,1) both;
+  animation-delay:var(--pull-delay,0s);
+}
+@keyframes tug-final-smooth{
+  0%{transform:translateX(0)}
+  14%{transform:translateX(-4.5%)}
+  28%{transform:translateX(5%)}
+  44%{transform:translateX(-5.5%)}
+  58%{transform:translateX(4.8%)}
+  72%{transform:translateX(calc(var(--end) * -.2))}
+  86%{transform:translateX(calc(var(--end) * .62))}
+  100%{transform:translateX(var(--end))}
+}
+#app .tug-scene[data-state="pull"] .tug-puller .game-character{animation-duration:.78s}
+#app .tug-scene[data-state="pull"] .tug-puller .tug-grip-hands{animation-duration:.78s}
+#app .tug-scene[data-state="pull"] .tug-cord::before{animation-duration:.42s}
+#app .tug-scene[data-state="done"] :is(.tug-cord::before,.tug-flag,.tug-puller .game-character,.tug-grip-hands){animation:none}
+
+/* 43.6 Cinco efeitos de comemoração variados (chuva, fogos, baloes, estrelas, fitas) para todos os jogos e pódio final */
+#app :is(.game-confetti,.final-confetti)[data-victory] i{background:hsl(var(--h,40) 88% 62%)}
+#app .game-confetti[data-victory="fogos"] i{
+  top:calc(10% + var(--y,30) * 1%);width:7px;height:7px;border-radius:50%;
+  color:hsl(var(--h,40) 95% 66%);background:currentColor;
+  animation:victory-burst 1.75s ease-out infinite;animation-delay:var(--w,0s);
+}
+#app .game-confetti[data-victory="fogos"] i:nth-child(n+15){display:none}
+#app .game-confetti[data-victory="baloes"] i{
+  top:auto;bottom:-60px;width:32px;height:40px;border-radius:50% 50% 46% 46%;
+  background:radial-gradient(circle at 32% 28%,rgba(255,255,255,.75) 0 9%,transparent 11%),hsl(var(--h,40) 86% 60%);
+  animation:victory-balloon calc(var(--t,3s) * 2.1) ease-in infinite;animation-delay:calc(var(--w,0s) * 1.4);
+}
+#app .game-confetti[data-victory="baloes"] i::after{content:'';position:absolute;left:50%;top:100%;width:1.5px;height:28px;background:rgba(255,255,255,.45)}
+#app .game-confetti[data-victory="baloes"] i:nth-child(n+17){display:none}
+#app .game-confetti[data-victory="estrelas"] i{
+  top:calc(6% + var(--y,30) * 1%);width:24px;height:24px;border-radius:0;
+  background:hsl(calc(38 + var(--n,0) * 2) 96% 64%);
+  clip-path:polygon(50% 0,61% 35%,98% 35%,68% 57%,79% 91%,50% 70%,21% 91%,32% 57%,2% 35%,39% 35%);
+  animation:victory-star 1.9s ease-in-out infinite;animation-delay:var(--w,0s);
+}
+#app .game-confetti[data-victory="estrelas"] i:nth-child(3n){width:15px;height:15px}
+#app .game-confetti[data-victory="estrelas"] i:nth-child(n+22){display:none}
+/* 5) fitas festivas serpenteando */
+#app :is(.game-confetti,.final-confetti)[data-victory="fitas"] i{
+  top:-36px;width:7px;height:30px;border-radius:999px;
+  background:linear-gradient(180deg,hsl(var(--h,40) 96% 74%),hsl(calc(var(--h,40) + 38) 92% 58%));
+  box-shadow:0 0 10px hsla(var(--h,40) 95% 65% / .45);
+  animation:victory-ribbon calc(var(--t,2.8s) * 1.25) ease-in-out infinite;
+  animation-delay:calc(var(--reveal-delay,0s) + var(--w,0s));
+}
+#app :is(.game-confetti,.final-confetti)[data-victory="fitas"] i:nth-child(even){width:5px;height:24px}
+@keyframes victory-ribbon{
+  0%{transform:translate3d(0,-20px,0) rotate(0deg) skewX(8deg);opacity:0}
+  8%{opacity:1}
+  35%{transform:translate3d(calc(var(--r,1) * 32px),32dvh,0) rotate(calc(var(--r,1) * 140deg)) skewX(-10deg)}
+  70%{transform:translate3d(calc(var(--r,1) * -28px),68dvh,0) rotate(calc(var(--r,1) * 320deg)) skewX(10deg);opacity:.9}
+  100%{transform:translate3d(calc(var(--r,1) * 20px),102dvh,0) rotate(calc(var(--r,1) * 480deg)) skewX(-6deg);opacity:.15}
+}
+
+/* 43.7 Placar Geral Final: sem banner duplicado, pódio maior, mais brilhante e mais claro */
+#app .grand-finale{
+  background:radial-gradient(ellipse at 50% 22%,color-mix(in srgb,var(--ui-accent,#8b5cf6) 22%,transparent) 0%,transparent 65%);
+}
+#app .grand-finale .results-heading>span{
+  font-size:12px;letter-spacing:.2em;color:color-mix(in srgb,var(--ui-ink,#fff) 72%,transparent);
+}
+#app .grand-finale .results-heading h1{
+  font-size:clamp(28px,5.2dvh,54px);letter-spacing:-.025em;
+  text-shadow:0 4px 24px rgba(0,0,0,.22);
+}
+#app .grand-finale .final-spotlights[data-on="true"]{
+  background:radial-gradient(ellipse at 50% 48%,rgba(250,204,21,.34) 0%,rgba(167,139,250,.18) 38%,transparent 68%);
+}
+#app .grand-finale .final-podium{
+  max-width:min(980px,100%);padding-top:16px;gap:clamp(14px,2.8vw,32px);
+}
+#app .grand-finale .team-podium-slot.final-team-champion{
+  position:relative;padding:0;background:transparent;border:0;box-shadow:none;max-width:none;width:100%;
+  display:flex;flex-direction:column;align-items:center;
+}
+#app .grand-finale .ftc-crown{
+  display:block;font-size:clamp(26px,4.2dvh,42px);line-height:1;margin-bottom:2px;
+  filter:drop-shadow(0 4px 12px rgba(250,204,21,.65));
+  animation:rank-crown .7s cubic-bezier(.3,1.8,.4,1) both;
+}
+#app .grand-finale .final-contestant:not(.team-podium-slot) .game-character{
+  --character-scale:.74;width:calc(92px * var(--character-scale));height:calc(145px * var(--character-scale));
+}
+#app .grand-finale .final-contestant>strong{font-size:clamp(16px,2.4dvh,24px);margin-top:4px}
+#app .grand-finale .final-contestant>span{font-size:clamp(14px,1.9dvh,19px);font-weight:800}
+#app .grand-finale .final-contestant>small{font-size:clamp(11.5px,1.4dvh,13.5px)}
+#app .grand-finale .final-tower{
+  height:clamp(82px,18dvh,164px);font-size:clamp(30px,4.8dvh,52px);
+  box-shadow:inset 0 3px 0 rgba(255,255,255,.45),0 18px 40px rgba(0,0,0,.28);
+}
+#app .grand-finale .place-1 .final-tower{
+  height:clamp(116px,24dvh,212px);
+  box-shadow:inset 0 3px 0 rgba(255,255,255,.65),0 0 0 3px rgba(250,204,21,.55),0 0 54px rgba(250,204,21,.48);
+}
+#app .grand-finale .place-3 .final-tower{height:clamp(62px,13dvh,122px)}
+@media (max-height:780px){
+  #app .grand-finale .final-contestant:not(.team-podium-slot) .game-character{--character-scale:.6}
+  #app .grand-finale .final-tower{height:clamp(64px,15dvh,128px)}
+  #app .grand-finale .place-1 .final-tower{height:clamp(92px,20dvh,166px)}
+  #app .grand-finale .place-3 .final-tower{height:clamp(48px,11dvh,96px)}
+}
+@media (max-width:760px){
+  #app .grand-finale .final-contestant:not(.team-podium-slot) .game-character{--character-scale:.48}
+  #app .grand-finale .final-tower{height:clamp(54px,13dvh,98px);font-size:26px}
+  #app .grand-finale .place-1 .final-tower{height:clamp(76px,17dvh,132px)}
+  #app .grand-finale .place-3 .final-tower{height:clamp(42px,10dvh,78px)}
+}
+
 
 

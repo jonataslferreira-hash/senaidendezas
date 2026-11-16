@@ -227,28 +227,41 @@ test('etapas interativas: equipes, relâmpago, sobrevivência, desafio, sorteio 
   const variants = validateGame({ type: 'tug', text: 'x', options: ['A', 'B'], rounds: [[1, 2, 3, 4].map(n => ({ text: 'v' + n, options: ['x', 'y'], correct: 0 }))] });
   assert.equal(variants.rounds[0].length, 3, 'no máximo 3 perguntas por rodada');
   assert.throws(() => validateGame({ type: 'tug', text: 'x', options: ['A', 'B'], rounds: [] }), /rodada/);
-  // Cada participante recebe 3 perguntas sorteadas aleatoriamente no próprio aparelho; o lado A acerta tudo, o lado B erra tudo.
+  // Rodada por rodada: em cada rodada cada participante recebe 1 pergunta sorteada; o lado A acerta tudo, o lado B erra tudo.
   assert.equal(room.snapshot().game.rounds, 3);
   assert.equal(room.snapshot().game.state, 'ready');
   const everyone = room.data.players;
+  const tugCfg = room.slides[room.data.slide].game;
   room.control('game', { do: 'next' });
   assert.equal(room.snapshot().game.state, 'open');
   assert.equal(room.snapshot().game.question, null, 'telão exibe a batalha da corda em tela cheia');
+  assert.equal(room.snapshot().game.revealScores, false, 'placar fica escondido durante as rodadas');
   const firstStudentQ = room.snapshot(everyone[0].id).game.question;
   assert.ok(firstStudentQ && firstStudentQ.text.length > 0, 'no cabo de guerra o aluno recebe o enunciado completo de sua pergunta sorteada');
-  for (let step = 0; step < 3; step++) {
+  for (let round = 0; round < 3; round++) {
+    assert.equal(room.snapshot().game.state, 'open');
+    assert.equal(room.snapshot().game.round, round);
     for (const player of everyone) {
       const snap = room.snapshot(player.id).game;
       const side = snap.side;
-      const raw = room.data.game.pool[room.data.game.decks[player.id][step]];
+      const raw = tugCfg.rounds[round][room.data.game.picks[player.id]];
       assert.equal(snap.question.text, raw.text);
-      room.answer(player.id, { choice: { choice: side === 0 ? raw.correct : (raw.correct + 1) % raw.options.length, step } });
+      room.answer(player.id, { choice: { choice: side === 0 ? raw.correct : (raw.correct + 1) % raw.options.length, round } });
+    }
+    if (round < 2) {
+      assert.equal(room.snapshot().game.state, 'between', 'entre rodadas entra em pausa de transição');
+      assert.equal(room.snapshot().game.revealScores, false, 'placar segue oculto entre rodadas');
+      now += 2500; room.tick();
     }
   }
-  assert.equal(room.snapshot().game.state, 'pull', 'quando todos concluem as 3 perguntas inicia a puxada final');
+  assert.equal(room.snapshot().game.state, 'pull', 'quando todos concluem a última rodada inicia a puxada final');
+  assert.equal(room.snapshot().game.revealScores, false, 'placar segue oculto durante a puxada final');
+  assert.deepEqual(room.snapshot().game.score, [0, 0]);
   assert.equal(room.snapshot().game.winner, 0, 'o lado que acertou mais puxa a corda');
-  now += 6000; room.tick();
+  now += 6200; room.tick();
   assert.equal(room.snapshot().game.state, 'done');
+  assert.equal(room.snapshot().game.revealScores, true, 'placar revela após concluir a puxada');
+  assert.deepEqual(room.snapshot().game.score, [100, 0]);
   assert.equal(room.snapshot().teams.reduce((sum, t) => sum + t.score, 0), 500 + 500 + 500 + room.snapshot().game.sides[0] * (300 + 200));
   room.control('next-stage');
   assert.equal(room.data.phase, 'lesson');
@@ -336,7 +349,7 @@ test('rodada 14: escolha de time, pódio guiado pela sala, corrida, textos escon
   now += 2100; room.tick(); assert.equal(room.snapshot(ana.id).podiumStep, 1);
   now += 5000; room.tick(); assert.equal(room.snapshot(ana.id).podiumStep, 3);
   room.control('podium-all'); assert.equal(room.snapshot(ana.id).podiumStep, 4);
-  assert.ok([0, 1, 2, 3].includes(room.snapshot().victory));
+  assert.ok([0, 1, 2, 3, 4].includes(room.snapshot().victory));
 
   const { leaderboardMarkup, quizMarkup } = await import('../src/game-ui.js');
   const hidden = leaderboardMarkup({ ...room.snapshot(ana.id), podiumRevealed: false, podiumStep: 1 }, { header: () => '', host: false, final: true });

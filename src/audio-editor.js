@@ -43,7 +43,7 @@ export function audioEditor(audio, scope, elements = [], { expanded = false } = 
     : '';
 
   const actionsRow = `<div class="audio-source-actions">
-    <label class="audio-upload-label audio-source-btn is-primary"><span>↑ ${audio ? 'Trocar' : 'Enviar áudio'}</span><input type="file" data-audio-upload="${scope}" accept="${AUDIO_ACCEPT}"></label>
+    <label class="audio-upload-label audio-source-btn is-primary"><span>↑ ${audio ? 'Trocar' : 'Enviar áudio'}</span><input type="file" title="" data-audio-upload="${scope}" accept="${AUDIO_ACCEPT}"></label>
     <button type="button" class="audio-source-btn" data-record-audio="${scope}">● Gravar</button>
   </div>`;
 

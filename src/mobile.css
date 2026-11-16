@@ -347,7 +347,9 @@ html[data-appearance=light] #app[data-role=student] .callout p{color:#6d5287}
     justify-content:safe center!important;gap:4px;
   }
   html[data-ui-style] body #app .editor-shell .designer-toolbar :is(.desktop-history,.desktop-insert-label),
+  html[data-ui-style] body #app .editor-shell .designer-toolbar>:is([data-designer-action=video],[data-designer-action=model],[data-designer-action=simulation]),
   html[data-ui-style] body #app .editor-shell .designer-toolbar>.slide-style-picker{display:none}
+  html[data-ui-style] body #app .editor-shell .designer-insert-more.mobile-only-more{display:block}
   html[data-ui-style] body #app .editor-shell .designer-insert-more summary>.mobile-action-label{display:inline}
   html[data-ui-style] body #app .editor-shell .designer-insert-more>summary{min-height:44px;display:flex;align-items:center;padding:0 8px}
   html[data-ui-style] body #app .editor-shell .designer-insert-more[open]>div{z-index:45;bottom:calc(116px + env(safe-area-inset-bottom))}
@@ -370,7 +372,7 @@ html[data-appearance=light] #app[data-role=student] .callout p{color:#6d5287}
   html[data-ui-style] body #app .editor-shell .designer-toolbar button{padding-inline:7px;font-size:11px}
 }
 
-#app .designer-toolbar :is([data-designer-action=add-text],[data-designer-action=image],[data-designer-action=shape]){
+#app .designer-toolbar :is([data-designer-action=add-text],[data-designer-action=image],[data-designer-action=shape],[data-designer-action=video],[data-designer-action=model],[data-designer-action=simulation]){
   display:inline-flex;align-items:center;gap:4px;
 }
 @media(max-width:900px){

@@ -169,9 +169,18 @@ export class GameAudio{
    if(g.state==='ready'||g.type==='teams'){
     this.playLobbyTrack(lesson,'game-lobby:'+g.id+':'+this.settings.lobby);return;
    }
-   if(g.state==='leaderboard'||g.state==='pull'){
+   if(g.state==='pull'){
     this.pause(this.audio);this.key='';
-    if(changed)this.startDrumroll(g.state==='pull'?'tug':'results');
+    if(changed)this.startDrumroll('tug');
+    return;
+   }
+   if(g.state==='leaderboard'){
+    this.pause(this.audio);this.key='';this.stopDrumroll();
+    if(changed){this.questionKey='game-board:'+g.id+':'+(g.round??'');this.resultKey='';this.playResult();}
+    return;
+   }
+   if(g.state==='between'){
+    this.stopDrumroll();
     return;
    }
    if(g.state==='done'){
