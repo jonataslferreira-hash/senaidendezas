@@ -459,18 +459,8 @@ let lastStudioView = null;
 function render() {
   const arrive = !state && !sharedLoading && !sharedError && !(busy && host) && lastStudioView !== null && lastStudioView !== studio.view;
   if (!state && arrive) app.dataset.viewArrive = '1'; else delete app.dataset.viewArrive;
-  const transition = arrive && !document.hidden && document.documentElement.dataset.motion !== 'reduced'
-    && !matchMedia('(prefers-reduced-motion: reduce)').matches && typeof document.startViewTransition === 'function';
-  const run = () => { applyRender(); lastStudioView = state ? null : studio.view; };
-  if (transition) {
-    try {
-      // Direção da puxada: avançar para outra visualização entra pela
-      // direita; voltar ao editor entra pela esquerda, como "voltar".
-      document.documentElement.dataset.viewDir = studio.view === 'editor' ? 'back' : 'fwd';
-      document.startViewTransition(run); return;
-    } catch { /* sem transição: aplica direto */ }
-  }
-  run();
+  applyRender();
+  lastStudioView = state ? null : studio.view;
 }
 function applyRender() {
   // Em sala ao vivo (slides, quiz e jogos) animações e transições definidas na aula sempre tocam, exceto se o usuário escolher "reduzido" no perfil.
