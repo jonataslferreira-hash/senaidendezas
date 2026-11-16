@@ -2,6 +2,7 @@
 // aqui o pedido do professor ("com sobrevivência", "cabo de guerra"…) vira etapas de verdade:
 // pedimos perguntas a mais e transformamos essas perguntas nas dinâmicas.
 import { defaultGame, gameNames, TUG_ROUNDS, TUG_VARIANTS } from './stage-games.js';
+import { dedupeQuestions } from './question-dedupe.js';
 
 const lead = '(?:etapas?|din[aâ]micas?|jogos?|modos?|desafios?|rodadas?|atividades?|brincadeiras?)\\s+(?:(?:de|da|do|com|tipo)\\s+)?(?:um[a]?\\s+)?';
 const rules = [
@@ -46,7 +47,8 @@ export function withGameQuestions(activities, games) {
 
 // Separa as perguntas: as primeiras ficam no quiz, as seguintes alimentam as dinâmicas.
 export function takeGameQuestions(result, games, quizTotal) {
-  const all = Array.isArray(result.questions) ? result.questions : [];
+  // O mesmo filtro do quiz: as perguntas quase repetidas caem antes de virar etapas de jogo.
+  const all = dedupeQuestions(Array.isArray(result.questions) ? result.questions : []);
   result.questions = all.slice(0, quizTotal);
   const rest = all.slice(quizTotal), want = gameQuestionNeed(games);
   // Vieram menos perguntas do que o pedido: cada dinâmica recebe o mínimo e o resto é repartido uma a uma, por igual.
