@@ -33,7 +33,7 @@ export class ProfileSettings {
   }
   card() {
     const m = this.account.user?.user_metadata || {};
-    return `<div class="profile-card">${this.avatar(true)}<h3>${esc(m.display_name || 'Seu espaço de professor')}</h3><p>${esc(this.account.user?.email)}</p>${m.school ? `<span class="profile-school">⌂ ${esc(m.school)}</span>` : ''}${m.bio ? `<p class="profile-bio">${esc(m.bio)}</p>` : ''}</div><div class="profile-shortcuts"><button type="button" data-account-action="profile">✎ Editar perfil</button><button type="button" data-account-action="password">⌑ Alterar senha</button></div>`;
+    return `<div class="profile-card">${this.avatar(true)}<h3>${esc(m.display_name || 'Seu espaço de professor')}</h3><p>${esc(this.account.user?.email)}</p>${m.school ? `<span class="profile-school">⌂ ${esc(m.school)}</span>` : ''}${m.bio ? `<p class="profile-bio">${esc(m.bio)}</p>` : ''}</div><div class="profile-shortcuts"><button type="button" data-account-action="profile">✎ Editar perfil</button><button type="button" data-account-action="password">⌑ Alterar senha</button><button type="button" data-account-action="restart-tour">✦ Rever tour da Kuro</button></div>`;
   }
   form() {
     if (this.photo.bitmap || this.photo.stream || this.photo.processing) return this.photo.markup();

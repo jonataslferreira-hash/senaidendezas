@@ -42,14 +42,26 @@
 .tour-next:hover{filter:brightness(1.08)}
 @keyframes tour-pop{from{opacity:0;transform:translateY(14px) scale(.97)}to{opacity:1;transform:none}}
 @keyframes tour-pop-top{from{opacity:0;transform:translateY(-14px) scale(.97)}to{opacity:1;transform:none}}
-/* Celular: balão vira folha fixa embaixo, acima de tudo. */
-.tour-bubble.sheet{position:fixed;left:12px!important;right:12px;width:auto;bottom:12px;top:auto!important;animation:tour-sheet-in .3s cubic-bezier(.2,.8,.2,1) both}
-@keyframes tour-sheet-in{from{opacity:0;transform:translateY(30px)}to{opacity:1;transform:none}}
+/* Celular: bolha flutuante compacta, no canto oposto ao destaque —
+   a Kuro flutua sem tampar o que está explicando. */
+.tour-bubble.float{position:fixed;left:12px;right:12px;width:auto;max-width:none;padding:11px 13px 10px;animation:tour-sheet-in .25s ease-out both,tour-float 3.4s ease-in-out .25s infinite}
+.tour-bubble.float.pos-top{top:calc(10px + env(safe-area-inset-top,0px))}
+.tour-bubble.float.pos-bottom{bottom:calc(12px + env(safe-area-inset-bottom,0px))}
+.tour-bubble.float.side-left{left:12px;right:auto;max-width:min(330px,86vw)}
+.tour-bubble.float.side-right{left:auto;right:12px;max-width:min(330px,86vw)}
+.tour-bubble.float .tour-mascot{width:42px;height:42px}
+.tour-bubble.float p{margin:8px 2px 10px;font-size:12.5px;max-height:34dvh;overflow:auto}
+.tour-bubble.float .tour-progress{margin-bottom:10px}
+.tour-bubble.float .tour-buttons button{padding:8px 12px;font-size:12px}
+@keyframes tour-sheet-in{from{opacity:0;transform:translateY(22px)}to{opacity:1;transform:none}}
+@keyframes tour-float{0%,100%{transform:translateY(0)}50%{transform:translateY(-5px)}}
+/* Boas-vindas sem alvo no desktop: centralizada. */
+.tour-bubble.centered{left:50%;top:16vh;transform:translateX(-50%);animation:tour-pop .3s cubic-bezier(.2,.8,.2,1) both,tour-float 3.4s ease-in-out .3s infinite}
 @media(prefers-reduced-motion:reduce){
-  .tour-bubble,.tour-bubble.sheet{animation-duration:.01ms}
+  .tour-bubble,.tour-bubble.float,.tour-bubble.centered{animation-duration:.01ms}
   .tour-highlight{transition:none}
   .kuro-head,.kuro-ear,.kuro-eyes,.kuro-arm,.kuro.talking .kuro-mouth-open{animation:none!important}
 }
-html[data-motion=reduced] .tour-bubble,html[data-motion=reduced] .tour-bubble.sheet{animation-duration:.01ms}
+html[data-motion=reduced] .tour-bubble,html[data-motion=reduced] .tour-bubble.float,html[data-motion=reduced] .tour-bubble.centered{animation-duration:.01ms}
 html[data-motion=reduced] .tour-highlight{transition:none}
 html[data-motion=reduced] .kuro-head,html[data-motion=reduced] .kuro-ear,html[data-motion=reduced] .kuro-eyes,html[data-motion=reduced] .kuro-arm,html[data-motion=reduced] .kuro.talking .kuro-mouth-open{animation:none!important}

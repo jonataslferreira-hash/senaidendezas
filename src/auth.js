@@ -54,6 +54,7 @@ export class Account {
       else if (action === 'diagnostics') this.measurePerformance();
       else if (action === 'copy-diagnostics') navigator.clipboard.writeText(JSON.stringify(this.diagnostics,null,2)).catch(()=>{});
       else if (action === 'logout') this.logout();
+      else if (action === 'restart-tour') { this.close(); document.dispatchEvent(new CustomEvent('start-tour')); }
       else if (action === 'remove-photo') this.settings.removePhoto();
       else this.show(action === 'open' ? (this.user ? 'account' : 'login') : action);
     });
