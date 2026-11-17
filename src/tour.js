@@ -35,6 +35,7 @@ export const kuroMascot = `<svg class="kuro" viewBox="0 0 120 120" aria-hidden="
 </svg>`;
 
 export const TOUR_STORAGE_KEY = 'sl-tour';
+export const VISIT_STORAGE_KEY = 'sl-visited';
 
 export function shouldOfferTour(storage = localStorage) {
   try { return !storage.getItem(TOUR_STORAGE_KEY); } catch { return false; }
@@ -42,6 +43,18 @@ export function shouldOfferTour(storage = localStorage) {
 
 export function markTourSeen(storage = localStorage, value = 'done') {
   try { storage.setItem(TOUR_STORAGE_KEY, value); } catch { /* modo privado */ }
+}
+
+// O tour automático é coisa de PRIMEIRA visita. Antes só a conclusão do tour
+// era registrada: quem recarregava no meio (ou só abria o site de novo dias
+// depois) via a Kuro aparecer "do nada" outra vez. Este marcador é gravado na
+// primeira vez que o site abre neste navegador, independente do tour.
+export function noteFirstVisit(storage = localStorage) {
+  try {
+    if (storage.getItem(VISIT_STORAGE_KEY)) return false;
+    storage.setItem(VISIT_STORAGE_KEY, '1');
+    return true;
+  } catch { return false; }
 }
 
 const wait = ms => new Promise(done => setTimeout(done, ms));
@@ -146,6 +159,14 @@ export class SiteTour {
     if (index >= steps.length) { this.stop('done'); return; }
     const step = steps[index];
     this.step = index;
+    // Cada etapa parte de um estado conhecido: se o passo anterior trocou de
+    // aba (Entrar / Compartilhados), volta para a biblioteca — é de lá que o
+    // editor abre e onde ficam a grade e o cartão de importar. Sem isto, as
+    // etapas seguintes ficavam sem alvo e eram puladas.
+    if (this.studio.view !== 'library' && !step.nav && index > 0 && this.studio.view !== 'editor') {
+      const home = this.studio.root.querySelector('button[data-studio-action="library"]');
+      if (home) { home.click(); await wait(220); }
+    }
     // Navegação da etapa (troca de aba/abrir editor) antes de destacar.
     if (step.nav) {
       const link = this.studio.root.querySelector(`button[data-studio-action="${step.nav}"]`);
@@ -165,7 +186,9 @@ export class SiteTour {
     // para não pular a etapa em silêncio.
     if (step.target && !target) { await wait(180); target = this.studio.root.querySelector(step.target); }
     this.target = target && target.offsetWidth ? target : null;
-    if (step.target && !this.target && index < steps.length - 1) { this.showStep(index + 1); return; } // elemento não encontrado: pula etapa
+    // NUNCA pular a etapa: o que a Kuro fala tem de aparecer escrito. Sem
+    // alvo na tela (aba fechada, elemento ausente) a etapa é exibida sem
+    // destaque. Antes daqui saía um showStep(index+1) que engolia o texto.
     if (this.target && this.target.scrollIntoView) { this.target.scrollIntoView({ block: 'center', behavior: 'instant' }); await wait(60); }
     this.nodes.classList.toggle('has-target', Boolean(this.target));
     this.position();

@@ -311,17 +311,25 @@ test('biblioteca: nunca esconder "Criar com IA" só no celular (o bug que foi ao
 });
 
 
-test('marca da barra lateral acompanha a largura da rail (sem cortar o logo)', async () => {
+test('marca da barra lateral cabe na rail sem reduzir a fonte', async () => {
   const { readFileSync } = await import('node:fs');
   const css = readFileSync(new URL('../src/studio.css', import.meta.url), 'utf8');
   const studio = readFileSync(new URL('../src/studio.js', import.meta.url), 'utf8');
 
-  // A rail é uma coluna e o wordmark não pode passar dela.
-  assert.match(css, /\.studio-shell \.studio-rail\{min-width:0;max-width:100%;container-type:inline-size\}/, 'rail é container');
+  // O wordmark ocupa a rail e não transborda.
   assert.match(css, /\.studio-rail \.studio-wordmark\{[^}]*width:100%;[^}]*overflow:hidden/s, 'wordmark ocupa a rail');
-  // O logo nunca encolhe nem é cortado; quem cede é o texto.
+  // O que criava o corte era o padding lateral de 8px: ele roubava 16px da
+  // coluna e empurrava o texto para fora. Tem de ficar zerado.
+  assert.match(css, /\.studio-rail \.studio-wordmark\{[^}]*padding:0;/s, 'sem padding que roube largura');
+  // A logo nunca encolhe nem é cortada; quem cede é o texto.
   assert.match(css, /\.studio-rail \.studio-wordmark \.lab-logo\{flex:0 0 auto\}/, 'logo inteiro');
   assert.match(css, /\.studio-rail \.studio-wordmark>span\{[^}]*text-overflow:ellipsis/s, 'texto encolhe com reticências');
+  // Regressão do bug que o usuário viu: NADA de fonte diminuída na marca.
+  // O tamanho vem dos breakpoints originais (23px / 20px) no topo do arquivo.
+  const brandBlock = css.slice(css.indexOf('/* ===== Marca do menu lateral'));
+  assert.ok(brandBlock.length > 100, 'bloco da marca presente');
+  assert.equal(/cqi|container-type/.test(brandBlock), false, 'sem container query reduzindo a fonte');
+  assert.equal(/font-size:/.test(brandBlock), false, 'bloco da marca não mexe no tamanho da fonte');
   // A marca continua sendo um botão único com logo + texto.
   assert.match(studio, /class="studio-wordmark"[^>]*><img class="lab-logo"[^>]*><span>storage<span>lab\.<\/span><\/span>/);
 });
