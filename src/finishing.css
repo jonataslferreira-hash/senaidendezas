@@ -3099,8 +3099,8 @@ dialog.simulation-modal .simulation-modal-foot-tools { display: none; }
 .team-leader-photo:active{transform:scale(.97)}
 .team-leader-photo:focus-visible{outline:2px solid #fff;outline-offset:2px}
 .team-leader-photo img{width:100%;height:100%;object-fit:cover;display:block}
-.team-leader-photo b{font-size:28px;font-weight:800;line-height:1;text-shadow:0 2px 8px #00000073}
-.team-leader-photo small{font-size:9.5px;font-weight:800;letter-spacing:.04em;text-transform:uppercase;opacity:.8}
+.team-leader-photo b{font-size:26px;font-weight:800;line-height:1;text-shadow:0 2px 8px #00000073}
+.team-leader-photo small{font-size:10px;font-weight:800;letter-spacing:.02em;opacity:.9;line-height:1}
 @media (max-width:760px){.team-leader-photo{width:64px;height:64px}}
 
 /* ===== Transição do slide no PC: o quadro novo carrega data-enter e a
