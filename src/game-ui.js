@@ -3,7 +3,7 @@ const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&
 // Bonequinho: cabeça com o ícone do aluno, corpo arredondado, mãos e pés soltos.
 // O movimento é todo de "amassa e estica" (CSS), sem juntas duras.
 // mood: '' (dancinha), 'idle', 'run', 'lose' ou 'win-0'…'win-3' (quatro comemorações).
-export function character(person,index=0,mood=''){return `<div class="game-character dance-${index%4}"${mood?` data-mood="${mood}"`:''} style="--beat-shift:${(index*37)%100}${/^#[0-9a-f]{6}$/i.test(person.color||'')?';--player-color:'+person.color:''}"${person.color?' data-team-color':''}><div class="character-rig buddy"><i class="buddy-shadow"></i><i class="buddy-foot left"></i><i class="buddy-foot right"></i><div class="buddy-top"><i class="buddy-body"></i><i class="buddy-hand left"></i><i class="buddy-hand right"></i><div class="character-head">${avatarContent(person.avatar)}</div></div></div></div>`;}
+export function character(person,index=0,mood=''){return `<div class="game-character dance-${index%6}"${mood?` data-mood="${mood}"`:''} style="--beat-shift:${(index*37)%100}${/^#[0-9a-f]{6}$/i.test(person.color||'')?';--player-color:'+person.color:''}"${person.color?' data-team-color':''}><div class="character-rig buddy"><i class="buddy-shadow"></i><i class="buddy-foot left"></i><i class="buddy-foot right"></i><div class="buddy-top"><i class="buddy-body"></i><i class="buddy-hand left"></i><i class="buddy-hand right"></i><div class="character-head">${avatarContent(person.avatar)}</div></div></div></div>`;}
 // Ranking entre as perguntas: as linhas entram na posição antiga, as barras
 // crescem com os pontos novos e só então cada um desliza para a posição nova.
 const rankColors=['#a78bfa','#34d399','#fbbf24','#60a5fa','#f472b6','#fb923c','#2dd4bf','#c084fc'];
@@ -16,7 +16,7 @@ function rankRace(state,elapsed){
  return `<ol class="rank-race" style="--rows:${count};--e:${elapsed.toFixed(2)}">${rows.map(({p,i},slot)=>{
   const from=before.findIndex(row=>row.p.id===p.id),gain=p.score-(p.previousScore||0),moved=p.previousRank?p.previousRank-(i+1):0;
   const ratio=p.score/max,prev=(p.previousScore||0)/max;
-  return `<li class="rank-row" data-me="${p.id===state.me?.id}" data-first="${i===0&&p.score>0}" data-gain="${gain>0}" data-wide="${ratio>=.5}" style="--from:${from};--to:${slot};--ratio:${ratio.toFixed(4)};--prev:${prev.toFixed(4)};--c:${p.color||rankColors[i%rankColors.length]};--k:${slot}">
+  return `<li class="rank-row" data-me="${p.id===state.me?.id}" data-first="${i===0&&p.score>0}" data-gain="${gain>0}" data-wide="${ratio>=.5}" data-streak="${p.streak>=2?'up':''}" style="--from:${from};--to:${slot};--ratio:${ratio.toFixed(4)};--prev:${prev.toFixed(4)};--c:${p.color||rankColors[i%rankColors.length]};--k:${slot};--fire:${Math.min(.7,(p.streak||0)/7).toFixed(2)}">
    <b class="rank-pos">${i+1}</b>
    <div class="rank-lane"><i class="rank-fill"></i><strong class="rank-name">${esc(p.name)}${p.streak>=2?` <em class="rank-fire" data-n="${p.streak}" title="Ofensiva: ${p.streak} acertos seguidos"></em>`:''}</strong>
     <div class="rank-runner"><span data-rank-runner data-gain="${gain>0}">${character(p,i,'idle')}</span></div></div>

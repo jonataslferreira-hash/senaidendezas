@@ -18,15 +18,27 @@ export class GameAudio{
   for(let i=0;i<length;i++)data[i]=(Math.random()*2-1)*Math.exp(-i/(length*0.35));
   this._noiseBuffer=buf;this._noiseCtx=ctx;return buf;
  }
- // Abertura das etapas: arpejo curto estilo chiptune (ré maior brilhante).
- playStageIntro(){
+ // Abertura das etapas: cada dinâmica tem o seu som (timbre, notas e ritmo),
+ // não um único arpejo para todas.
+ playStageIntro(type=''){
   if(!this.context||this.context.state!=='running')return;
   try{
    const ctx=this.context,now=ctx.currentTime+0.03,vol=Math.max(.05,Math.min(.2,(this.settings?.volume??.1)*1.5));
-   const notes=[587.33,739.99,880,1174.66],step=.085;
+   const intros={
+     flash:{notes:[587.33,739.99,880,1174.66],step:.075,wave:'square',bass:146.83,bassWave:'triangle'},
+     survival:{notes:[392,349.23,293.66,220],step:.115,wave:'sawtooth',bass:98,bassWave:'sine'},
+     tug:{notes:[196,261.63,196,261.63,329.63],step:.1,wave:'sawtooth',bass:98,bassWave:'square'},
+     race:{notes:[440,554.37,659.25,880],step:.07,wave:'triangle',bass:110,bassWave:'sawtooth'},
+     teams:{notes:[523.25,659.25,783.99,1046.5],step:.1,wave:'sine',bass:130.81,bassWave:'triangle'},
+     challenge:{notes:[392,493.88,587.33,783.99],step:.12,wave:'triangle',bass:98,bassWave:'sine'},
+     raffle:{notes:[659.25,783.99,987.77,1318.51],step:.06,wave:'square',bass:164.81,bassWave:'triangle'},
+     quiz:{notes:[523.25,587.33,659.25,783.99],step:.09,wave:'square',bass:130.81,bassWave:'triangle'}
+   };
+   const tune=intros[type]||intros.teams;
+   const notes=tune.notes,step=tune.step;
    notes.forEach((freq,i)=>{
     const t=now+i*step,osc=ctx.createOscillator(),gain=ctx.createGain();
-    osc.type='square';osc.frequency.setValueAtTime(freq,t);
+    osc.type=tune.wave;osc.frequency.setValueAtTime(freq,t);
     gain.gain.setValueAtTime(.0001,t);gain.gain.linearRampToValueAtTime(vol*(i===3?.9:.66),t+.012);gain.gain.exponentialRampToValueAtTime(.0001,t+.24);
     osc.connect(gain);gain.connect(ctx.destination);osc.start(t);osc.stop(t+.26);
     const shine=ctx.createOscillator(),sg=ctx.createGain();
@@ -35,7 +47,7 @@ export class GameAudio{
     shine.connect(sg);sg.connect(ctx.destination);shine.start(t+.02);shine.stop(t+.22);
    });
    const bass=ctx.createOscillator(),bg=ctx.createGain();
-   bass.type='triangle';bass.frequency.setValueAtTime(146.83,now);
+   bass.type=tune.bassWave;bass.frequency.setValueAtTime(tune.bass,now);
    bg.gain.setValueAtTime(.0001,now);bg.gain.linearRampToValueAtTime(vol*.5,now+.02);bg.gain.exponentialRampToValueAtTime(.0001,now+.5);
    bass.connect(bg);bg.connect(ctx.destination);bass.start(now);bass.stop(now+.52);
   }catch{}
@@ -219,6 +231,12 @@ export class GameAudio{
    }
    if(g.state==='done'){
     if(changed){this.stopDrumroll();this.questionKey='game-done:'+g.id;this.resultKey='';this.playResult();this.cue('confetti');this.startPodium();}
+    return;
+   }
+   // Desafio do experimento: trilha de fundo enquanto a turma mexe nos controles.
+   if(g.type==='challenge'){
+    if(g.state==='open'){this.stageBed(true,'challenge:'+g.id);return;}
+    this.stageBed(false);
     return;
    }
    // Resultados parciais de rodada (Relâmpago, Sobrevivência, Corrida): suspense suave nos resultados.

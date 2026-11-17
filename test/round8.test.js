@@ -227,7 +227,7 @@ test('etapas interativas: equipes, relâmpago, sobrevivência, desafio, sorteio 
   const variants = validateGame({ type: 'tug', text: 'x', options: ['A', 'B'], rounds: [[1, 2, 3, 4].map(n => ({ text: 'v' + n, options: ['x', 'y'], correct: 0 }))] });
   assert.equal(variants.rounds[0].length, 3, 'no máximo 3 perguntas por rodada');
   assert.throws(() => validateGame({ type: 'tug', text: 'x', options: ['A', 'B'], rounds: [] }), /rodada/);
-  // Rodada por rodada: em cada rodada cada participante recebe 1 pergunta sorteada; o lado A acerta tudo, o lado B erra tudo.
+  // Rodada por rodada: todo mundo responde as mesmas perguntas da rodada; o lado A acerta tudo, o lado B erra tudo.
   assert.equal(room.snapshot().game.rounds, 3);
   assert.equal(room.snapshot().game.state, 'ready');
   const everyone = room.data.players;
@@ -237,16 +237,17 @@ test('etapas interativas: equipes, relâmpago, sobrevivência, desafio, sorteio 
   assert.equal(room.snapshot().game.question, null, 'telão exibe a batalha da corda em tela cheia');
   assert.equal(room.snapshot().game.revealScores, false, 'placar fica escondido durante as rodadas');
   const firstStudentQ = room.snapshot(everyone[0].id).game.question;
-  assert.ok(firstStudentQ && firstStudentQ.text.length > 0, 'no cabo de guerra o aluno recebe o enunciado completo de sua pergunta sorteada');
+  assert.ok(firstStudentQ && firstStudentQ.text.length > 0, 'no cabo de guerra o aluno recebe o enunciado completo das perguntas da rodada');
   for (let round = 0; round < 3; round++) {
     assert.equal(room.snapshot().game.state, 'open');
     assert.equal(room.snapshot().game.round, round);
     for (const player of everyone) {
       const snap = room.snapshot(player.id).game;
       const side = snap.side;
-      const raw = tugCfg.rounds[round][room.data.game.picks[player.id]];
-      assert.equal(snap.question.text, raw.text);
-      room.answer(player.id, { choice: { choice: side === 0 ? raw.correct : (raw.correct + 1) % raw.options.length, round } });
+      tugCfg.rounds[round].forEach((raw, v) => {
+        assert.equal(room.snapshot(player.id).game.question.text, raw.text, 'a pergunta da vez segue a ordem da rodada');
+        room.answer(player.id, { choice: { choice: side === 0 ? raw.correct : (raw.correct + 1) % raw.options.length, round, v } });
+      });
     }
     if (round < 2) {
       assert.equal(room.snapshot().game.state, 'between', 'entre rodadas entra em pausa de transição');

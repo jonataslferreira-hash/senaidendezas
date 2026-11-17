@@ -49,6 +49,49 @@ export function isSupportedAudioFile(file) {
 }
 
 // Aplica volume, velocidade e efeito slowed (quando rate < 1, reduz o tom junto sem esticar artificialmente).
+// Slowed + reverb de verdade: acelera/desacelera a música inteira e passa o áudio
+// por uma reverberação longa (o efeito que todo mundo usa). O grafo fica em
+// cache por elemento — trocar de música não reconstrói a cada play.
+const audioGraphs = new WeakMap();
+export function audioGraph(player) {
+  if (!player || typeof player !== 'object') return null;
+  let graph = audioGraphs.get(player);
+  if (graph) return graph;
+  const Ctx = globalThis.AudioContext || globalThis.webkitAudioContext;
+  if (!Ctx) return null;
+  try {
+    const ctx = new Ctx();
+    const source = ctx.createMediaElementSource(player);
+    const dry = ctx.createGain(), wet = ctx.createGain(), convolver = ctx.createConvolver(), master = ctx.createGain();
+    // Impulso sintético: sala grande com cauda de ~2.6 s (reverb de slowed).
+    const seconds = 2.6, rate = ctx.sampleRate, length = Math.floor(rate * seconds), impulse = ctx.createBuffer(2, length, rate);
+    for (let channel = 0; channel < 2; channel++) {
+      const data = impulse.getChannelData(channel);
+      for (let i = 0; i < length; i++) data[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / length, 2.6);
+    }
+    convolver.buffer = impulse;
+    dry.gain.value = 1; wet.gain.value = 0; master.gain.value = 1;
+    source.connect(dry).connect(master);
+    source.connect(convolver).connect(wet).connect(master);
+    master.connect(ctx.destination);
+    graph = { ctx, dry, wet, master, source };
+    audioGraphs.set(player, graph);
+  } catch { graph = null; }
+  return graph;
+}
+// Liga/desliga o reverb e devolve o volume combinado do grafo.
+export function applyReverb(player, wet = 0, volume = 1) {
+  const graph = audioGraph(player);
+  if (graph) {
+    try {
+      if (graph.ctx.state === 'suspended') graph.ctx.resume().catch(() => {});
+      graph.wet.gain.value = Math.max(0, Math.min(1, wet));
+      graph.master.gain.value = Math.max(0, Math.min(1, volume));
+    } catch { /* sem Web Audio: segue só com o elemento */ }
+  }
+  return Boolean(graph);
+}
+
 export function applyAudioPlayback(player, track) {
   if (!player || !track) return;
   const rate = Math.max(0.5, Math.min(2, Number(track.rate) || 1));
@@ -56,6 +99,9 @@ export function applyAudioPlayback(player, track) {
   player.volume = Math.max(0, Math.min(1, Number.isFinite(Number(track.volume)) ? Number(track.volume) : 0.45));
   player.defaultPlaybackRate = rate;
   player.playbackRate = rate;
+  // Efeito slowed: reverb junto (na música inteira, do começo ao fim).
+  if (slowed) applyReverb(player, Math.max(0.18, Math.min(0.55, (1 - rate) * 2.2)), player.volume);
+  else applyReverb(player, 0, player.volume);
   player.preservesPitch = !slowed;
   player.mozPreservesPitch = !slowed;
   player.webkitPreservesPitch = !slowed;

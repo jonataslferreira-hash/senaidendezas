@@ -162,7 +162,7 @@ export class StageEditor {
       body += field('Os dois lados', `<div class="stage-options two">${[0, 1].map(i => `<input type="text" data-game-field="option" data-index="${i}" maxlength="60" value="${esc(g.options[i] || '')}" placeholder="Lado ${'AB'[i]}" ${off}>`).join('')}</div>`, 'Se a aula tiver uma etapa "Equipes" antes, os lados viram os próprios times (com o nome e a cor deles). Sem equipes, a turma é dividida ao meio com estes nomes.');
       body += field('Tempo por pergunta', `<select data-game-field="seconds" ${off}>${[8, 10, 15, 20, 30, 45].map(n => `<option value="${n}" ${g.seconds === n ? 'selected' : ''}>${n} segundos</option>`).join('')}</select>`);
       body += field('Tolerância para vencer', `<select data-game-field="tug-tolerance" ${off}>${[0, 5, 10, 15, 20, 30].map(n => `<option value="${n}" ${g.tolerance === n ? 'selected' : ''}>${n === 0 ? 'Qualquer diferença vence' : n + ' pontos de diferença'}</option>`).join('')}</select>`, 'A força de cada lado é a porcentagem de acertos (0 a 100). Se a diferença entre os lados não passar da tolerância, dá empate e ninguém puxa a corda.');
-      body += roundList('Cada rodada pode ter até 3 perguntas: na hora do jogo uma delas é sorteada, a mesma para todos, então a partida muda a cada vez. Cada acerto vale 100 pontos para o aluno, e o lado que vencer ganha mais 200 por pessoa.');
+      body += roundList('Cada rodada pode ter até 3 perguntas, e todos respondem todas em sequência — mesmo tempo, mesmas perguntas para os dois lados. Cada acerto vale 100 pontos para o aluno, e o lado que vencer ganha mais 200 por pessoa.');
     }
     if (g.type === 'challenge') {
       const marked = (g.answer || []).filter(item => !item.skip && item.k !== 'text');
