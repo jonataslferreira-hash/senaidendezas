@@ -258,7 +258,7 @@ export async function editablePptx(bytes,{signal,progress}){
    for(const renderedId of new Set(a.targetShapeIds.map(id=>animationTargets.get(id)))){const targets=elements.filter(e=>e.id==='pptx-'+renderedId||e.id==='pptx-shape-bg-'+renderedId);if(!targets.length)warnings.add('Uma animação aponta para um objeto não importado.');for(const target of targets)animations.push({id:target.id,group,effect:a.effect,duration,delay,direction:a.direction||'',orientation:a.orientation||''});}
   }
   const transition=pptx.getSlideTransition(source);if(transition?.advanceAfterMs)warnings.add('O avanço automático do PowerPoint fica manual nesta aula.');
-  result.push({...newSlide(),kind:'canvas',title:pptx.getSlideTitle(source)||'Slide '+(index+1),tag:'PPTX editável',sourceType:'pptx',image:preview,imageAlt:'Prévia do slide '+(index+1),pageWidth:width,pageHeight:height,background:'#ffffff',elements,animations,audio:slideAudio,importWarnings:[...warnings],transition:transition?.effect==='fade'?'fade':'none'});progress(index+1,slides.length);
+  result.push({...newSlide(),kind:'canvas',title:pptx.getSlideTitle(source)||'Slide '+(index+1),tag:'PPTX editável',sourceType:'pptx',image:preview,imageAlt:'Prévia do slide '+(index+1),pageWidth:width,pageHeight:height,background:'#ffffff',elements,animations,audio:slideAudio,importWarnings:[...warnings],transition:transition?.effect==='fade'?'fade':'slide'});progress(index+1,slides.length);
  }
  return result;
 }
