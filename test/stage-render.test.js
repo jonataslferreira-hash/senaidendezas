@@ -310,3 +310,18 @@ test('biblioteca: nunca esconder "Criar com IA" só no celular (o bug que foi ao
   assert.equal(wrongWay.test(css), false, 'o botão não pode ser escondido apenas no celular');
 });
 
+
+test('marca da barra lateral acompanha a largura da rail (sem cortar o logo)', async () => {
+  const { readFileSync } = await import('node:fs');
+  const css = readFileSync(new URL('../src/studio.css', import.meta.url), 'utf8');
+  const studio = readFileSync(new URL('../src/studio.js', import.meta.url), 'utf8');
+
+  // A rail é uma coluna e o wordmark não pode passar dela.
+  assert.match(css, /\.studio-shell \.studio-rail\{min-width:0;max-width:100%;container-type:inline-size\}/, 'rail é container');
+  assert.match(css, /\.studio-rail \.studio-wordmark\{[^}]*width:100%;[^}]*overflow:hidden/s, 'wordmark ocupa a rail');
+  // O logo nunca encolhe nem é cortado; quem cede é o texto.
+  assert.match(css, /\.studio-rail \.studio-wordmark \.lab-logo\{flex:0 0 auto\}/, 'logo inteiro');
+  assert.match(css, /\.studio-rail \.studio-wordmark>span\{[^}]*text-overflow:ellipsis/s, 'texto encolhe com reticências');
+  // A marca continua sendo um botão único com logo + texto.
+  assert.match(studio, /class="studio-wordmark"[^>]*><img class="lab-logo"[^>]*><span>storage<span>lab\.<\/span><\/span>/);
+});

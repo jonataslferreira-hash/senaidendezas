@@ -8,7 +8,7 @@ export function character(person,index=0,mood=''){return `<div class="game-chara
 // crescem com os pontos novos e só então cada um desliza para a posição nova.
 const rankColors=['#a78bfa','#34d399','#fbbf24','#60a5fa','#f472b6','#fb923c','#2dd4bf','#c084fc'];
 function rankRace(state,elapsed){
- const all=state.quizRanking||state.ranking,limit=7,rows=all.slice(0,limit).map((p,i)=>({p,i})),mine=all.findIndex(p=>p.id===state.me?.id);
+ const all=state.quizRanking||state.ranking||[],limit=7,rows=all.slice(0,limit).map((p,i)=>({p,i})),mine=all.findIndex(p=>p.id===state.me?.id);
  if(mine>=limit)rows[limit-1]={p:all[mine],i:mine};
  const max=Math.max(1,...all.map(p=>p.score)),count=rows.length;
  // posição de partida: a ordem anterior entre os que aparecem na tela
@@ -52,7 +52,7 @@ export function animateRanking(root,elapsed=0){
 }
 // Resumo no topo do placar da rodada: quem lidera, quem mais subiu e a posição do aluno.
 function roundSummary(state){
- const all=state.quizRanking||state.ranking;if(!all.length)return '';
+ const all=state.quizRanking||state.ranking||[];if(!all.length)return '';
  const gain=p=>p.score-(p.previousScore||0),lead=all[0],jump=[...all].sort((a,b)=>gain(b)-gain(a))[0],me=all.findIndex(p=>p.id===state.me?.id),mine=all[me];
  const card=(kind,label,p,detail)=>`<article class="rs-card ${kind}"${p.color?` style="--c:${p.color}"`:''}><span class="rs-head">${avatarContent(p.avatar)}</span><div><small>${label}</small><strong>${esc(p.name)}</strong><em>${detail}</em></div></article>`;
  const moved=mine?.previousRank?mine.previousRank-(me+1):0;
@@ -79,7 +79,7 @@ export function leaderboardMarkup(state,{header,host,offset=0,final=false,shareD
  const isQuizStageEnd=final&&Boolean(state.activity?.hasNext&&isQuizStage);
  const useQuizTowers=final&&(isQuizStageEnd||(!sortedTeams.length&&isQuizStage));
  const useTeamPodium=final&&!useQuizTowers&&sortedTeams.length>0;
- const board=(!final||useQuizTowers)?(state.quizRanking||state.ranking):state.ranking;
+ const board=((!final||useQuizTowers)?(state.quizRanking||state.ranking):state.ranking)||[];
  const winners=board.slice(0,3),champion=winners[0],me=board.findIndex(p=>p.id===state.me?.id);
  const podiumCount=useTeamPodium?Math.min(3,sortedTeams.length):Math.min(3,winners.length);
  const need=place=>podiumCount<=2?(place===2?1:3):(place===3?1:place===2?2:3);

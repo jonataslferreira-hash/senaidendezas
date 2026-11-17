@@ -67,7 +67,7 @@ export function manageParticipants(state,kick){
     state={...state,ranking:people};
   }
   const dialog=document.createElement('dialog');dialog.className='participants-sheet';
-  const people=[...state.ranking].sort((a,b)=>Number(b.online)-Number(a.online)||a.name.localeCompare(b.name,'pt-BR')),online=people.filter(p=>p.online).length,teams=state.teams||[];
+  const people=[...(state.ranking||[])].sort((a,b)=>Number(b.online)-Number(a.online)||a.name.localeCompare(b.name,'pt-BR')),online=people.filter(p=>p.online).length,teams=state.teams||[];
   const teamOf=p=>teams.find(team=>team.members.some(member=>member.id===p.id));
   const row=p=>{const team=teamOf(p);return `<li class="ps-person" data-name="${esc(p.name.toLowerCase())}" data-online="${p.online}" data-me="${p.id===state.me?.id}"${team?` style="--team:${esc(team.color)}"`:''}><span class="ps-avatar">${avatarContent(p.avatar)}</span><div class="ps-text"><strong>${esc(p.name)}${p.id===state.me?.id?' <em>você</em>':''}</strong><small>${p.online?'Conectado':'Saiu da sala'}${team?' · Time '+esc(team.name):''}${p.score?' · '+p.score.toLocaleString('pt-BR')+' pts':''}</small></div>${kick?`<button type="button" class="ps-remove" data-remove-player="${esc(p.id)}">Remover</button>`:''}</li>`;};
   dialog.innerHTML=`<header><div><h2>Participantes</h2><p><b>${online}</b> ${online===1?'conectado':'conectados'}${people.length>online?' · '+(people.length-online)+' fora':''}</p></div><button type="button" data-close aria-label="Fechar participantes">×</button></header>
