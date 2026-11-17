@@ -32,6 +32,9 @@ export function teamsBoard(state, { compact = false, hostTools = false } = {}) {
   </article>`).join('')}</div>`;
 }
 export const teamStrip = state => state.teams?.length ? `<section class="team-strip" aria-label="Placar das equipes"><h2>Placar das equipes</h2>${teamsBoard(state, { compact: true })}</section>` : '';
+// Atalho do professor: mexer nos times (quantos, nomes, líderes) sem sair da
+// etapa. Abre o mesmo painel de edição que já existe para a etapa de equipes.
+export const teamsShortcut = host => host ? `<section class="teams-shortcut" aria-label="Editar times"><div><strong>Times</strong><small>Nomes, líderes e quantidade, sem sair daqui.</small></div><button type="button" class="btn secondary small" data-action="edit-teams">Editar times</button><button type="button" class="btn secondary small" data-game-do="shuffle">Sortear times de novo</button></section>` : '';
 
 function hostActions(state, buttons, { showNext = true } = {}) {
   const next = state.activity?.hasNext ? 'Próxima etapa →' : 'Ver placar geral →';
@@ -51,13 +54,21 @@ function teamsView(state, g, host, player) {
   // A foto é o próprio botão: tocar na imagem abre o seletor. Antes havia um
   // botão "Escolher foto" longe dela e um bloco empilhado sem hierarquia.
   const photoPreview = !mine ? '' : `<button type="button" class="team-leader-photo" data-team-preview data-team-photo-button style="--team:${esc(mine.color)}" aria-label="${mine.photo ? 'Trocar a foto do time' : 'Escolher uma foto para o time'}" title="${mine.photo ? 'Trocar a foto do time' : 'Escolher uma foto para o time'}">${mine.photo ? `<img src="${esc(mine.photo)}" alt="Foto do time">` : `<b>${initial}</b><small>+ foto</small>`}</button>`;
+  // Foto e nome na mesma linha: a foto ocupa as duas linhas do campo (rótulo
+  // + entrada) e a dica fica embaixo de tudo. Antes a foto ficava sozinha e o
+  // texto caía bem mais abaixo, desalinhado.
   const leaderTools = leading ? `<section class="team-leader-tools" style="--team:${esc(mine.color)}" data-leader-team="${mine.index}" aria-label="Editar o time">
     <p class="team-leader-title"><span aria-hidden="true">👑</span> Você lidera o <b>Time ${esc(mine.name)}</b></p>
-    <div class="team-leader-edit">${photoPreview}<div class="team-leader-fields">
-      <label for="team-name-field">Nome do time</label>
-      <input id="team-name-field" type="text" maxlength="24" value="${esc(mine.name)}" data-team-name autocomplete="off">
-      <small class="team-leader-hint">${mine.photo ? 'Toque na foto para trocar.' : 'Toque no quadro para colocar a foto do time.'}</small>
-    </div></div>
+    <div class="team-leader-edit">
+      <div class="team-leader-photo-col">
+        <span class="team-leader-label" aria-hidden="true">Foto</span>
+        ${photoPreview}
+      </div>
+      <div class="team-leader-fields">
+        <label for="team-name-field">Nome do time</label>
+        <input id="team-name-field" type="text" maxlength="24" value="${esc(mine.name)}" data-team-name autocomplete="off">
+      </div>
+    </div>
     <div class="team-leader-actions">
       <button type="button" class="btn primary small" data-team-save>Salvar</button>
       ${mine.photo ? '<button type="button" class="btn secondary small" data-team-photo-clear>Remover foto</button>' : ''}
@@ -174,6 +185,57 @@ function survivalView(state, g, host, player, now) {
 // Espelhamento do experimento: os cartões do telão mostram o experimento de
 // cada pessoa com os controles no estado em que ela deixou. O aluno manda o
 // estado a cada ~700 ms (peek) e aqui a gente reaplica nos campos.
+// Os valores deslizam do antigo para o novo (a barra vai de 10 a 14 passando
+// por 11, 12, 13) em vez de teleportar direto.
+const mirrorAnim = new Map(); // nó da simulação -> {target, start, fields, frame}
+const MIRROR_MS = 600;
+
+function mirrorTick(sim) {
+  const state = mirrorAnim.get(sim);
+  if (!state) return;
+  const progress = Math.min(1, (performance.now() - state.at) / MIRROR_MS);
+  let finished = true;
+  state.fields.forEach((field, i) => {
+    const a = Number(state.cur[i] ?? ''), b = Number(state.target[i] ?? '');
+    let next;
+    if (!isNaN(a) && !isNaN(b)) {
+      const step = Number(field.step || 1);
+      next = Math.round((a + (b - a) * progress) / step) * step;
+    } else {
+      next = progress >= 1 ? state.target[i] : state.start[i];
+    }
+    if (String(field.value ?? '') !== String(next)) {
+      field.value = next;
+      field.dispatchEvent(new Event('input', { bubbles: true }));
+    }
+    if (progress < 1 || String(field.value ?? '') !== String(state.target[i])) finished = false;
+  });
+  if (finished) {
+    for (const field of state.fields) field.dispatchEvent(new Event('change', { bubbles: true }));
+    mirrorAnim.delete(sim);
+    return;
+  }
+  state.frame = requestAnimationFrame(() => mirrorTick(sim));
+}
+
+// Aponta um espelho para novos valores, iniciando (ou retargetando) a animação
+// de deslize. Sem isso o controle saltava direto do valor antigo para o novo.
+function mirrorTo(sim, values) {
+  if (!sim || !Array.isArray(values)) return;
+  const fields = [...sim.querySelectorAll(':is([data-param],[data-sim-select],[data-sim-text],[data-sim-toggle])')];
+  const cur = fields.map(f => String(f.value ?? ''));
+  const target = values.map(String);
+  const same = cur.every((v, i) => v === target[i]);
+  if (same) { mirrorAnim.delete(sim); return; }
+  const prev = mirrorAnim.get(sim);
+  if (prev) cancelAnimationFrame(prev.frame);
+  mirrorAnim.set(sim, { at: performance.now(), cur, target, fields, frame: 0 });
+  mirrorTick(sim);
+}
+
+// Espelhamento do experimento: os cartões do telão mostram o experimento de
+// cada pessoa com os controles no estado em que ela deixou. O aluno manda o
+// estado a cada ~700 ms (peek) e aqui a gente reaplica nos campos.
 function applyChallengeMirror(g) {
   // Experimento grande: no telão segue o líder; para quem só assiste, é o
   // experimento do líder do time se mexendo (controles travados).
@@ -182,14 +244,14 @@ function applyChallengeMirror(g) {
   // Quem está com o experimento na mão não recebe o próprio eco: isso puxaria
   // o controle de volta enquanto a pessoa arrasta.
   const driving = Boolean(g.me?.leader);
-  if (main && values && !driving) applySimValues(main, values, false);
+  if (main && values && !driving) mirrorTo(main, values);
   const cards = document.querySelectorAll('.challenge-live-card');
   const people = g.live || [];
   cards.forEach((card, index) => {
     const person = people[index];
     const sim = card.querySelector('[data-simulation]');
     if (!person || !sim) return;
-    applySimValues(sim, person.values, true);
+    mirrorTo(sim, person.values);
   });
 }
 
@@ -241,7 +303,7 @@ function challengeView(state, g, host, player) {
   // Rodada de dicas: o líder tenta, o time lê a dica e palpita a resposta.
   const teamHint = g.hint
     ? `<div class="challenge-team-hint"><span>Dica ${g.hintIndex + 1} de ${g.hintCount}</span><p>${esc(g.hint)}</p>${leader ? '' : `<small>O líder está ajustando o experimento. Escreva o que você acha que é a resposta certa.</small>`}</div>`
-    : `<div class="challenge-team-hint quiet"><p>${leader ? 'Você está no comando: ajuste os controles e toque em tentar.' : 'O líder do time está no comando do experimento. Fique de olho e palpita quando a dica aparecer.'}</p></div>`;
+    : `<div class="challenge-team-hint quiet"><p>${leader ? 'Ajuste os controles e toque em tentar.' : 'O líder do time está ajustando o experimento. Fique de olho e palpite quando a dica aparecer.'}</p></div>`;
   const guessBox = !leader && me && !me.ok && !done
     ? `<form class="challenge-guess" data-challenge-guess><label for="challenge-guess-field">Seu palpite para a turma</label>
         <div><input id="challenge-guess-field" name="guess" maxlength="80" value="${esc(me.guess || '')}" placeholder="Ex.: 45 graus" autocomplete="off"><button class="btn secondary small" type="submit">Enviar</button></div>
@@ -251,7 +313,7 @@ function challengeView(state, g, host, player) {
     ? `<p class="game-winner"><span>🎯</span>Você chegou à meta! <small>${me.place}º lugar · +${me.points} pts</small></p>`
     : done ? '<p class="game-wait">Tempo encerrado.</p>'
     : left <= 0 ? `<p class="sv-dead">As ${max} tentativas acabaram. Acompanhe a turma!</p>`
-    : leader ? `${controlHints}<div class="challenge-submit-row"><button class="btn primary game-submit" data-challenge-send>${stageIcon('challenge')} Tentar acertar</button><span class="challenge-tries" data-left="${left}" aria-label="${left} de ${max} tentativas restantes">${Array.from({ length: max }, (_, i) => `<i data-used="${i >= left}"></i>`).join('')}</span></div>`
+    : leader ? `${controlHints}<div class="challenge-submit-row">${character({ avatar: '', color: 'var(--ui-accent)' }, 0, 'working')}<button class="btn primary game-submit" data-challenge-send>${stageIcon('challenge')} Tentar acertar</button><span class="challenge-tries" data-left="${left}" aria-label="${left} de ${max} tentativas restantes">${Array.from({ length: max }, (_, i) => `<i data-used="${i >= left}"></i>`).join('')}</span></div>`
     : `<p class="game-wait">Você está no time de quem mexe: acompanhe a dica e palpite.</p>`)
     : '';
   const podium = g.solved.length ? `<ol class="challenge-podium">${g.solved.slice(0, 5).map((item, i) => `<li><b>${['🥇', '🥈', '🥉'][i] || i + 1 + 'º'}</b><span>${esc(item.name)}</span><small>${(item.at / 1000).toFixed(1)} s · ${plural(item.tries, 'tentativa', 'tentativas')}</small></li>`).join('')}</ol>` : '';
@@ -262,8 +324,11 @@ function challengeView(state, g, host, player) {
   // alguém mexe no experimento, o keepGame troca só o número de tentativas e a
   // fita de valores — o cartão não é remontado, então não há animação de
   // entrada a cada tique nem a cena recomeçando.
+  // Identidade do time no experimento: quando há times, o cartão ao vivo mostra
+  // a foto do time e "Time <nome>" em vez do avatar da pessoa.
+  const teamOf = item => state.teams?.find(t => (t.members || []).some(m => m.id === item.id));
   const liveLab = host && !done && g.live?.length
-    ? `<div class="game-live game-mirror" data-game-live data-soft="mirror:${esc(g.simulation)}"><div class="challenge-live"><h2>Espelho ao vivo <small>${g.live.length}</small></h2><div class="challenge-live-grid">${g.live.map(item => `<div class="challenge-live-card" data-k="${esc(item.id)}" data-ok="${item.ok}"><header>${character(item, 0, item.ok ? 'win-0' : 'idle')}<strong>${esc(item.name)}</strong><small data-soft-slot="tries">${item.tries}/${max}</small></header><div class="challenge-live-sim">${simulationMarkup(g.simulation)}</div><div class="challenge-live-values" data-soft-slot="values">${item.values.map(value => `<i>${esc(String(value ?? '').slice(0, 6))}</i>`).join('')}</div></div>`).join('')}</div></div></div>`
+    ? `<div class="game-live game-mirror" data-game-live data-soft="mirror:${esc(g.simulation)}"><div class="challenge-live"><h2>Espelho ao vivo <small>${g.live.length}</small></h2><div class="challenge-live-grid" data-teams="${g.live.length}">${g.live.map(item => { const tm = teamOf(item); const dead = !item.ok && item.tries >= max; const lead = tm ? `<img class="team-photo" src="${esc(tm.photo)}" alt="Foto do time ${tm.name}"><strong>Time ${esc(tm.name)}</strong>` : `${character(item, 0, item.ok ? 'win-0' : 'idle')}<strong>${esc(item.name)}</strong>`; return `<div class="challenge-live-card" data-k="${esc(item.id)}" data-ok="${item.ok}"${dead ? ' data-dead' : ''}><header>${lead}<small data-soft-slot="tries">${item.tries}/${max}</small></header><div class="challenge-live-sim">${simulationMarkup(g.simulation)}</div><div class="challenge-live-values" data-soft-slot="values">${item.values.map(value => `<i>${esc(String(value ?? '').slice(0, 6))}</i>`).join('')}</div></div>`}).join('')}</div></div></div>`
     : '';
   // O espelho de verdade: aplica no experimento grande (e nas miniaturas do
   // telão) os valores que o líder está usando agora.
@@ -277,7 +342,10 @@ function challengeView(state, g, host, player) {
   // (objetivo, dica, tentar) fica num bloco logo abaixo — largura de leitura,
   // não uma coluna apertada ao lado que espremia o simulador no celular.
   const actionBar = host ? live(modeSwitch + hostActions(state, [done ? ['restart', '↻ Jogar de novo'] : ['end', 'Encerrar jogo', 'primary']], { showNext: done }), 'control') : '';
-  const results = live(`<div class="challenge-results-head"><h2>Quem chegou na meta</h2><small>${g.solvedCount}</small></div>${podium}${done ? answer : ''}`, 'board');
+  // Sem placar "quem chegou na meta": o status de cada time fica na cor do
+  // próprio cartão ao vivo (verde = meta atingida, vermelho = tentativas
+  // esgotadas). O pódio de resolução some daqui para não competir com isso.
+  const results = '';
   return `<div class="challenge-layout"><div class="challenge-stage">
       <div class="challenge-sim" data-challenge-sim data-locked="${!host && !leader}">${simulationMarkup(g.simulation)}</div>
       ${live(goal + teamHint + mine + guessBox, 'command')}
