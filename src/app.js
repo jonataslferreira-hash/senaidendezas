@@ -864,6 +864,13 @@ app.addEventListener('click', event => {
   if (button.dataset.gameDo === 'team-rename') { if (host) control('game', { do: 'team-rename', team: Number(button.dataset.team), name: button.closest('.team-rename')?.querySelector('[data-team-rename-input]')?.value || '' }); return; }
   if (button.dataset.gameDo === 'team-leader') { if (host) control('game', { do: 'team-leader', team: Number(button.dataset.team), player: button.dataset.player || '' }); return; }
   if (button.dataset.gameDo === 'team-count') { if (host) control('game', { do: 'team-count', count: Number(button.closest('.team-count-control')?.querySelector('[data-team-count-select]')?.value) || 2 }); return; }
+  // Desafio: alternar entre "só o líder mexe" e "todos mexem". O label do
+  // botão reflete o estado atual (vem de g.freeForAll), mas o clique precisa
+  // enviar o modo contrário, senão o botão nunca muda de fato.
+  if (button.dataset.gameDo === 'challenge-mode') {
+    if (host) control('game', { do: 'challenge-mode', mode: state.game.freeForAll ? 'leader' : 'all' });
+    return;
+  }
   if (button.dataset.gameDo) { control('game', { do: button.dataset.gameDo, id: button.dataset.id }); return; }
   if (button.hasAttribute('data-challenge-send')) {
     const values = challengeValues();
@@ -930,9 +937,9 @@ async function action(name) {
     case 'choose-guest-photo':app.querySelector('[data-guest-photo]')?.click();break;
     case 'take-guest-photo':{const file=await takePhoto();if(file){selectedAvatar=await participantPhoto(file);avatarChanged=true;render();}break;}
     case 'scan-qr':{const code=await scanRoomCode();if(code){codeDraft=code;const field=app.querySelector('#room-code');if(field)field.value=code;studio.view='join';render();}break;}
-    case 'participants':if(state)manageParticipants(state,host&&!demo?id=>control('kick',id):null);break;
+    case 'participants':if(state)manageParticipants(state,host&&!demo?id=>control('kick',id):null,control);break;
     case 'room-invite':if(state){if(host){shareOpen=true;render();}else manageParticipants(state,null);}break;
-    case 'manage-people':if(state)manageParticipants(state,host&&!demo?id=>control('kick',id):null);break;
+    case 'manage-people':if(state)manageParticipants(state,host&&!demo?id=>control('kick',id):null,control);break;
     case 'edit-player':await editParticipant(state.me,async(name,avatar)=>{selectedAvatar=avatar;avatarChanged=true;joinNameDraft=name;joinNameTouched=true;if(demo){classroom.updateProfile(demoPlayer,{name,avatar});receive({...classroom.snapshot(demoPlayer),lesson:classroom.publicLesson(true)});}else await classroom.updateProfile(name,avatar);});break;
     case 'show-ranking':control('ranking');break;
     case 'podium-all':control('podium-all');break;
