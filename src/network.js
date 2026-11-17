@@ -84,7 +84,12 @@ export class Classroom {
     if (this.connections.size >= 65) { conn.close(); return; }
     const timeout = setTimeout(() => { if (!conn.playerId) conn.close(); }, 12_000);
     conn.on('data', msg => {
-      if (!msg || typeof msg !== 'object' || JSON.stringify(msg).length > (['join','profile'].includes(msg.type)?32768:4096)) return;
+      // A foto do time viaja dentro da resposta (até 30 KB). Com o limite antigo
+      // de 4 KB ela era descartada em silêncio: o líder salvava, o cartão dele
+      // mostrava a prévia e o telão continuava sem foto — e, na renderização
+      // seguinte, a prévia voltava para a inicial do nome.
+      const limit = msg?.type === 'answer' ? 48000 : ['join', 'profile'].includes(msg?.type) ? 32768 : 4096;
+      if (!msg || typeof msg !== 'object' || JSON.stringify(msg).length > limit) return;
       const time = Date.now();
       conn.actions = (conn.actions || []).filter(t => t > time - 10_000);
       if (conn.actions.length > 40) return;

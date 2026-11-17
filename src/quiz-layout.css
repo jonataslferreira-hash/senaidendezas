@@ -1,7 +1,10 @@
 /* One viewport per game scene; lists may open inside an overlay. */
-#app.quiz-party:has(>main),#app.quiz-party:has(>main.game-question){height:100dvh;min-height:0;display:grid;grid-template-rows:64px minmax(0,1fr);overflow:hidden}
+/* A coluna do grid precisa ser minmax(0,1fr): sem isso ela cresce até o
+   max-content do conteúdo (no celular virava ~1,8× a largura da tela) e a
+   tela do jogo aparecia cortada na direita, sem barra de rolagem. */
+#app.quiz-party:has(>main),#app.quiz-party:has(>main.game-question){height:100dvh;min-height:0;display:grid;grid-template-columns:minmax(0,1fr);grid-template-rows:64px minmax(0,1fr);overflow:hidden}
 #app.quiz-party>.header{height:64px;min-height:0;width:100%;margin:0;padding:10px 24px;box-sizing:border-box;max-width:none}
-#app.quiz-party>main{min-height:0;height:100%;width:100%;box-sizing:border-box;overflow:hidden}
+#app.quiz-party>main{min-height:0;min-width:0;height:100%;width:100%;box-sizing:border-box;overflow:hidden}
 #app .quiz-lobby{display:flex;flex-direction:column;padding:12px 4% 16px;gap:10px;background:transparent}
 #app .lobby-top{min-height:30px;flex:none;justify-content:flex-end}#app .lobby-label:empty{display:none}
 #app .lobby-heading{margin:0 auto;flex:none;text-align:center}#app .lobby-heading h1{font-size:clamp(26px,5vh,46px);line-height:1.05;letter-spacing:-1px;margin:4px 0}#app .lobby-heading h1 br{display:none}#app .lobby-heading h1 em{margin-left:.15em}#app .lobby-heading p:empty{display:none}#app .lobby-heading .lobby-eyebrow{display:none}
@@ -85,7 +88,7 @@
 
 /* Fill the question viewport even when older scene rules use automatic margins. */
 #app.quiz-party{--game-header:64px}
-#app.quiz-party:has(>main),#app.quiz-party:has(>main.game-question){grid-template-rows:var(--game-header) minmax(0,1fr)}
+#app.quiz-party:has(>main),#app.quiz-party:has(>main.game-question){grid-template-columns:minmax(0,1fr);grid-template-rows:var(--game-header) minmax(0,1fr)}
 #app.quiz-party:has(>main.game-question)>.game-question{height:100%;margin:0 auto;align-self:stretch;flex:none}
 #app.quiz-party:has(>main)>.header{height:var(--game-header);min-height:0;max-height:var(--game-header);padding-block:8px}
 @media(max-width:800px){#app.quiz-party{--game-header:56px}}

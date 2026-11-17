@@ -852,11 +852,16 @@ html[data-theme][data-ui-style][data-appearance] body #app dialog.remote-v2 :is(
 #app .cloud-form .btn{min-height:54px;font-size:16px}
 #app .cloud-form[data-left="0"]{opacity:.5}
 /* desafio no experimento */
-#app .challenge-layout{display:grid;grid-template-columns:minmax(0,1.6fr) minmax(250px,1fr);gap:18px;width:100%;align-items:start;text-align:left}
-#app .challenge-sim{min-width:0;border-radius:20px;overflow:hidden;background:#fff;color:#171324}
-#app .challenge-sim .simulation-widget{width:100%;min-height:min(60dvh,520px)}
-#app .challenge-layout aside{display:flex;flex-direction:column;gap:14px}
-#app .challenge-layout aside .game-live{align-items:stretch}
+#app .challenge-layout{display:grid;grid-template-columns:minmax(0,1.55fr) minmax(260px,.85fr);gap:18px;width:100%;align-items:start;text-align:left}
+#app .challenge-stage{display:flex;flex-direction:column;gap:12px;min-width:0}
+#app .challenge-side{display:flex;flex-direction:column;gap:14px;min-width:0}
+#app .challenge-side .game-live{align-items:stretch}
+#app .challenge-results-head{display:flex;align-items:center;justify-content:space-between;gap:10px}
+#app .challenge-results-head h2{margin:0}
+#app .challenge-results-head small{font-size:13px;font-weight:800;opacity:.75;font-variant-numeric:tabular-nums}
+#app .challenge-sim{min-width:0;border-radius:20px;overflow:hidden;background:#171c2c;color:#e8eefc;display:flex}
+#app .challenge-sim .simulation-widget{width:100%;min-height:clamp(360px,62dvh,660px)}
+
 #app .challenge-layout h2{margin:0;font-size:15px;letter-spacing:1px;text-transform:uppercase;opacity:.8;display:flex;justify-content:space-between}
 #app .challenge-podium{list-style:none;margin:0;padding:0;display:grid;gap:8px}
 #app .challenge-podium li{display:grid;grid-template-columns:auto 1fr;gap:2px 10px;align-items:center;padding:10px 14px;border-radius:14px;background:var(--g-card);border:1px solid var(--g-line);animation:game-pop .4s}
@@ -890,7 +895,7 @@ html[data-theme][data-ui-style][data-appearance] body #app dialog.remote-v2 :is(
 #app .tug-tap small{font-size:13px;opacity:.9;max-width:20ch;margin:0 auto}
 #app .tug-tap.pulse{animation:tug-pulse .16s}
 @keyframes tug-pulse{50%{transform:scale(.93)}}
-@media (max-width:760px){#app .game-stage{padding:12px 14px 22px;gap:12px}#app .game-options{grid-template-columns:1fr}#app .game-option{min-height:68px}#app .team-board{grid-template-columns:repeat(2,minmax(0,1fr))}#app .challenge-layout{grid-template-columns:1fr}#app .challenge-sim .simulation-widget{min-height:0}#app .tug-rope{grid-template-columns:1fr 1fr}#app .tug-track{grid-column:1/-1;grid-row:1}#app .cloud-form{flex-direction:column}}
+@media (max-width:760px){#app .game-stage{padding:12px 14px 22px;gap:12px}#app .game-options{grid-template-columns:1fr}#app .game-option{min-height:68px}#app .team-board{grid-template-columns:repeat(2,minmax(0,1fr))}#app .challenge-layout{grid-template-columns:1fr}#app .tug-rope{grid-template-columns:1fr 1fr}#app .tug-track{grid-column:1/-1;grid-row:1}#app .cloud-form{flex-direction:column}}
 @media (prefers-reduced-motion:reduce){:root:not([data-motion=normal]):not([data-play]) #app .game-stage *{animation:none!important;transition:none!important}}
 
 /* 34. Editor das etapas interativas */
@@ -2985,11 +2990,15 @@ dialog.simulation-modal .simulation-modal-foot-tools { display: none; }
 #app .team-rename[open] summary{opacity:1}
 #app .team-rename span{position:absolute;right:0;top:calc(100% + 6px);z-index:5;display:grid;gap:6px;background:#1c1730f2;border:1px solid #ffffff30;padding:8px;border-radius:10px;box-shadow:0 14px 40px #00000070}
 #app .team-rename input{min-width:170px}
-.team-leader-tools{display:grid;gap:10px;justify-items:start;padding:14px 16px;border-radius:16px;border:2px solid var(--team,#7950b4);background:color-mix(in srgb,var(--team,#7950b4) 16%,rgba(0,0,0,.25));margin:10px 0}
-.team-leader-tools strong{color:#fff;font-size:15px}
-.team-leader-tools label{display:grid;gap:4px;font-size:12.5px;color:#e7dcff;width:100%}
-.team-leader-tools input[type=text]{border-radius:8px;border:1px solid #ffffff38;background:#0f0c1cd9;color:#fff;padding:8px 10px;font:inherit}
-.team-leader-row{display:flex;gap:8px;flex-wrap:wrap}
+.team-leader-tools{display:grid;gap:14px;padding:16px;border-radius:18px;border:1px solid color-mix(in srgb,var(--team,#7950b4) 55%,transparent);background:color-mix(in srgb,var(--team,#7950b4) 12%,rgba(10,8,20,.55));margin:0 auto 4px;width:min(100%,520px);text-align:left;box-shadow:0 12px 30px #00000033}
+.team-leader-title{margin:0;font-size:14.5px;font-weight:650;color:#fff;line-height:1.35}
+.team-leader-title b{font-weight:800}
+.team-leader-tools label{display:block;font-size:11.5px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:#d9cdf2;opacity:.85}
+.team-leader-tools input[type=text]{border-radius:12px;border:1px solid #ffffff2e;background:#0f0c1cd9;color:#fff;padding:11px 13px;font:inherit;font-size:16px;width:100%;box-sizing:border-box}
+.team-leader-tools input[type=text]:focus-visible{outline:2px solid color-mix(in srgb,var(--team,#7950b4) 70%,#fff);outline-offset:1px}
+.team-leader-hint{font-size:11.5px;line-height:1.4;color:#cfc4e6;opacity:.8}
+.team-leader-actions{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.team-leader-actions .btn.primary{flex:1;min-width:120px}
 .team-pick-photo{width:54px;height:54px;border-radius:12px;object-fit:cover;border:2px solid #ffffff52;margin-bottom:4px}
 .stage-ai-field .studio-btn.is-loading{opacity:.6;pointer-events:none}
 
@@ -3031,7 +3040,9 @@ dialog.simulation-modal .simulation-modal-foot-tools { display: none; }
 @keyframes challenge-hint-pop{from{transform:scale(0)}to{transform:scale(1)}}
 #app .challenge-live{display:flex;flex-direction:column;gap:8px}
 #app .challenge-live-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(168px,1fr));gap:8px}
-#app .challenge-live-card{padding:10px 12px;border-radius:14px;background:var(--g-card);border:1px solid var(--g-line);display:flex;flex-direction:column;gap:7px;animation:game-pop .4s}
+/* Sem animação de entrada: o cartão se atualiza ao vivo (a cada ~700 ms) e a
+   animação a cada tique era a "intro" piscando na tela o tempo todo. */
+#app .challenge-live-card{padding:10px 12px;border-radius:14px;background:var(--g-card);border:1px solid var(--g-line);display:flex;flex-direction:column;gap:7px}
 #app .challenge-live-card[data-ok="true"]{border-color:#4ade80;background:rgba(34,197,94,.12)}
 #app .challenge-live-card header{display:flex;align-items:center;gap:8px;min-width:0}
 #app .challenge-live-card header strong{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:14px}
@@ -3065,14 +3076,32 @@ dialog.simulation-modal .simulation-modal-foot-tools { display: none; }
 #app .team-rename summary:hover{background:rgba(255,255,255,.16);transform:translateY(-1px)}
 #app .team-rename summary::-webkit-details-marker{display:none}
 
+/* Card de um time: foto + nome + pontos na mesma linha, sem quebrar. */
+#app .team-card>header{align-items:center}
+#app .team-card>header>strong{flex:1 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+#app .team-card>header>b{flex:none}
+#app .team-card>header .team-rename{flex:none}
+#app .team-card>header.has-photo{display:grid;grid-template-columns:auto minmax(0,1fr) auto;align-items:center;column-gap:10px;row-gap:2px}
+#app .team-card>header.has-photo .team-photo{grid-row:1 / span 2;width:46px;height:46px}
+#app .team-card>header.has-photo>strong{grid-column:2;grid-row:1}
+#app .team-card>header.has-photo>b{grid-column:2;grid-row:2;text-align:left;font-size:clamp(17px,2.4vh,22px)}
+#app .team-card>header.has-photo .team-rename{grid-column:3;grid-row:1 / span 2}
+#app .team-card>header:not(.has-photo) .team-rename{order:3}
+
 /* Editar time (painel do líder): prévia da foto ao lado dos campos,
    com o fundo acompanhando a cor do time. */
 .team-leader-edit{display:flex;gap:12px;align-items:flex-start;width:100%}
-.team-leader-fields{display:grid;gap:10px;flex:1;min-width:0;justify-items:start;width:100%}
-.team-leader-preview{width:64px;height:64px;flex:none;border-radius:14px;overflow:hidden;display:grid;place-items:center;border:2px solid color-mix(in srgb,var(--team,#7950b4) 65%,#fff);background:color-mix(in srgb,var(--team,#7950b4) 32%,#0f0c1c);box-shadow:0 6px 16px #00000042}
-.team-leader-preview img{width:100%;height:100%;object-fit:cover;display:block}
-.team-leader-preview b{font-size:26px;font-weight:800;color:#fff;text-shadow:0 2px 8px #00000073}
-@media (max-width:760px){.team-leader-preview{width:56px;height:56px}}
+.team-leader-fields{display:grid;gap:6px;flex:1;min-width:0;width:100%}
+/* A foto É o botão de trocar a foto: sem texto solto embaixo. */
+.team-leader-photo{width:72px;height:72px;flex:none;padding:0;border-radius:18px;overflow:hidden;position:relative;display:grid;place-items:center;gap:1px;cursor:pointer;font:inherit;color:#fff;
+  border:1px dashed color-mix(in srgb,var(--team,#7950b4) 70%,#fff);background:color-mix(in srgb,var(--team,#7950b4) 26%,#0f0c1c);box-shadow:0 6px 16px #00000042;transition:transform .15s,border-color .15s}
+.team-leader-photo:hover{border-color:#fff}
+.team-leader-photo:active{transform:scale(.97)}
+.team-leader-photo:focus-visible{outline:2px solid #fff;outline-offset:2px}
+.team-leader-photo img{width:100%;height:100%;object-fit:cover;display:block}
+.team-leader-photo b{font-size:28px;font-weight:800;line-height:1;text-shadow:0 2px 8px #00000073}
+.team-leader-photo small{font-size:9.5px;font-weight:800;letter-spacing:.04em;text-transform:uppercase;opacity:.8}
+@media (max-width:760px){.team-leader-photo{width:64px;height:64px}}
 
 /* ===== Transição do slide no PC: o quadro novo carrega data-enter e a
    animação roda direto nele — apresentador e aluno conectado, sempre.
@@ -3253,7 +3282,7 @@ button.connection:hover{background:#ffffff14}
 #app .challenge-hint i{width:22px;height:9px;border-radius:99px;background:color-mix(in srgb,currentColor 18%,transparent)}
 #app .challenge-hint i.hot{background:#22c55e}#app .challenge-hint i.warm{background:#f59e0b}#app .challenge-hint i.cold{background:#94a3b8}
 @media (max-width:800px){
-  #app .challenge-layout{display:flex;flex-direction:column;gap:10px}
+  #app .challenge-layout{display:flex;flex-direction:column;gap:12px}
   #app .challenge-goal{font-size:14px;padding:10px 12px}
   #app .challenge-howto{font-size:12.5px}
   #app .challenge-submit-row{bottom:calc(10px + env(safe-area-inset-bottom))}
@@ -3403,9 +3432,97 @@ button.connection:hover{background:#ffffff14}
    tela (era o "esse experimento ainda fica na minha tela"). No telão ele
    some e o espelho ao vivo ocupa o espaço. O aluno continua vendo o dele. */
 #app[data-role=presenter] .challenge-layout{grid-template-columns:minmax(0,1fr)}
-#app[data-role=presenter] .challenge-layout>.challenge-sim{display:none}
-#app[data-role=presenter] .challenge-layout aside{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));align-items:start;gap:16px}
-#app[data-role=presenter] .challenge-live-grid{grid-template-columns:repeat(auto-fit,minmax(240px,1fr))}
+#app[data-role=presenter] .challenge-layout .challenge-sim{display:none}
+#app[data-role=presenter] .challenge-stage{display:contents}
+#app[data-role=presenter] .challenge-layout .challenge-side{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));align-items:start;gap:16px}
+#app[data-role=presenter] .challenge-live-grid{grid-template-columns:repeat(auto-fit,minmax(260px,1fr))}
 @media (max-width:760px){
-  #app[data-role=presenter] .challenge-layout aside{display:flex}
+  #app[data-role=presenter] .challenge-layout .challenge-side{display:flex}
+}
+
+/* ===== 57. Desafio no experimento: o experimento ocupa a tela =====
+   Antes o simulador ficava espremido numa coluna ao lado de um bloco de
+   texto e, no celular, os três avisos (objetivo, comando e dica) empurravam
+   "Tentar acertar" para fora. Agora: experimento grande no palco, comandos
+   logo abaixo e, no computador, um painel de apoio separado. */
+@media (min-width:801px){
+  /* Telão: o experimento é a estrela — painel de apoio ao lado, com largura mínima real. */
+  #app .challenge-sim .simulation-widget{gap:10px;padding:16px}
+  #app .challenge-sim .simulation-controls{gap:10px}
+}
+/* Barra de comando embaixo do experimento (aluno e apresentador sem espelho). */
+#app .game-live.game-command{align-items:stretch;gap:10px}
+#app .game-live.game-command .challenge-goal,
+#app .game-live.game-command .challenge-team-hint{margin:0}
+#app .challenge-goal{background:color-mix(in srgb,var(--ui-accent,#a78bfa) 18%,transparent)}
+#app .game-live.game-control{width:100%}
+#app .game-live.game-control .game-actions{justify-content:flex-start}
+#app .challenge-mode{gap:8px 10px}
+#app .challenge-side .game-live.game-board{align-items:stretch}
+#app .challenge-side .challenge-podium li{grid-template-columns:auto minmax(0,1fr)}
+
+@media (max-width:800px){
+  /* O experimento cresce: é nele que o aluno precisa tocar. */
+  #app .challenge-sim .simulation-widget{min-height:clamp(330px,52dvh,560px)}
+  #app .challenge-layout{gap:10px}
+  #app .challenge-stage{gap:10px}
+  /* Os avisos de instrução param de competir com o botão de tentar. */
+  #app .challenge-team-hint{padding:10px 12px}
+  #app .challenge-team-hint.quiet p{font-size:12.5px}
+  #app .game-live.game-command .challenge-goal{padding:10px 12px}
+  #app .challenge-submit-row{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center;position:sticky;bottom:calc(8px + env(safe-area-inset-bottom));z-index:6;gap:10px;
+    padding:8px;margin:0 -2px;border-radius:16px;background:#17122bf2;border:1px solid #ffffff24;box-shadow:0 -6px 22px #00000055}
+  #app .challenge-submit-row .game-submit{min-height:54px;font-size:17px}
+  #app .challenge-tries i{width:14px;height:14px}
+  #app .challenge-tries{flex:none}
+}
+
+/* ===== 58. Experimento do desafio: cena grande de verdade =====
+   A cena SVG crescia com "flex:1 1 0" e ficava minúscula dentro do cartão,
+   com metade do espaço vazia em volta (o "mal formatado" do telão). Aqui a
+   cena recebe uma área mínima proporcional e ocupa a largura toda. */
+#app .challenge-sim .simulation-widget{display:grid;grid-template-rows:auto minmax(0,1fr) auto auto auto;gap:10px;height:clamp(420px,66dvh,720px);box-sizing:border-box}
+#app .challenge-sim .simulation-widget>svg{width:100%;height:100%;min-height:0;max-height:none;flex:none;align-self:stretch;border-radius:12px}
+#app .challenge-sim .simulation-widget>header{padding-bottom:2px}
+#app .challenge-sim .simulation-controls{gap:8px;align-content:start}
+#app .challenge-sim .simulation-result{font-size:12.5px;line-height:1.45}
+#app .challenge-sim .simulation-widget>small{font-size:10px;opacity:.7}
+@media (max-width:800px){
+  /* Celular: cena com proporção fixa (não esmaga) + controles abaixo. */
+  #app .challenge-sim .simulation-widget{height:auto;grid-template-rows:auto auto auto auto auto;gap:9px;padding:12px}
+  #app .challenge-sim .simulation-widget>svg{aspect-ratio:400/220;height:auto;min-height:0}
+  #app .challenge-sim .simulation-widget>small{display:none}
+}
+
+/* ===== 59. Desafio: painel de apoio e comandos =====
+   Antes o bloco de comando (objetivo, dica, tentar) dividia a coluna com o
+   experimento e, no telão, "Encerrar jogo" caía solto no canto direito com
+   meia tela vazia. Agora: experimento à esquerda; à direita, comandos,
+   espelho ao vivo e placar. No celular, experimento → comandos → placar. */
+@media (min-width:801px){
+  #app .challenge-layout{grid-template-columns:minmax(0,1.65fr) minmax(300px,.95fr);align-items:start}
+}
+@media (max-width:800px){
+  #app .challenge-submit-row .game-submit{font-size:18px;min-height:58px}
+  #app .challenge-goal{font-size:15px}
+}
+
+/* ===== 60. Celular: nada cortado na direita nem fora da tela =====
+   Dois problemas somados deixavam o desafio "cortado" no celular:
+   1) o palco é um grid com uma coluna implícita. O tamanho automático dessa
+      coluna respeita o min-content do conteúdo e, quando algum pedaço do
+      experimento ficava mais largo que a tela, a coluna crescia e o `overflow`
+      do app escondia a direita — sem barra de rolagem para chegar lá.
+   2) o palco tem `overflow:hidden` com altura de tela: o que passava embaixo
+      (o botão de tentar e o placar) ficava inalcançável.
+   Agora a coluna nunca passa da tela e, no desafio, o palco rola na vertical. */
+#app.quiz-party>main{overflow-x:hidden;grid-column:1;min-width:0}
+#app .game-stage{max-width:100%}
+#app .game-stage :is(.challenge-layout,.challenge-stage,.challenge-side,.challenge-sim,.simulation-widget,.challenge-command,aside){min-width:0;max-width:100%}
+@media (max-width:800px){
+  #app .challenge-layout,#app .challenge-stage,#app .challenge-side{width:100%}
+  #app .challenge-sim{width:100%}
+  /* O desafio rola: experimento, comando e placar, nessa ordem. */
+  #app.quiz-party>main.game-stage[data-game-type=challenge]{height:100%;min-height:0;overflow-y:auto;overflow-x:hidden;
+    -webkit-overflow-scrolling:touch;overscroll-behavior:contain;padding-bottom:calc(14px + env(safe-area-inset-bottom))}
 }

@@ -415,10 +415,10 @@ html[data-appearance=light] #app[data-role=student] .callout p{color:#6d5287}
   #app[data-role=student] .game-stage .game-options.bare .game-option{min-height:0}
   #app[data-role=student] .game-stage .game-options.bare .game-option b{font-size:clamp(44px,16vw,84px)}
   #app[data-role=student] .answer-options.bare-answers .answer-option{min-height:clamp(110px,20dvh,180px)}
-  /* Experimento: simulador em cima e o botão de tentar sempre ao alcance do dedo */
+  /* Experimento: simulador em cima (grande) e o botão de tentar sempre ao alcance do dedo.
+     A altura do simulador no celular é decidida em finishing.css (§58); aqui
+     só garantimos uma coluna e cartões do espelho mais estreitos. */
   #app .challenge-layout{grid-template-columns:1fr}
-  #app .challenge-sim .simulation-widget{min-height:min(42dvh,380px)}
-  #app .challenge-submit-row{position:sticky;bottom:10px;z-index:6}
   #app .challenge-live-grid{grid-template-columns:repeat(auto-fill,minmax(140px,1fr))}
 }
 

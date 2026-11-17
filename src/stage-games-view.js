@@ -27,7 +27,7 @@ const live = (html, name = '') => `<div class="game-live${name ? ' game-' + name
 export function teamsBoard(state, { compact = false, hostTools = false } = {}) {
   const teams = state.teams || [], best = Math.max(0, ...teams.map(team => team.score));
   return `<div class="team-board${compact ? ' compact' : ''}" style="--teams:${teams.length}">${teams.map(team => `<article class="team-card" style="--team:${esc(team.color)}" data-leading="${best > 0 && team.score === best}" data-mine="${state.me?.team === team.index}">
-    <header>${team.photo ? `<img class="team-photo" src="${esc(team.photo)}" alt="">` : ''}<strong>Time ${esc(team.name)}</strong><b>${team.score}<small> pts</small></b>${hostTools && !compact ? `<details class="team-rename"><summary aria-label="Renomear time" title="Renomear time">✎</summary><span><input type="text" maxlength="24" value="${esc(team.name)}" data-team-rename-input aria-label="Novo nome do time"><button type="button" class="btn secondary small" data-game-do="team-rename" data-team="${team.index}">Salvar</button></span></details>` : ''}</header>
+    <header${team.photo ? ' class="has-photo"' : ''}>${team.photo ? `<img class="team-photo" src="${esc(team.photo)}" alt="">` : ''}<strong>Time ${esc(team.name)}</strong><b>${team.score}<small> pts</small></b>${hostTools && !compact ? `<details class="team-rename"><summary aria-label="Renomear time" title="Renomear time">✎</summary><span><input type="text" maxlength="24" value="${esc(team.name)}" data-team-rename-input aria-label="Novo nome do time"><button type="button" class="btn secondary small" data-game-do="team-rename" data-team="${team.index}">Salvar</button></span></details>` : ''}</header>
     ${compact ? '' : `<ul>${team.members.map(member => hostTools ? `<li data-online="${member.online}" data-leader="${Boolean(member.leader)}"><button type="button" class="team-member-pick" data-game-do="team-leader" data-team="${team.index}" data-player="${esc(member.id)}" title="Tornar líder do time" aria-label="Tornar ${esc(member.name)} líder do time">${member.leader ? '👑 ' : ''}${esc(member.name)}</button></li>` : `<li data-online="${member.online}" data-leader="${Boolean(member.leader)}">${member.leader ? '👑 ' : ''}${esc(member.name)}</li>`).join('') || '<li class="empty">Aguardando participantes…</li>'}</ul>`}
   </article>`).join('')}</div>`;
 }
@@ -47,15 +47,23 @@ function teamsView(state, g, host, player) {
   // Prévia da foto do time (ou a inicial do nome enquanto não tem foto):
   // o líder vê o que vai salvar antes de salvar. Só existe quando há time —
   // antes, quem ainda não tinha time derrubava a etapa inteira aqui.
-  const photoPreview = !mine ? '' : `<span class="team-leader-preview" data-team-preview style="--team:${esc(mine.color)}">${mine.photo ? `<img src="${esc(mine.photo)}" alt="Foto do time">` : `<b>${esc((mine.name || '?').trim().slice(0, 1).toUpperCase() || '?')}</b>`}</span>`;
-  const leaderTools = leading ? `<div class="team-leader-tools" style="--team:${esc(mine.color)}" data-leader-team="${mine.index}">
-    <strong>👑 Você lidera o Time ${esc(mine.name)}</strong>
+  const initial = esc((mine?.name || '?').trim().slice(0, 1).toUpperCase() || '?');
+  // A foto é o próprio botão: tocar na imagem abre o seletor. Antes havia um
+  // botão "Escolher foto" longe dela e um bloco empilhado sem hierarquia.
+  const photoPreview = !mine ? '' : `<button type="button" class="team-leader-photo" data-team-preview data-team-photo-button style="--team:${esc(mine.color)}" aria-label="${mine.photo ? 'Trocar a foto do time' : 'Escolher uma foto para o time'}" title="${mine.photo ? 'Trocar a foto do time' : 'Escolher uma foto para o time'}">${mine.photo ? `<img src="${esc(mine.photo)}" alt="Foto do time">` : `<b>${initial}</b><small>+ foto</small>`}</button>`;
+  const leaderTools = leading ? `<section class="team-leader-tools" style="--team:${esc(mine.color)}" data-leader-team="${mine.index}" aria-label="Editar o time">
+    <p class="team-leader-title"><span aria-hidden="true">👑</span> Você lidera o <b>Time ${esc(mine.name)}</b></p>
     <div class="team-leader-edit">${photoPreview}<div class="team-leader-fields">
-      <label>Nome do time<input type="text" maxlength="24" value="${esc(mine.name)}" data-team-name></label>
-      <div class="team-leader-row"><button type="button" class="btn secondary small" data-team-photo-button>Escolher foto</button>${mine.photo ? '<button type="button" class="btn secondary small" data-team-photo-clear>Remover foto</button>' : ''}<input type="file" accept="image/png,image/jpeg,image/webp" data-team-photo hidden></div>
+      <label for="team-name-field">Nome do time</label>
+      <input id="team-name-field" type="text" maxlength="24" value="${esc(mine.name)}" data-team-name autocomplete="off">
+      <small class="team-leader-hint">${mine.photo ? 'Toque na foto para trocar.' : 'Toque no quadro para colocar a foto do time.'}</small>
     </div></div>
-    <button type="button" class="btn primary small" data-team-save>Salvar</button>
-  </div>` : '';
+    <div class="team-leader-actions">
+      <button type="button" class="btn primary small" data-team-save>Salvar</button>
+      ${mine.photo ? '<button type="button" class="btn secondary small" data-team-photo-clear>Remover foto</button>' : ''}
+      <input type="file" accept="image/png,image/jpeg,image/webp" data-team-photo hidden>
+    </div>
+  </section>` : '';
   const badge = player ? (leading ? '' : mine ? `<p class="team-mine" style="--team:${esc(mine.color)}">Você é do <b>Time ${esc(mine.name)}</b></p>` : picking ? '<p class="game-wait">Toque no time que você quer entrar.</p>' : '') : '';
   const countControl = host ? `<div class="team-count-control"><label for="team-count-live">Quantos times</label><div class="team-count-row"><select id="team-count-live" data-team-count-select aria-label="Quantos times">${Array.from({ length: 9 }, (_, i) => i + 2).map(n => `<option value="${n}" ${(g.teams?.length || 0) === n ? 'selected' : ''}>${n}</option>`).join('')}</select><button type="button" class="btn secondary small" data-game-do="team-count">Aplicar</button></div></div>` : '';
   return live(badge + choose + leaderTools + teamsBoard(state, { hostTools: host })) +
@@ -250,8 +258,12 @@ function challengeView(state, g, host, player) {
   const answer = g.answer ? `<p class="challenge-answer"><b>Resposta:</b> ${g.answer.map(item => `${esc(item.label)} = ${esc(item.v)}`).join(' · ')}</p>` : '';
   const goal = g.text ? `<p class="challenge-goal">${esc(g.text)}</p>` : '';
   // Telão: cada time espelhado ao vivo (os controles de quem está mexendo).
+  // Cada cartão é identificado por pessoa (data-k) e o bloco é "soft": quando
+  // alguém mexe no experimento, o keepGame troca só o número de tentativas e a
+  // fita de valores — o cartão não é remontado, então não há animação de
+  // entrada a cada tique nem a cena recomeçando.
   const liveLab = host && !done && g.live?.length
-    ? `<div class="challenge-live"><h2>Espelho ao vivo <small>${g.live.length}</small></h2><div class="challenge-live-grid">${g.live.map(item => `<div class="challenge-live-card" data-ok="${item.ok}"><header>${character(item, 0, item.ok ? 'win-0' : 'idle')}<strong>${esc(item.name)}</strong><small>${item.tries}/${max}</small></header><div class="challenge-live-sim">${simulationMarkup(g.simulation)}</div><div class="challenge-live-values">${item.values.map(value => `<i>${esc(String(value ?? '').slice(0, 6))}</i>`).join('')}</div></div>`).join('')}</div></div>`
+    ? `<div class="game-live game-mirror" data-game-live data-soft="mirror:${esc(g.simulation)}"><div class="challenge-live"><h2>Espelho ao vivo <small>${g.live.length}</small></h2><div class="challenge-live-grid">${g.live.map(item => `<div class="challenge-live-card" data-k="${esc(item.id)}" data-ok="${item.ok}"><header>${character(item, 0, item.ok ? 'win-0' : 'idle')}<strong>${esc(item.name)}</strong><small data-soft-slot="tries">${item.tries}/${max}</small></header><div class="challenge-live-sim">${simulationMarkup(g.simulation)}</div><div class="challenge-live-values" data-soft-slot="values">${item.values.map(value => `<i>${esc(String(value ?? '').slice(0, 6))}</i>`).join('')}</div></div>`).join('')}</div></div></div>`
     : '';
   // O espelho de verdade: aplica no experimento grande (e nas miniaturas do
   // telão) os valores que o líder está usando agora.
@@ -261,9 +273,15 @@ function challengeView(state, g, host, player) {
     ? `<div class="challenge-guess-wall"><h2>Palpites do time <small>${g.guessesCount}</small></h2><ul>${g.guesses.map(item => `<li><strong>${esc(item.name)}</strong><span>${esc(item.guess || '—')}</span></li>`).join('')}</ul></div>`
     : '';
   const modeSwitch = host && !done ? `<div class="challenge-mode"><button type="button" class="btn secondary small" data-game-do="challenge-mode" data-mode="${g.freeForAll ? 'leader' : 'all'}">${g.freeForAll ? 'Voltar a só o líder mexer' : 'Deixar todos mexerem'}</button><button type="button" class="btn secondary small" data-game-do="next-hint">Próxima dica</button><span class="challenge-mode-state">${g.freeForAll ? 'Todos podem mexer' : 'Só o líder mexe'}</span></div>` : '';
-  return `<div class="challenge-layout"><div class="challenge-sim" data-challenge-sim data-locked="${!host && !leader}">${simulationMarkup(g.simulation)}</div><aside>` +
-    live(goal + teamHint + mine + guessBox + liveLab + guessWall + `<h2>Quem chegou na meta <small>${g.solvedCount}</small></h2>${podium}${done ? answer : ''}`) +
-    (host ? live(modeSwitch + hostActions(state, [done ? ['restart', '↻ Jogar de novo'] : ['end', 'Encerrar jogo', 'primary']], { showNext: done })) : '') + '</aside></div>';
+  // O experimento é o protagonista: fica no palco grande e o que é comando
+  // (objetivo, dica, tentar) fica num bloco logo abaixo — largura de leitura,
+  // não uma coluna apertada ao lado que espremia o simulador no celular.
+  const actionBar = host ? live(modeSwitch + hostActions(state, [done ? ['restart', '↻ Jogar de novo'] : ['end', 'Encerrar jogo', 'primary']], { showNext: done }), 'control') : '';
+  const results = live(`<div class="challenge-results-head"><h2>Quem chegou na meta</h2><small>${g.solvedCount}</small></div>${podium}${done ? answer : ''}`, 'board');
+  return `<div class="challenge-layout"><div class="challenge-stage">
+      <div class="challenge-sim" data-challenge-sim data-locked="${!host && !leader}">${simulationMarkup(g.simulation)}</div>
+      ${live(goal + teamHint + mine + guessBox, 'command')}
+    </div><aside class="challenge-side">${results}${liveLab}${live(guessWall, 'guesses')}</aside></div>` + actionBar;
 }
 
 function raffleView(state, g, host, player) {
@@ -433,6 +451,12 @@ export function keepGame(root, markup, state) {
         fromList.forEach((item, i) => {
           const next = toList[i];
           for (const name of next.getAttributeNames()) if (item.getAttribute(name) !== next.getAttribute(name)) item.setAttribute(name, next.getAttribute(name));
+          // Só os pedaços que mudaram são reescritos (contador, fita de
+          // valores, etiqueta): o cartão e a cena dentro dele seguem vivos.
+          for (const slot of next.querySelectorAll('[data-soft-slot]')) {
+            const current = item.querySelector(`[data-soft-slot="${slot.dataset.softSlot}"]`);
+            if (current && current.innerHTML !== slot.innerHTML) current.innerHTML = slot.innerHTML;
+          }
           const label = item.querySelector('[data-t]'), nextLabel = next.querySelector('[data-t]');
           if (label && nextLabel && label.innerHTML !== nextLabel.innerHTML) label.innerHTML = nextLabel.innerHTML;
         });
