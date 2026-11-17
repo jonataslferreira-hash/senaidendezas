@@ -303,7 +303,7 @@ function challengeView(state, g, host, player) {
   // Rodada de dicas: o líder tenta, o time lê a dica e palpita a resposta.
   const teamHint = g.hint
     ? `<div class="challenge-team-hint"><span>Dica ${g.hintIndex + 1} de ${g.hintCount}</span><p>${esc(g.hint)}</p>${leader ? '' : `<small>O líder está ajustando o experimento. Escreva o que você acha que é a resposta certa.</small>`}</div>`
-    : `<div class="challenge-team-hint quiet"><p>${leader ? 'Ajuste os controles e toque em tentar.' : 'O líder do time está ajustando o experimento. Fique de olho e palpite quando a dica aparecer.'}</p></div>`;
+    : `<div class="challenge-team-hint quiet">${leader ? '' : `<p>O líder do time está ajustando o experimento. Fique de olho e palpite quando a dica aparecer.</p>`}</div>`;
   const guessBox = !leader && me && !me.ok && !done
     ? `<form class="challenge-guess" data-challenge-guess><label for="challenge-guess-field">Seu palpite para a turma</label>
         <div><input id="challenge-guess-field" name="guess" maxlength="80" value="${esc(me.guess || '')}" placeholder="Ex.: 45 graus" autocomplete="off"><button class="btn secondary small" type="submit">Enviar</button></div>
@@ -477,6 +477,12 @@ function stageHead(g) {
   const titleText = String(g.text || '').trim();
   const normType = normTitle(typeName), normText = normTitle(titleText);
   const duplicatesType = !normText || normText === normType || normText.includes(normType) || redundantHead(titleText, g.type);
+  // Desafio: não exibe o objetivo do professor como título grande ("Ajuste o
+  // experimento até chegar à meta." etc.) — esse texto já vive no bloco de
+  // comando e, quando o professor escreve algo estranho, polui a tela.
+  if (g.type === 'challenge') {
+    return `<div class="game-head-row game-head-single"><span class="game-eyebrow">${gameIcon('challenge')} ${typeName.toUpperCase()}</span>${meta}</div>`;
+  }
   if (duplicatesType) {
     return `<div class="game-head-row game-head-single"><h1 class="game-hero-title"><span class="game-hero-icon" aria-hidden="true">${gameIcon(g.type)}</span>${esc(titleText || typeName)}</h1>${meta}</div>`;
   }
