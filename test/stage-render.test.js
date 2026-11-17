@@ -325,3 +325,17 @@ test('marca da barra lateral acompanha a largura da rail (sem cortar o logo)', a
   // A marca continua sendo um botão único com logo + texto.
   assert.match(studio, /class="studio-wordmark"[^>]*><img class="lab-logo"[^>]*><span>storage<span>lab\.<\/span><\/span>/);
 });
+
+test('barra do topo não quebra quando o snapshot ainda não chegou', async () => {
+  const { readFileSync } = await import('node:fs');
+  const app = readFileSync(new URL('../src/app.js', import.meta.url), 'utf8');
+  // header() roda no editor/prévia antes de existir state; sem a guarda a tela
+  // inteira caía com "Cannot read properties of undefined (reading 'ranking')".
+  assert.match(app, /const connected = state\?\.ranking\?\.filter/, 'contador de conectados protegido');
+  assert.match(app, /const count = state\?\.ranking\?\.filter/, 'contagem da aula protegida');
+  // Nenhum acesso direto a state.ranking sem optional nem dentro de
+  // Array.isArray(...) — que é justamente a guarda do rankingTable.
+  const bare = [...app.matchAll(/(?<![?.\w])state\.ranking(?!\?)/g)]
+    .filter(m => !/Array\.isArray\(state\?\.ranking\)\s*\?\s*$/.test(app.slice(Math.max(0, m.index - 60), m.index)));
+  assert.equal(bare.length, 0, `acesso sem guarda em ${bare.length} ponto(s)`);
+});

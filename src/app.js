@@ -254,7 +254,10 @@ function header() {
   // Uma única barra para TODAS as etapas (aula, enquete, quiz, jogos, pódio):
   // os mesmos botões no mesmo lugar. "Conectados" abre a lista de pessoas e
   // "Ao vivo" abre o convite com QR — os dois funcionam em qualquer tela.
-  const connected = state.ranking?.filter(person => person.online).length || 0;
+  // `header()` roda em TODAS as telas, inclusive antes do snapshot chegar
+  // (editor, prévia, reconexão). Sem a guarda, a tela inteira caía com
+  // "Cannot read properties of undefined (reading 'ranking')".
+  const connected = state?.ranking?.filter(person => person.online).length || 0;
   const live = status === 'online' || demo;
   const chip = readOnlyPresentation ? '' : `<button type="button" class="stage-people" data-action="participants" aria-label="${connected} conectado${connected === 1 ? '' : 's'} · ver participantes" title="Ver participantes">${icon('users')}<b>${connected}</b></button>`;
   const pill = state && !readOnlyPresentation
@@ -317,7 +320,7 @@ function joinForm() {
 }
 function participantCount() {
   if (demo) return '';
-  const count = state.ranking?.filter(person => person.online).length || 0;
+  const count = state?.ranking?.filter(person => person.online).length || 0;
   const label = `${icon('users')} ${count} conectado${count === 1 ? '' : 's'}`;
   return count ? `<button class="live-participants" data-action="participants" aria-label="${count} conectado${count === 1 ? '' : 's'} · Ver participantes">${label}</button>` : `<span class="live-participants">${label}</span>`;
 }
