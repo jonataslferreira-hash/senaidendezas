@@ -291,7 +291,7 @@ dialog.image-replacement .image-drop-zone{display:grid;justify-items:center;gap:
   #app .mobile-slide-previews .slide-cover-mini .canvas-frame{display:flex;align-items:center;justify-content:center;container-type:size}
   html[data-ui-style] body #app .editor-shell .mobile-slide-preview>button{background:transparent;box-shadow:none}
   #app .mobile-slide-previews .slide-cover-mini .slide-canvas{display:block;position:relative;flex:none;width:min(84px,calc(47.25px * var(--canvas-ratio,1.77778)));height:auto;max-height:100%;margin:0}
-  #app .studio-shell .studio-join{grid-template-columns:minmax(0,1fr);justify-items:center;padding:16px 12px!important;gap:10px!important}
+  #app .studio-shell .studio-join{grid-template-columns:minmax(0,1fr);justify-items:stretch;padding:16px 14px calc(20px + env(safe-area-inset-bottom))!important;gap:14px!important}
   #app .studio-join #join-form{width:min(100%,410px);border-radius:18px;padding:15px;background:var(--ui-panel)}
 }
 @media(max-width:390px){

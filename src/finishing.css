@@ -3343,12 +3343,3 @@ button.connection:hover{background:#ffffff14}
 @media (prefers-reduced-motion:reduce){
   html:not([data-motion=normal]) #app .game-character[data-mood=idle] .buddy *{animation:none!important}
 }
-
-/* Aviso de animações reduzidas no aparelho */
-.motion-notice{position:fixed;left:50%;bottom:calc(16px + env(safe-area-inset-bottom));transform:translateX(-50%);
-  z-index:9999;display:flex;align-items:center;gap:10px;flex-wrap:wrap;max-width:min(560px,calc(100vw - 24px));
-  padding:12px 14px;border-radius:14px;background:#241a33;color:#f4eeff;font-size:13px;line-height:1.4;
-  box-shadow:0 18px 50px #160d2480;border:1px solid #ffffff26}
-.motion-notice b{color:#c4b5fd}
-.motion-notice button{border:0;border-radius:999px;padding:8px 14px;font-weight:800;font-size:12.5px;cursor:pointer;background:#a78bfa;color:#1a1024}
-.motion-notice button[data-motion-dismiss]{background:transparent;color:#cbbfe0;font-size:20px;line-height:1;padding:2px 6px}

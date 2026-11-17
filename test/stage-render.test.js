@@ -172,3 +172,28 @@ test('slowed é o padrão da trilha (sem seletor, já vem slowed)', async () => 
   assert.match(audio, /Number\(track\.rate\) \|\| 0\.85/, 'rate ausente cai em 0.85 (slowed + reverb)');
   assert.match(audio, /if \(slowed\) applyReverb\(player,/, 'reverb acompanha o slowed na faixa inteira');
 });
+
+test('biblioteca: Catálogo nunca aparece no cartão; "Criar com IA" só no celular', async () => {
+  const { readFileSync } = await import('node:fs');
+  const css = readFileSync(new URL('../src/studio-workflows.css', import.meta.url), 'utf8');
+  assert.match(css, /\.library-actions \[data-studio-action="open-templates"\]\{display:none!important\}/, 'catálogo some em qualquer largura');
+  assert.match(css, /@media \(min-width:901px\)\{\.library-actions \.storage-ai-primary\{display:none!important\}\}/, '"Criar com IA" fica só no celular');
+});
+
+test('nada de aviso flutuante de animações na tela', async () => {
+  const { readFileSync } = await import('node:fs');
+  const app = readFileSync(new URL('../src/app.js', import.meta.url), 'utf8');
+  const css = readFileSync(new URL('../src/finishing.css', import.meta.url), 'utf8');
+  assert.doesNotMatch(app, /motion-notice|maybeExplainReducedMotion/, 'sem barra de aviso no app');
+  assert.doesNotMatch(css, /\.motion-notice/, 'sem estilo de aviso');
+});
+
+test('entrada na sala: página nova com passo a passo e cartão', async () => {
+  const { readFileSync } = await import('node:fs');
+  const studio = readFileSync(new URL('../src/studio.js', import.meta.url), 'utf8');
+  assert.match(studio, /studio-join join-v3/, 'layout novo da entrada');
+  assert.match(studio, /join-eyebrow/, 'selo de aula ao vivo');
+  assert.match(studio, /join-steps/, 'passo a passo');
+  const css = readFileSync(new URL('../src/studio-workflows.css', import.meta.url), 'utf8');
+  assert.doesNotMatch(css, /\.join-intro :is\(h1,p\)\{display:none\}/, 'título e texto continuam no celular');
+});

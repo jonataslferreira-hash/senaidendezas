@@ -580,7 +580,23 @@ export class Studio {
     if (this.view==='ai-generation') return this.shell(this.ai.generationMarkup());
     if (this.view === 'editor') return this.editor();
     if (this.view === 'templates') return this.shell(`<main class="studio-templates">${this.templateStore.markup()}</main>`);
-    if (this.view === 'join') return this.shell(`<main class="studio-join"><svg class="join-waves" viewBox="0 0 1000 600" preserveAspectRatio="none" aria-hidden="true"><path d="M-50 360C190 180 295 510 525 340S820 165 1050 315"/><path d="M-50 415C180 235 300 540 520 395S805 215 1050 360"/><path d="M-50 470C185 295 315 605 540 450S840 295 1050 410"/></svg><div class="join-intro"><h1>Entre na sala<br>e participe <em>ao vivo.</em></h1><p>Use o código compartilhado pelo professor ou aponte a câmera para o QR Code da apresentação.</p><div class="join-illustration join-orbit" aria-hidden="true">${[['🚀','⚡','🦉'],['🤖','🎮','👾'],['🦊','🐸','🪐']].map((icons,i)=>`<div class="join-float" style="--float:${i}">${icons.map((icon,j)=>`<span style="--cycle:${j}">${avatarContent(icon)}</span>`).join('')}</div>`).join('')}</div></div>${this.callbacks.joinForm()}</main>`);
+    if (this.view === 'join') return this.shell(`<main class="studio-join join-v3">
+      <svg class="join-waves" viewBox="0 0 1000 600" preserveAspectRatio="none" aria-hidden="true"><path d="M-50 360C190 180 295 510 525 340S820 165 1050 315"/><path d="M-50 415C180 235 300 540 520 395S805 215 1050 360"/><path d="M-50 470C185 295 315 605 540 450S840 295 1050 410"/></svg>
+      <section class="join-intro">
+        <span class="join-eyebrow">${studioIcon('join')} AULA AO VIVO</span>
+        <h1>Entre na sala<br>e participe <em>ao vivo.</em></h1>
+        <p>Use o código de 6 números que o professor mostrou, ou aponte a câmera para o QR Code da apresentação.</p>
+        <ul class="join-steps">
+          <li><b>1</b><span>Digite o código</span></li>
+          <li><b>2</b><span>Escolha seu nome e avatar</span></li>
+          <li><b>3</b><span>Responda pelo celular</span></li>
+        </ul>
+        <div class="join-mascots" aria-hidden="true">
+          ${['🤖','🦊','🚀','🦉','🎮','👾'].map((icon, i) => `<span style="--i:${i}">${icon}</span>`).join('')}
+        </div>
+      </section>
+      ${this.callbacks.joinForm()}
+    </main>`);
     if(this.view==='storage-ai')return this.shell(this.ai.createMarkup());
     if(this.view==='shared')return this.shell(`<main class="studio-library shared-library">${this.groups.markup()}</main>`);
     return this.libraryMarkup();
