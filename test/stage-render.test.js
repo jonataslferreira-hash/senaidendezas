@@ -177,8 +177,13 @@ test('slowed é o padrão da trilha (sem seletor, já vem slowed)', async () => 
 test('biblioteca: Catálogo nunca aparece no cartão; "Criar com IA" só no celular', async () => {
   const { readFileSync } = await import('node:fs');
   const css = readFileSync(new URL('../src/studio-workflows.css', import.meta.url), 'utf8');
+  const studio = readFileSync(new URL('../src/studio.js', import.meta.url), 'utf8');
   assert.match(css, /\.library-actions \[data-studio-action="open-templates"\]\{display:none!important\}/, 'catálogo some em qualquer largura');
-  assert.match(css, /@media \(min-width:901px\)\{\.library-actions \.storage-ai-primary\{display:none!important\}\}/, '"Criar com IA" fica só no celular');
+  // O botão nasce marcado como "só no toque" e some por padrão; o celular é
+  // quem reexibe. Já foi o contrário e o botão aparecia no PC.
+  assert.match(studio, /storage-ai-primary" data-only-touch/, 'botão marcado como só-celular');
+  assert.match(css, /\.library-actions \[data-only-touch\]\{display:none!important\}/, '"Criar com IA" some no PC');
+  assert.match(css, /@media \(max-width:900px\)\{\.library-actions \[data-only-touch\]\{display:inline-flex!important\}/, 'e volta no celular');
 });
 
 test('nada de aviso flutuante de animações na tela', async () => {
@@ -260,8 +265,15 @@ test('editor do desafio deixa o professor trocar as dicas e o modo de controle',
   assert.match(html, /<option value="0" selected>/, 'todos podem mexer aparece marcado');
 });
 
-test('telão do desafio espelha o experimento de cada pessoa sem estourar', async () => {
-  const { JSDOM } = await import('jsdom');
+// Usa jsdom quando ele estiver disponível (ambiente de desenvolvimento). No CI
+// ele não é dependência do projeto, então o teste pula em vez de quebrar o
+// build/deploy — foi exatamente isso que travou a publicação uma vez.
+let challengeDom = null;
+try { challengeDom = await import('jsdom'); } catch { challengeDom = null; }
+
+test('telão do desafio espelha o experimento de cada pessoa sem estourar',
+  { skip: challengeDom ? false : 'jsdom não instalado' }, async () => {
+  const { JSDOM } = challengeDom;
   const dom = new JSDOM('<!doctype html><body><div id="app"></div></body>', { pretendToBeVisual: true });
   const previous = { window: globalThis.window, document: globalThis.document, HTMLElement: globalThis.HTMLElement, Event: globalThis.Event };
   globalThis.window = dom.window; globalThis.document = dom.window.document;
@@ -288,3 +300,13 @@ test('telão do desafio espelha o experimento de cada pessoa sem estourar', asyn
     globalThis.HTMLElement = previous.HTMLElement; globalThis.Event = previous.Event;
   }
 });
+
+test('biblioteca: nunca esconder "Criar com IA" só no celular (o bug que foi ao ar)', async () => {
+  const { readFileSync } = await import('node:fs');
+  const css = readFileSync(new URL('../src/studio-workflows.css', import.meta.url), 'utf8');
+  // @media (max-width:900px){ ... storage-ai-primary{display:none} } deixava o
+  // botão visível no PC e escondido no celular — exatamente o inverso.
+  const wrongWay = /@media \(max-width:900px\)\{(?:[^{}]*\{[^{}]*\})*[^{}]*storage-ai-primary[^{}]*\{[^{}]*display:none/;
+  assert.equal(wrongWay.test(css), false, 'o botão não pode ser escondido apenas no celular');
+});
+
