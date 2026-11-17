@@ -32,7 +32,7 @@ test('etapas do tour têm forma válida e ids únicos', () => {
 
 test('etapas cobrem as abas da tela inicial', () => {
   const targets = tourSteps.map(s => s.target || '').join(' ');
-  for (const expected of ['[data-library-grid]', '.create-import-card', '.studio-rail button[data-studio-action="storage-ai"]', '#join-form', '.shared-library'])
+  for (const expected of ['[data-library-grid]', '.create-import-card', '.studio-rail nav', '.studio-rail button[data-studio-action="storage-ai"]', '.studio-rail button[data-studio-action="templates"]', '#join-form', '.shared-library'])
     assert.ok(targets.includes(expected), `cobre ${expected}`);
 });
 
