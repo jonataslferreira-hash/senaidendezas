@@ -411,3 +411,15 @@ test('nome digitado antes de entrar não é descartado por um render', async () 
   assert.ok(line, 'só marca o nome como tocado quando há texto');
   assert.equal(/if \(form && draftName !== undefined\) \{ joinNameDraft/.test(app), false, 'sem a marcação incondicional');
 });
+
+test('bloco com o nome do time não tem faixa de cor sólida', async () => {
+  const { readFileSync } = await import('node:fs');
+  const css = readFileSync(new URL('../src/finishing.css', import.meta.url), 'utf8');
+  // O card do time já é da cor do time; a faixa de 100% de largura no topo
+  // repetia a cor chapada sem função. Última regra do header deve anular o fundo.
+  const rules = [...css.matchAll(/#app \.team-card>header\{([^}]*)\}/g)].map(m => m[1]);
+  assert.ok(rules.length, 'existe regra para o header do card');
+  const last = rules[rules.length - 1];
+  assert.match(last, /background:none/, 'sem fundo no bloco do nome');
+  assert.equal(/linear-gradient|radial-gradient/.test(last), false, 'sem gradiente no bloco do nome');
+});
