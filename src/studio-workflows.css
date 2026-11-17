@@ -833,9 +833,13 @@ html[data-motion=reduced] #app .studio-btn.ai-tool::before, html[data-motion=red
 
 /* Biblioteca: o Catálogo vive na barra lateral e no cartão "Nova
    apresentação", então nunca repete aqui. O "Criar com IA" é coisa do celular:
-   no PC o caminho é o Storage AI do menu — lá só fica o recarregar. */
+   no PC o caminho é o Storage AI do menu — lá só fica o recarregar.
+   ATENÇÃO: a regra do PC precisa valer ACIMA de 900px (antes ela estava dentro
+   de um @media de celular e por isso aparecia no PC). O atributo
+   [data-only-touch] no HTML é a segunda trava, caso o CSS não carregue.      */
 .library-actions [data-studio-action="open-templates"]{display:none!important}
-@media (min-width:901px){.library-actions .storage-ai-primary{display:none!important}}
+.library-actions [data-only-touch]{display:none!important}
+@media (max-width:900px){.library-actions [data-only-touch]{display:inline-flex!important}}
 
 /* ===== Entrar na sala: cartão novo (código em destaque, identidade junto) ===== */
 #app .join-card-v2{padding:clamp(20px,3vw,30px);border-radius:clamp(18px,3vw,26px);gap:0;box-shadow:0 24px 60px color-mix(in srgb,var(--ui-accent) 22%,transparent)}
