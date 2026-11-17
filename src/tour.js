@@ -3,9 +3,10 @@
 // toca uma trilha baixinha e descreve cada aba — só o essencial.
 // A escolha de ver (ou pular) o tour fica salva: não enche o saco de novo.
 // (O CSS do tour é importado pelo app.js — aqui o módulo fica puro para testes.)
+import { applyAudioPlayback } from './audio-data.js';
 
-// Trilha do tour, hospedada pelo usuário (catbox) — toca em loop. Enquanto a
-// narração fala, ela abaixa o volume e desacelera (duckMusic abaixo).
+// Trilha do tour, hospedada pelo usuário (catbox) — toca em loop com slowed +
+// reverb do começo ao fim. A narração só abaixa o volume (duckMusic abaixo).
 const TOUR_THEME_URL = 'https://files.catbox.moe/1jds9q.mp3';
 
 // Mascote Kuro em SVG por partes: orelhas, olhos, boca e braço são elementos
@@ -98,6 +99,8 @@ export class SiteTour {
     this.teardown();
     this.offering = offering;
     this.build();
+    // showStep já narra o passo (inclusive o de abertura): nada de tocar a
+    // fala do primeiro ponto duas vezes nem pular a primeira narração.
     this.showStep(Number.isInteger(at) ? at : 1);
   }
 
@@ -138,6 +141,8 @@ export class SiteTour {
 
   async showStep(index) {
     const steps = tourSteps;
+    // Pular etapa só acontece quando o alvo realmente não existe; o passo de
+    // abertura (0) sempre aparece, com a Kuro falando.
     if (index >= steps.length) { this.stop('done'); return; }
     const step = steps[index];
     this.step = index;
@@ -155,7 +160,10 @@ export class SiteTour {
     this.nodes.querySelector('[data-tour-skip]').textContent = index === 0 ? 'Agora não' : 'Pular tour';
     const dots = this.nodes.querySelector('[data-tour-dots]');
     dots.innerHTML = steps.map((_, i) => `<i class="${i === index ? 'on' : ''}" aria-label="Etapa ${i + 1} de ${steps.length}"></i>`).join('');
-    const target = step.target ? this.studio.root.querySelector(step.target) : null;
+    let target = step.target ? this.studio.root.querySelector(step.target) : null;
+    // Alvo ainda não montado (troca de tela): espera um quadro antes de desistir,
+    // para não pular a etapa em silêncio.
+    if (step.target && !target) { await wait(180); target = this.studio.root.querySelector(step.target); }
     this.target = target && target.offsetWidth ? target : null;
     if (step.target && !this.target && index < steps.length - 1) { this.showStep(index + 1); return; } // elemento não encontrado: pula etapa
     if (this.target && this.target.scrollIntoView) { this.target.scrollIntoView({ block: 'center', behavior: 'instant' }); await wait(60); }
@@ -166,7 +174,8 @@ export class SiteTour {
     const bubble = this.nodes.querySelector('[data-tour-bubble]');
     const classes = bubble.className;
     bubble.className = ''; void bubble.offsetWidth; bubble.className = classes;
-    this.speak(index);
+    // A fala só começa com a bolha (e a Kuro) já em cena.
+    if (bubble.isConnected) this.speak(index);
   }
 
   position() {
@@ -218,6 +227,9 @@ export class SiteTour {
       // Referência imediata: se o tour acabar antes do play resolver, o
       // teardown pausa o áudio certo em vez de deixar a música vazar.
       this.music = audio;
+      // Slowed + reverb na faixa inteira (não só enquanto a Kuro fala): o que
+      // muda com a narração é só o volume, o efeito fica ligado do começo ao fim.
+      applyAudioPlayback(audio, { volume: 0.22, rate: 0.85, loop: true });
       this.duckMusic(false);
       audio.play().catch(() => { /* autoplay bloqueado: o primeiro toque destrava */ });
     } catch { /* sem trilha: o tour segue mudo */ }
@@ -226,8 +238,9 @@ export class SiteTour {
   // Kuro cala a boca, a música volta ao ritmo normal.
   duckMusic(ducked) {
     if (!this.music) return;
-    this.music.volume = ducked ? 0.07 : 0.22;
-    this.music.playbackRate = ducked ? 0.85 : 1;
+    // Só o volume abaixa; a velocidade (slowed) e o reverb seguem iguais.
+    const volume = ducked ? 0.07 : 0.22;
+    applyAudioPlayback(this.music, { volume, rate: 0.85, loop: true });
   }
   stopMusic() { if (this.music) { this.music.pause(); } }
   speak(index) {

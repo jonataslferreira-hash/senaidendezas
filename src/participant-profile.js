@@ -2,8 +2,23 @@ import {takePhoto} from './camera-photo.js';
 import {avatars} from './content.js';
 import {avatarContent,isPhotoAvatar} from './player-avatar.js';
 const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-export async function participantPhoto(file){
- if(!file||!/^image\/(png|jpeg|webp|gif)$/.test(file.type)||file.size>15*1024*1024)throw Error('Escolha uma imagem de até 15 MB.');const bitmap=await createImageBitmap(file).catch(()=>{throw Error('Não foi possível abrir a foto. Tente outra imagem PNG, JPEG ou WebP.');}),canvas=document.createElement('canvas');canvas.width=canvas.height=96;const side=Math.min(bitmap.width,bitmap.height);canvas.getContext('2d').drawImage(bitmap,(bitmap.width-side)/2,(bitmap.height-side)/2,side,side,0,0,96,96);bitmap.close();const data=canvas.toDataURL('image/webp',.8);if(!isPhotoAvatar(data))throw Error('A foto ficou grande demais. Tente outra imagem.');return data;
+// Foto do convidado: abre o recorte (arrastar/zoom) e sai num quadrado 96px
+// leve. Sem passar pelo recorte (ex.: GIF animado), cai no centro da imagem.
+export async function participantPhoto(file,{crop=true}={}){
+ if(!file||!/^image\/(png|jpeg|webp|gif)$/.test(file.type)||file.size>15*1024*1024)throw Error('Escolha uma imagem de até 15 MB.');
+ const bitmap=await createImageBitmap(file).catch(()=>{throw Error('Não foi possível abrir a foto. Tente outra imagem PNG, JPEG ou WebP.');});
+ let image=bitmap;
+ if(crop&&typeof document!=='undefined'&&bitmap.width&&bitmap.height){
+   const {cropSheet}=await import('./photo-crop.js');
+   const cropped=await cropSheet(bitmap,{title:'Ajuste sua foto',output:480});
+   if(cropped){image=await createImageBitmap(cropped);}
+ }
+ const canvas=document.createElement('canvas');canvas.width=canvas.height=96;const side=Math.min(image.width,image.height);
+ canvas.getContext('2d').drawImage(image,(image.width-side)/2,(image.height-side)/2,side,side,0,0,96,96);
+ bitmap.close();if(image!==bitmap)image.close();
+ const data=canvas.toDataURL('image/webp',.8);
+ if(!isPhotoAvatar(data))throw Error('A foto ficou grande demais. Tente outra imagem.');
+ return data;
 }
 export async function editParticipant(person,save){
  const dialog=document.createElement('dialog');dialog.className='profile-sheet';dialog.setAttribute('aria-labelledby','profile-sheet-title');
@@ -45,6 +60,12 @@ export async function editParticipant(person,save){
 }
 // Painel "N conectados": lista da turma com busca, time, pontos e (para o professor) remover da sala.
 export function manageParticipants(state,kick){
+  // Nunca deixa de abrir: se a lista não veio (jogo em andamento, snapshot
+  // antigo), monta com o que existe em vez de estourar e fechar mudo.
+  if(!Array.isArray(state?.ranking)){
+    const people=(state?.teams||[]).flatMap(team=>(team.members||[]).map(member=>({...member,score:member.score||0})));
+    state={...state,ranking:people};
+  }
   const dialog=document.createElement('dialog');dialog.className='participants-sheet';
   const people=[...state.ranking].sort((a,b)=>Number(b.online)-Number(a.online)||a.name.localeCompare(b.name,'pt-BR')),online=people.filter(p=>p.online).length,teams=state.teams||[];
   const teamOf=p=>teams.find(team=>team.members.some(member=>member.id===p.id));
@@ -63,5 +84,6 @@ export function manageParticipants(state,kick){
     }
     if(e.target.closest('[data-close]')||e.target===dialog)dialog.close();
   });
-  dialog.addEventListener('close',()=>dialog.remove(),{once:true});document.body.append(dialog);dialog.showModal();
+  dialog.addEventListener('close',()=>dialog.remove(),{once:true});document.body.append(dialog);
+  if(typeof dialog.showModal==='function')dialog.showModal();else dialog.setAttribute('open','');
 }

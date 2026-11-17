@@ -255,7 +255,7 @@ test('Cabo de Guerra pré-distribui times no lobby, Relâmpago oculta pular-etap
   const caio = room.join({ name: 'Caio', avatar: '🔥' });
   assert.equal(room.snapshot().game.crews[0].length + room.snapshot().game.crews[1].length, 3, 'participante que entra tarde também já entra em um lado da corda');
 
-  // Durante batalha aberta do Cabo de Guerra, telão mostra a batalha sem botão prematuro de pular etapa; aluno recebe 3 perguntas sorteadas com texto e ativa data-wide-options para alternativa longa.
+  // Durante batalha aberta do Cabo de Guerra, telão mostra a batalha sem botão prematuro de pular etapa; aluno recebe as perguntas da rodada com texto e ativa data-wide-options para alternativa longa.
   const hostView = snap => gameMarkup(snap, { host: true, demo: false, header: () => '', now: clock });
   const studentView = snap => gameMarkup(snap, { host: false, demo: false, header: () => '', now: clock });
   room.control('game', { do: 'next' });
@@ -264,7 +264,8 @@ test('Cabo de Guerra pré-distribui times no lobby, Relâmpago oculta pular-etap
   assert.match(tugOpenHtml, /tug-scene/, 'telão do professor exibe a batalha ao vivo em tela cheia');
   const tugStudentHtml = studentView(room.snapshot(ana.id));
   assert.match(tugStudentHtml, /data-wide-options="true"/, 'ativa expansão lateral no aparelho do aluno quando há alternativa longa');
-  assert.match(tugStudentHtml, /Rodada <b>1<\/b> de 1/, 'aluno recebe 1 pergunta sorteada na rodada atual');
+  assert.match(tugStudentHtml, /Rodada <b>1<\/b> de 1/, 'aluno vê em que rodada está');
+  assert.match(tugStudentHtml, /Pergunta 1 de \d+/, 'aluno responde as perguntas da rodada em sequência');
   assert.match(tugOpenHtml, /tug-hidden-score/, 'apresentador oculta porcentagens antes do fim da puxada');
   assert.doesNotMatch(tugOpenHtml, /tug-grip-hands/, 'sem mãos extras sobrepostas aos braços do boneco');
 

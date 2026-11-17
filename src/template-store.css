@@ -144,10 +144,9 @@ html[data-appearance="dark"] .tstore-icon-util.is-active {
   height: 44px;
   padding: 0 14px;
   border-radius: 999px;
-  background: color-mix(in srgb, var(--ui-panel, #fff) 86%, transparent);
-  backdrop-filter: blur(12px);
-  border: 1.5px solid var(--ui-line);
-  color: var(--ui-muted);
+  background: #ffffff;
+  border: 1.5px solid #d6c9ea;
+  color: #5b4b6e;
   transition: border-color .16s ease, box-shadow .16s ease;
 }
 
@@ -1214,3 +1213,20 @@ html[data-appearance="dark"] .tstore-icon-util.is-active {
     display: -webkit-box;
   }
 }
+
+/* Busca do catálogo: o campo fica em cima do fundo verde/roxo do cabeçalho,
+   então o texto de exemplo sumia. Fundo mais sólido + placeholder legível. */
+#app .tstore-search,
+.tstore-search {
+  background: #ffffff;
+  border-color: #d6c9ea;
+  color: #5b4b6e;
+}
+.tstore-search input { color: #2f2440; font-weight: 600; }
+.tstore-search input::placeholder { color: #6c5c80; opacity: 1; font-weight: 600; }
+.tstore-search input::-webkit-input-placeholder { color: #6c5c80; opacity: 1; }
+.tstore-search svg, .tstore-search .tstore-search-clear { color: #6a5b7c; opacity: 1; }
+.tstore-search:focus-within { border-color: #7c52d9; box-shadow: 0 0 0 4px #7c52d924; }
+html[data-appearance=dark] .tstore-search { background: #201a2e; border-color: #453760; color: #cbbfe0; }
+html[data-appearance=dark] .tstore-search input { color: #f1ecfb; }
+html[data-appearance=dark] .tstore-search input::placeholder { color: #b2a3c9; opacity: 1; }

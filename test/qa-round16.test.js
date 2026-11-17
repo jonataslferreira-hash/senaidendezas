@@ -201,11 +201,11 @@ test('Cabo de Guerra e Corrida: sem títulos duplicados, rodada por rodada com p
   assert.doesNotMatch(tugOpenHtml, /0 acertos/, 'não exibe contagem de acertos antes do fim');
 
   // Responde rodada 1 -> entra em between -> avança para rodada 2 -> pull (placar ainda oculto!) -> done (revela!)
+  // Cada pessoa responde TODAS as perguntas da rodada (nada de sorteio).
   for (const r of [0, 1]) {
     for (const p of [a, b]) {
-      const pick = room.data.game.picks[p.id] ?? 0;
-      const q = lesson.slides[4].game.rounds[r][pick];
-      room.answer(p.id, { choice: { round: r, choice: p.id === a.id ? q.correct : (q.correct + 1) % q.options.length } });
+      const roundQs = lesson.slides[4].game.rounds[r];
+      roundQs.forEach((q, v) => room.answer(p.id, { choice: { round: r, v, choice: p.id === a.id ? q.correct : (q.correct + 1) % q.options.length } }));
     }
     if (r === 0) {
       assert.equal(room.snapshot().game.state, 'between');
