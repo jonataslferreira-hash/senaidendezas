@@ -1,6 +1,6 @@
 import {studioIcon} from './studio-icons.js';
 import { reconcileStageSafely, tagStageSources, setStageCache } from './stage-keep.js';
-import { SiteTour, shouldOfferTour, markTourSeen } from './tour.js';
+import { SiteTour, shouldOfferTour, markTourSeen, noteFirstVisit } from './tour.js';
 import './tour.css';
 import { BUILTIN_MODELS, HARDWARE_MODEL_IDS, modelMeta } from './model-catalog.js';
 import {routeParams} from './editor-route.js';
@@ -230,8 +230,14 @@ let codeDraft = (params.get('s') || '').replace(/\D/g, '').slice(0, 6);
 const studio = new Studio(app, { render, toast, joinForm, preview, remoteAction:(name,value)=>{if(name==='sim')remoteInteract(value);else action(name);}, present: (lesson,startIndex,fromEditor) => connectSession({host:true,lesson,startIndex,fromEditor}) });
 const tour = new SiteTour(studio);
 document.addEventListener('start-tour', () => tour.start());
+// Só a PRIMEIRA visita deste navegador recebe o tour sozinho. Antes o critério
+// era apenas "o tour já foi concluído?": quem entrava, saía sem terminar e
+// voltava depois via a Kuro aparecer do nada de novo. Agora o marcador de
+// visita é gravado na abertura do site (e quem já visitou não é incomodado —
+// o tour continua disponível em "Rever tour", no painel da conta).
+const firstVisit = noteFirstVisit();
 queueMicrotask(() => {
-  if (!shouldOfferTour() || state || studio.view !== 'library') return;
+  if (!firstVisit || !shouldOfferTour() || state || studio.view !== 'library') return;
   // O tour é só para quem chegou agora de verdade: quem já tem conta (ativa
   // ou lembrada neste navegador) não recebe a oferta — e nunca recebe.
   const account = studio.account;
