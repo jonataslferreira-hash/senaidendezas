@@ -12,24 +12,27 @@
 @media(prefers-reduced-motion:reduce){:root:not([data-motion=normal]) .confetti i{animation:none}}
 .discussion-prompt{padding:18px 0 3px;margin-top:18px;border-top:1px solid #ffffff0d}.discussion-prompt .eyebrow{font-size:8px;letter-spacing:1.2px}.discussion-prompt>p{font-size:17px;line-height:1.6;color:#d1bfec;margin-top:10px}.text-lesson .discussion-prompt>p{font-size:22px}@media(max-width:600px){.discussion-prompt>p,.text-lesson .discussion-prompt>p{font-size:16px}}
 
-/* ===== Marca do menu lateral =====
-   Medido com a fonte real (Inter 700, "storage lab." = 5,81em + letter-spacing
-   -1px): a 23px o texto ocupa 121,6px. Na rail de 224px sobram, descontando
-   o padding da rail (19px x2), a logo (40px) e o gap (11px), 135px — cabia.
-   O corte vinha dos 8px de padding lateral do wordmark, que roubavam 16px e
-   empurravam o texto 2,6px para fora. Solução: zerar esse padding e manter o
-   tamanho de fonte do design. O tamanho NÃO é reduzido em tela normal; o
-   ellipsis é só a rede de segurança para telas fora do previsto. */
-.studio-shell .studio-rail .studio-wordmark{
-  width:100%;max-width:100%;min-width:0;box-sizing:border-box;
-  padding:0;overflow:hidden;
+/* ===== Marca da barra lateral: quem manda na largura é a BARRA =====
+   Medido com a Inter real (700): "storage lab." = 5,81em, e o design usa
+   letter-spacing -1px por caractere. A 19px o texto tem 98,4px; somando logo
+   (34px) + gap (8px) + texto + gap (8px) + botão fechar (38px) + padding da
+   gaveta (28px) chega a 214,4px. Como a gaveta do celular tinha 190px, o
+   texto era cortado ali — era esse o "corta a logo no celular".
+   Agora a gaveta tem a MESMA largura da barra do desktop (224px), então logo
+   e texto ficam inteiros, no tamanho de fonte do design. Nada aqui reduz
+   fonte. */
+:root { --studio-rail-width: 224px; }
+#app .studio-drawer,
+#app .ai-drawer {
+  /* 100vw - 24px só entra em telas mais estreitas que a própria barra. */
+  width: min(var(--studio-rail-width), calc(100vw - 24px));
 }
-.studio-shell .studio-rail .studio-wordmark .lab-logo{flex:0 0 auto}
-.studio-shell .studio-rail .studio-wordmark>span{
-  min-width:0;flex:0 1 auto;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+#app .studio-drawer .studio-rail .studio-wordmark,
+#app .ai-drawer .studio-rail .studio-wordmark {
+  width: 100%; max-width: 100%; min-width: 0; box-sizing: border-box;
+  padding: 0;
 }
-/* Menu do celular: mesma lógica; os tamanhos por breakpoint continuam sendo
-   os do mobile.css (19px na gaveta, 16px em telas de 380px para baixo). */
-#app .studio-drawer .studio-rail .studio-wordmark{width:100%;max-width:100%;padding:0}
-#app .studio-drawer .ai-rail-brand{gap:8px;min-width:0}
-#app .studio-drawer .ai-rail-brand .studio-wordmark>span{min-width:0;flex:0 1 auto;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+#app .studio-drawer .ai-rail-brand .studio-wordmark>span,
+#app .ai-drawer .ai-rail-brand .studio-wordmark>span {
+  min-width: 0; white-space: nowrap;
+}
