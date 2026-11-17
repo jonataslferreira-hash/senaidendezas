@@ -171,7 +171,10 @@ function applyChallengeMirror(g) {
   // experimento do líder do time se mexendo (controles travados).
   const main = document.querySelector('[data-challenge-sim] [data-simulation]');
   const values = g.mirror || (g.live?.[0]?.values || null);
-  if (main && values) applySimValues(main, values, false);
+  // Quem está com o experimento na mão não recebe o próprio eco: isso puxaria
+  // o controle de volta enquanto a pessoa arrasta.
+  const driving = Boolean(g.me?.leader);
+  if (main && values && !driving) applySimValues(main, values, false);
   const cards = document.querySelectorAll('.challenge-live-card');
   const people = g.live || [];
   cards.forEach((card, index) => {
