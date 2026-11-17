@@ -3462,8 +3462,8 @@ button.connection:hover{background:#ffffff14}
 #app .challenge-side .challenge-podium li{grid-template-columns:auto minmax(0,1fr)}
 
 @media (max-width:800px){
-  /* O experimento cresce: é nele que o aluno precisa tocar. */
-  #app .challenge-sim .simulation-widget{min-height:clamp(330px,52dvh,560px)}
+  /* O experimento cresce: é nele que o aluno precisa tocar. A altura fica
+     em §58 (um valor só, para não brigar com min-height). */
   #app .challenge-layout{gap:10px}
   #app .challenge-stage{gap:10px}
   /* Os avisos de instrução param de competir com o botão de tentar. */
@@ -3488,9 +3488,12 @@ button.connection:hover{background:#ffffff14}
 #app .challenge-sim .simulation-result{font-size:12.5px;line-height:1.45}
 #app .challenge-sim .simulation-widget>small{font-size:10px;opacity:.7}
 @media (max-width:800px){
-  /* Celular: cena com proporção fixa (não esmaga) + controles abaixo. */
-  #app .challenge-sim .simulation-widget{height:auto;grid-template-rows:auto auto auto auto auto;gap:9px;padding:12px}
-  #app .challenge-sim .simulation-widget>svg{aspect-ratio:400/220;height:auto;min-height:0}
+  /* Celular: a cena ocupa a maior parte do cartão e os controles ficam
+     logo abaixo, grandes o bastante para o dedo. */
+  /* Altura total enxuta: cabe experimento + objetivo + botão de tentar na
+     primeira tela do celular; o resto fica no painel que rola. */
+  #app .challenge-sim .simulation-widget{height:auto;min-height:0;grid-template-rows:auto auto auto auto auto;gap:9px;padding:12px}
+  #app .challenge-sim .simulation-widget>svg{width:100%;height:auto;min-height:0;aspect-ratio:420/240;border-radius:10px}
   #app .challenge-sim .simulation-widget>small{display:none}
 }
 
@@ -3526,3 +3529,10 @@ button.connection:hover{background:#ffffff14}
   #app.quiz-party>main.game-stage[data-game-type=challenge]{height:100%;min-height:0;overflow-y:auto;overflow-x:hidden;
     -webkit-overflow-scrolling:touch;overscroll-behavior:contain;padding-bottom:calc(14px + env(safe-area-inset-bottom))}
 }
+
+/* ===== 61. Foto do time: prévia com moldura estável =====
+   O seletor de arquivo some (input hidden) e a prévia mostra a foto nova
+   antes de salvar. A moldura não muda de tamanho quando a imagem entra. */
+#app .team-leader-photo{aspect-ratio:1}
+#app .team-leader-photo img{width:100%;height:100%;object-fit:cover;border-radius:inherit}
+#app .team-card .team-photo{border-radius:12px;object-fit:cover;background:#0f0c1c;border:1px solid #ffffff2e}
