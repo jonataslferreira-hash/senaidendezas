@@ -623,6 +623,8 @@ function applyRender() {
     ? `${activeLesson.id}:${state.phase}:${state.slide}:${state.questionIndex}`
     : studio.view==='editor'?`editor:${studio.draft?.id||''}`:studio.view;
   pageMotion.mount(app, {key:motionKey,kind:state?.phase||studio.view,slide:state?.slide||0});
+  // Espelho do experimento: liga/desliga com a etapa do desafio.
+  syncChallengeMirror();
   pageMotion.showOutgoingSlide(app, outgoingSlide);
   gameLayout.mount(app);
   updateClock();
@@ -788,6 +790,34 @@ async function sendGame(payload, quiet = false) {
     else await classroom.answer(payload, state.game.id);
   } catch (err) { if (!quiet) toast(String(err?.message || 'Não foi possível agora. Tente de novo.').slice(0, 160)); }
 }
+function challengeValues() {
+  return [...app.querySelectorAll('[data-challenge-sim] :is([data-param],[data-sim-select],[data-sim-text],[data-sim-toggle])')]
+    .map(field => field.dataset.simToggle !== undefined ? field.dataset.value || '0' : String(field.value).slice(0, 80));
+}
+// Espelhamento ao vivo: quem está mexendo manda o estado do experimento a cada
+// ~700 ms, e o telão redesenha. Sem isso o apresentador só via o valor quando
+// alguém tocava em "tentar".
+let challengeMirror = 0, challengeLast = '';
+function syncChallengeMirror() {
+  clearInterval(challengeMirror);
+  if (!state?.game || state.game.type !== 'challenge' || state.game.state !== 'open') return;
+  const sim = app.querySelector('[data-challenge-sim]');
+  if (!sim || host) return;
+  challengeMirror = setInterval(() => {
+    if (!app.querySelector('[data-challenge-sim]')) return clearInterval(challengeMirror);
+    // Quem manda o espelho é só quem está no comando — se o professor liberar
+    // todo mundo no meio do caminho, o próximo tique já assume.
+    const g = state?.game;
+    if (!g || g.type !== 'challenge' || g.state !== 'open') return;
+    const leader = !g.leaderMode || g.freeForAll || g.me?.leader;
+    if (!leader) return;
+    const values = challengeValues(), key = values.join('|');
+    if (key === challengeLast) return;
+    challengeLast = key;
+    sendGame({ values, peek: true }, true);
+  }, 700);
+}
+app.addEventListener('input', () => { if (state?.game?.type === 'challenge') challengeLast = ''; });
 let tugTaps = 0, tugTimer = 0;
 function tugTap(button) {
   tugTaps++; navigator.vibrate?.(8);
@@ -817,8 +847,7 @@ app.addEventListener('click', event => {
   if (button.dataset.gameDo === 'team-count') { if (host) control('game', { do: 'team-count', count: Number(button.closest('.team-count-control')?.querySelector('[data-team-count-select]')?.value) || 2 }); return; }
   if (button.dataset.gameDo) { control('game', { do: button.dataset.gameDo, id: button.dataset.id }); return; }
   if (button.hasAttribute('data-challenge-send')) {
-    const values = [...app.querySelectorAll('[data-challenge-sim] :is([data-param],[data-sim-select],[data-sim-text],[data-sim-toggle])')].map(field => field.dataset.simToggle !== undefined ? field.dataset.value || '0' : String(field.value).slice(0, 80));
-    // Prévia silenciosa: o telão vê os controles mexendo em tempo real.
+    const values = challengeValues();
     sendGame({ values, peek: true }, true);
     sendGame({ values }); return;
   }
@@ -986,6 +1015,14 @@ app.addEventListener('change', async e => {
 });
 app.addEventListener('submit', async e => {
   if (e.target.id === 'live-edit-form') { e.preventDefault(); saveLiveSlide(); return; }
+  // Desafio: palpite de quem não está mexendo no experimento.
+  if (e.target.matches('[data-challenge-guess]')) {
+    e.preventDefault();
+    const input = e.target.querySelector('[name=guess]'), guess = input?.value.trim();
+    if (!guess) { toast('Escreva o seu palpite antes de enviar.'); return; }
+    sendGame({ guess });
+    return;
+  }
   if (e.target.id !== 'join-form') return;
   e.preventDefault(); if (busy||guestPhotoPending) return;
   const form = new FormData(e.target);

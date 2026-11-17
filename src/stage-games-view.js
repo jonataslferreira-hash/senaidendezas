@@ -163,37 +163,97 @@ function survivalView(state, g, host, player, now) {
     live(arena, 'arena');
 }
 
+// Espelhamento do experimento: os cartões do telão mostram o experimento de
+// cada pessoa com os controles no estado em que ela deixou. O aluno manda o
+// estado a cada ~700 ms (peek) e aqui a gente reaplica nos campos.
+function applyChallengeMirror(g) {
+  // Experimento grande: no telão segue o líder; para quem só assiste, é o
+  // experimento do líder do time se mexendo (controles travados).
+  const main = document.querySelector('[data-challenge-sim] [data-simulation]');
+  const values = g.mirror || (g.live?.[0]?.values || null);
+  if (main && values) applySimValues(main, values, false);
+  const cards = document.querySelectorAll('.challenge-live-card');
+  const people = g.live || [];
+  cards.forEach((card, index) => {
+    const person = people[index];
+    const sim = card.querySelector('[data-simulation]');
+    if (!person || !sim) return;
+    applySimValues(sim, person.values, true);
+  });
+}
+
+// Escreve os valores nos campos do experimento na ordem em que aparecem.
+function applySimValues(sim, values, interactive) {
+  const fields = [...sim.querySelectorAll(':is([data-param],[data-sim-select],[data-sim-text],[data-sim-toggle])')];
+  let changed = false;
+    person.values.forEach((value, i) => {
+      const field = fields[i];
+      if (!field) return;
+      const next = String(value);
+      if (field.dataset.simToggle !== undefined) {
+        if (String(field.dataset.value) !== next) { field.dataset.value = next; changed = true; }
+        // Botões de liga/desliga guardam o estado em data-value; refletimos no
+        // aria para leitor de tela e no visual.
+        const on = next === '1' || next === 'true';
+        field.setAttribute('aria-pressed', String(on));
+        field.dataset.on = String(on);
+      } else if (String(field.value) !== next) {
+        field.value = next; changed = true;
+      }
+    });
+    // Repinta a cena da miniatura com os valores novos (o simulador escuta
+    // input/change nos campos; o telão é só leitura).
+  if (changed) for (const field of fields) field.dispatchEvent(new Event('change', { bubbles: true }));
+}
+
 function challengeView(state, g, host, player) {
   const done = g.state === 'done';
   const max = g.maxTries || 3;
   const me = player && g.me;
   const left = me ? Math.max(0, max - me.tries) : max;
+  const leader = me?.leader || host;
+  const hintLeft = Math.max(0, Math.ceil((g.hintSeconds || 20) - (g.hintAt ? (Date.now() - g.hintAt) / 1000 : 0)));
   // Dica por controle depois de errar: verde = quase lá, âmbar = perto, cinza =
-  // longe — agora com legenda, porque só as barrinhas não diziam nada.
+  // longe — com legenda, porque só as barrinhas não diziam nada.
   const hintWords = { hot: 'quase lá', warm: 'perto', cold: 'longe' };
   const closest = me?.hints?.filter(Boolean).sort((a, b) => ['hot', 'warm', 'cold'].indexOf(a) - ['hot', 'warm', 'cold'].indexOf(b))[0];
-  const hints = me && !me.ok && !done && me.hints?.length && left > 0
+  const controlHints = me && !me.ok && !done && me.hints?.length && left > 0
     ? `<div class="challenge-hint-box"><p class="challenge-hint" role="img" aria-label="Quão perto cada controle está da meta">${me.hints.map(hint => hint ? `<i class="${hint}"></i>` : '').join('')}</p><small>Dica: ${closest ? hintWords[closest] : 'ajuste de novo'} da meta · cada barra é um controle</small></div>`
+    : '';
+  // Rodada de dicas: o líder tenta, o time lê a dica e palpita a resposta.
+  const teamHint = g.hint
+    ? `<div class="challenge-team-hint"><span>Dica ${g.hintIndex + 1} de ${g.hintCount}</span><p>${esc(g.hint)}</p>${leader ? '' : `<small>O líder está ajustando o experimento. Escreva o que você acha que é a resposta certa.</small>`}</div>`
+    : `<div class="challenge-team-hint quiet"><p>${leader ? 'Você está no comando: ajuste os controles e toque em tentar.' : 'O líder do time está no comando do experimento. Fique de olho e palpita quando a dica aparecer.'}</p></div>`;
+  const guessBox = !leader && me && !me.ok && !done
+    ? `<form class="challenge-guess" data-challenge-guess><label for="challenge-guess-field">Seu palpite para a turma</label>
+        <div><input id="challenge-guess-field" name="guess" maxlength="80" value="${esc(me.guess || '')}" placeholder="Ex.: 45 graus" autocomplete="off"><button class="btn secondary small" type="submit">Enviar</button></div>
+        ${g.guessesCount ? `<small>${g.guessesCount} ${g.guessesCount === 1 ? 'palpite' : 'palpites'} na tela</small>` : '<small>O telão mostra os palpites de todo mundo.</small>'}</form>`
     : '';
   const mine = me ? (me.ok
     ? `<p class="game-winner"><span>🎯</span>Você chegou à meta! <small>${me.place}º lugar · +${me.points} pts</small></p>`
     : done ? '<p class="game-wait">Tempo encerrado.</p>'
     : left <= 0 ? `<p class="sv-dead">As ${max} tentativas acabaram. Acompanhe a turma!</p>`
-    : `${hints}<div class="challenge-submit-row"><button class="btn primary game-submit" data-challenge-send>🎯 Tentar acertar</button><span class="challenge-tries" data-left="${left}" aria-label="${left} de ${max} tentativas restantes">${Array.from({ length: max }, (_, i) => `<i data-used="${i >= left}"></i>`).join('')}</span></div>`)
+    : leader ? `${controlHints}<div class="challenge-submit-row"><button class="btn primary game-submit" data-challenge-send>${stageIcon('challenge')} Tentar acertar</button><span class="challenge-tries" data-left="${left}" aria-label="${left} de ${max} tentativas restantes">${Array.from({ length: max }, (_, i) => `<i data-used="${i >= left}"></i>`).join('')}</span></div>`
+    : `<p class="game-wait">Você está no time de quem mexe: acompanhe a dica e palpite.</p>`)
     : '';
-  const podium = g.solved.length ? `<ol class="challenge-podium">${g.solved.slice(0, 5).map((item, i) => `<li><b>${['🥇', '🥈', '🥉'][i] || i + 1 + 'º'}</b><span>${esc(item.name)}</span><small>${(item.at / 1000).toFixed(1)} s · ${plural(item.tries, 'tentativa', 'tentativas')}</small></li>`).join('')}</ol>` : '<p class="game-wait">Ninguém chegou à meta ainda…</p>';
+  const podium = g.solved.length ? `<ol class="challenge-podium">${g.solved.slice(0, 5).map((item, i) => `<li><b>${['🥇', '🥈', '🥉'][i] || i + 1 + 'º'}</b><span>${esc(item.name)}</span><small>${(item.at / 1000).toFixed(1)} s · ${plural(item.tries, 'tentativa', 'tentativas')}</small></li>`).join('')}</ol>` : '';
   const answer = g.answer ? `<p class="challenge-answer"><b>Resposta:</b> ${g.answer.map(item => `${esc(item.label)} = ${esc(item.v)}`).join(' · ')}</p>` : '';
-  // Telão: os experimentos da turma ao vivo, com os controles atuais de cada time.
-  const liveLab = host && !done && g.live?.length
-    ? `<div class="challenge-live"><h2>Experimentos ao vivo</h2><div class="challenge-live-grid">${g.live.map(item => `<div class="challenge-live-card" data-ok="${item.ok}"><header>${character(item, 0, item.ok ? 'win-0' : 'idle')}<strong>${esc(item.name)}</strong><small>${item.tries}/${max}</small></header><div class="challenge-live-values">${item.values.map(value => `<i>${esc(String(value ?? '').slice(0, 6))}</i>`).join('')}</div></div>`).join('')}</div></div>`
-    : '';
-  // "Qual é a dica, o objetivo?" — a meta fica escrita no topo do cartão, e o
-  // botão diz exatamente o que fazer.
   const goal = g.text ? `<p class="challenge-goal">${esc(g.text)}</p>` : '';
-  const howto = !done && !me ? '<p class="challenge-howto">Ajuste os controles até o experimento chegar na meta. Você tem 3 tentativas.</p>' : '';
-  return `<div class="challenge-layout"><div class="challenge-sim" data-challenge-sim>${simulationMarkup(g.simulation)}</div><aside>` +
-    live(goal + howto + mine + liveLab + `<h2>Quem chegou na meta <small>${g.solvedCount}</small></h2>${podium}${done ? answer : ''}`) +
-    (host ? live(hostActions(state, [done ? ['restart', '↻ Jogar de novo'] : ['end', 'Encerrar jogo', 'primary']], { showNext: done })) : '') + '</aside></div>';
+  // Telão: cada time espelhado ao vivo (os controles de quem está mexendo).
+  const liveLab = host && !done && g.live?.length
+    ? `<div class="challenge-live"><h2>Espelho ao vivo <small>${g.live.length}</small></h2><div class="challenge-live-grid">${g.live.map(item => `<div class="challenge-live-card" data-ok="${item.ok}"><header>${character(item, 0, item.ok ? 'win-0' : 'idle')}<strong>${esc(item.name)}</strong><small>${item.tries}/${max}</small></header><div class="challenge-live-sim">${simulationMarkup(g.simulation)}</div><div class="challenge-live-values">${item.values.map(value => `<i>${esc(String(value ?? '').slice(0, 6))}</i>`).join('')}</div></div>`).join('')}</div></div>`
+    : '';
+  // O espelho de verdade: aplica no experimento grande (e nas miniaturas do
+  // telão) os valores que o líder está usando agora.
+  if (typeof document !== 'undefined') queueMicrotask(() => applyChallengeMirror(g));
+  // Telão: palpites chegando em tempo real, tipo mural.
+  const guessWall = host && g.guesses?.length
+    ? `<div class="challenge-guess-wall"><h2>Palpites do time <small>${g.guessesCount}</small></h2><ul>${g.guesses.map(item => `<li><strong>${esc(item.name)}</strong><span>${esc(item.guess || '—')}</span></li>`).join('')}</ul></div>`
+    : '';
+  const modeSwitch = host && !done ? `<div class="challenge-mode"><button type="button" class="btn secondary small" data-game-do="challenge-mode" data-mode="${g.freeForAll ? 'leader' : 'all'}">${g.freeForAll ? 'Voltar a só o líder mexer' : 'Deixar todos mexerem'}</button><button type="button" class="btn secondary small" data-game-do="next-hint">Próxima dica</button><span class="challenge-mode-state">${g.freeForAll ? 'Todos podem mexer' : 'Só o líder mexe'}</span></div>` : '';
+  return `<div class="challenge-layout"><div class="challenge-sim" data-challenge-sim data-locked="${!host && !leader}">${simulationMarkup(g.simulation)}</div><aside>` +
+    live(goal + teamHint + mine + guessBox + liveLab + guessWall + `<h2>Quem chegou na meta <small>${g.solvedCount}</small></h2>${podium}${done ? answer : ''}`) +
+    (host ? live(modeSwitch + hostActions(state, [done ? ['restart', '↻ Jogar de novo'] : ['end', 'Encerrar jogo', 'primary']], { showNext: done })) : '') + '</aside></div>';
 }
 
 function raffleView(state, g, host, player) {

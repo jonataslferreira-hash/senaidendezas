@@ -5,9 +5,10 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { Room } from '../src/room.js';
 import { newLesson, newSlide, validateLesson } from '../src/lessons.js';
-import { defaultGame } from '../src/stage-games.js';
+import { defaultGame, gameSnapshot, gameInput, gameControl } from '../src/stage-games.js';
 import { gameMarkup } from '../src/stage-games-view.js';
 import { createSlideFromTemplate } from '../src/slide-templates.js';
+import { StageEditor } from '../src/stage-editor.js';
 
 function challengeSlide() {
   const slide = newSlide('Desafio');
@@ -196,4 +197,94 @@ test('entrada na sala: página nova com passo a passo e cartão', async () => {
   assert.match(studio, /join-steps/, 'passo a passo');
   const css = readFileSync(new URL('../src/studio-workflows.css', import.meta.url), 'utf8');
   assert.doesNotMatch(css, /\.join-intro :is\(h1,p\)\{display:none\}/, 'título e texto continuam no celular');
+});
+
+test('desafio em rodadas: só o líder mexe, dica libera para o time e palpite chega no telão', () => {
+  let now = 20_000;
+  const lesson = newLesson('Desafio');
+  const slide = newSlide('Experimento');
+  slide.game = { type: 'challenge', text: 'Cheguem na meta', simulation: 'projectile', tolerance: 5,
+    hints: ['O ângulo é maior.', 'Falta pouco, sobe mais um tico.', 'Agora é ajuste fino.'],
+    hintSeconds: 20, leaderMode: true,
+    answer: [{ k: 'range', label: 'Ângulo', v: '45', min: 0, max: 90 }] };
+  const cover = newSlide('Capa');
+  lesson.slides = [cover, slide];
+  lesson.activityBlocks = [{ id: 'a', type: 'slides', items: [cover.id] }, { id: 'b', type: 'challenge', items: [slide.id] }];
+  const room = new Room('454545', null, () => now, validateLesson(lesson));
+  const lia = room.join({ name: 'Lia' });   // entra primeiro e vira líder do time
+  const ana = room.join({ name: 'Ana' });
+  room.control('next-stage');
+  room.data.players.find(p => p.id === ana.id).team = room.data.players.find(p => p.id === lia.id).team;
+
+  assert.equal(gameSnapshot(room, lia.id).me.leader, true, 'líder do time está no comando');
+  assert.equal(gameSnapshot(room, ana.id).me.leader, false, 'quem não é líder só palpita');
+  assert.equal(gameSnapshot(room, ana.id).hint, '', 'sem dica antes da primeira tentativa');
+
+  assert.throws(() => gameInput(room, ana.id, { values: ['20'] }), /Só o líder/, 'quem não é líder não mexe');
+  gameInput(room, lia.id, { values: ['20'] });
+  const afterTry = gameSnapshot(room, ana.id);
+  assert.ok(afterTry.hint, 'dica liberada para o time');
+  assert.equal(afterTry.hintCount, 3, 'três dicas cadastradas');
+  assert.equal(afterTry.hintIndex, 0, 'primeira dica');
+
+  now += 2000;
+  gameInput(room, ana.id, { guess: '45 graus' });
+  const tv = gameSnapshot(room, null);
+  assert.equal(tv.guesses.length, 1, 'palpite aparece no telão');
+  assert.equal(tv.guesses[0].guess, '45 graus');
+
+  gameControl(room, { do: 'next-hint' });
+  const dica2 = gameSnapshot(room, ana.id);
+  assert.match(dica2.hint, /Falta pouco/);
+  assert.equal(dica2.hintIndex, 1);
+
+  gameControl(room, { do: 'challenge-mode', mode: 'all' });
+  assert.equal(gameSnapshot(room, ana.id).me.leader, true, 'todos passam a mexer');
+  gameControl(room, { do: 'challenge-mode', mode: 'leader' });
+  assert.equal(gameSnapshot(room, ana.id).me.leader, false, 'volta para só o líder');
+});
+
+test('editor do desafio deixa o professor trocar as dicas e o modo de controle', () => {
+  const slide = newSlide('Experimento');
+  slide.game = { type: 'challenge', text: 'Meta', simulation: 'projectile', tolerance: 5,
+    hints: ['Dica do professor'], hintSeconds: 45, leaderMode: false, answer: [{ k: 'range', label: 'A', v: '45', min: 0, max: 90 }] };
+  const studio = { root: { querySelector: () => null, addEventListener() {} }, draft: { slides: [slide] }, index: 0,
+    view: 'editor', tab: 'slides', markDirty() {}, callbacks: {}, itemToolbar: () => '' };
+  const editor = new StageEditor(studio);
+  const html = editor.markup();
+  assert.match(html, /data-game-field="hints"/, 'campo de dicas existe');
+  assert.match(html, /Dica do professor/, 'dicas atuais aparecem');
+  assert.match(html, /data-game-field="hintSeconds"/, 'tempo da dica existe');
+  assert.match(html, /<option value="45" selected>/, 'tempo salvo é o escolhido');
+  assert.match(html, /data-game-field="leaderMode"/, 'modo de controle existe');
+  assert.match(html, /<option value="0" selected>/, 'todos podem mexer aparece marcado');
+});
+
+test('telão do desafio espelha o experimento de cada pessoa sem estourar', async () => {
+  const { JSDOM } = await import('jsdom');
+  const dom = new JSDOM('<!doctype html><body><div id="app"></div></body>', { pretendToBeVisual: true });
+  const previous = { window: globalThis.window, document: globalThis.document, HTMLElement: globalThis.HTMLElement, Event: globalThis.Event };
+  globalThis.window = dom.window; globalThis.document = dom.window.document;
+  globalThis.HTMLElement = dom.window.HTMLElement; globalThis.Event = dom.window.Event;
+  try {
+    const state = { game: { id: 'g', type: 'challenge', state: 'open', text: 'Meta', simulation: 'projectile', bare: false,
+      solved: [], solvedCount: 0, trying: 2, maxTries: 3, live: [], hint: '', hintIndex: 0, hintCount: 3, hintAt: 0, hintSeconds: 20,
+      guesses: [], guessesCount: 0, openForGuess: true, leaderMode: true, freeForAll: false, me: null } };
+    const host = gameMarkup(state, { host: true, header: () => '', demo: false });
+    document.querySelector('#app').innerHTML = host;
+    await new Promise(done => setTimeout(done, 20));
+    assert.ok(document.querySelector('.challenge-mode'), 'telão tem os botões de controle');
+    assert.match(host, /Espelho do líder|data-challenge-sim/, 'experimento aparece');
+    const locked = gameMarkup({ ...state, game: { ...state.game, me: { tries: 0, ok: false, place: 0, points: 300, leader: false, guess: '' } } },
+      { host: false, header: () => '', demo: false });
+    document.querySelector('#app').innerHTML = locked;
+    await new Promise(done => setTimeout(done, 20));
+    assert.ok(document.querySelector('.challenge-team-hint'), 'quem não é líder recebe a dica');
+    assert.ok(document.querySelector('[data-challenge-guess]'), 'e o campo de palpite');
+    assert.equal(document.querySelector('[data-challenge-send]'), null, 'quem não é líder não tenta');
+    assert.equal(document.querySelector('[data-challenge-sim]').dataset.locked, 'true', 'experimento travado no espelho');
+  } finally {
+    globalThis.window = previous.window; globalThis.document = previous.document;
+    globalThis.HTMLElement = previous.HTMLElement; globalThis.Event = previous.Event;
+  }
 });

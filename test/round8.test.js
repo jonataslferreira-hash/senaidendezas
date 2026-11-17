@@ -213,6 +213,9 @@ test('etapas interativas: equipes, relâmpago, sobrevivência, desafio, sorteio 
   assert.throws(() => room.answer(bia.id, { choice: { choice: 0, round: 0 } }), /terminou|caiu/);
   assert.equal(room.snapshot().ranking.find(p => p.name === 'Ana').score, 500, 'pontos das dinâmicas contam no ranking individual');
   room.control('next-stage'); now += 5000;
+  // Desafio: só o líder do time mexe no experimento.
+  room.data.teams[room.data.players.find(p => p.id === ana.id).team].leader = ana.id;
+  assert.throws(() => room.answer(bia.id, { choice: { values: ['80', 'a'] } }), /Só o líder/);
   room.answer(ana.id, { choice: { values: ['80', 'a'] } });
   assert.equal(room.snapshot(ana.id).game.me.ok, false);
   now += 2000; room.answer(ana.id, { choice: { values: ['53', 'a'] } });
