@@ -910,9 +910,12 @@ app.addEventListener('change', async event => {
     else {
       const preview = input.closest('.team-leader-tools')?.querySelector('[data-team-preview]');
       if (preview) {
-        preview.innerHTML = `<img src="${teamPhotoDraft}" alt="Nova foto do time">`;
+        // A foto é o botão: troca só a imagem, mantendo o botão (e o toque).
+        preview.replaceChildren(Object.assign(document.createElement('img'), { src: teamPhotoDraft, alt: 'Nova foto do time' }));
         preview.setAttribute('aria-label', 'Trocar a foto do time');
         preview.title = 'Trocar a foto do time';
+        const hint = input.closest('.team-leader-tools')?.querySelector('.team-leader-hint');
+        if (hint) hint.textContent = 'Toque na foto para trocar.';
       }
       toast('Foto pronta. Toque em Salvar.');
     }
