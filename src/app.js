@@ -241,6 +241,28 @@ queueMicrotask(() => {
 });
 if (codeDraft) studio.view = 'join';
 
+// Sistema com "reduzir animações": o site inteiro fica parado e não é culpa de
+// conta/settings. Avisa uma vez e oferece ligar as animações neste navegador.
+let motionNoticeShown = false;
+function maybeExplainReducedMotion() {
+  if (motionNoticeShown || typeof localStorage === 'undefined') return;
+  try { if (localStorage.getItem('sl-motion-notice') === 'done') return; } catch { return; }
+  import('./motion-storage.js').then(({ systemReduced, motionWasChosen, writeLocalMotion }) => {
+    if (!systemReduced() || motionWasChosen()) return;
+    motionNoticeShown = true;
+    try { localStorage.setItem('sl-motion-notice', 'done'); } catch { /* modo privado */ }
+    const bar = document.createElement('div');
+    bar.className = 'motion-notice';
+    bar.innerHTML = `<span>Seu aparelho está com <b>animações reduzidas</b> ligadas, então o site fica sem movimento.</span>
+      <button type="button" data-motion-allow>Ligar animações aqui</button>
+      <button type="button" data-motion-dismiss aria-label="Fechar aviso">×</button>`;
+    document.body.append(bar);
+    bar.addEventListener('click', e => {
+      if (e.target.closest('[data-motion-allow]')) { writeLocalMotion('normal'); toast('Animações ligadas neste navegador.'); }
+      bar.remove();
+    });
+  });
+}
 function toast(message) {
   const el = document.querySelector('#toast'); el.textContent = message; el.classList.add('visible');
   clearTimeout(toastTimer); toastTimer = setTimeout(() => el.classList.remove('visible'), 4500);
@@ -362,7 +384,7 @@ function rankingTable(full = false) {
 }
 function quiz(){return quizMarkup(state,{header,host,demo,status,shareDialog,shareOpen});}
 function finished() {
-  return leaderboardMarkup(state,{header,host,offset:timerOffset,final:true});
+  return leaderboardMarkup(state,{header,host,offset:timerOffset,final:true,shareDialog,shareOpen});
 }
 
 function joinUrl() {
@@ -532,7 +554,7 @@ function applyRender() {
   // Aula sem atividades pontuadas (nem quiz nem jogos) volta direto ao encerrar.
   if (state?.phase === 'finished' && !state.totalQuestions && !state.hasScoredStages) { focusView.close(); leave(); return; }
   app.classList.toggle('quiz-party', Boolean(state && state.phase !== 'lesson'));
-  const markup = sharedLoading || busy && host && !state ? `${header()}<main class="public-loading"><p role="status">Carregando apresentação…</p></main>` : sharedError ? `${header()}<main class="public-loading"><h1>Apresentação indisponível</h1><p>${esc(sharedError)}</p><button class="btn secondary" data-action="home">Voltar</button></main>` : !state ? studio.markup() : state.phase === 'lesson' ? lesson() : ['lobby', 'countdown'].includes(state.phase) ? lobbyMarkup(state, { host, demo, header, shareDialog, shareOpen }) : state.phase === 'finished' ? finished() : state.phase==='leaderboard'?leaderboardMarkup(state,{header,host,offset:timerOffset}):state.game ? gameMarkup(state, { host, demo, header, now: Date.now() + timerOffset }) : state.poll ? pollMarkup() : quiz();
+  const markup = sharedLoading || busy && host && !state ? `${header()}<main class="public-loading"><p role="status">Carregando apresentação…</p></main>` : sharedError ? `${header()}<main class="public-loading"><h1>Apresentação indisponível</h1><p>${esc(sharedError)}</p><button class="btn secondary" data-action="home">Voltar</button></main>` : !state ? studio.markup() : state.phase === 'lesson' ? lesson() : ['lobby', 'countdown'].includes(state.phase) ? lobbyMarkup(state, { host, demo, header, shareDialog, shareOpen }) : state.phase === 'finished' ? finished() : state.phase==='leaderboard'?leaderboardMarkup(state,{header,host,offset:timerOffset,shareDialog,shareOpen}):state.game ? gameMarkup(state, { host, demo, header, now: Date.now() + timerOffset, shareDialog, shareOpen }) : state.poll ? pollMarkup() : quiz();
   const chatSlots = '[data-chat-slot], [data-social-slot]';
   const currentAIPage = app.querySelector('.storage-ai-page');
   const keepAI = !state && !sharedLoading && !sharedError && !(busy && host) &&
@@ -1079,6 +1101,7 @@ window.addEventListener('beforeunload', e => { if (editDraft) { e.preventDefault
 if (!['preview','present'].includes(params.get('page'))) render();
 else app.innerHTML='<main class="public-loading"><p role="status">Carregando apresentação…</p></main>';
 document.documentElement.dataset.appReady = 'true';
+setTimeout(maybeExplainReducedMotion, 1500);
 async function openPublicPresentation(token) {
   leave(false);sharedLoading=true;render();
   try{if(validPublicCode(token))token=await resolvePublicCode(token);const lesson=await loadPublicPresentation(token);sharedLoading=false;preview(lesson,{readOnly:true,token});}

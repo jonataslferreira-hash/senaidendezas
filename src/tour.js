@@ -141,6 +141,8 @@ export class SiteTour {
 
   async showStep(index) {
     const steps = tourSteps;
+    // Pular etapa só acontece quando o alvo realmente não existe; o passo de
+    // abertura (0) sempre aparece, com a Kuro falando.
     if (index >= steps.length) { this.stop('done'); return; }
     const step = steps[index];
     this.step = index;
@@ -172,7 +174,8 @@ export class SiteTour {
     const bubble = this.nodes.querySelector('[data-tour-bubble]');
     const classes = bubble.className;
     bubble.className = ''; void bubble.offsetWidth; bubble.className = classes;
-    this.speak(index);
+    // A fala só começa com a bolha (e a Kuro) já em cena.
+    if (bubble.isConnected) this.speak(index);
   }
 
   position() {

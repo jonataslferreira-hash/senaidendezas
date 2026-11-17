@@ -8,3 +8,16 @@ html[data-appearance=dark] .studio-shell .experience-copy p,html[data-appearance
 html[data-appearance=dark] .studio-shell :is(.outline-item,.designer-toolbar button,.designer-toolbar select,.designer-inspector button,.designer-inspector select,.designer-layer-list button,.designer-tools button,.editor-top-actions .studio-btn:not(.accent),.audio-editor button){background:#3b3e45;color:#ece9f1;border-color:#5b5e66}html[data-appearance=dark] .studio-shell .outline-item.active{background:#514963;color:#fff;border-color:#a387c0}html[data-appearance=dark] .studio-shell .outline-item :is(strong,small){color:inherit}html[data-appearance=dark] .studio-shell .designer-stage-wrap{background-color:#292b30;background-image:radial-gradient(#60646b66 1px,transparent 1px)}html[data-appearance=dark] .studio-shell :is(.designer-help,.designer-notes summary){color:#bec1c9}html[data-appearance=dark] .studio-shell .designer-layer-list button[aria-pressed=true]{background:#67557c;color:#fff}html[data-appearance=dark] .studio-shell .new-lesson-card .create-half{color:#f0f0f2}html[data-appearance=dark] .account-dialog .appearance-picker select{background:#3b3e45;color:#f0f0f2}
 .photo-zoom-controls{display:flex;align-items:center;justify-content:center;gap:10px;margin:18px 0}.photo-zoom-controls button{min-width:44px;border-radius:50%;font-size:22px}.photo-zoom-controls [data-photo-action=reset]{font-size:11px;border-radius:10px}.photo-zoom-controls output{font-size:12px;min-width:45px;text-align:center}.photo-editor>div:last-child button{flex:1;min-height:46px}.photo-crop-preview{border-radius:18px;background:#242629}.photo-editor{background:linear-gradient(160deg,#ab87cd0c,#8bbfa60c)}
 .account-dialog:has(.photo-editor){width:min(480px,calc(100vw - 24px));max-height:94dvh;padding:24px}.account-dialog:has(.photo-editor) :is(.account-appearance,footer,button[type=submit],.photo-editor h3){display:none!important}.account-dialog:has(.photo-editor) .photo-editor{border:0;padding:0;background:none;margin:12px 0 0}.account-dialog:has(.photo-editor) #account-title{font-size:25px;margin:18px 0 10px}.account-dialog:has(.photo-editor) .photo-crop-preview{width:min(100%,256px,36dvh);margin:14px auto}.account-dialog:has(.photo-editor) .photo-editor p{margin:10px 0;font-size:12px!important}
+
+/* Janela de recorte reaproveitável (convite e perfil da sala) */
+.photo-crop-sheet{border:0;padding:0;border-radius:22px;background:var(--ui-panel,#fff);color:var(--ui-ink,#241a33);width:min(440px,calc(100vw - 24px));max-height:94dvh;box-shadow:0 30px 80px #1b10304d}
+.photo-crop-sheet::backdrop{background:#160d2459}
+.photo-crop-sheet>section{display:grid;gap:12px;padding:18px}
+.photo-crop-sheet header{display:flex;align-items:center;justify-content:space-between;gap:10px}
+.photo-crop-sheet h3{margin:0;font-size:17px}
+.photo-crop-sheet header button{border:0;background:none;font-size:24px;line-height:1;cursor:pointer;color:inherit;opacity:.6}
+.photo-crop-sheet p{margin:0;font-size:12.5px;opacity:.75}
+.photo-crop-preview{display:grid;place-items:center;background:#0e0a17;border-radius:18px;overflow:hidden}
+.photo-crop-preview canvas{width:100%;max-width:300px;border-radius:50%;cursor:grab;touch-action:none}
+.photo-crop-preview canvas:active{cursor:grabbing}
+.photo-crop-sheet footer{display:flex;gap:8px;justify-content:flex-end}

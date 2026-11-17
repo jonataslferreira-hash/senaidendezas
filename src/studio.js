@@ -503,7 +503,9 @@ export class Studio {
   }
   syncAudioUi(card, scope, audio) {
     if (!audio) return;
-    const rate = Math.max(.5, Math.min(2, Number(audio.rate) || 1));
+    // Sem rate escolhido, a trilha entra no slowed padrão (0.85) em vez de 1.0:
+    // é o efeito que a turma conhece como "slowed + reverb".
+    const rate = Math.max(.5, Math.min(2, Number(audio.rate) || .85));
     const slowed = rate < 0.999;
     const preview = card?.querySelector('[data-audio-preview]');
     if (preview) applyAudioPlayback(preview, audio);

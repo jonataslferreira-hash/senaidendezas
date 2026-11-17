@@ -94,7 +94,9 @@ export function applyReverb(player, wet = 0, volume = 1) {
 
 export function applyAudioPlayback(player, track) {
   if (!player || !track) return;
-  const rate = Math.max(0.5, Math.min(2, Number(track.rate) || 1));
+  // Trilha sem velocidade escolhida já entra no slowed (0.85): o padrão do
+  // editor de música é slowed + reverb, não a faixa em velocidade normal.
+  const rate = Math.max(0.5, Math.min(2, Number(track.rate) || 0.85));
   const slowed = rate < 0.999;
   player.volume = Math.max(0, Math.min(1, Number.isFinite(Number(track.volume)) ? Number(track.volume) : 0.45));
   player.defaultPlaybackRate = rate;

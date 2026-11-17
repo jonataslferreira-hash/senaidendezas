@@ -426,7 +426,11 @@ html[data-appearance=light] #app[data-role=student] .callout p{color:#6d5287}
    Antes, ao abrir o menu, a marca aparecia maior e deslocada (o cartão do
    drawer usava o estilo do desktop). Agora ela fica idêntica ao cabeçalho. */
 @media (max-width:900px){
-  #app .studio-drawer .ai-rail-brand{align-items:center;justify-content:space-between;gap:8px;min-height:62px;padding:0 2px;margin-bottom:6px}
+  /* A marca do menu é a MESMA da barra do topo: mesma altura de linha (62px),
+     mesmo tamanho de logo e mesma margem à esquerda — assim ela não "salta"
+     ao abrir o menu. */
+  #app .studio-drawer .studio-rail{padding-inline:14px!important}
+  #app .studio-drawer .ai-rail-brand{align-items:center;justify-content:space-between;gap:8px;height:62px;min-height:62px;max-height:62px;padding:0;margin:0 0 2px}
   #app .studio-drawer .ai-rail-brand .studio-wordmark{font-size:19px;gap:8px;padding:0;min-width:0;display:inline-flex;align-items:center}
   #app .studio-drawer .ai-rail-brand .studio-wordmark .lab-logo{width:34px;height:34px;border-radius:10px;flex:none}
   #app .studio-drawer .ai-rail-brand .studio-wordmark>span{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}

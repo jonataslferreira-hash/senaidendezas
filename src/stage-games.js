@@ -659,7 +659,9 @@ export function gameSnapshot(room, playerId, bare = false) {
     if (!list.length) return { name: config.options[side], color: teamPalette[side][1], gradient: null };
     // Dois times no mesmo lado viram um gradiente com a cor de cada um.
     const gradient = list.length > 1 ? { a: list[0].color, b: list[1].color } : null;
-    return { name: list.map(team => 'Time ' + team.name).join(' + '), color: list[0].color, gradient };
+    const name = list.map(team => 'Time ' + team.name).join(' + ');
+    // Um lado pode ficar com um time a mais (número ímpar): fica dito na tela.
+    return { name, color: list[0].color, gradient, count: list.length };
   };
   // Mantém porcentagens e acertos ocultos até o fim da puxada da corda (state === 'done') para preservar o suspense!
   return { ...base, bare: false, round: game.round, rounds: totalRounds, seconds: Math.max(config.seconds || 15, 5), deadline: game.deadline, betweenAt: game.betweenAt || 0, betweenMs: TUG_BETWEEN_MS, tolerance: config.tolerance ?? 10,

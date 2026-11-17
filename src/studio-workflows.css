@@ -832,11 +832,13 @@ html[data-motion=reduced] #app .ai-instant-button.is-active{animation:none}
 }
 html[data-motion=reduced] #app .studio-btn.ai-tool::before, html[data-motion=reduced] #app .studio-btn.ai-tool::after { animation: none; }
 
-/* Biblioteca: Catálogo e "Criar com IA" já vivem na barra lateral — aqui só
-   repetem. No celular (barra de cima compacta, ícones pequenos) o "Criar com
-   IA" continua à mão; o Catálogo já aparece no cartão de nova apresentação. */
-.library-actions [data-studio-action="open-templates"]{display:none}
-@media (min-width:901px){.library-actions .storage-ai-primary{display:none}}
+/* Biblioteca: o Catálogo já vive na barra lateral e no cartão "Nova
+   apresentação" — no celular ele só repetia e foi embora. O "Criar com IA" é
+   coisa de PC: no celular o mesmo caminho está no menu lateral (Storage AI). */
+@media (max-width:900px){
+  .library-actions [data-studio-action="open-templates"]{display:none}
+  .library-actions .storage-ai-primary{display:none}
+}
 
 /* ===== Entrar na sala: cartão novo (código em destaque, identidade junto) ===== */
 #app .join-card-v2{padding:clamp(20px,3vw,30px);border-radius:clamp(18px,3vw,26px);gap:0;box-shadow:0 24px 60px color-mix(in srgb,var(--ui-accent) 22%,transparent)}
@@ -870,3 +872,17 @@ html[data-motion=reduced] #app .studio-btn.ai-tool::before, html[data-motion=red
   #app .library-section-title .library-actions .storage-ai-primary{flex:0 1 auto;background:linear-gradient(135deg,var(--ui-accent,#8b5cf6),color-mix(in srgb,var(--ui-accent,#8b5cf6) 55%,#22d3ee))!important;color:#fff!important;border:0!important;border-radius:999px!important;min-height:38px;padding:0 14px;font-weight:800;font-size:12px;box-shadow:0 6px 16px color-mix(in srgb,var(--ui-accent,#8b5cf6) 35%,transparent)}
   #app .library-section-title .library-actions .storage-ai-btn-icon{width:18px;height:18px}
 }
+
+/* ===== Avatar do convite: foto sempre DENTRO do círculo =====
+   O botão tinha cantos arredondados mas sem recorte, então a foto custom
+   "vazava" pelas bordas e ficava torta. Agora o botão recorta a imagem.  */
+#app .studio-join #join-form .avatar-picker .avatar{
+  overflow:hidden;border-radius:50%;place-items:center;line-height:0;
+}
+#app .studio-join #join-form .avatar-picker .avatar>img,
+#app .studio-join #join-form .avatar-picker .avatar>svg{
+  width:100%;height:100%;object-fit:cover;border-radius:50%;display:block;pointer-events:none;
+}
+#app .studio-join #join-form .avatar-picker .avatar>svg{padding:14%}
+#app .join-identity-photo{border-radius:22px}
+#app .join-identity-photo img{border-radius:18px}

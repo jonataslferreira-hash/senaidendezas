@@ -134,7 +134,8 @@ export class GameAudio{
  stageBed(on,key){
   if(!on){if(this.stageKey&&this.key===this.stageKey){this.pause(this.audio);this.key='';}this.stageKey='';return;}
   if(!this.enabled||this.key===key)return;
-  const tracks=questionTracks.filter(track=>(track.seconds||0)>=120);
+  const long=questionTracks.filter(track=>(track.seconds||0)>=120);
+  const tracks=long.length?long:questionTracks.filter(track=>track.url);
   if(!tracks.length)return;
   const track=this.stageKey===key&&this.lastTrack&&tracks.some(t=>t.id===this.lastTrack)?tracks.find(t=>t.id===this.lastTrack):chooseTrack(tracks,this.stageKey===key?this.lastTrack:'',this.random);
   this.stageKey=key;

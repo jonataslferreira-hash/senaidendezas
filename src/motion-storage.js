@@ -8,3 +8,11 @@ export function writeLocalMotion(value) {
   document.documentElement.dataset.motion = localMotion();
   document.dispatchEvent(new Event('motion-preference-changed'));
 }
+
+// O sistema operacional pode desligar animações (Windows: "Mostrar animações
+// no Windows" / "Efeitos de animação"). Nesse caso o site todo fica parado e a
+// pessoa acha que o site quebrou. Aqui detectamos isso para oferecer o botão.
+export function systemReduced() {
+  try { return Boolean(globalThis.matchMedia?.('(prefers-reduced-motion: reduce)')?.matches); } catch { return false; }
+}
+export function motionWasChosen() { return localMotion() !== 'system'; }

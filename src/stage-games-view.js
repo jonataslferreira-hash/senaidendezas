@@ -168,9 +168,12 @@ function challengeView(state, g, host, player) {
   const max = g.maxTries || 3;
   const me = player && g.me;
   const left = me ? Math.max(0, max - me.tries) : max;
-  // Dica por controle depois de errar: verde = quase lá, âmbar = perto, cinza = longe.
+  // Dica por controle depois de errar: verde = quase lá, âmbar = perto, cinza =
+  // longe — agora com legenda, porque só as barrinhas não diziam nada.
+  const hintWords = { hot: 'quase lá', warm: 'perto', cold: 'longe' };
+  const closest = me?.hints?.filter(Boolean).sort((a, b) => ['hot', 'warm', 'cold'].indexOf(a) - ['hot', 'warm', 'cold'].indexOf(b))[0];
   const hints = me && !me.ok && !done && me.hints?.length && left > 0
-    ? `<p class="challenge-hint" role="img" aria-label="Quão perto cada controle está da meta">${me.hints.map(hint => hint ? `<i class="${hint}"></i>` : '').join('')}</p>`
+    ? `<div class="challenge-hint-box"><p class="challenge-hint" role="img" aria-label="Quão perto cada controle está da meta">${me.hints.map(hint => hint ? `<i class="${hint}"></i>` : '').join('')}</p><small>Dica: ${closest ? hintWords[closest] : 'ajuste de novo'} da meta · cada barra é um controle</small></div>`
     : '';
   const mine = me ? (me.ok
     ? `<p class="game-winner"><span>🎯</span>Você chegou à meta! <small>${me.place}º lugar · +${me.points} pts</small></p>`
@@ -194,7 +197,8 @@ function challengeView(state, g, host, player) {
 }
 
 function raffleView(state, g, host, player) {
-  const names = g.names.length ? g.names : ['…'];
+  // Snapshot de jogo recém-criado pode chegar sem a lista: cai no placeholder.
+  const names = g.names?.length ? g.names : ['…'];
   const stage = g.current
     ? `<div class="raffle-stage"><i class="raffle-glow" aria-hidden="true"></i><div class="raffle-wheel" data-raffle data-at="${g.drawAt}" data-final="${esc(g.current.name)}" data-names="${esc(JSON.stringify(names))}" data-me="${Boolean(g.me)}"><i class="raffle-ptr left" aria-hidden="true">▸</i><span data-raffle-name>${esc(g.current.name)}</span><i class="raffle-ptr right" aria-hidden="true">◂</i>${celebration(24, `${g.id}:${g.draws || 0}:raffle`)}</div></div>`
     : `<div class="raffle-stage"><i class="raffle-glow" aria-hidden="true"></i><div class="raffle-wheel idle"><i class="raffle-ptr left" aria-hidden="true">▸</i><span>?</span><i class="raffle-ptr right" aria-hidden="true">◂</i></div></div>`;
@@ -207,15 +211,16 @@ function tugView(state, g, host, player, now) {
   const done = g.state === 'done', pulling = g.state === 'pull', between = g.state === 'between', over = done || pulling, open = g.state === 'open';
   const colors = g.labels.map(label => label.color), names = g.labels.map(label => label.name), crews = g.crews || [[], []];
   // Lado com dois times (4 equipes = 2 duplas) usa gradiente com as duas cores.
-  const side = i => g.labels[i]?.gradient ? `linear-gradient(120deg,${g.labels[i].gradient.a},${g.labels[i].gradient.b})` : colors[i];
+  const side = i => g.labels[i]?.gradient ? `linear-gradient(100deg,${g.labels[i].gradient.a} 0 46%,${g.labels[i].gradient.b} 54% 100%)` : colors[i];
   const tints = [0, 1].map(i => g.labels[i]?.gradient ? `--team:${colors[i]};--team2:${g.labels[i].gradient.b}` : '');
+  const uneven = g.labels[0]?.count && g.labels[1]?.count && g.labels[0].count !== g.labels[1].count;
   const revealed = Boolean(done && g.revealScores !== false);
   const diff = revealed ? g.score[0] - g.score[1] : 0, lean = Math.max(-1, Math.min(1, diff / 100));
   const end = g.winner === 0 ? -20 : g.winner === 1 ? 20 : 0;
   const roundDots = g.rounds > 1 && g.state !== 'ready'
     ? `<ol class="tug-rounds" data-many="${g.rounds > 6}" aria-label="Progresso das rodadas">${Array.from({ length: g.rounds }, (_, r) => `<li data-on="${done || pulling || r < g.round || (between && r <= g.round)}" data-now="${open && r === g.round}">${r + 1}</li>`).join('')}</ol>`
     : '';
-  const hud = !done ? `<div class="sv-hud"><span>${stageIcon('tug')} ${g.round >= 0 ? `Rodada <b>${Math.min(g.round + 1, g.rounds)}</b> de ${g.rounds}` : `${plural(g.rounds, 'rodada', 'rodadas')} · ${g.seconds}s cada`}</span><span>${open ? `${g.answered} de ${g.total} responderam` : between ? `Preparando rodada ${g.round + 2}…` : pulling ? 'Puxando a corda…' : g.labels.some(label => label.gradient) ? 'Dupla de times de cada lado' : `${g.roundQuestions || 1} ${(g.roundQuestions || 1) === 1 ? 'pergunta' : 'perguntas'} nesta rodada`}</span></div>${roundDots}` : '';
+  const hud = !done ? `<div class="sv-hud"><span>${stageIcon('tug')} ${g.round >= 0 ? `Rodada <b>${Math.min(g.round + 1, g.rounds)}</b> de ${g.rounds}` : `${plural(g.rounds, 'rodada', 'rodadas')} · ${g.seconds}s cada`}</span><span>${open ? `${g.answered} de ${g.total} responderam` : between ? `Preparando rodada ${g.round + 2}…` : pulling ? 'Puxando a corda…' : uneven ? `Times ímpares: ${esc(g.labels[g.labels[0].count > g.labels[1].count ? 0 : 1].name)} tem um time a mais` : g.labels.some(label => label.gradient) ? 'Dupla de times de cada lado' : `${g.roundQuestions || 1} ${(g.roundQuestions || 1) === 1 ? 'pergunta' : 'perguntas'} nesta rodada`}</span></div>${roundDots}` : '';
   const team = side => `<div class="tug-team ${side ? 'right' : 'left'}" data-result="${done && g.winner >= 0 ? (g.winner === side ? 'won' : 'lost') : ''}" style="--team:${colors[side]};${tints[side]}">${(crews[side].length ? crews[side] : [{ avatar: '', name: '' }]).map((person, i) => `<span class="tug-puller" style="--i:${i}" data-empty="${!crews[side].length}" data-answered="${Boolean(open && person.answered)}">${character({ ...person, color: colors[side] }, i, done && g.winner >= 0 ? (g.winner === side ? 'win-' + (i + side) % 4 : 'lose') : '')}${open && person.answered ? '<small class="tug-puller-prog" aria-label="Respondeu">✓</small>' : ''}</span>`).join('')}${g.sides[side] > 5 ? `<em>+${g.sides[side] - 5}</em>` : ''}</div>`;
   const sideCard = i => `<span style="--team:${colors[i]};${tints[i]}${g.labels[i]?.gradient ? `;--side-paint:${side(i)}` : ''}" data-mine="${player && g.side === i}"><b>${esc(names[i])}</b><small>${plural(g.sides[i], 'pessoa', 'pessoas')}${revealed ? ` · ${g.hits[i]} ${g.hits[i] === 1 ? 'acerto' : 'acertos'}` : ''}</small>${revealed ? `<strong>${g.score[i]}%</strong>` : `<strong class="tug-hidden-score" aria-label="Respostas da rodada">${g.hits[i]}</strong>`}</span>`;
   const scene = `<div class="tug-scene" data-state="${g.state}" data-winner="${done ? g.winner : ''}" data-revealed="${revealed}" style="--shift:${done ? end : 0}%;--end:${end}%;--pull-delay:${pulling ? (-(Math.max(0, now - g.pullAt) / 1000)).toFixed(2) : 0}s">
@@ -322,9 +327,11 @@ function stageHead(g) {
   return `<div class="game-head-row"><span class="game-eyebrow">${gameIcon(g.type)} ${esc(typeName.toUpperCase())}</span>${meta}</div><h1>${esc(titleText)}</h1>`;
 }
 
-export function gameMarkup(state, { host, demo, header, now = Date.now() }) {
+export function gameMarkup(state, { host, demo, header, now = Date.now(), shareDialog = () => '', shareOpen = false }) {
   const g = state.game, player = !host || demo;
-  return `${header()}<main class="game-stage" data-game-key="${esc(g.id)}" data-game-type="${g.type}" data-game-state="${g.state}">${live(stageHead(g), 'head')}${views[g.type](state, g, host, player, now)}</main>`;
+  // O convite com QR entra em qualquer etapa: "Ao vivo" abre a mesma coisa aqui
+  // e nas telas de aula/lobby.
+  return `${header()}<main class="game-stage" data-game-key="${esc(g.id)}" data-game-type="${g.type}" data-game-state="${g.state}">${live(stageHead(g), 'head')}${views[g.type](state, g, host, player, now)}</main>${shareOpen ? shareDialog() : ''}`;
 }
 
 // Atualiza só os trechos que mudam, para não reiniciar o experimento do desafio,

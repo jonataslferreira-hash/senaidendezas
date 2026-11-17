@@ -155,3 +155,20 @@ test('barra do topo: mesmos botões (conectados e ao vivo) em toda etapa', async
   const view = readFileSync(new URL('../src/stage-games-view.js', import.meta.url), 'utf8');
   assert.match(view, /header\(\)\}<main class="game-stage"/, 'todas as etapas usam a mesma barra');
 });
+
+test('convite (QR) abre em TODAS as fases, inclusive nos jogos', async () => {
+  const { readFileSync } = await import('node:fs');
+  const app = readFileSync(new URL('../src/app.js', import.meta.url), 'utf8');
+  assert.match(app, /gameMarkup\(state, \{ host, demo, header, now: Date\.now\(\) \+ timerOffset, shareDialog, shareOpen \}\)/, 'jogo recebe o modal');
+  assert.match(app, /leaderboardMarkup\(state,\{header,host,offset:timerOffset,shareDialog,shareOpen\}\)/, 'placar da rodada recebe o modal');
+  assert.match(app, /final:true,shareDialog,shareOpen/, 'placar final recebe o modal');
+  const view = readFileSync(new URL('../src/stage-games-view.js', import.meta.url), 'utf8');
+  assert.match(view, /shareOpen \? shareDialog\(\) : ''/, 'jogo renderiza o convite quando aberto');
+});
+
+test('slowed é o padrão da trilha (sem seletor, já vem slowed)', async () => {
+  const { readFileSync } = await import('node:fs');
+  const audio = readFileSync(new URL('../src/audio-data.js', import.meta.url), 'utf8');
+  assert.match(audio, /Number\(track\.rate\) \|\| 0\.85/, 'rate ausente cai em 0.85 (slowed + reverb)');
+  assert.match(audio, /if \(slowed\) applyReverb\(player,/, 'reverb acompanha o slowed na faixa inteira');
+});
