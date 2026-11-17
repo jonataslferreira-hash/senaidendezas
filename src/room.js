@@ -45,7 +45,9 @@ export class Room {
       if (this.data.players.length >= 60) throw Error('Esta sala atingiu o limite de 60 participantes.');
       name = String(name || '').trim().replace(/[\x00-\x1f\x7f]/g, '').slice(0, 24);
       if (!name) throw Error('Digite seu nome ou apelido.');
-      p = { id: newToken(), token: newToken(), name, avatar: avatars.includes(avatar)||isPhotoAvatar(avatar) ? avatar : avatars[0], score: 0, correct: 0, streak:0, answers: {}, online: true };
+      // Quem volta de uma remoção mantém o próprio token: é assim que a sala
+      // conta quantas vezes a mesma pessoa já foi removida (3ª vira banimento).
+      p = { id: newToken(), token: String(token || '') || newToken(), name, avatar: avatars.includes(avatar)||isPhotoAvatar(avatar) ? avatar : avatars[0], score: 0, correct: 0, streak:0, answers: {}, online: true };
       this.data.players.push(p);
     }
     p.online = true;assignTeam(this,p);syncGameJoin(this,p);
@@ -110,7 +112,11 @@ export class Room {
     else throw Error('Esta ação não está disponível agora.');
   }
   updateProfile(id,{name,avatar}={}){const p=this.data.players.find(p=>p.id===id);if(!p)throw Error('Participante não encontrado.');name=String(name||'').trim().replace(/[\x00-\x1f\x7f]/g,'').slice(0,24);if(!name)throw Error('Digite seu nome.');p.name=name;if(avatars.includes(avatar)||isPhotoAvatar(avatar))p.avatar=avatar;}
-  kick(id){const p=this.data.players.find(p=>p.id===id);if(!p)throw Error('Participante não encontrado.');this.data.removedTokens=[...(this.data.removedTokens||[]),p.token].slice(-120);this.data.players=this.data.players.filter(p=>p.id!==id);if(this.data.votes)delete this.data.votes[id];this.checkAutoReveal();}
+  kick(id){const p=this.data.players.find(p=>p.id===id);if(!p)throw Error('Participante não encontrado.');
+    // Remover não é banir: a pessoa pode voltar a entrar com o mesmo código.
+    // Só na 3ª remoção da mesma pessoa ela fica banida da sala.
+    if(p.token){const n=(this.data.removedCounts?.[p.token]||0)+1;this.data.removedCounts={...(this.data.removedCounts||{}),[p.token]:n};if(n>=3)this.data.removedTokens=[...(this.data.removedTokens||[]),p.token].slice(-120);}
+    this.data.players=this.data.players.filter(p=>p.id!==id);if(this.data.votes)delete this.data.votes[id];this.checkAutoReveal();}
   startQuestion(index) {
     this.data.previousRanking=[...this.data.players].sort((a,b)=>(b.score+(b.bonus||0))-(a.score+(a.bonus||0))||b.correct-a.correct||a.name.localeCompare(b.name,'pt-BR')).map(p=>p.id);
     this.data.previousQuizRanking=[...this.data.players].sort((a,b)=>b.score-a.score||b.correct-a.correct||a.name.localeCompare(b.name,'pt-BR')).map(p=>p.id);
@@ -125,7 +131,11 @@ export class Room {
       const poll = this.slides[d.slide].poll;
       if (!p || questionIndex !== d.pollId || !Number.isInteger(choice) || choice < 0 || choice >= poll.options.length) throw Error('Voto inválido ou enquete já mudou.');
       if (Object.hasOwn(d.votes, id)) throw Error('Seu voto já foi registrado.');
-      d.votes[id] = choice; return;
+      d.votes[id] = choice;
+      // Todo mundo online já votou: a votação se encerra sozinha.
+      const waiting = this.data.players.filter(p => p.online && !Object.hasOwn(d.votes, p.id));
+      if (this.data.players.some(p => p.online) && !waiting.length) d.phase = 'poll-results';
+      return;
     }
     if (!p || d.phase !== 'question' || this.now() >= d.deadline) throw Error('O tempo desta pergunta terminou.');
     if (questionIndex !== d.questionIndex) throw Error('Esta pergunta já mudou.');

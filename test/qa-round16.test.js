@@ -197,7 +197,7 @@ test('Cabo de Guerra e Corrida: sem títulos duplicados, rodada por rodada com p
   const tugOpenHtml = gameMarkup(room.snapshot(), { header: () => '', host: true, now });
   assert.match(tugOpenHtml, /tug-hidden-score/, 'oculta % durante a rodada');
   assert.match(tugOpenHtml, /tug-meter" data-hidden="true"/, 'barra centralizada sem entregar vencedor antes do fim');
-  assert.match(tugOpenHtml, /tug-grip-hands/, 'renderiza mãos em primeiro plano segurando a corda');
+  assert.doesNotMatch(tugOpenHtml, /tug-grip-hands/, 'sem mãos extras: o boneco segura a corda com os próprios braços');
   assert.doesNotMatch(tugOpenHtml, /0 acertos/, 'não exibe contagem de acertos antes do fim');
 
   // Responde rodada 1 -> entra em between -> avança para rodada 2 -> pull (placar ainda oculto!) -> done (revela!)

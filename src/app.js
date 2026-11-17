@@ -210,6 +210,20 @@ const presenterSettings = loadPresenterSettings();
 // Só celular na vertical usa o cartão de leitura; ao girar para a horizontal (paisagem) o aluno vê o slide visual como foi desenhado.
 const phoneLayout=matchMedia('(max-width: 800px) and (orientation: portrait) and (pointer: coarse), (max-width: 800px) and (orientation: portrait) and (hover: none)');
 phoneLayout.addEventListener('change',()=>{if(state?.phase==='lesson')render();});
+// Celular do aluno: ao entrar na sala, a apresentação toma a tela inteira e a
+// tela vira para o lado (paisagem). Se o navegador segurar o fullscreen por
+// falta de gesto, o primeiro toque completa. Quem sair manualmente não é
+// forçado a voltar.
+let immersiveDone = false;
+let lastStageEnter = null;
+async function enterImmersiveRoom() {
+  if (host || demo || !state || !phoneLayout.matches || immersiveDone) return;
+  try {
+    if (!document.fullscreenElement) await document.documentElement.requestFullscreen({ navigationUI: 'hide' });
+    immersiveDone = true;
+    try { await screen.orientation?.lock?.('landscape'); } catch { /* iPhone e afins: segue na orientação da tela */ }
+  } catch { /* sem gesto do usuário ainda: o primeiro toque tenta de novo */ }
+}
 const qrCache = new Map();
 const params = routeParams();
 let codeDraft = (params.get('s') || '').replace(/\D/g, '').slice(0, 6);
@@ -237,7 +251,7 @@ function soundButton() {
   return `<button class="icon-btn" data-action="sound" aria-label="${enabled?'Desativar':'Ativar'} áudio" title="Áudio da apresentação">${icon(enabled?'volume':'mute')}</button>`;
 }
 function header() {
-  return `<header class="header">${brand()}<div class="header-right">${state?`${!host&&state.phase==='lesson'?'':participantCount()}${host&&!readOnlyPresentation&&!demo&&state.phase==='lesson'?'<button class="btn secondary small" data-action="edit-current-slide">Editar slide</button>':''}${!host&&state.me&&state.phase!=='lesson'?'<button class="my-room-avatar" data-action="edit-player" aria-label="Editar meu perfil na sala">'+avatarContent(state.me.avatar||selectedAvatar)+'</button>':''}${!host?`<span data-room-controller data-room-code="${esc(state.code)}">${studio.remote.roomButton(state.code)}</span>`:''}<span class="connection ${status==='online'||demo?'connected':''}"><span></span>${readOnlyPresentation&&demo?'Apresentação':demo?'Prévia':status==='online'?'Ao vivo':'Reconectando'}</span>${host||state.me?soundButton():''}`:''}</div></header>`;
+  return `<header class="header">${brand()}<div class="header-right">${state?`${!host&&state.phase==='lesson'?'':participantCount()}${host&&!readOnlyPresentation&&!demo&&state.phase==='lesson'?'<button class="btn secondary small" data-action="edit-current-slide">Editar slide</button>':''}${!host&&state.me&&state.phase!=='lesson'?'<button class="my-room-avatar" data-action="edit-player" aria-label="Editar meu perfil na sala">'+avatarContent(state.me.avatar||selectedAvatar)+'</button>':''}${!host?`<span data-room-controller data-room-code="${esc(state.code)}">${studio.remote.roomButton(state.code)}</span>`:''}${state&&!readOnlyPresentation?`<button type="button" class="connection ${status==='online'||demo?'connected':''}" data-action="participants" title="Participantes da sala" aria-label="Ver participantes da sala"><span></span>${demo?'Prévia':status==='online'?'Ao vivo':'Reconectando'}</button>`:`<span class="connection ${status==='online'||demo?'connected':''}"><span></span>${readOnlyPresentation&&demo?'Apresentação':demo?'Prévia':status==='online'?'Ao vivo':'Reconectando'}</span>`}${host||state.me?soundButton():''}`:''}</div></header>`;
 }
 function modelPanel(landing = false) {
   const custom = state && slides[state.slide]?.customModel;
@@ -345,7 +359,7 @@ function joinUrl() {
 }
 function shareDialog() {
   const url=joinUrl();
-  return `<div class="modal-backdrop"><section class="share-modal" role="dialog" aria-modal="true" aria-labelledby="share-title"><button class="icon-btn close-modal" data-action="close-share" aria-label="Fechar convite">${icon('close')}</button><span class="eyebrow purple-text">A AULA FICA MELHOR JUNTO</span><h2 id="share-title">Conecte a turma<span>.</span></h2><p>Aponte a câmera. Escolha um avatar. Entre na aula.</p><div class="qr-wrap"><img id="room-qr" width="230" height="230" alt="QR Code para entrar nesta sala"></div><span class="eyebrow">OU ENTRE COM O CÓDIGO</span><div class="big-code">${esc(state.code.slice(0, 3))}<span> </span>${esc(state.code.slice(3))}</div><div class="share-link"><input readonly aria-label="Link de convite" value="${esc(url)}"><button class="icon-btn" data-action="copy-link" aria-label="Copiar link">${icon('copy')}</button></div>${import.meta.env.DEV&&/^(localhost|127\.0\.0\.1)$/.test(location.hostname)&&!routeParams().has('localSignal')?`<details><summary>Configurar endereço público</summary><label for="public-url">URL publicada no GitHub Pages</label><input id="public-url" type="url" placeholder="https://usuario.github.io/senaidendezas/"><button class="btn secondary small" data-action="save-url">Salvar endereço</button></details>`:''}</section></div>`;
+  return `<div class="modal-backdrop"><section class="share-modal" role="dialog" aria-modal="true" aria-labelledby="share-title"><button class="icon-btn close-modal" data-action="close-share" aria-label="Fechar convite">${icon('close')}</button><span class="eyebrow purple-text">A AULA FICA MELHOR JUNTO</span><h2 id="share-title">Conecte a turma<span>.</span></h2><p>Aponte a câmera. Escolha um avatar. Entre na aula.</p><div class="qr-wrap"><img id="room-qr" width="230" height="230" alt="QR Code para entrar nesta sala"></div><span class="eyebrow">OU ENTRE COM O CÓDIGO</span><div class="big-code">${esc(state.code.slice(0, 3))}<span> </span>${esc(state.code.slice(3))}</div><div class="share-link"><input readonly aria-label="Link de convite" value="${esc(url)}"><button class="icon-btn" data-action="copy-link" aria-label="Copiar link">${icon('copy')}</button></div>${host ? `<button class="btn secondary small share-manage" data-action="manage-people">Ver e remover pessoas</button>` : ''}${import.meta.env.DEV&&/^(localhost|127\.0\.0\.1)$/.test(location.hostname)&&!routeParams().has('localSignal')?`<details><summary>Configurar endereço público</summary><label for="public-url">URL publicada no GitHub Pages</label><input id="public-url" type="url" placeholder="https://usuario.github.io/senaidendezas/"><button class="btn secondary small" data-action="save-url">Salvar endereço</button></details>`:''}</section></div>`;
 }
 // Vídeos, experimentos e modelos 3D recomeçariam do zero a cada atualização da
 // tela (clique de animação, aluno entrando…). Enquanto o slide é o mesmo e o
@@ -488,6 +502,12 @@ function applyRender() {
   viewer.el.remove();
   app.dataset.readOnly = String(readOnlyPresentation);
   app.dataset.role = state ? host ? 'presenter' : 'student' : 'studio';
+  // A URL acompanha a sala atual: o código antigo sai, o atual entra —
+  // assim o refresh volta direto para a sala em que a turma está.
+  if (state?.code && classroom && !readOnlyPresentation && !demo) {
+    const url = new URL(location.href);
+    if (url.searchParams.get('s') !== state.code) { url.searchParams.set('s', state.code); history.replaceState(history.state, '', url); }
+  }
   // Aula sem atividades pontuadas (nem quiz nem jogos) volta direto ao encerrar.
   if (state?.phase === 'finished' && !state.totalQuestions && !state.hasScoredStages) { focusView.close(); leave(); return; }
   app.classList.toggle('quiz-party', Boolean(state && state.phase !== 'lesson'));
@@ -535,6 +555,13 @@ function applyRender() {
       setStageCache(editorStage);
     } else if (!state) { editorStage = null; setStageCache(null); }
   }
+  // Entrada do slide no computador (apresentador e aluno conectado): o quadro
+  // novo chega com data-enter e a transição escolhida anima direto nele — sem
+  // depender da janela de tempo da cena, que não alcançava o PC de quem
+  // acompanha a aula.
+  const stageNode = state?.phase === 'lesson' ? app.querySelector('.document-stage') : null;
+  if (stageNode && state.slide !== lastStageEnter && activeTransition && activeTransition !== 'none') stageNode.dataset.enter = activeTransition;
+  lastStageEnter = state?.phase === 'lesson' ? state.slide : null;
   if (state?.phase === 'lesson') {
     app.insertAdjacentHTML('beforeend', pinnedInvite({ host, demo, state, settings: presenterSettings }));
     if (editDraft) app.insertAdjacentHTML('beforeend', liveEditDialog(editDraft, editError));
@@ -568,6 +595,9 @@ function applyRender() {
     else QRCode.toDataURL(url, { width: 460, margin: 2 }).then(src => { qrCache.set(url, src); setQR(src); }).catch(() => toast('Não foi possível gerar o QR Code. Use o link ou código.'));
   }
   if(state?.phase==='lesson'){pptxAnimations.mount(app,slides[state.slide],activeLesson.id+':'+state.slide,state.animationStep||0);}else{pptxAnimations.key=null;}
+  // Desafio do experimento: trilha de fundo (as músicas de 120 s+ dos
+  // quizzes) enquanto a turma trabalha; para no encerramento.
+  gameAudio.stageBed(state?.phase==='game'&&state.game?.type==='challenge'&&state.game.state!=='done','challenge:'+(state?.game?.id||''));
   const motionKey=state
     ? `${activeLesson.id}:${state.phase}:${state.slide}:${state.questionIndex}`
     : studio.view==='editor'?`editor:${studio.draft?.id||''}`:studio.view;
@@ -632,7 +662,7 @@ async function connectSession(mode) {
   liveInteraction = null;
   try {
     if (host) { await classroom.create(Boolean(mode.resume), mode.lesson, mode.startIndex,editorLaunch);shareOpen=!mode.resume; }
-    else {music=true;gameAudio.unlock();await classroom.join(mode.code, mode.name, mode.avatar);}
+    else {music=true;gameAudio.unlock();await classroom.join(mode.code, mode.name, mode.avatar);enterImmersiveRoom();}
     if (!readOnlyPresentation) studio.writeRoute('present', activeLesson.id);
   } catch (err) {
     classroom.stop(); if (!state) host = false;
@@ -649,7 +679,7 @@ function leave(show = true) {
   if (host && !demo && classroom?.end) { const room = classroom; room.end(); clearInterval(room.timer); setTimeout(() => room.stop(), 300); } else classroom?.stop?.();
   classroom = null;
   readOnlyPresentation=false;publicPresentationToken='';sharedLoading=false;sharedError='';
-  state = null; host = false; demo = false; editorLaunch=false;shareOpen = false; lastSlide = -1;
+  state = null; host = false; demo = false; editorLaunch=false;shareOpen = false; lastSlide = -1; immersiveDone = false; lastStageEnter = null;
   localModel = 'ssd'; localExploded = true; status = 'offline'; stopMusic();
   if (show) { studio.writeRoute(); render(); }
 }
@@ -759,6 +789,8 @@ app.addEventListener('click', event => {
   if (button.dataset.gameDo) { control('game', { do: button.dataset.gameDo, id: button.dataset.id }); return; }
   if (button.hasAttribute('data-challenge-send')) {
     const values = [...app.querySelectorAll('[data-challenge-sim] :is([data-param],[data-sim-select],[data-sim-text],[data-sim-toggle])')].map(field => field.dataset.simToggle !== undefined ? field.dataset.value || '0' : String(field.value).slice(0, 80));
+    // Prévia silenciosa: o telão vê os controles mexendo em tempo real.
+    sendGame({ values, peek: true }, true);
     sendGame({ values }); return;
   }
   try { sendGame(JSON.parse(button.dataset.gameSend)); } catch { /* botão inválido */ }
@@ -798,7 +830,11 @@ app.addEventListener('change', async event => {
       reader.readAsDataURL(optimized);
     });
     if (teamPhotoDraft.length > 30000) { teamPhotoDraft = undefined; toast('Escolha uma foto menor.'); }
-    else toast('Foto pronta. Toque em Salvar.');
+    else {
+      const preview = input.closest('.team-leader-tools')?.querySelector('[data-team-preview]');
+      if (preview) preview.innerHTML = `<img src="${teamPhotoDraft}" alt="Nova foto do time">`;
+      toast('Foto pronta. Toque em Salvar.');
+    }
   } catch (error) { toast(error?.message || 'Não foi possível abrir a imagem.'); }
 });
 function exportResults() {
@@ -810,7 +846,8 @@ async function action(name) {
     case 'choose-guest-photo':app.querySelector('[data-guest-photo]')?.click();break;
     case 'take-guest-photo':{const file=await takePhoto();if(file){selectedAvatar=await participantPhoto(file);avatarChanged=true;render();}break;}
     case 'scan-qr':{const code=await scanRoomCode();if(code){codeDraft=code;const field=app.querySelector('#room-code');if(field)field.value=code;studio.view='join';render();}break;}
-    case 'participants':if(state)manageParticipants(state,host?id=>control('kick',id):null);break;
+    case 'participants':if(state){if(host){shareOpen=true;render();}else manageParticipants(state,null);}break;
+    case 'manage-people':if(state)manageParticipants(state,host&&!demo?id=>control('kick',id):null);break;
     case 'edit-player':await editParticipant(state.me,async(name,avatar)=>{selectedAvatar=avatar;avatarChanged=true;joinNameDraft=name;joinNameTouched=true;if(demo){classroom.updateProfile(demoPlayer,{name,avatar});receive({...classroom.snapshot(demoPlayer),lesson:classroom.publicLesson(true)});}else await classroom.updateProfile(name,avatar);});break;
     case 'show-ranking':control('ranking');break;
     case 'podium-all':control('podium-all');break;
@@ -1056,6 +1093,9 @@ import './personalization.css';
 import './interface-system.css';
 
 app.addEventListener('pointerdown',e=>{gameAudio.unlock();if(document.fullscreenElement&&(e.clientY<48||e.target.closest('.document-top')))showPresentationControls();});
+// Celular do aluno que ainda não conseguiu a tela cheia: o primeiro toque
+// completa (o navegador exige um gesto para liberar o fullscreen).
+app.addEventListener('pointerdown',()=>{enterImmersiveRoom();},{passive:true});
 
 // Navigate only deliberate taps; model dragging and interactive controls keep
 // their own gestures and never advance the presentation.

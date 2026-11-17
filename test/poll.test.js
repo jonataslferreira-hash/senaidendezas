@@ -13,9 +13,10 @@ test('enquete sincroniza votos sem pontos, aceita entrada tardia e retorna ao me
   assert.throws(() => room.control('slide', 0));
   assert.throws(() => room.answer(ana.id, { choice: 2, questionIndex: id }));
   assert.throws(() => room.answer(ana.id, { choice: 1, questionIndex: 'old' }));
+  const bruno = room.join({ name: 'Bruno' });
   room.answer(ana.id, { choice: 0, questionIndex: id });
   assert.throws(() => room.answer(ana.id, { choice: 1, questionIndex: id }));
-  const bruno = room.join({ name: 'Bruno' });
+  assert.equal(room.snapshot().phase, 'poll', 'com gente ainda sem votar, segue aberta');
   room.answer(bruno.id, { choice: 1, questionIndex: id });
   const snapshot = room.snapshot(ana.id);
   assert.deepEqual(snapshot.poll.counts, [1, 1]);
@@ -24,7 +25,7 @@ test('enquete sincroniza votos sem pontos, aceita entrada tardia e retorna ao me
   assert.equal(JSON.stringify(snapshot).includes(ana.token), false);
   assert.equal('votes' in snapshot.poll, false);
   assert.equal(snapshot.ranking.every(p => p.score === 0), true);
-  room.control('close-poll');
+  assert.equal(room.snapshot().phase, 'poll-results', 'todo mundo votando encerra sozinha');
   assert.throws(() => room.answer(bruno.id, { choice: 0, questionIndex: id }));
   room.control('lesson'); assert.equal(room.snapshot().slide, 0);
   assert.equal(room.snapshot().lesson.slides[0].transition, 'fade');

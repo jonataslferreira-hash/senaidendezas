@@ -1042,7 +1042,6 @@ html[data-appearance=dark] #app .rank-row{--rank-card:#2b2540;box-shadow:0 6px 1
 @keyframes rank-bob{from{transform:translateY(1px) rotate(-5deg)}to{transform:translateY(-3px) rotate(5deg)}}
 #app .rank-main{min-width:0;display:grid;gap:5px}
 #app .rank-main strong{font-size:calc(var(--row)*.27 + 3px);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;text-align:left}
-#app .rank-fire{font-style:normal;font-size:.8em;margin-left:4px}
 #app .rank-bar{height:calc(var(--row)*.16);border-radius:99px;background:color-mix(in srgb,var(--c) 18%,transparent);overflow:hidden}
 #app .rank-bar i{display:block;height:100%;width:100%;border-radius:99px;transform-origin:0 50%;background:linear-gradient(90deg,color-mix(in srgb,var(--c) 70%,#fff),var(--c));transform:scaleX(max(.02,var(--ratio)));animation:rank-grow 1s cubic-bezier(.2,.9,.25,1) both;animation-delay:calc(var(--d) + .6s)}
 @keyframes rank-grow{from{transform:scaleX(max(.02,var(--prev)))}to{transform:scaleX(max(.02,var(--ratio)))}}
@@ -3012,3 +3011,81 @@ dialog.simulation-modal .simulation-modal-foot-tools { display: none; }
 .chat-link-copy strong{font-size:12.5px;line-height:1.3;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .chat-link-copy small{font-size:10.5px;opacity:.7;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .chat-link-copy em{font-style:normal;font-size:10.5px;font-weight:650;color:var(--studio-accent,#7950b4)}
+
+/* ===== Experimento: tentativas, dicas e os experimentos da turma ao vivo ===== */
+#app .challenge-submit-row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+#app .challenge-submit-row .game-submit{flex:1;min-height:52px}
+#app .challenge-tries{display:inline-flex;gap:6px;align-items:center}
+#app .challenge-tries i{width:16px;height:16px;border-radius:50%;border:2px solid var(--g-line);background:transparent;transition:all .25s}
+#app .challenge-tries i[data-used="true"]{background:rgba(248,113,113,.75);border-color:#f87171;transform:scale(.9)}
+#app .challenge-tries i[data-used="false"]{background:rgba(74,222,128,.35);border-color:#4ade80}
+#app .challenge-hint{display:flex;gap:8px;margin:0 0 10px;flex-wrap:wrap}
+#app .challenge-hint i{width:18px;height:18px;border-radius:50%;animation:challenge-hint-pop .35s cubic-bezier(.2,1.6,.4,1) both}
+#app .challenge-hint i:nth-child(2){animation-delay:.06s}
+#app .challenge-hint i:nth-child(3){animation-delay:.12s}
+#app .challenge-hint i:nth-child(4){animation-delay:.18s}
+#app .challenge-hint i.hot{background:#4ade80;box-shadow:0 0 14px #4ade8090}
+#app .challenge-hint i.warm{background:#fbbf24;box-shadow:0 0 14px #fbbf2490}
+#app .challenge-hint i.cold{background:#64748b}
+@keyframes challenge-hint-pop{from{transform:scale(0)}to{transform:scale(1)}}
+#app .challenge-live{display:flex;flex-direction:column;gap:8px}
+#app .challenge-live-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(168px,1fr));gap:8px}
+#app .challenge-live-card{padding:10px 12px;border-radius:14px;background:var(--g-card);border:1px solid var(--g-line);display:flex;flex-direction:column;gap:7px;animation:game-pop .4s}
+#app .challenge-live-card[data-ok="true"]{border-color:#4ade80;background:rgba(34,197,94,.12)}
+#app .challenge-live-card header{display:flex;align-items:center;gap:8px;min-width:0}
+#app .challenge-live-card header strong{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:14px}
+#app .challenge-live-card header small{opacity:.75;font-weight:800;font-variant-numeric:tabular-nums}
+#app .challenge-live-values{display:flex;flex-wrap:wrap;gap:4px}
+#app .challenge-live-values i{font-style:normal;font-size:11px;font-weight:700;padding:2px 7px;border-radius:999px;background:rgba(255,255,255,.09);border:1px solid var(--g-line);font-variant-numeric:tabular-nums}
+
+/* ===== Ofensiva: chama de fogo animada (sem emoji) =====
+   Um único desenho de chama serve o placar do relâmpago (.streak-flame), a
+   corrida do ranking (.rank-fire) e o selo do aluno (.streak-badge). */
+#app :is(.streak-flame,.rank-fire,.streak-badge)::before{content:'';width:12px;height:16px;flex:none;background:radial-gradient(circle at 50% 78%,#fff8dc 0 16%,#fde047 34%,#fb923c 60%,#ea580c 85%);border-radius:50% 50% 50% 50%/64% 64% 36% 36%;filter:drop-shadow(0 0 4px #fbbf2490);animation:streak-flicker .48s ease-in-out infinite alternate}
+#app .flash-board .streak-flame{display:inline-flex;align-items:center;gap:4px;min-width:28px;height:22px;padding:0 7px;border-radius:999px;background:linear-gradient(135deg,#9a3412,#7c2d12);border:1px solid #f9731655;color:#fff;font-style:normal;font-size:11px;font-weight:800}
+#app .flash-board .streak-flame::after{content:attr(data-n);font-variant-numeric:tabular-nums}
+/* Ranking entre perguntas: chama do lado do nome, sem fundo (o nome já é branco) */
+#app .rank-fire{display:inline-flex;align-items:center;gap:4px;vertical-align:-.12em;font-style:normal;font-size:.8em;margin-left:4px}
+#app .rank-fire::after{content:attr(data-n);font-variant-numeric:tabular-nums;font-weight:800}
+/* Selo de ofensiva do aluno (tema claro do quiz): chama na ponta do pill */
+#app .streak-badge{display:inline-flex;align-items:center;gap:6px}
+@keyframes streak-flicker{0%{transform:scale(1,.96) rotate(-2deg)}55%{transform:scale(.86,1.14) rotate(2deg)}100%{transform:scale(1.05,.9) rotate(-1deg)}}
+@media (prefers-reduced-motion:reduce){#app :is(.streak-flame,.rank-fire,.streak-badge)::before{animation:none}}
+
+/* ===== Corrida: comemoração liberada da caixa da pista ===== */
+#app .race-track[data-state="done"]{overflow:visible}
+
+/* ===== Times: caixinha de aplicar times e lápis de editar ===== */
+#app .team-count-control{display:flex;flex-direction:column;gap:8px;padding:12px 14px;border-radius:16px;border:1px solid var(--g-line);background:var(--g-card)}
+#app .team-count-control label{margin:0;font-size:12px;font-weight:700;letter-spacing:.4px;text-transform:uppercase;opacity:.85}
+#app .team-count-row{display:flex;gap:8px;align-items:center}
+#app .team-count-row select{flex:1;min-width:0;padding:10px 12px;border-radius:12px;border:1px solid var(--g-line);background:#161427;color:#fff;font-weight:700}
+#app .team-rename summary{cursor:pointer;list-style:none;display:inline-grid;place-items:center;width:34px;height:34px;border-radius:10px;border:1px solid var(--g-line);background:rgba(255,255,255,.08);font-size:16px;transition:background .2s,transform .2s}
+#app .team-rename summary:hover{background:rgba(255,255,255,.16);transform:translateY(-1px)}
+#app .team-rename summary::-webkit-details-marker{display:none}
+
+/* Editar time (painel do líder): prévia da foto ao lado dos campos,
+   com o fundo acompanhando a cor do time. */
+.team-leader-edit{display:flex;gap:12px;align-items:flex-start;width:100%}
+.team-leader-fields{display:grid;gap:10px;flex:1;min-width:0;justify-items:start;width:100%}
+.team-leader-preview{width:64px;height:64px;flex:none;border-radius:14px;overflow:hidden;display:grid;place-items:center;border:2px solid color-mix(in srgb,var(--team,#7950b4) 65%,#fff);background:color-mix(in srgb,var(--team,#7950b4) 32%,#0f0c1c);box-shadow:0 6px 16px #00000042}
+.team-leader-preview img{width:100%;height:100%;object-fit:cover;display:block}
+.team-leader-preview b{font-size:26px;font-weight:800;color:#fff;text-shadow:0 2px 8px #00000073}
+@media (max-width:760px){.team-leader-preview{width:56px;height:56px}}
+
+/* ===== Transição do slide no PC: o quadro novo carrega data-enter e a
+   animação roda direto nele — apresentador e aluno conectado, sempre.
+   (Mesmos valores das regras da cena: quem ganhar no cascade, o efeito
+   é idêntico, sem reinício.) ===== */
+html:not([data-motion=reduced]) #app .document-stage[data-enter="slide"]{animation:slide-appear .46s cubic-bezier(.2,.8,.2,1) both}
+html:not([data-motion=reduced]) #app .document-stage[data-enter="zoom"]{animation:storage-slide-zoom .46s ease-out both}
+html:not([data-motion=reduced]) #app .document-stage[data-enter="rise"]{animation:storage-slide-rise .44s ease-out both}
+html:not([data-motion=reduced]) #app .document-stage[data-enter="wipe"]{animation:storage-slide-wipe .52s ease-out both}
+html:not([data-motion=reduced]) #app .document-stage[data-enter="iris"]{animation:slide-iris-in .55s ease-in-out both}
+html:not([data-motion=reduced]) #app .document-stage[data-enter="split"]{animation:slide-curtain-in .55s ease-in-out both}
+html:not([data-motion=reduced]) #app .document-stage[data-enter="flip"]{animation:slide-flip-in .48s cubic-bezier(.16,.75,.32,1) both}
+html:not([data-motion=reduced]) #app .document-stage[data-enter="fade"]{animation:slide-fade-in .45s ease both}
+
+/* Pill "Ao vivo" do topo: agora é botão (abre participantes/QR da sala). */
+button.connection{cursor:pointer;padding:6px 10px;margin:-6px -10px;border-radius:999px;transition:background .15s}
+button.connection:hover{background:#ffffff14}

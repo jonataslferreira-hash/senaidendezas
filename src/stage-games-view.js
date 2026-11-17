@@ -44,14 +44,19 @@ function teamsView(state, g, host, player) {
   const choose = picking && player ? `<div class="team-pick" style="--teams:${state.teams.length}">${state.teams.map(team => `<button class="team-pick-btn" style="--team:${esc(team.color)}" data-game-send='{"team":${team.index}}' data-mine="${mine?.index === team.index}">${team.photo ? `<img class="team-pick-photo" src="${esc(team.photo)}" alt="">` : ''}<b>Time ${esc(team.name)}</b><small>${plural(team.members.length, 'pessoa', 'pessoas')}</small></button>`).join('')}</div>` : '';
   // O líder do time pode trocar o nome e a foto da equipe pelo próprio celular.
   const leading = player && mine && mine.leader === state.me?.id;
+  // Prévia da foto do time (ou a inicial do nome enquanto não tem foto):
+  // o líder vê o que vai salvar antes de salvar.
+  const photoPreview = `<span class="team-leader-preview" data-team-preview style="--team:${esc(mine.color)}">${mine.photo ? `<img src="${esc(mine.photo)}" alt="Foto do time">` : `<b>${esc((mine.name || '?').trim().slice(0, 1).toUpperCase() || '?')}</b>`}</span>`;
   const leaderTools = leading ? `<div class="team-leader-tools" style="--team:${esc(mine.color)}" data-leader-team="${mine.index}">
     <strong>👑 Você lidera o Time ${esc(mine.name)}</strong>
-    <label>Nome do time<input type="text" maxlength="24" value="${esc(mine.name)}" data-team-name></label>
-    <div class="team-leader-row"><button type="button" class="btn secondary small" data-team-photo-button>Escolher foto</button>${mine.photo ? '<button type="button" class="btn secondary small" data-team-photo-clear>Remover foto</button>' : ''}<input type="file" accept="image/png,image/jpeg,image/webp" data-team-photo hidden></div>
+    <div class="team-leader-edit">${photoPreview}<div class="team-leader-fields">
+      <label>Nome do time<input type="text" maxlength="24" value="${esc(mine.name)}" data-team-name></label>
+      <div class="team-leader-row"><button type="button" class="btn secondary small" data-team-photo-button>Escolher foto</button>${mine.photo ? '<button type="button" class="btn secondary small" data-team-photo-clear>Remover foto</button>' : ''}<input type="file" accept="image/png,image/jpeg,image/webp" data-team-photo hidden></div>
+    </div></div>
     <button type="button" class="btn primary small" data-team-save>Salvar</button>
   </div>` : '';
   const badge = player ? (leading ? '' : mine ? `<p class="team-mine" style="--team:${esc(mine.color)}">Você é do <b>Time ${esc(mine.name)}</b></p>` : picking ? '<p class="game-wait">Toque no time que você quer entrar.</p>' : '') : '';
-  const countControl = host ? `<div class="team-count-control"><label for="team-count-live">Quantos times</label><div class="team-count-row"><select id="team-count-live" data-team-count-select aria-label="Quantos times">${Array.from({ length: 9 }, (_, i) => i + 2).map(n => `<option value="${n}" ${state.teams.length === n ? 'selected' : ''}>${n}</option>`).join('')}</select><button type="button" class="btn secondary small" data-game-do="team-count">Aplicar</button></div><small>Muda na hora: nome, foto e líder dos times que continuam são preservados.</small></div>` : '';
+  const countControl = host ? `<div class="team-count-control"><label for="team-count-live">Quantos times</label><div class="team-count-row"><select id="team-count-live" data-team-count-select aria-label="Quantos times">${Array.from({ length: 9 }, (_, i) => i + 2).map(n => `<option value="${n}" ${state.teams.length === n ? 'selected' : ''}>${n}</option>`).join('')}</select><button type="button" class="btn secondary small" data-game-do="team-count">Aplicar</button></div></div>` : '';
   return live(badge + choose + leaderTools + teamsBoard(state, { hostTools: host })) +
     live(host ? `${countControl}<p class="game-note">${picking ? 'Os alunos estão escolhendo o time no celular. Quem não escolher entra no time com menos gente.' : 'Os pontos do quiz e das dinâmicas de cada aluno somam para o time. Toque no nome de um aluno para torná-lo líder: o líder pode trocar o nome e a foto do time no celular dele.'}</p>${hostActions(state, [picking ? ['end', 'Fechar escolha', 'primary'] : null, ['shuffle', 'Sortear os times']], { showNext: !picking })}` : `<p class="game-note">${picking ? 'Dá para trocar de time até o professor fechar a escolha.' : 'Cada ponto seu soma para o time. Boa sorte!'}</p>`);
 }
@@ -93,7 +98,7 @@ function flashView(state, g, host, player, now) {
         }).join('')}</div></div>`)
     : '';
   const multiCols = done && g.board.length > 5;
-  const board = g.board.length && (done || boardPhase) ? `<section class="flash-ranking-box" data-multi="${multiCols}">${boardPhase ? '<h2>Placar da rodada</h2>' : `<h3>${hasTeams ? 'Classificação individual' : 'Classificação completa'}</h3>`}<ol class="flash-board" data-done="${done}" data-multi="${multiCols}">${g.board.map((item, i) => `<li style="--n:${i}" data-me="${Boolean(player && item.id === state.me?.id)}" data-first="${i === 0 && item.score > 0}"><b>${i === 0 ? '♛' : i + 1 + 'º'}</b><div class="flash-board-who">${character(item, i, boardPhase && item.gain > 0 ? 'win-0' : 'idle')}<span>${esc(item.name)}</span></div><small>${item.wins ? `${bolt}×${item.wins}` : ''}${boardPhase && item.gain > 0 ? ` <em>+${item.gain}</em>` : ''}</small><strong>${item.score.toLocaleString('pt-BR')}<small> pts</small></strong></li>`).join('')}</ol></section>` : '';
+  const board = g.board.length && (done || boardPhase) ? `<section class="flash-ranking-box" data-multi="${multiCols}">${boardPhase ? '<h2>Placar da rodada</h2>' : `<h3>${hasTeams ? 'Classificação individual' : 'Classificação completa'}</h3>`}<ol class="flash-board" data-done="${done}" data-multi="${multiCols}">${g.board.map((item, i) => `<li style="--n:${i}" data-me="${Boolean(player && item.id === state.me?.id)}" data-first="${i === 0 && item.score > 0}"><b>${i === 0 ? '♛' : i + 1 + 'º'}</b><div class="flash-board-who">${character(item, i, boardPhase && item.gain > 0 ? 'win-0' : 'idle')}<span>${esc(item.name)}</span></div><small>${item.streak >= 2 ? `<i class="streak-flame" data-n="${item.streak}" title="Ofensiva: ${item.streak} acertos seguidos"></i>` : ''}${item.wins ? `${bolt}×${item.wins}` : ''}${boardPhase && item.gain > 0 ? ` <em>+${item.gain}</em>` : ''}</small><strong>${item.score.toLocaleString('pt-BR')}<small> pts</small></strong></li>`).join('')}</ol></section>` : '';
   const status = done ? ((hasTeams ? scoredTeams.length : g.board.length) ? '' : '<p class="game-winner none">Ninguém pontuou desta vez.</p>')
     : boardPhase ? ''
     : !player ? (g.state === 'ready' ? `<p class="game-note">Cada pergunta fica ${g.seconds} segundos no ar. Mais rapidez rende mais pontos (${g.points[0]} a ${g.points[1]} pts) e quem acerta primeiro ganha +${g.points[2]} pts.</p>` : '')
@@ -157,12 +162,28 @@ function survivalView(state, g, host, player, now) {
 
 function challengeView(state, g, host, player) {
   const done = g.state === 'done';
+  const max = g.maxTries || 3;
+  const me = player && g.me;
+  const left = me ? Math.max(0, max - me.tries) : max;
+  // Dica por controle depois de errar: verde = quase lá, âmbar = perto, cinza = longe.
+  const hints = me && !me.ok && !done && me.hints?.length && left > 0
+    ? `<p class="challenge-hint" role="img" aria-label="Quão perto cada controle está da meta">${me.hints.map(hint => hint ? `<i class="${hint}"></i>` : '').join('')}</p>`
+    : '';
+  const mine = me ? (me.ok
+    ? `<p class="game-winner"><span>🎯</span>Você chegou à meta! <small>${me.place}º lugar · +${me.points} pts</small></p>`
+    : done ? '<p class="game-wait">Tempo encerrado.</p>'
+    : left <= 0 ? `<p class="sv-dead">As ${max} tentativas acabaram. Acompanhe a turma!</p>`
+    : `${hints}<div class="challenge-submit-row"><button class="btn primary game-submit" data-challenge-send>🎯 Tentar acertar</button><span class="challenge-tries" data-left="${left}" aria-label="${left} de ${max} tentativas restantes">${Array.from({ length: max }, (_, i) => `<i data-used="${i >= left}"></i>`).join('')}</span></div>`)
+    : '';
   const podium = g.solved.length ? `<ol class="challenge-podium">${g.solved.slice(0, 5).map((item, i) => `<li><b>${['🥇', '🥈', '🥉'][i] || i + 1 + 'º'}</b><span>${esc(item.name)}</span><small>${(item.at / 1000).toFixed(1)} s · ${plural(item.tries, 'tentativa', 'tentativas')}</small></li>`).join('')}</ol>` : '<p class="game-wait">Ninguém chegou à meta ainda…</p>';
   const answer = g.answer ? `<p class="challenge-answer"><b>Resposta:</b> ${g.answer.map(item => `${esc(item.label)} = ${esc(item.v)}`).join(' · ')}</p>` : '';
-  const mine = player && g.me ? (g.me.ok ? `<p class="game-winner"><span>🎯</span>Você chegou à meta! <small>${g.me.place}º lugar · +${g.me.points} pts</small></p>` : done ? '<p class="game-wait">Tempo encerrado.</p>' : `<button class="btn primary game-submit" data-challenge-send>🎯 Conferir minha resposta</button>${g.me.tries ? `<p class="game-wait">Ainda não é isso. Tentativas: ${g.me.tries}</p>` : ''}`) : '';
+  // Telão: os experimentos da turma ao vivo, com os controles atuais de cada time.
+  const liveLab = host && !done && g.live?.length
+    ? `<div class="challenge-live"><h2>Experimentos ao vivo</h2><div class="challenge-live-grid">${g.live.map(item => `<div class="challenge-live-card" data-ok="${item.ok}"><header>${character(item, 0, item.ok ? 'win-0' : 'idle')}<strong>${esc(item.name)}</strong><small>${item.tries}/${max}</small></header><div class="challenge-live-values">${item.values.map(value => `<i>${esc(String(value ?? '').slice(0, 6))}</i>`).join('')}</div></div>`).join('')}</div></div>`
+    : '';
   return `<div class="challenge-layout"><div class="challenge-sim" data-challenge-sim>${simulationMarkup(g.simulation)}</div><aside>` +
-    live(mine + `<h2>Quem já conseguiu <small>${g.solvedCount}</small></h2>${podium}${done || host && !player ? answer : ''}`) +
-    (host ? live(hostActions(state, [done ? ['restart', '↻ Jogar de novo'] : ['end', 'Encerrar e mostrar resposta', 'primary']], { showNext: done })) : '') + '</aside></div>';
+    live(mine + liveLab + `<h2>Quem chegou na meta <small>${g.solvedCount}</small></h2>${podium}${done ? answer : ''}`) +
+    (host ? live(hostActions(state, [done ? ['restart', '↻ Jogar de novo'] : ['end', 'Encerrar jogo', 'primary']], { showNext: done })) : '') + '</aside></div>';
 }
 
 function raffleView(state, g, host, player) {
@@ -170,7 +191,7 @@ function raffleView(state, g, host, player) {
   const stage = g.current
     ? `<div class="raffle-stage"><i class="raffle-glow" aria-hidden="true"></i><div class="raffle-wheel" data-raffle data-at="${g.drawAt}" data-final="${esc(g.current.name)}" data-names="${esc(JSON.stringify(names))}" data-me="${Boolean(g.me)}"><i class="raffle-ptr left" aria-hidden="true">▸</i><span data-raffle-name>${esc(g.current.name)}</span><i class="raffle-ptr right" aria-hidden="true">◂</i>${celebration(24, `${g.id}:${g.draws || 0}:raffle`)}</div></div>`
     : `<div class="raffle-stage"><i class="raffle-glow" aria-hidden="true"></i><div class="raffle-wheel idle"><i class="raffle-ptr left" aria-hidden="true">▸</i><span>?</span><i class="raffle-ptr right" aria-hidden="true">◂</i></div></div>`;
-  return live(stage, 'raffle') + live(`<p class="game-note">${g.current ? (g.left ? plural(g.left, 'pessoa ainda não foi sorteada', 'pessoas ainda não foram sorteadas') : 'Todo mundo já foi sorteado. O próximo sorteio recomeça a lista.') : plural(g.names.length, 'participante na roleta', 'participantes na roleta')}</p>${host ? hostActions(state, [['draw', g.current ? 'Sortear outro' : 'Sortear', 'primary']]) : ''}`);
+  return live(stage, 'raffle') + live(host ? hostActions(state, [['draw', g.current ? 'Sortear outro' : 'Sortear', 'primary']]) : '');
 }
 
 // Cabo de guerra: rodada por rodada; cada rodada tem até 3 perguntas e cada participante recebe 1 sorteada aleatoriamente.
@@ -185,7 +206,7 @@ function tugView(state, g, host, player, now) {
     ? `<ol class="tug-rounds" data-many="${g.rounds > 6}" aria-label="Progresso das rodadas">${Array.from({ length: g.rounds }, (_, r) => `<li data-on="${done || pulling || r < g.round || (between && r <= g.round)}" data-now="${open && r === g.round}">${r + 1}</li>`).join('')}</ol>`
     : '';
   const hud = !done ? `<div class="sv-hud"><span>${stageIcon('tug')} ${g.round >= 0 ? `Rodada <b>${Math.min(g.round + 1, g.rounds)}</b> de ${g.rounds}` : `${plural(g.rounds, 'rodada', 'rodadas')} · ${g.seconds}s cada`}</span><span>${open ? `${g.answered} de ${g.total} responderam` : between ? `Preparando rodada ${g.round + 2}…` : pulling ? 'Puxando a corda…' : '1 pergunta sorteada por rodada'}</span></div>${roundDots}` : '';
-  const team = side => `<div class="tug-team ${side ? 'right' : 'left'}" data-result="${done && g.winner >= 0 ? (g.winner === side ? 'won' : 'lost') : ''}" style="--team:${colors[side]}">${(crews[side].length ? crews[side] : [{ avatar: '', name: '' }]).map((person, i) => `<span class="tug-puller" style="--i:${i}" data-empty="${!crews[side].length}" data-answered="${Boolean(open && person.answered)}">${character({ ...person, color: colors[side] }, i, done && g.winner >= 0 ? (g.winner === side ? 'win-' + (i + side) % 4 : 'lose') : '')}<span class="tug-grip-hands" aria-hidden="true"><i></i><i></i></span>${open && person.answered ? '<small class="tug-puller-prog" aria-label="Respondeu">✓</small>' : ''}</span>`).join('')}${g.sides[side] > 5 ? `<em>+${g.sides[side] - 5}</em>` : ''}</div>`;
+  const team = side => `<div class="tug-team ${side ? 'right' : 'left'}" data-result="${done && g.winner >= 0 ? (g.winner === side ? 'won' : 'lost') : ''}" style="--team:${colors[side]}">${(crews[side].length ? crews[side] : [{ avatar: '', name: '' }]).map((person, i) => `<span class="tug-puller" style="--i:${i}" data-empty="${!crews[side].length}" data-answered="${Boolean(open && person.answered)}">${character({ ...person, color: colors[side] }, i, done && g.winner >= 0 ? (g.winner === side ? 'win-' + (i + side) % 4 : 'lose') : '')}${open && person.answered ? '<small class="tug-puller-prog" aria-label="Respondeu">✓</small>' : ''}</span>`).join('')}${g.sides[side] > 5 ? `<em>+${g.sides[side] - 5}</em>` : ''}</div>`;
   const sideCard = i => `<span style="--team:${colors[i]}" data-mine="${player && g.side === i}"><b>${esc(names[i])}</b><small>${plural(g.sides[i], 'pessoa', 'pessoas')}${revealed ? ` · ${g.hits[i]} ${g.hits[i] === 1 ? 'acerto' : 'acertos'}` : ''}</small>${revealed ? `<strong>${g.score[i]}%</strong>` : '<strong class="tug-hidden-score" aria-label="Resultado oculto">?</strong>'}</span>`;
   const scene = `<div class="tug-scene" data-state="${g.state}" data-winner="${done ? g.winner : ''}" data-revealed="${revealed}" style="--shift:${done ? end : 0}%;--end:${end}%;--pull-delay:${pulling ? (-(Math.max(0, now - g.pullAt) / 1000)).toFixed(2) : 0}s">
     ${done && g.winner >= 0 ? celebration(28, `${g.id}:${g.resultStartedAt || 0}:tug`) : ''}
@@ -204,7 +225,7 @@ function tugView(state, g, host, player, now) {
     ? `<p class="tug-feedback ${me.lastRight ? 'ok' : 'miss'}">${me.lastRight ? '✓ Acertou! +100 pts de força para o seu lado!' : '✕ Não era essa — prepare-se para a próxima rodada!'}</p>`
     : '';
   const studentAsk = studentOpen && q
-    ? `<div class="tug-student-hud"><span>Rodada <b>${g.round + 1}</b> de ${g.rounds}</span><span>Pergunta sorteada</span></div><h2 class="sv-text">${esc(q.text)}</h2>${optionButtons(q.options, { bare: false, send: i => `{"choice":${i},"round":${g.round}}`, enabled: true })}`
+    ? `<h2 class="sv-text">${esc(q.text)}</h2>${optionButtons(q.options, { bare: false, send: i => `{"choice":${i},"round":${g.round}}`, enabled: true })}`
     : studentOpen && me.answered
       ? `${fbFresh}<p class="sv-safe">Resposta registrada na rodada ${g.round + 1}! Aguardando a turma…</p>`
       : between && player ? fbFresh : '';
@@ -228,16 +249,16 @@ function tugView(state, g, host, player, now) {
 // Tudo em tempo real: o boneco anda assim que a pessoa responde, e as perguntas seguem sozinhas.
 function raceView(state, g, host, player, now) {
   const q = g.question, done = g.state === 'done', shown = g.state === 'reveal' || done, me = g.me, count = g.runners.length;
-  const hud = `<div class="sv-hud"><span>${stageIcon('race')} ${g.round >= 0 ? `Pergunta <b>${g.round + 1}</b> de ${g.rounds}` : `${plural(g.rounds, 'pergunta', 'perguntas')} · ${g.seconds}s cada`}</span><span>${g.state === 'open' ? `${g.answered} de ${g.total} responderam` : g.state === 'reveal' ? (g.round + 1 < g.rounds ? 'Próxima pergunta já vem…' : 'Resultado já vem…') : 'Acertou, correu · mais rápido, mais longe'}</span></div>`;
+  const hud = `<div class="sv-hud"><span>${stageIcon('race')} ${g.round >= 0 ? `Pergunta <b>${g.round + 1}</b> de ${g.rounds}` : `${plural(g.rounds, 'pergunta', 'perguntas')} · ${g.seconds}s cada`}</span><span>${g.state === 'open' ? `${g.answered} de ${g.total} responderam` : g.state === 'reveal' ? (g.round + 1 < g.rounds ? 'Próxima pergunta já vem…' : 'Resultado já vem…') : 'Corrida concluída'}</span></div>`;
   const canAnswer = player && me && g.state === 'open' && me.choice === null;
   const question = q && !done ? `${g.bare ? (canAnswer ? screenHint : '') : `<h2 class="sv-text">${esc(q.text)}</h2>`}${optionButtons(q.options, { bare: g.bare, send: i => `{"choice":${i},"round":${g.round}}`, enabled: canAnswer, chosen: me?.choice, correct: q.correct, shown, counts: q.counts })}` : '';
   const medal = place => place && place <= 3 ? `<b class="race-place" data-place="${place}">${place}º</b>` : '';
   const mood = (runner, i) => done ? (runner.place && runner.place <= 3 ? 'win-' + (runner.place + i) % 4 : runner.dist ? 'idle' : 'lose') : runner.right === undefined ? 'idle' : runner.right ? 'run' : 'lose';
   const tag = runner => done ? medal(runner.place) : runner.right === undefined ? '' : runner.right ? `<b class="race-gain">+${runner.gain} m</b>` : '<b class="race-gain miss">✕</b>';
   const lanes = g.runners.map((runner, i) => `<div class="race-lane" data-k="${esc(runner.id)}" data-me="${player && runner.id === state.me?.id}" data-place="${runner.place || ''}" data-right="${!done && runner.right !== undefined ? runner.right : ''}" style="--p:${runner.p.toFixed(3)};--i:${i}"><span class="race-name">${esc(runner.name)}<small>${runner.dist} m</small></span><div class="race-road"><div class="race-runner">${character(runner, i, mood(runner, i))}<span data-t>${tag(runner)}</span></div></div></div>`).join('');
-  const track = `<div class="race-track" data-state="${g.state}" style="--lanes:${Math.max(1, count)};--s:${count <= 3 ? .5 : count <= 5 ? .4 : .32}">${done && g.runners.some(runner => runner.place) ? celebration(26, `${g.id}:${g.resultStartedAt || 0}:race`) : ''}<i class="race-finish" aria-hidden="true"></i>${lanes || '<p class="game-wait">Aguardando participantes…</p>'}${g.total > count ? `<p class="race-more">+${g.total - count} correndo</p>` : ''}</div>`;
+  const track = `<div class="race-track" data-state="${g.state}" style="--lanes:${Math.max(1, count)};--s:${count <= 3 ? .5 : count <= 5 ? .4 : .32}">${done && g.runners.some(runner => runner.place) ? celebration(26, `${g.id}:${g.resultStartedAt || 0}:race`, true) : ''}<i class="race-finish" aria-hidden="true"></i>${lanes || '<p class="game-wait">Aguardando participantes…</p>'}${g.total > count ? `<p class="race-more">+${g.total - count} correndo</p>` : ''}</div>`;
   const first = g.runners.find(runner => runner.place === 1);
-  const status = done ? (first ? `<p class="game-winner"><b>${esc(first.name)}</b> foi mais longe: ${first.dist} m! <small>+${g.points[0]} pts</small></p>` : '<p class="game-winner none">Ninguém saiu do lugar desta vez.</p>')
+  const status = done ? (first ? `<p class="game-winner"><b>${esc(first.name)}</b> venceu com ${first.dist} m!</p>` : '<p class="game-winner none">Ninguém saiu do lugar desta vez.</p>')
     : !player ? (g.state === 'ready' ? `<p class="game-note">Você só dá a largada: as perguntas seguem sozinhas quando todos respondem ou o tempo acaba. Cada acerto vale de 10 a 20 metros · 1º lugar +${g.points[0]} · 2º +${g.points[1]} · 3º +${g.points[2]} pontos</p>` : '')
     : !me ? '<p class="game-wait">Você entrou depois do início. Assista e torça!</p>'
     : g.state === 'ready' ? '<p class="game-wait">Fique pronto: acertou, seu boneco corre. Quanto mais rápido, mais longe!</p>'
