@@ -1042,7 +1042,6 @@ html[data-appearance=dark] #app .rank-row{--rank-card:#2b2540;box-shadow:0 6px 1
 @keyframes rank-bob{from{transform:translateY(1px) rotate(-5deg)}to{transform:translateY(-3px) rotate(5deg)}}
 #app .rank-main{min-width:0;display:grid;gap:5px}
 #app .rank-main strong{font-size:calc(var(--row)*.27 + 3px);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;text-align:left}
-#app .rank-fire{font-style:normal;font-size:.8em;margin-left:4px}
 #app .rank-bar{height:calc(var(--row)*.16);border-radius:99px;background:color-mix(in srgb,var(--c) 18%,transparent);overflow:hidden}
 #app .rank-bar i{display:block;height:100%;width:100%;border-radius:99px;transform-origin:0 50%;background:linear-gradient(90deg,color-mix(in srgb,var(--c) 70%,#fff),var(--c));transform:scaleX(max(.02,var(--ratio)));animation:rank-grow 1s cubic-bezier(.2,.9,.25,1) both;animation-delay:calc(var(--d) + .6s)}
 @keyframes rank-grow{from{transform:scaleX(max(.02,var(--prev)))}to{transform:scaleX(max(.02,var(--ratio)))}}
@@ -3039,12 +3038,19 @@ dialog.simulation-modal .simulation-modal-foot-tools { display: none; }
 #app .challenge-live-values{display:flex;flex-wrap:wrap;gap:4px}
 #app .challenge-live-values i{font-style:normal;font-size:11px;font-weight:700;padding:2px 7px;border-radius:999px;background:rgba(255,255,255,.09);border:1px solid var(--g-line);font-variant-numeric:tabular-nums}
 
-/* ===== Ofensiva do relâmpago no placar: chama de fogo animada ===== */
+/* ===== Ofensiva: chama de fogo animada (sem emoji) =====
+   Um único desenho de chama serve o placar do relâmpago (.streak-flame), a
+   corrida do ranking (.rank-fire) e o selo do aluno (.streak-badge). */
+#app :is(.streak-flame,.rank-fire,.streak-badge)::before{content:'';width:12px;height:16px;flex:none;background:radial-gradient(circle at 50% 78%,#fff8dc 0 16%,#fde047 34%,#fb923c 60%,#ea580c 85%);border-radius:50% 50% 50% 50%/64% 64% 36% 36%;filter:drop-shadow(0 0 4px #fbbf2490);animation:streak-flicker .48s ease-in-out infinite alternate}
 #app .flash-board .streak-flame{display:inline-flex;align-items:center;gap:4px;min-width:28px;height:22px;padding:0 7px;border-radius:999px;background:linear-gradient(135deg,#9a3412,#7c2d12);border:1px solid #f9731655;color:#fff;font-style:normal;font-size:11px;font-weight:800}
-#app .flash-board .streak-flame::before{content:'';width:12px;height:16px;flex:none;background:radial-gradient(circle at 50% 78%,#fff8dc 0 16%,#fde047 34%,#fb923c 60%,#ea580c 85%);border-radius:50% 50% 50% 50%/64% 64% 36% 36%;filter:drop-shadow(0 0 4px #fbbf2490);animation:streak-flicker .48s ease-in-out infinite alternate}
 #app .flash-board .streak-flame::after{content:attr(data-n);font-variant-numeric:tabular-nums}
+/* Ranking entre perguntas: chama do lado do nome, sem fundo (o nome já é branco) */
+#app .rank-fire{display:inline-flex;align-items:center;gap:4px;vertical-align:-.12em;font-style:normal;font-size:.8em;margin-left:4px}
+#app .rank-fire::after{content:attr(data-n);font-variant-numeric:tabular-nums;font-weight:800}
+/* Selo de ofensiva do aluno (tema claro do quiz): chama na ponta do pill */
+#app .streak-badge{display:inline-flex;align-items:center;gap:6px}
 @keyframes streak-flicker{0%{transform:scale(1,.96) rotate(-2deg)}55%{transform:scale(.86,1.14) rotate(2deg)}100%{transform:scale(1.05,.9) rotate(-1deg)}}
-@media (prefers-reduced-motion:reduce){#app .flash-board .streak-flame::before{animation:none}}
+@media (prefers-reduced-motion:reduce){#app :is(.streak-flame,.rank-fire,.streak-badge)::before{animation:none}}
 
 /* ===== Corrida: comemoração liberada da caixa da pista ===== */
 #app .race-track[data-state="done"]{overflow:visible}
