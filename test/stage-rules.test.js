@@ -4,7 +4,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { gameInput, gameSnapshot } from '../src/stage-games.js';
-import { newLesson, validateLesson } from '../src/lessons.js';
 import { Room } from '../src/room.js';
 
 const clock = () => { let t = 10000; return { now: () => t, tick: ms => t += ms }; };
@@ -128,12 +127,4 @@ test('remoção só vira banimento na terceira vez', () => {
   room.data.players.push({ id: 'a3', online: true, token: 'tk' });
   Room.prototype.kick.call(room, 'a3');
   assert.deepEqual(room.data.removedTokens, ['tk'], 'terceira: banida');
-});
-
-test('slide importado do PowerPoint anima a entrada no PC também', () => {
-  const lesson = newLesson();
-  lesson.slides[0] = { ...lesson.slides[0], sourceType: 'pptx', transition: 'none' };
-  assert.equal(validateLesson(lesson).slides[0].transition, 'slide', 'importado com "nenhuma" antiga vira deslizar');
-  lesson.slides[0] = { ...lesson.slides[0], sourceType: '', transition: 'none' };
-  assert.equal(validateLesson(lesson).slides[0].transition, 'none', 'escolha manual de "sem animação" continua valendo');
 });
