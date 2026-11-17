@@ -44,10 +44,15 @@ function teamsView(state, g, host, player) {
   const choose = picking && player ? `<div class="team-pick" style="--teams:${state.teams.length}">${state.teams.map(team => `<button class="team-pick-btn" style="--team:${esc(team.color)}" data-game-send='{"team":${team.index}}' data-mine="${mine?.index === team.index}">${team.photo ? `<img class="team-pick-photo" src="${esc(team.photo)}" alt="">` : ''}<b>Time ${esc(team.name)}</b><small>${plural(team.members.length, 'pessoa', 'pessoas')}</small></button>`).join('')}</div>` : '';
   // O líder do time pode trocar o nome e a foto da equipe pelo próprio celular.
   const leading = player && mine && mine.leader === state.me?.id;
+  // Prévia da foto do time (ou a inicial do nome enquanto não tem foto):
+  // o líder vê o que vai salvar antes de salvar.
+  const photoPreview = `<span class="team-leader-preview" data-team-preview style="--team:${esc(mine.color)}">${mine.photo ? `<img src="${esc(mine.photo)}" alt="Foto do time">` : `<b>${esc((mine.name || '?').trim().slice(0, 1).toUpperCase() || '?')}</b>`}</span>`;
   const leaderTools = leading ? `<div class="team-leader-tools" style="--team:${esc(mine.color)}" data-leader-team="${mine.index}">
     <strong>👑 Você lidera o Time ${esc(mine.name)}</strong>
-    <label>Nome do time<input type="text" maxlength="24" value="${esc(mine.name)}" data-team-name></label>
-    <div class="team-leader-row"><button type="button" class="btn secondary small" data-team-photo-button>Escolher foto</button>${mine.photo ? '<button type="button" class="btn secondary small" data-team-photo-clear>Remover foto</button>' : ''}<input type="file" accept="image/png,image/jpeg,image/webp" data-team-photo hidden></div>
+    <div class="team-leader-edit">${photoPreview}<div class="team-leader-fields">
+      <label>Nome do time<input type="text" maxlength="24" value="${esc(mine.name)}" data-team-name></label>
+      <div class="team-leader-row"><button type="button" class="btn secondary small" data-team-photo-button>Escolher foto</button>${mine.photo ? '<button type="button" class="btn secondary small" data-team-photo-clear>Remover foto</button>' : ''}<input type="file" accept="image/png,image/jpeg,image/webp" data-team-photo hidden></div>
+    </div></div>
     <button type="button" class="btn primary small" data-team-save>Salvar</button>
   </div>` : '';
   const badge = player ? (leading ? '' : mine ? `<p class="team-mine" style="--team:${esc(mine.color)}">Você é do <b>Time ${esc(mine.name)}</b></p>` : picking ? '<p class="game-wait">Toque no time que você quer entrar.</p>' : '') : '';

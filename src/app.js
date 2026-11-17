@@ -574,6 +574,9 @@ function applyRender() {
     else QRCode.toDataURL(url, { width: 460, margin: 2 }).then(src => { qrCache.set(url, src); setQR(src); }).catch(() => toast('Não foi possível gerar o QR Code. Use o link ou código.'));
   }
   if(state?.phase==='lesson'){pptxAnimations.mount(app,slides[state.slide],activeLesson.id+':'+state.slide,state.animationStep||0);}else{pptxAnimations.key=null;}
+  // Desafio do experimento: trilha de fundo (as músicas de 120 s+ dos
+  // quizzes) enquanto a turma trabalha; para no encerramento.
+  gameAudio.stageBed(state?.phase==='game'&&state.game?.type==='challenge'&&state.game.state!=='done','challenge:'+(state?.game?.id||''));
   const motionKey=state
     ? `${activeLesson.id}:${state.phase}:${state.slide}:${state.questionIndex}`
     : studio.view==='editor'?`editor:${studio.draft?.id||''}`:studio.view;
@@ -806,7 +809,11 @@ app.addEventListener('change', async event => {
       reader.readAsDataURL(optimized);
     });
     if (teamPhotoDraft.length > 30000) { teamPhotoDraft = undefined; toast('Escolha uma foto menor.'); }
-    else toast('Foto pronta. Toque em Salvar.');
+    else {
+      const preview = input.closest('.team-leader-tools')?.querySelector('[data-team-preview]');
+      if (preview) preview.innerHTML = `<img src="${teamPhotoDraft}" alt="Nova foto do time">`;
+      toast('Foto pronta. Toque em Salvar.');
+    }
   } catch (error) { toast(error?.message || 'Não foi possível abrir a imagem.'); }
 });
 function exportResults() {

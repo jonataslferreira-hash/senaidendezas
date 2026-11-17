@@ -4,8 +4,9 @@
 // A escolha de ver (ou pular) o tour fica salva: não enche o saco de novo.
 // (O CSS do tour é importado pelo app.js — aqui o módulo fica puro para testes.)
 
-// Trilha do tour, hospedada pelo usuário (catbox) — toca baixinha e em slow.
-const TOUR_THEME_URL = 'https://files.catbox.moe/ox6yi0.mp3';
+// Trilha do tour, hospedada pelo usuário (catbox) — toca em loop. Enquanto a
+// narração fala, ela abaixa o volume e desacelera (duckMusic abaixo).
+const TOUR_THEME_URL = 'https://files.catbox.moe/1jds9q.mp3';
 
 // Mascote Kuro em SVG por partes: orelhas, olhos, boca e braço são elementos
 // separados, cada um com sua animação (CSS em tour.css). A boca ganha vida
@@ -51,8 +52,8 @@ export const tourSteps = [
     text: 'Aqui ficam suas aulas. Em cada cartão você pode editar, apresentar, duplicar ou exportar.' },
   { id: 'create', title: 'Criar ou importar', target: '.create-import-card',
     text: 'Comece uma apresentação do zero — ou importe o PDF/PPTX que você já tem.' },
-  { id: 'storage-ai', title: 'Storage AI', target: '.storage-ai-primary',
-    text: 'Escreve o tema e a inteligência artificial monta os slides pra você. Depois é só ajustar do seu jeito.' },
+  { id: 'storage-ai', title: 'Storage AI', target: '.studio-rail button[data-studio-action="storage-ai"]',
+    text: 'Aqui no canto esquerdo fica o Storage AI: escreve o tema e a inteligência artificial monta os slides pra você. Depois é só ajustar do seu jeito.' },
   { id: 'catalog', title: 'Catálogo', target: 'button[data-studio-action="open-templates"]',
     text: 'Modelos prontos de ciências pra começar com estilo: só escolher, personalizar e apresentar.' },
   { id: 'join', title: 'Entrar em uma sala', target: '#join-form', nav: 'join',
@@ -67,7 +68,7 @@ export const tourSteps = [
   { id: 'present', title: 'Hora do show!', target: 'button[data-studio-action="present-draft"]',
     text: 'Clique em Apresentar pra gerar o código da sala: a turma entra pelo celular e responde ao vivo. Aqui a playlist do editor assume, então eu fico quietinha…' },
   { id: 'bye', title: 'É isso! 💜', target: null,
-    text: 'Agora é com você. Se quiser rever esse tour depois, é só clicar em “Rever tour” na biblioteca. Bora criar!' },
+    text: 'Agora é com você! Se quiser rever esse tour depois, ele fica no pé do painel da sua conta, aqui em cima. Bora criar!' },
 ];
 
 export class SiteTour {
@@ -80,6 +81,9 @@ export class SiteTour {
     this.voice = null;
     this.raf = 0;
     this.onReflow = () => { if (this.raf) cancelAnimationFrame(this.raf); this.raf = requestAnimationFrame(() => { this.raf = 0; this.position(); }); };
+    // O navegador só libera áudio depois de um toque: o primeiro clique em
+    // qualquer lugar destrava a trilha se o play inicial foi bloqueado.
+    this.onGesture = () => { if (this.music?.paused) this.music.play().catch(() => {}); };
     this.onKey = event => {
       if (!this.nodes) return;
       if (event.key === 'Escape') this.stop('skipped');
@@ -126,6 +130,7 @@ export class SiteTour {
     window.addEventListener('resize', this.onReflow, { passive: true });
     window.addEventListener('scroll', this.onReflow, { passive: true, capture: true });
     document.addEventListener('keydown', this.onKey);
+    document.addEventListener('pointerdown', this.onGesture, { passive: true });
     this.startMusic();
   }
 
@@ -154,6 +159,11 @@ export class SiteTour {
     if (this.target && this.target.scrollIntoView) { this.target.scrollIntoView({ block: 'center', behavior: 'instant' }); await wait(60); }
     this.nodes.classList.toggle('has-target', Boolean(this.target));
     this.position();
+    // position() reescreve o className da bolha; limpar e devolver no mesmo
+    // quadro força o replay da animação de entrada a cada passo.
+    const bubble = this.nodes.querySelector('[data-tour-bubble]');
+    const classes = bubble.className;
+    bubble.className = ''; void bubble.offsetWidth; bubble.className = classes;
     this.speak(index);
   }
 
@@ -203,28 +213,40 @@ export class SiteTour {
     try {
       const audio = new Audio(TOUR_THEME_URL);
       audio.loop = true;
-      audio.volume = 0.2;      // baixinho de fundo
-      audio.playbackRate = 0.92; // em slow, como pedido
-      audio.play().then(() => { this.music = audio; }).catch(() => {});
+      // Referência imediata: se o tour acabar antes do play resolver, o
+      // teardown pausa o áudio certo em vez de deixar a música vazar.
+      this.music = audio;
+      this.duckMusic(false);
+      audio.play().catch(() => { /* autoplay bloqueado: o primeiro toque destrava */ });
     } catch { /* sem trilha: o tour segue mudo */ }
+  }
+  // Enquanto a narração fala, a trilha baixa o volume e desacelera; quando a
+  // Kuro cala a boca, a música volta ao ritmo normal.
+  duckMusic(ducked) {
+    if (!this.music) return;
+    this.music.volume = ducked ? 0.07 : 0.22;
+    this.music.playbackRate = ducked ? 0.85 : 1;
   }
   stopMusic() { if (this.music) { this.music.pause(); } }
   speak(index) {
     this.stopVoice();
     if (!this.voiceOn) return;
     try {
-      const clip = new Audio(`/tour/step-${String(index + 1).padStart(2, '0')}.mp3`);
+      // Caminho RELATIVO: o site é publicado com base './' (GitHub Pages em
+      // /senaidendezas/) — com barra absoluta a narração dava 404 no deploy.
+      const clip = new Audio(`tour/step-${String(index + 1).padStart(2, '0')}.mp3`);
       clip.volume = 0.9;
       this.voice = clip;
+      this.duckMusic(true);
       clip.play().then(() => {
         const mascot = this.nodes?.querySelector('.kuro');
-        if (!mascot) return;
+        if (!mascot) { this.duckMusic(false); return; }
         mascot.classList.add('talking');
-        clip.onended = () => mascot.classList.remove('talking');
-      }).catch(() => {});
-    } catch { /* sem voz nesta etapa */ }
+        clip.onended = () => { mascot.classList.remove('talking'); this.duckMusic(false); };
+      }).catch(() => this.duckMusic(false));
+    } catch { this.duckMusic(false); }
   }
-  stopVoice() { if (this.voice) { this.voice.onended = null; this.voice.pause(); this.voice = null; } this.nodes?.querySelector('.kuro')?.classList.remove('talking'); }
+  stopVoice() { if (this.voice) { this.voice.onended = null; this.voice.pause(); this.voice = null; } this.nodes?.querySelector('.kuro')?.classList.remove('talking'); this.duckMusic(false); }
 
   stop(reason = 'done') {
     markTourSeen(undefined, reason);
@@ -239,6 +261,7 @@ export class SiteTour {
     window.removeEventListener('resize', this.onReflow);
     window.removeEventListener('scroll', this.onReflow, { capture: true });
     document.removeEventListener('keydown', this.onKey);
+    document.removeEventListener('pointerdown', this.onGesture);
     this.nodes?.remove();
     this.nodes = null;
     this.target = null;

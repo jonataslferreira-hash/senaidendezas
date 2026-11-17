@@ -1,6 +1,7 @@
 // Tour de boas-vindas: persistência da escolha e forma das etapas.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import { shouldOfferTour, markTourSeen, tourSteps, TOUR_STORAGE_KEY, kuroMascot } from '../src/tour.js';
 
 const storage = () => { const data = new Map(); return { getItem: k => data.get(k) ?? null, setItem: (k, v) => data.set(k, v), data }; };
@@ -31,7 +32,7 @@ test('etapas do tour têm forma válida e ids únicos', () => {
 
 test('etapas cobrem as abas da tela inicial', () => {
   const targets = tourSteps.map(s => s.target || '').join(' ');
-  for (const expected of ['[data-library-grid]', '.create-import-card', '.storage-ai-primary', '#join-form', '.shared-library'])
+  for (const expected of ['[data-library-grid]', '.create-import-card', '.studio-rail button[data-studio-action="storage-ai"]', '#join-form', '.shared-library'])
     assert.ok(targets.includes(expected), `cobre ${expected}`);
 });
 
@@ -40,4 +41,13 @@ test('mascote Kuro é um SVG com partes separadas e animáveis', () => {
   for (const part of ['kuro-ear-l', 'kuro-ear-r', 'kuro-eyes', 'kuro-mouth', 'kuro-mouth-open', 'kuro-arm', 'kuro-head'])
     assert.ok(kuroMascot.includes(part), `parte ${part} presente e nomeada`);
   assert.ok(!kuroMascot.includes('<img'), 'vetor, não imagem raster');
+});
+
+test('trilha nova em loop e narração com caminho relativo (sem 404 no Pages)', () => {
+  const code = readFileSync(new URL('../src/tour.js', import.meta.url), 'utf8');
+  assert.ok(code.includes('files.catbox.moe/1jds9q.mp3'), 'usa a trilha nova em loop');
+  assert.ok(!code.includes('`/tour/step-'), 'narração é caminho relativo — barra absoluta dá 404 no deploy com base ./');
+  assert.ok(code.includes('duckMusic'), 'trilha abaixa volume e velocidade só enquanto a narração fala');
+  const css = readFileSync(new URL('../src/tour.css', import.meta.url), 'utf8');
+  assert.ok(!css.includes('.site-tour.has-target .tour-backdrop{background:'), 'backdrop não escurece o alvo do spotlight');
 });

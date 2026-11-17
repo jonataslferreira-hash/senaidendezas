@@ -831,3 +831,9 @@ html[data-motion=reduced] #app .ai-instant-button.is-active{animation:none}
   html:not([data-motion=normal]) #app .studio-btn.ai-tool::before, html:not([data-motion=normal]) #app .studio-btn.ai-tool::after { animation: none; }
 }
 html[data-motion=reduced] #app .studio-btn.ai-tool::before, html[data-motion=reduced] #app .studio-btn.ai-tool::after { animation: none; }
+
+/* Biblioteca: Catálogo e "Criar com IA" já vivem na barra lateral — aqui só
+   repetem. No celular (barra de cima compacta, ícones pequenos) o "Criar com
+   IA" continua à mão; o Catálogo já aparece no cartão de nova apresentação. */
+.library-actions [data-studio-action="open-templates"]{display:none}
+@media (min-width:901px){.library-actions .storage-ai-primary{display:none}}

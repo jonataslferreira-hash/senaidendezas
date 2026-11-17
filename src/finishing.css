@@ -3057,3 +3057,12 @@ dialog.simulation-modal .simulation-modal-foot-tools { display: none; }
 #app .team-rename summary{cursor:pointer;list-style:none;display:inline-grid;place-items:center;width:34px;height:34px;border-radius:10px;border:1px solid var(--g-line);background:rgba(255,255,255,.08);font-size:16px;transition:background .2s,transform .2s}
 #app .team-rename summary:hover{background:rgba(255,255,255,.16);transform:translateY(-1px)}
 #app .team-rename summary::-webkit-details-marker{display:none}
+
+/* Editar time (painel do líder): prévia da foto ao lado dos campos,
+   com o fundo acompanhando a cor do time. */
+.team-leader-edit{display:flex;gap:12px;align-items:flex-start;width:100%}
+.team-leader-fields{display:grid;gap:10px;flex:1;min-width:0;justify-items:start;width:100%}
+.team-leader-preview{width:64px;height:64px;flex:none;border-radius:14px;overflow:hidden;display:grid;place-items:center;border:2px solid color-mix(in srgb,var(--team,#7950b4) 65%,#fff);background:color-mix(in srgb,var(--team,#7950b4) 32%,#0f0c1c);box-shadow:0 6px 16px #00000042}
+.team-leader-preview img{width:100%;height:100%;object-fit:cover;display:block}
+.team-leader-preview b{font-size:26px;font-weight:800;color:#fff;text-shadow:0 2px 8px #00000073}
+@media (max-width:760px){.team-leader-preview{width:56px;height:56px}}

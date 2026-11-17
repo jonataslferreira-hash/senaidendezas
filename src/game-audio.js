@@ -116,6 +116,18 @@ export class GameAudio{
  remaining(){return Math.max(0,((this.state?.question?.deadline||0)-this.now()-this.offset)/1000);}
  playResult(){if(!this.enabled||!this.effects||this.resultKey===this.questionKey)return;this.resultKey=this.questionKey;this.suppressedResult=false;if(!this.result.paused&&this.result.src===resultTrack.url)return;this.pause(this.result);this.result.src=resultTrack.url;this.result.loop=false;this.result.playbackRate=1;this.result.volume=this.settings.volume>0?Math.min(.35,Math.max(.2,this.settings.volume*2)):0;this.play(this.result);}
  startTrack(track,key,{loop=true,volume=this.settings.volume,rate=1}={}){if(!track||this.key===key)return;this.pause(this.audio);clearInterval(this.fade);this.fade=null;this.key=key;this.lastTrack=track.id;this.audio.src=track.url;this.audio.loop=loop;this.audio.volume=volume;this.audio.playbackRate=rate;this.audio.preservesPitch=rate===1;this.play(this.audio);}
+ // Trilha da dinâmica de experimento (desafio): as músicas mais longas dos
+ // quizzes (120 s ou mais) rodam em loop enquanto a turma ajusta os
+ // controles — uma diferente a cada desafio.
+ stageBed(on,key){
+  if(!on){if(this.stageKey&&this.key===this.stageKey){this.pause(this.audio);this.key='';}this.stageKey='';return;}
+  if(!this.enabled||this.key===key)return;
+  const tracks=questionTracks.filter(track=>(track.seconds||0)>=120);
+  if(!tracks.length)return;
+  const track=this.stageKey===key&&this.lastTrack&&tracks.some(t=>t.id===this.lastTrack)?tracks.find(t=>t.id===this.lastTrack):chooseTrack(tracks,this.stageKey===key?this.lastTrack:'',this.random);
+  this.stageKey=key;
+  this.startTrack(track,key,{loop:true,volume:this.settings.volume});
+ }
  startPodium(){
   const activePodium=this.state?.phase==='finished'||(this.state?.phase==='game'&&this.state?.game?.state==='done');
   if(!this.enabled||!activePodium||this.key==='podium')return;

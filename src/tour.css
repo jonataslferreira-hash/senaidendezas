@@ -2,8 +2,12 @@
    real, balão acompanhando o destaque e versão mobile em folha inferior. */
 .site-tour{position:fixed;inset:0;z-index:10000;pointer-events:none;font-family:inherit}
 .tour-backdrop{position:absolute;inset:0;background:transparent}
-.site-tour.has-target .tour-backdrop{background:rgba(16,10,26,.55)}
+/* O escurecimento é feito SÓ pelo sombra-vedação do highlight: dentro do
+   retângulo destacado a tela fica clara — o aluno enxerga o que a Kuro
+   ensina. Um backdrop escuro por cima apagaria o alvo junto. */
 .tour-highlight{position:absolute;display:none;border-radius:14px;box-shadow:0 0 0 9999px rgba(16,10,26,.55),0 0 0 3px #d64ba6,0 0 26px #d64ba66e;transition:left .25s cubic-bezier(.2,.8,.2,1),top .25s cubic-bezier(.2,.8,.2,1),width .25s cubic-bezier(.2,.8,.2,1),height .25s cubic-bezier(.2,.8,.2,1)}
+.tour-highlight::after{content:'';position:absolute;inset:-3px;border-radius:17px;border:2.5px solid #ff7ac8;pointer-events:none;animation:tour-ring 1.6s ease-in-out infinite}
+@keyframes tour-ring{0%,100%{opacity:.9;transform:scale(1)}50%{opacity:.25;transform:scale(1.012)}}
 .tour-bubble{pointer-events:auto;position:absolute;width:340px;max-width:calc(100vw - 24px);box-sizing:border-box;padding:14px 16px 12px;border-radius:18px;border:1px solid #ffffff2b;background:linear-gradient(160deg,#241a38,#171027 70%);color:#f4eefc;box-shadow:0 18px 50px #000000a6;animation:tour-pop .3s cubic-bezier(.2,.8,.2,1) both}
 .tour-bubble.above{animation:tour-pop-top .3s cubic-bezier(.2,.8,.2,1) both}
 .tour-mascot-row{display:flex;align-items:center;gap:10px}
@@ -11,19 +15,25 @@
 .tour-mascot{width:56px;height:56px;flex:none;border-radius:16px;background:#ffffff14;border:1px solid #ffffff20;display:block}
 .tour-mascot svg{width:100%;height:100%;display:block}
 .kuro-head{animation:kuro-bob 3.2s ease-in-out infinite}
-.kuro-ear,.kuro-eyes,.kuro-arm{transform-box:view-box}
-.kuro-ear-l{transform:rotate(-26deg);transform-origin:39.5px 44px;animation:kuro-ear-l 3.2s ease-in-out infinite}
-.kuro-ear-r{transform:rotate(26deg);transform-origin:80.5px 44px;animation:kuro-ear-r 3.2s ease-in-out infinite}
+.kuro-ear,.kuro-eyes,.kuro-arm,.kuro-skull,.kuro-body{transform-box:view-box}
+.kuro-ear-l{transform:rotate(-26deg);transform-origin:39.5px 44px;animation:kuro-ear-l 2.1s ease-in-out infinite}
+.kuro-ear-r{transform:rotate(26deg);transform-origin:80.5px 44px;animation:kuro-ear-r 2.1s ease-in-out infinite}
 .kuro-eyes{transform-origin:60px 64px;animation:kuro-blink 4.8s infinite}
 .kuro-arm{transform-origin:88px 84px;animation:kuro-wave 2.8s ease-in-out infinite}
+.kuro-skull{transform-origin:60px 35px;animation:kuro-skull 5.2s ease-in-out infinite}
+.kuro-body{transform-origin:60px 110px;animation:kuro-breathe 3.2s ease-in-out infinite}
 .kuro-mouth-open{opacity:0}
 .kuro.talking .kuro-smile{opacity:0}
 .kuro.talking .kuro-mouth-open{animation:kuro-talk .26s ease-in-out infinite}
-@keyframes kuro-bob{0%,100%{transform:translateY(0)}50%{transform:translateY(-2.5px)}}
-@keyframes kuro-ear-l{0%,100%{transform:rotate(-26deg)}50%{transform:rotate(-16deg)}}
-@keyframes kuro-ear-r{0%,100%{transform:rotate(26deg)}50%{transform:rotate(16deg)}}
+.kuro.talking .kuro-head{animation-duration:1.1s}
+.kuro.talking .kuro-skull{animation-duration:1.8s}
+@keyframes kuro-bob{0%,100%{transform:translateY(0) rotate(-2.5deg)}50%{transform:translateY(-3.5px) rotate(2.5deg)}}
+@keyframes kuro-ear-l{0%,100%{transform:rotate(-27deg)}50%{transform:rotate(-13deg)}}
+@keyframes kuro-ear-r{0%,100%{transform:rotate(27deg)}50%{transform:rotate(13deg)}}
 @keyframes kuro-blink{0%,93%,100%{transform:scaleY(1)}96%{transform:scaleY(.12)}}
-@keyframes kuro-wave{0%,100%{transform:rotate(0)}12%{transform:rotate(-22deg)}24%{transform:rotate(2deg)}36%{transform:rotate(-18deg)}48%{transform:rotate(0)}}
+@keyframes kuro-wave{0%,100%{transform:rotate(0)}12%{transform:rotate(-24deg)}24%{transform:rotate(4deg)}36%{transform:rotate(-20deg)}48%{transform:rotate(0)}}
+@keyframes kuro-skull{0%,100%{transform:rotate(-7deg)}50%{transform:rotate(7deg)}}
+@keyframes kuro-breathe{0%,100%{transform:scaleY(1)}50%{transform:scaleY(1.05)}}
 @keyframes kuro-talk{0%,100%{opacity:1}50%{opacity:0}}
 .tour-heading{display:grid;min-width:0}
 .tour-heading strong{font-size:15.5px}
@@ -33,13 +43,15 @@
 .site-tour p{margin:10px 2px 12px;font-size:13.5px;line-height:1.65;color:#e9dff5}
 .tour-progress{display:flex;gap:5px;margin:0 2px 12px}
 .tour-progress i{width:7px;height:7px;border-radius:50%;background:#ffffff33}
-.tour-progress i.on{background:#d64ba6;box-shadow:0 0 8px #d64ba6aa}
+.tour-progress i.on{background:#d64ba6;box-shadow:0 0 8px #d64ba6aa;animation:tour-dot 1.6s ease-in-out infinite}
+@keyframes tour-dot{0%,100%{transform:scale(1)}50%{transform:scale(1.45)}}
 .tour-buttons{display:flex;gap:8px;justify-content:flex-end}
 .tour-buttons button{all:unset;cursor:pointer;padding:9px 14px;border-radius:11px;font-size:13px;font-weight:650}
 .tour-skip{color:#cbb8de}
 .tour-skip:hover{color:#fff;text-decoration:underline}
-.tour-next{background:linear-gradient(150deg,#d64ba6,#8b5cd6);color:#fff;box-shadow:0 6px 18px #d64ba65c}
-.tour-next:hover{filter:brightness(1.08)}
+.tour-next{background:linear-gradient(150deg,#d64ba6,#8b5cd6);color:#fff;box-shadow:0 6px 18px #d64ba65c;transition:transform .15s,filter .15s}
+.tour-next:hover{filter:brightness(1.08);transform:translateY(-1.5px)}
+.tour-next:active{transform:translateY(0) scale(.97)}
 @keyframes tour-pop{from{opacity:0;transform:translateY(14px) scale(.97)}to{opacity:1;transform:none}}
 @keyframes tour-pop-top{from{opacity:0;transform:translateY(-14px) scale(.97)}to{opacity:1;transform:none}}
 /* Celular: bolha flutuante compacta, no canto oposto ao destaque —
@@ -60,8 +72,10 @@
 @media(prefers-reduced-motion:reduce){
   .tour-bubble,.tour-bubble.float,.tour-bubble.centered{animation-duration:.01ms}
   .tour-highlight{transition:none}
-  .kuro-head,.kuro-ear,.kuro-eyes,.kuro-arm,.kuro.talking .kuro-mouth-open{animation:none!important}
+  .tour-highlight::after,.tour-progress i.on{animation:none}
+  .kuro-head,.kuro-ear,.kuro-eyes,.kuro-arm,.kuro-skull,.kuro-body,.kuro.talking .kuro-mouth-open{animation:none!important}
 }
 html[data-motion=reduced] .tour-bubble,html[data-motion=reduced] .tour-bubble.float,html[data-motion=reduced] .tour-bubble.centered{animation-duration:.01ms}
 html[data-motion=reduced] .tour-highlight{transition:none}
-html[data-motion=reduced] .kuro-head,html[data-motion=reduced] .kuro-ear,html[data-motion=reduced] .kuro-eyes,html[data-motion=reduced] .kuro-arm,html[data-motion=reduced] .kuro.talking .kuro-mouth-open{animation:none!important}
+html[data-motion=reduced] .tour-highlight::after,html[data-motion=reduced] .tour-progress i.on{animation:none}
+html[data-motion=reduced] .kuro-head,html[data-motion=reduced] .kuro-ear,html[data-motion=reduced] .kuro-eyes,html[data-motion=reduced] .kuro-arm,html[data-motion=reduced] .kuro-skull,html[data-motion=reduced] .kuro-body,html[data-motion=reduced] .kuro.talking .kuro-mouth-open{animation:none!important}
