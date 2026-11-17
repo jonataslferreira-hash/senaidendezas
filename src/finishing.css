@@ -3039,12 +3039,12 @@ dialog.simulation-modal .simulation-modal-foot-tools { display: none; }
 #app .challenge-live-values{display:flex;flex-wrap:wrap;gap:4px}
 #app .challenge-live-values i{font-style:normal;font-size:11px;font-weight:700;padding:2px 7px;border-radius:999px;background:rgba(255,255,255,.09);border:1px solid var(--g-line);font-variant-numeric:tabular-nums}
 
-/* ===== Ofensiva do relâmpago no placar ===== */
-#app .flash-board .streak-flame{display:inline-grid;place-items:center;grid-auto-flow:column;gap:2px;min-width:26px;height:22px;padding:0 6px;border-radius:999px;background:linear-gradient(135deg,#f97316,#ef4444);color:#fff;font-style:normal;font-size:11px;font-weight:800;animation:streak-burn .7s ease-in-out infinite alternate}
-#app .flash-board .streak-flame::before{content:'🔥'}
-#app .flash-board .streak-flame::after{content:attr(data-n)}
-@keyframes streak-burn{from{transform:scale(1)}to{transform:scale(1.1)}}
-@media (prefers-reduced-motion:reduce){#app .flash-board .streak-flame{animation:none}}
+/* ===== Ofensiva do relâmpago no placar: chama de fogo animada ===== */
+#app .flash-board .streak-flame{display:inline-flex;align-items:center;gap:4px;min-width:28px;height:22px;padding:0 7px;border-radius:999px;background:linear-gradient(135deg,#9a3412,#7c2d12);border:1px solid #f9731655;color:#fff;font-style:normal;font-size:11px;font-weight:800}
+#app .flash-board .streak-flame::before{content:'';width:12px;height:16px;flex:none;background:radial-gradient(circle at 50% 78%,#fff8dc 0 16%,#fde047 34%,#fb923c 60%,#ea580c 85%);border-radius:50% 50% 50% 50%/64% 64% 36% 36%;filter:drop-shadow(0 0 4px #fbbf2490);animation:streak-flicker .48s ease-in-out infinite alternate}
+#app .flash-board .streak-flame::after{content:attr(data-n);font-variant-numeric:tabular-nums}
+@keyframes streak-flicker{0%{transform:scale(1,.96) rotate(-2deg)}55%{transform:scale(.86,1.14) rotate(2deg)}100%{transform:scale(1.05,.9) rotate(-1deg)}}
+@media (prefers-reduced-motion:reduce){#app .flash-board .streak-flame::before{animation:none}}
 
 /* ===== Corrida: comemoração liberada da caixa da pista ===== */
 #app .race-track[data-state="done"]{overflow:visible}
@@ -3066,3 +3066,20 @@ dialog.simulation-modal .simulation-modal-foot-tools { display: none; }
 .team-leader-preview img{width:100%;height:100%;object-fit:cover;display:block}
 .team-leader-preview b{font-size:26px;font-weight:800;color:#fff;text-shadow:0 2px 8px #00000073}
 @media (max-width:760px){.team-leader-preview{width:56px;height:56px}}
+
+/* ===== Transição do slide no PC: o quadro novo carrega data-enter e a
+   animação roda direto nele — apresentador e aluno conectado, sempre.
+   (Mesmos valores das regras da cena: quem ganhar no cascade, o efeito
+   é idêntico, sem reinício.) ===== */
+html:not([data-motion=reduced]) #app .document-stage[data-enter="slide"]{animation:slide-appear .46s cubic-bezier(.2,.8,.2,1) both}
+html:not([data-motion=reduced]) #app .document-stage[data-enter="zoom"]{animation:storage-slide-zoom .46s ease-out both}
+html:not([data-motion=reduced]) #app .document-stage[data-enter="rise"]{animation:storage-slide-rise .44s ease-out both}
+html:not([data-motion=reduced]) #app .document-stage[data-enter="wipe"]{animation:storage-slide-wipe .52s ease-out both}
+html:not([data-motion=reduced]) #app .document-stage[data-enter="iris"]{animation:slide-iris-in .55s ease-in-out both}
+html:not([data-motion=reduced]) #app .document-stage[data-enter="split"]{animation:slide-curtain-in .55s ease-in-out both}
+html:not([data-motion=reduced]) #app .document-stage[data-enter="flip"]{animation:slide-flip-in .48s cubic-bezier(.16,.75,.32,1) both}
+html:not([data-motion=reduced]) #app .document-stage[data-enter="fade"]{animation:slide-fade-in .45s ease both}
+
+/* Pill "Ao vivo" do topo: agora é botão (abre participantes/QR da sala). */
+button.connection{cursor:pointer;padding:6px 10px;margin:-6px -10px;border-radius:999px;transition:background .15s}
+button.connection:hover{background:#ffffff14}

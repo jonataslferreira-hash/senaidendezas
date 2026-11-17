@@ -210,6 +210,20 @@ const presenterSettings = loadPresenterSettings();
 // Só celular na vertical usa o cartão de leitura; ao girar para a horizontal (paisagem) o aluno vê o slide visual como foi desenhado.
 const phoneLayout=matchMedia('(max-width: 800px) and (orientation: portrait) and (pointer: coarse), (max-width: 800px) and (orientation: portrait) and (hover: none)');
 phoneLayout.addEventListener('change',()=>{if(state?.phase==='lesson')render();});
+// Celular do aluno: ao entrar na sala, a apresentação toma a tela inteira e a
+// tela vira para o lado (paisagem). Se o navegador segurar o fullscreen por
+// falta de gesto, o primeiro toque completa. Quem sair manualmente não é
+// forçado a voltar.
+let immersiveDone = false;
+let lastStageEnter = null;
+async function enterImmersiveRoom() {
+  if (host || demo || !state || !phoneLayout.matches || immersiveDone) return;
+  try {
+    if (!document.fullscreenElement) await document.documentElement.requestFullscreen({ navigationUI: 'hide' });
+    immersiveDone = true;
+    try { await screen.orientation?.lock?.('landscape'); } catch { /* iPhone e afins: segue na orientação da tela */ }
+  } catch { /* sem gesto do usuário ainda: o primeiro toque tenta de novo */ }
+}
 const qrCache = new Map();
 const params = routeParams();
 let codeDraft = (params.get('s') || '').replace(/\D/g, '').slice(0, 6);
@@ -237,7 +251,7 @@ function soundButton() {
   return `<button class="icon-btn" data-action="sound" aria-label="${enabled?'Desativar':'Ativar'} áudio" title="Áudio da apresentação">${icon(enabled?'volume':'mute')}</button>`;
 }
 function header() {
-  return `<header class="header">${brand()}<div class="header-right">${state?`${!host&&state.phase==='lesson'?'':participantCount()}${host&&!readOnlyPresentation&&!demo&&state.phase==='lesson'?'<button class="btn secondary small" data-action="edit-current-slide">Editar slide</button>':''}${!host&&state.me&&state.phase!=='lesson'?'<button class="my-room-avatar" data-action="edit-player" aria-label="Editar meu perfil na sala">'+avatarContent(state.me.avatar||selectedAvatar)+'</button>':''}${!host?`<span data-room-controller data-room-code="${esc(state.code)}">${studio.remote.roomButton(state.code)}</span>`:''}<span class="connection ${status==='online'||demo?'connected':''}"><span></span>${readOnlyPresentation&&demo?'Apresentação':demo?'Prévia':status==='online'?'Ao vivo':'Reconectando'}</span>${host||state.me?soundButton():''}`:''}</div></header>`;
+  return `<header class="header">${brand()}<div class="header-right">${state?`${!host&&state.phase==='lesson'?'':participantCount()}${host&&!readOnlyPresentation&&!demo&&state.phase==='lesson'?'<button class="btn secondary small" data-action="edit-current-slide">Editar slide</button>':''}${!host&&state.me&&state.phase!=='lesson'?'<button class="my-room-avatar" data-action="edit-player" aria-label="Editar meu perfil na sala">'+avatarContent(state.me.avatar||selectedAvatar)+'</button>':''}${!host?`<span data-room-controller data-room-code="${esc(state.code)}">${studio.remote.roomButton(state.code)}</span>`:''}${state&&!readOnlyPresentation?`<button type="button" class="connection ${status==='online'||demo?'connected':''}" data-action="participants" title="Participantes da sala" aria-label="Ver participantes da sala"><span></span>${demo?'Prévia':status==='online'?'Ao vivo':'Reconectando'}</button>`:`<span class="connection ${status==='online'||demo?'connected':''}"><span></span>${readOnlyPresentation&&demo?'Apresentação':demo?'Prévia':status==='online'?'Ao vivo':'Reconectando'}</span>`}${host||state.me?soundButton():''}`:''}</div></header>`;
 }
 function modelPanel(landing = false) {
   const custom = state && slides[state.slide]?.customModel;
@@ -541,6 +555,13 @@ function applyRender() {
       setStageCache(editorStage);
     } else if (!state) { editorStage = null; setStageCache(null); }
   }
+  // Entrada do slide no computador (apresentador e aluno conectado): o quadro
+  // novo chega com data-enter e a transição escolhida anima direto nele — sem
+  // depender da janela de tempo da cena, que não alcançava o PC de quem
+  // acompanha a aula.
+  const stageNode = state?.phase === 'lesson' ? app.querySelector('.document-stage') : null;
+  if (stageNode && state.slide !== lastStageEnter && activeTransition && activeTransition !== 'none') stageNode.dataset.enter = activeTransition;
+  lastStageEnter = state?.phase === 'lesson' ? state.slide : null;
   if (state?.phase === 'lesson') {
     app.insertAdjacentHTML('beforeend', pinnedInvite({ host, demo, state, settings: presenterSettings }));
     if (editDraft) app.insertAdjacentHTML('beforeend', liveEditDialog(editDraft, editError));
@@ -641,7 +662,7 @@ async function connectSession(mode) {
   liveInteraction = null;
   try {
     if (host) { await classroom.create(Boolean(mode.resume), mode.lesson, mode.startIndex,editorLaunch);shareOpen=!mode.resume; }
-    else {music=true;gameAudio.unlock();await classroom.join(mode.code, mode.name, mode.avatar);}
+    else {music=true;gameAudio.unlock();await classroom.join(mode.code, mode.name, mode.avatar);enterImmersiveRoom();}
     if (!readOnlyPresentation) studio.writeRoute('present', activeLesson.id);
   } catch (err) {
     classroom.stop(); if (!state) host = false;
@@ -658,7 +679,7 @@ function leave(show = true) {
   if (host && !demo && classroom?.end) { const room = classroom; room.end(); clearInterval(room.timer); setTimeout(() => room.stop(), 300); } else classroom?.stop?.();
   classroom = null;
   readOnlyPresentation=false;publicPresentationToken='';sharedLoading=false;sharedError='';
-  state = null; host = false; demo = false; editorLaunch=false;shareOpen = false; lastSlide = -1;
+  state = null; host = false; demo = false; editorLaunch=false;shareOpen = false; lastSlide = -1; immersiveDone = false; lastStageEnter = null;
   localModel = 'ssd'; localExploded = true; status = 'offline'; stopMusic();
   if (show) { studio.writeRoute(); render(); }
 }
@@ -1072,6 +1093,9 @@ import './personalization.css';
 import './interface-system.css';
 
 app.addEventListener('pointerdown',e=>{gameAudio.unlock();if(document.fullscreenElement&&(e.clientY<48||e.target.closest('.document-top')))showPresentationControls();});
+// Celular do aluno que ainda não conseguiu a tela cheia: o primeiro toque
+// completa (o navegador exige um gesto para liberar o fullscreen).
+app.addEventListener('pointerdown',()=>{enterImmersiveRoom();},{passive:true});
 
 // Navigate only deliberate taps; model dragging and interactive controls keep
 // their own gestures and never advance the presentation.
