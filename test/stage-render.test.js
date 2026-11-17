@@ -355,3 +355,59 @@ test('barra do topo não quebra quando o snapshot ainda não chegou', async () =
     .filter(m => !/Array\.isArray\(state\?\.ranking\)\s*\?\s*$/.test(app.slice(Math.max(0, m.index - 60), m.index)));
   assert.equal(bare.length, 0, `acesso sem guarda em ${bare.length} ponto(s)`);
 });
+
+test('tela de Equipes não quebra e o convite abre em qualquer etapa', async () => {
+  const { readFileSync } = await import('node:fs');
+  const view = readFileSync(new URL('../src/stage-games-view.js', import.meta.url), 'utf8');
+  // O seletor "Quantos times" lia state.teams.length — state.teams não existe
+  // no snapshot de jogo, então a tela inteira caía com TypeError e o clique em
+  // "Ao vivo" nunca chegava a pintar o QR.
+  // O seletor "Quantos times" é montado dentro de teamsView, onde a lista
+  // vem do jogo (g), não do snapshot da sala.
+  const countControl = view.slice(view.indexOf('const countControl'), view.indexOf('const countControl') + 900);
+  assert.equal(/state\.teams/.test(countControl), false, 'seletor não lê state.teams');
+  assert.match(countControl, /g\.teams\?\.length \|\| 0/, 'o seletor usa a lista do jogo');
+  // O convite é um bloco vivo em toda tela de jogo.
+  assert.match(view, /<\/main>\$\{shareOpen \? shareDialog\(\) : ''\}/, 'convite aparece nas etapas de jogo');
+});
+
+test('espelho do experimento aplica os valores (sem ReferenceError) e não remonta a cena', async () => {
+  const { readFileSync } = await import('node:fs');
+  const view = readFileSync(new URL('../src/stage-games-view.js', import.meta.url), 'utf8');
+  // applySimValues lia `person.values` — variável inexistente no escopo. Hoje
+  // percorre o parâmetro `values`; `person.values` só aparece onde `person` é
+  // de fato declarado (o laço dos cartões do telão).
+  const fn = view.slice(view.indexOf('function applySimValues'), view.indexOf('function challengeView'))
+    .split('\n').filter(line => !line.trim().startsWith('//')).join('\n');
+  assert.equal(/person\.values/.test(fn), false, 'applySimValues não lê person (só o parâmetro values)');
+  assert.match(fn, /values\.forEach\(\(value, i\)/, 'percorre a lista recebida');
+  // O bloco do experimento não pode ter o innerHTML trocado no keepGame.
+  assert.match(view, /node\.querySelector\('\[data-challenge-sim\] \[data-simulation\]'\)/, 'experimento preservado entre renders');
+});
+
+test('o apresentador não vê o experimento grande (só o espelho)', async () => {
+  const { readFileSync } = await import('node:fs');
+  const css = readFileSync(new URL('../src/finishing.css', import.meta.url), 'utf8');
+  assert.match(css, /#app\[data-role=presenter\] \.challenge-layout>\.challenge-sim\{display:none\}/, 'simulador grande some no telão');
+});
+
+test('recorte de foto responde 1:1 ao dedo (sem sensibilidade alta)', async () => {
+  const { readFileSync } = await import('node:fs');
+  const crop = readFileSync(new URL('../src/photo-crop.js', import.meta.url), 'utf8');
+  // Antes: dx * (side / bitmap.width) sem converter do espaço da TELA.
+  assert.match(crop, /const imagePerScreen = box\.side \/ Math\.max\(1, canvas\.width\)/, 'converte tela -> imagem');
+  assert.match(crop, /\(dx \* imagePerScreen\) \/ Math\.max\(1, bitmap\.width\)/, 'deslocamento em fração da imagem');
+  assert.equal(/dx \* \(box\.side \/ bitmap\.width\)/.test(crop), false, 'sem a fórmula antiga');
+  // Roda do mouse mais suave.
+  assert.match(crop, /\.0009/, 'zoom da roda suavizado');
+});
+
+test('nome digitado antes de entrar não é descartado por um render', async () => {
+  const { readFileSync } = await import('node:fs');
+  const app = readFileSync(new URL('../src/app.js', import.meta.url), 'utf8');
+  // Antes: todo render marcava joinNameTouched=true, mesmo com o campo vazio,
+  // e o nome digitado na hora de enviar era ignorado.
+  const line = app.split('\n').find(l => l.includes('draftName.trim()'));
+  assert.ok(line, 'só marca o nome como tocado quando há texto');
+  assert.equal(/if \(form && draftName !== undefined\) \{ joinNameDraft/.test(app), false, 'sem a marcação incondicional');
+});

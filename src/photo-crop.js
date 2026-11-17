@@ -31,7 +31,22 @@ export function cropSheet(bitmap, { title = 'Ajuste sua foto', output = 480 } = 
       zoomOut.textContent = Math.round(zoom * 100) + '%';
     };
     const clamp = () => { x = Math.min(1, Math.max(0, x)); y = Math.min(1, Math.max(0, y)); };
-    const move = (dx, dy) => { const box = rect(); x += dx * (box.side / bitmap.width); y += dy * (box.side / bitmap.height); clamp(); paint(); };
+    // Arrastar 1 px na TELA tem de mover exatamente 1 px da imagem na escala em
+    // que ela aparece. Antes o deslocamento era multiplicado direto por
+    // side/bitmap.width — como o canvas da prévia tem 300 px de lado e a foto
+    // do celular tem ~4000 px, cada pixel de dedo valia ~13 px de imagem: o
+    // recorte disparava ("sensibilidade muito alta"). Aqui a conversão passa
+    // pela escala real (canvas:bitmap) e o resultado fica 1:1 com o dedo.
+    const move = (dx, dy) => {
+      const box = rect();
+      // A prévia mostra `box.side` pixels da imagem dentro de `canvas.width`
+      // pixels de tela. Logo, 1 px de tela = box.side/canvas.width px de
+      // imagem, e o deslocamento em fração da imagem é esse valor / width.
+      const imagePerScreen = box.side / Math.max(1, canvas.width);
+      x += (dx * imagePerScreen) / Math.max(1, bitmap.width);
+      y += (dy * imagePerScreen) / Math.max(1, bitmap.height);
+      clamp(); paint();
+    };
     const zoomBy = (factor, cx = .5, cy = .5) => {
       const before = rect();
       zoom = Math.max(1, Math.min(6, zoom * factor));
@@ -53,9 +68,13 @@ export function cropSheet(bitmap, { title = 'Ajuste sua foto', output = 480 } = 
       canvas.setPointerCapture?.(e.pointerId);
       drag = { id: e.pointerId, x: e.clientX, y: e.clientY };
     });
+    // Passa o delta do evento direto para move(): a posição é lida do próprio
+    // evento (não de um acumulador), então o arrasto não "dispara" quando o
+    // navegador coalesce eventos de dedo.
     dialog.addEventListener('pointermove', e => {
       if (!drag || drag.id !== e.pointerId) return;
-      move(drag.x - e.clientX, drag.y - e.clientY);
+      const dx = e.clientX - drag.x, dy = e.clientY - drag.y;
+      if (dx || dy) move(dx, dy);
       drag = { id: e.pointerId, x: e.clientX, y: e.clientY };
     });
     const end = e => { if (drag?.id === e.pointerId) drag = null; };
@@ -65,7 +84,9 @@ export function cropSheet(bitmap, { title = 'Ajuste sua foto', output = 480 } = 
       if (!e.target.closest('.photo-crop-preview')) return;
       e.preventDefault();
       const box = canvas.getBoundingClientRect();
-      zoomBy(Math.exp(-Math.max(-300, Math.min(300, e.deltaY)) * .002), (e.clientX - box.left) / box.width, (e.clientY - box.top) / box.height);
+      // .002 -> .0009: a roda ampliava quase 2x por "tick" em mouse/trackpad
+      // rápido. Agora um giro completo (~300) dá ~1,3x, o que se controla.
+      zoomBy(Math.exp(-Math.max(-300, Math.min(300, e.deltaY)) * .0009), (e.clientX - box.left) / box.width, (e.clientY - box.top) / box.height);
     }, { passive: false });
     dialog.addEventListener('click', async e => {
       const action = e.target.closest('[data-crop]')?.dataset.crop;
