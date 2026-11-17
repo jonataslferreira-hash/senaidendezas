@@ -311,25 +311,33 @@ test('biblioteca: nunca esconder "Criar com IA" só no celular (o bug que foi ao
 });
 
 
-test('marca da barra lateral cabe na rail sem reduzir a fonte', async () => {
+test('a barra manda na largura: marca cabe sem reduzir a fonte (PC e celular)', async () => {
   const { readFileSync } = await import('node:fs');
   const css = readFileSync(new URL('../src/studio.css', import.meta.url), 'utf8');
   const studio = readFileSync(new URL('../src/studio.js', import.meta.url), 'utf8');
 
-  // O wordmark ocupa a rail e não transborda.
-  assert.match(css, /\.studio-rail \.studio-wordmark\{[^}]*width:100%;[^}]*overflow:hidden/s, 'wordmark ocupa a rail');
-  // O que criava o corte era o padding lateral de 8px: ele roubava 16px da
-  // coluna e empurrava o texto para fora. Tem de ficar zerado.
-  assert.match(css, /\.studio-rail \.studio-wordmark\{[^}]*padding:0;/s, 'sem padding que roube largura');
-  // A logo nunca encolhe nem é cortada; quem cede é o texto.
-  assert.match(css, /\.studio-rail \.studio-wordmark \.lab-logo\{flex:0 0 auto\}/, 'logo inteiro');
-  assert.match(css, /\.studio-rail \.studio-wordmark>span\{[^}]*text-overflow:ellipsis/s, 'texto encolhe com reticências');
-  // Regressão do bug que o usuário viu: NADA de fonte diminuída na marca.
-  // O tamanho vem dos breakpoints originais (23px / 20px) no topo do arquivo.
-  const brandBlock = css.slice(css.indexOf('/* ===== Marca do menu lateral'));
+  // A fonte original (23px / 20px por breakpoint) fica intocada: o bloco da
+  // marca não pode declarar font-size nem clamp/container query.
+  const brandBlock = css.slice(css.indexOf('/* ===== Marca da barra lateral'));
   assert.ok(brandBlock.length > 100, 'bloco da marca presente');
-  assert.equal(/cqi|container-type/.test(brandBlock), false, 'sem container query reduzindo a fonte');
-  assert.equal(/font-size:/.test(brandBlock), false, 'bloco da marca não mexe no tamanho da fonte');
+  assert.equal(/font-size:|cqi|container-type/.test(brandBlock), false, 'bloco da marca não mexe no tamanho da fonte');
+
+  // O wordmark ocupa a largura da barra e nunca passa dela.
+  assert.match(css, /#app \.studio-drawer \.studio-rail \.studio-wordmark,\s*#app \.ai-drawer \.studio-rail \.studio-wordmark \{[^}]*width: 100%;[^}]*max-width: 100%;[^}]*padding: 0;/s, 'wordmark acompanha a barra');
+  // A logo nunca encolhe nem é cortada; quem cede é o texto.
+  const appearance = readFileSync(new URL('../src/appearance.css', import.meta.url), 'utf8');
+  assert.match(appearance, /\.studio-wordmark \.lab-logo\{width:40px;height:40px\}/, 'logo inteiro no PC');
+  assert.match(appearance, /^:?\.lab-logo\{width:44px;height:44px;flex-shrink:0/, 'logo nunca encolhe');
+  assert.match(css, /\.ai-rail-brand \.studio-wordmark>span[,{]\s*(?:#app[^{]*)?\{[^}]*min-width: 0;[^}]*white-space: nowrap/s, 'texto fica numa linha');
+
+  // A gaveta do celular tem a largura da BARRA (224px). Com 190px o texto era
+  // cortado: logo 34 + texto 98 + gaps 16 + fechar 38 + padding 28 = 214px.
+  assert.match(css, /--studio-rail-width: 224px/, 'barra tem 224px');
+  assert.match(css, /#app \.studio-drawer,\s*#app \.ai-drawer \{[^}]*width: min\(var\(--studio-rail-width\), calc\(100vw - 24px\)\)/s, 'gaveta = largura da barra');
+  const ai = readFileSync(new URL('../src/storage-ai-remake.css', import.meta.url), 'utf8');
+  assert.match(ai, /width: min\(var\(--studio-rail-width, 224px\), calc\(100vw - 24px\)\)/, 'gaveta do Storage AI também');
+  assert.equal(/calc\(100vw - 40px\)/.test(ai), false, 'sem a folga antiga de 40px');
+
   // A marca continua sendo um botão único com logo + texto.
   assert.match(studio, /class="studio-wordmark"[^>]*><img class="lab-logo"[^>]*><span>storage<span>lab\.<\/span><\/span>/);
 });
