@@ -909,7 +909,11 @@ app.addEventListener('change', async event => {
     if (teamPhotoDraft.length > 30000) { teamPhotoDraft = undefined; toast('Escolha uma foto menor.'); }
     else {
       const preview = input.closest('.team-leader-tools')?.querySelector('[data-team-preview]');
-      if (preview) preview.innerHTML = `<img src="${teamPhotoDraft}" alt="Nova foto do time">`;
+      if (preview) {
+        preview.innerHTML = `<img src="${teamPhotoDraft}" alt="Nova foto do time">`;
+        preview.setAttribute('aria-label', 'Trocar a foto do time');
+        preview.title = 'Trocar a foto do time';
+      }
       toast('Foto pronta. Toque em Salvar.');
     }
   } catch (error) { toast(error?.message || 'Não foi possível abrir a imagem.'); }

@@ -271,6 +271,86 @@ test('editor do desafio deixa o professor trocar as dicas e o modo de controle',
 let challengeDom = null;
 try { challengeDom = await import('jsdom'); } catch { challengeDom = null; }
 
+test('foto do time enviada pelo líder chega ao telão (limite do socket não descarta a resposta)', async () => {
+  const { readFileSync } = await import('node:fs');
+  const net = readFileSync(new URL('../src/network.js', import.meta.url), 'utf8');
+  // A foto viaja como data URL de até 30 KB dentro da resposta do líder. O
+  // limite antigo de 4 KB descartava a mensagem em silêncio (a foto aparecia
+  // na prévia e sumia no cartão, voltando para a inicial do nome).
+  assert.match(net, /msg\?\.type === 'answer' \? 48000/, 'resposta aceita payload de foto');
+  // E o caminho real: líder salva, telão e celular leem a mesma foto.
+  let now = 30_000;
+  const lesson = newLesson('Times');
+  const slide = newSlide('Equipes');
+  slide.game = { ...defaultGame('teams'), count: 2 };
+  lesson.slides = [newSlide('Capa'), slide]; lesson.questions = [];
+  lesson.activityBlocks = [{ id: 'a', type: 'slides', items: [lesson.slides[0].id] }, { id: 'b', type: 'teams', items: [slide.id] }];
+  const room = new Room('787878', null, () => now, validateLesson(lesson));
+  const ana = room.join({ name: 'Ana' });
+  room.join({ name: 'Bia' });
+  room.control('next-stage');
+  // O começo do jogo já sorteia os times; o líder é a própria Ana (o
+  // controle de líder alterna, então não vale chamá-lo com quem já lidera).
+  assert.ok(room.data.teams?.length, 'times sorteados ao iniciar');
+  const teamIndex = room.data.players.find(p => p.id === ana.id).team;
+  room.data.teams[teamIndex].leader = ana.id;
+  const photo = 'data:image/webp;base64,' + 'A'.repeat(24000);
+  gameInput(room, ana.id, { teamCustom: { team: teamIndex, name: 'Roxo', photo } });
+  for (const id of [null, ana.id]) {
+    assert.equal(room.snapshot(id).teams[teamIndex].photo, photo, 'foto disponível no telão e no celular');
+  }
+  const html = gameMarkup(room.snapshot(), { header: () => '', host: true, now });
+  assert.match(html, /class="team-photo"/, 'cartão do time desenha a foto');
+  assert.match(html, /<header class="has-photo">/, 'cabeçalho do cartão entra no modo com foto');
+  // Foto acima do limite continua sendo recusada (não estoura a mensagem).
+  gameInput(room, ana.id, { teamCustom: { team: teamIndex, name: 'Roxo', photo: 'data:image/webp;base64,' + 'B'.repeat(40000) } });
+  assert.equal(room.snapshot().teams[teamIndex].photo, photo, 'foto gigante é ignorada, a boa permanece');
+});
+
+test('espelho ao vivo não pisca: cartão do telão é atualizado no lugar, não remontado',
+  { skip: challengeDom ? false : 'jsdom não instalado' }, async () => {
+  const { JSDOM } = challengeDom;
+  const dom = new JSDOM('<!doctype html><body><div id="app"></div></body>', { pretendToBeVisual: true });
+  const previous = { window: globalThis.window, document: globalThis.document, HTMLElement: globalThis.HTMLElement, Event: globalThis.Event };
+  globalThis.window = dom.window; globalThis.document = dom.window.document;
+  globalThis.HTMLElement = dom.window.HTMLElement; globalThis.Event = dom.window.Event;
+  try {
+    const { keepGame } = await import('../src/stage-games-view.js');
+    let now = 40_000;
+    const lesson = newLesson('Desafio');
+    const slide = newSlide('Experimento');
+    slide.game = { type: 'challenge', text: 'Meta', simulation: 'moon', tolerance: 5,
+      hints: ['Maior.'], hintSeconds: 20, leaderMode: true, answer: [{ k: 'range', label: 'Dia', v: '7', min: 0, max: 29 }] };
+    lesson.slides = [newSlide('Capa'), slide]; lesson.questions = [];
+    lesson.activityBlocks = [{ id: 'a', type: 'slides', items: [lesson.slides[0].id] }, { id: 'b', type: 'challenge', items: [slide.id] }];
+    const room = new Room('787977', null, () => now, validateLesson(lesson));
+    const ana = room.join({ name: 'Ana' });
+    room.join({ name: 'Bia' });
+    room.control('next-stage');
+    gameInput(room, ana.id, { values: ['7'], peek: true });
+    const app = document.querySelector('#app');
+    const paint = () => gameMarkup(room.snapshot(), { header: () => '<header class="header"></header>', host: true, now });
+    app.innerHTML = paint();
+    const card = app.querySelector('.challenge-live-card');
+    assert.ok(card, 'cartão do espelho aparece no telão');
+    // Cena montada dentro do cartão (é o nó que a animação usa).
+    card.querySelector('.challenge-live-sim').dataset.mounted = 'yes';
+    now += 3000;
+    gameInput(room, ana.id, { values: ['20'], peek: true });
+    assert.equal(keepGame(app, paint(), room.snapshot()), true, 'keepGame assume a atualização');
+    const after = app.querySelector('.challenge-live-card');
+    assert.equal(after, card, 'mesmo nó do cartão (sem animação de entrada a cada tique)');
+    assert.equal(after.querySelector('.challenge-live-sim').dataset.mounted, 'yes', 'cena montada continua viva');
+    assert.equal(after.querySelector('.challenge-live-values i').textContent, '20', 'valor novo aparece');
+  } finally {
+    // O challengeView agenda um queueMicrotask para o espelho: espera ele
+    // rodar antes de devolver o document ao estado anterior.
+    await new Promise(done => setTimeout(done, 30));
+    globalThis.window = previous.window; globalThis.document = previous.document;
+    globalThis.HTMLElement = previous.HTMLElement; globalThis.Event = previous.Event;
+  }
+});
+
 test('telão do desafio espelha o experimento de cada pessoa sem estourar',
   { skip: challengeDom ? false : 'jsdom não instalado' }, async () => {
   const { JSDOM } = challengeDom;
@@ -388,7 +468,7 @@ test('espelho do experimento aplica os valores (sem ReferenceError) e não remon
 test('o apresentador não vê o experimento grande (só o espelho)', async () => {
   const { readFileSync } = await import('node:fs');
   const css = readFileSync(new URL('../src/finishing.css', import.meta.url), 'utf8');
-  assert.match(css, /#app\[data-role=presenter\] \.challenge-layout>\.challenge-sim\{display:none\}/, 'simulador grande some no telão');
+  assert.match(css, /#app\[data-role=presenter\] \.challenge-layout \.challenge-sim\{display:none\}/, 'simulador grande some no telão');
 });
 
 test('recorte de foto responde 1:1 ao dedo (sem sensibilidade alta)', async () => {
