@@ -254,7 +254,10 @@ function header() {
   // Uma única barra para TODAS as etapas (aula, enquete, quiz, jogos, pódio):
   // os mesmos botões no mesmo lugar. "Conectados" abre a lista de pessoas e
   // "Ao vivo" abre o convite com QR — os dois funcionam em qualquer tela.
-  const connected = state.ranking?.filter(person => person.online).length || 0;
+  // `header()` roda em TODAS as telas, inclusive antes do snapshot chegar
+  // (editor, prévia, reconexão). Sem a guarda, a tela inteira caía com
+  // "Cannot read properties of undefined (reading 'ranking')".
+  const connected = state?.ranking?.filter(person => person.online).length || 0;
   const live = status === 'online' || demo;
   const chip = readOnlyPresentation ? '' : `<button type="button" class="stage-people" data-action="participants" aria-label="${connected} conectado${connected === 1 ? '' : 's'} · ver participantes" title="Ver participantes">${icon('users')}<b>${connected}</b></button>`;
   const pill = state && !readOnlyPresentation
@@ -317,7 +320,7 @@ function joinForm() {
 }
 function participantCount() {
   if (demo) return '';
-  const count = state.ranking?.filter(person => person.online).length || 0;
+  const count = state?.ranking?.filter(person => person.online).length || 0;
   const label = `${icon('users')} ${count} conectado${count === 1 ? '' : 's'}`;
   return count ? `<button class="live-participants" data-action="participants" aria-label="${count} conectado${count === 1 ? '' : 's'} · Ver participantes">${label}</button>` : `<span class="live-participants">${label}</span>`;
 }
@@ -357,7 +360,10 @@ function pollMarkup() {
   }).join('')}</div><p role="status">${p.total} voto${p.total === 1 ? '' : 's'} recebido${p.total === 1 ? '' : 's'}${p.choice !== null ? ' · Seu voto está registrado!' : ''}</p>${host ? `<div class="poll-actions">${!closed ? '<button class="btn primary" data-action="close-poll">Encerrar votação</button>' : ''}<button class="btn secondary" data-action="${state.activity?.type==='poll'?'next-stage':'back-lesson'}">${state.activity?.type==='poll'?(state.activity.hasNext?'Próxima etapa →':'Concluir enquete'):'Voltar ao slide '+(state.slide+1)}</button></div>` : `<p>${closed ? 'Aguarde o professor voltar à apresentação.' : 'Escolha uma opção. Você pode votar uma vez nesta rodada.'}</p>`}</main>`;
 }
 function rankingTable(full = false) {
-  const rank = full ? state.ranking : state.ranking.slice(0, 5);
+  // Snapshot pode chegar sem a lista (aba em segundo plano, jogo em andamento);
+  // sem a guarda a tela inteira caía com "reading 'ranking'".
+  const all = Array.isArray(state?.ranking) ? state.ranking : [];
+  const rank = full ? all : all.slice(0, 5);
   return `<div class="ranking-list">${rank.length ? rank.map((p, i) => `<div class="rank-row ${state.me?.id === p.id ? 'is-me' : ''}"><span class="rank-position">${i === 0 ? '♛' : String(i + 1).padStart(2, '0')}</span><span class="rank-avatar">${avatarContent(p.avatar)}</span><div class="rank-person"><strong>${esc(p.name)}${state.me?.id === p.id ? ' <small>você</small>' : ''}</strong><span>${p.correct} acerto${p.correct === 1 ? '' : 's'}${p.online ? '' : ' · offline'}</span></div><strong class="rank-score">${p.score.toLocaleString('pt-BR')}<small> pts</small></strong></div>`).join('') : '<p class="empty-state">O ranking começa com a primeira resposta.</p>'}</div>`;
 }
 function quiz(){return quizMarkup(state,{header,host,demo,status,shareDialog,shareOpen});}
