@@ -3135,22 +3135,12 @@ button.connection:hover{background:#ffffff14}
 
 /* ===== 43. Times: gradiente da cor do time (não o roxo do site) ===== */
 #app .team-card,#app .team-pick-btn,#app .team-mine,#app .tug-team{--team2:color-mix(in srgb,var(--team) 55%,#111)}
-/* A faixa chapada de 100% de largura no topo do card ("q barra feia de cor
-   solida") vira um selo arredondado: o gradiente fica no próprio bloco, com
-   forma de pílula e brilho interno, em vez de atravessar o card de ponta a
-   ponta. O restante do card mantém a cor do time no gradiente suave. */
-#app .team-card>header{
-  display:flex;width:fit-content;max-width:100%;gap:10px;
-  justify-content:flex-start;align-items:center;flex-wrap:wrap;
-  padding:7px 14px 7px 12px;border-radius:999px;
-  background:
-    radial-gradient(120% 160% at 0% 0%,#ffffff40,transparent 62%),
-    linear-gradient(135deg,var(--team),var(--team2));
-  box-shadow:inset 0 1px 0 #ffffff2e,0 6px 18px color-mix(in srgb,var(--team) 26%,transparent);
-}
-#app .team-card>header b{margin-left:auto}
+/* O bloco com o nome do time não leva fundo. O card inteiro já é da cor do
+   time, então a faixa sólida no topo era uma cor chapada repetida — sem
+   função. Aqui ela simplesmente some: o nome, os pontos e o botão de
+   renomear ficam direto sobre o card. */
+#app .team-card>header{background:none;width:auto;max-width:100%}
 #app .team-pick-btn,#app .team-card .team-photo{background:linear-gradient(135deg,var(--team),var(--team2))}
-#app .team-card>header:has(.team-rename){border-radius:16px}
 #app .team-mine{background:linear-gradient(120deg,color-mix(in srgb,var(--team) 22%,transparent),color-mix(in srgb,var(--team2) 18%,transparent));border-color:color-mix(in srgb,var(--team) 45%,transparent)}
 #app .team-card{border-color:color-mix(in srgb,var(--team) 40%,transparent)}
 #app .team-card>header>strong{color:#fff;text-shadow:0 1px 2px #0006}
@@ -3418,50 +3408,4 @@ button.connection:hover{background:#ffffff14}
 #app[data-role=presenter] .challenge-live-grid{grid-template-columns:repeat(auto-fit,minmax(240px,1fr))}
 @media (max-width:760px){
   #app[data-role=presenter] .challenge-layout aside{display:flex}
-}
-
-/* ===== 48. Chips do topo maiores e sem "bloco verde" chapado =====
-   O "Ao vivo" sólido destoava do resto da barra. Vira vidro: fundo quase
-   transparente, borda fina e um ponto luminoso pulsando. Ícones e toque
-   crescem para 38px (alvo confortável no celular). */
-#app .header .header-right{gap:10px}
-#app .stage-people,
-#app button.connection{
-  display:inline-flex;align-items:center;gap:8px;
-  min-height:38px;padding:0 13px;border-radius:999px;
-  border:1px solid #ffffff24;
-  background:#ffffff0f;
-  backdrop-filter:blur(10px);
-  color:#ece9f6;font:inherit;font-size:13px;font-weight:650;
-  transition:background .15s,border-color .15s,transform .15s;
-}
-#app .stage-people:hover,
-#app button.connection:hover{background:#ffffff1f;border-color:#ffffff38;transform:translateY(-1px)}
-#app .stage-people svg,#app button.connection svg{width:18px;height:18px;opacity:.9}
-#app button.connection>span{
-  width:8px;height:8px;border-radius:50%;flex:none;
-  background:#8b8798;box-shadow:none;
-}
-#app button.connection.connected{
-  color:#dff6e9;border-color:#8fe0b640;background:#7fe0b014;
-}
-#app button.connection.connected>span{
-  background:#7cf0b0;
-  box-shadow:0 0 0 0 #7cf0b080;
-  animation:live-pulse 2s ease-out infinite;
-}
-@keyframes live-pulse{
-  0%{box-shadow:0 0 0 0 #7cf0b077}
-  70%{box-shadow:0 0 0 9px #7cf0b000}
-  100%{box-shadow:0 0 0 0 #7cf0b000}
-}
-#app .header-right>.icon-btn{width:38px;height:38px;border-radius:999px;border:1px solid #ffffff24;background:#ffffff0f;color:#ece9f6}
-#app .header-right>.icon-btn svg{width:19px;height:19px}
-#app .header-right>.icon-btn:hover{background:#ffffff1f}
-@media (prefers-reduced-motion:reduce){#app button.connection.connected>span{animation:none}}
-html[data-motion=reduced] #app button.connection.connected>span{animation:none}
-@media (max-width:800px){
-  #app .stage-people,#app button.connection{min-height:36px;padding:0 11px;font-size:12px}
-  #app .stage-people svg,#app button.connection svg{width:17px;height:17px}
-  #app .header-right>.icon-btn{width:36px;height:36px}
 }
