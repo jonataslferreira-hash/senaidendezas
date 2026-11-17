@@ -266,7 +266,7 @@ test('Cabo de Guerra pré-distribui times no lobby, Relâmpago oculta pular-etap
   assert.match(tugStudentHtml, /data-wide-options="true"/, 'ativa expansão lateral no aparelho do aluno quando há alternativa longa');
   assert.match(tugStudentHtml, /Rodada <b>1<\/b> de 1/, 'aluno recebe 1 pergunta sorteada na rodada atual');
   assert.match(tugOpenHtml, /tug-hidden-score/, 'apresentador oculta porcentagens antes do fim da puxada');
-  assert.match(tugOpenHtml, /tug-grip-hands/, 'bonecos seguram a corda com mãos em primeiro plano');
+  assert.doesNotMatch(tugOpenHtml, /tug-grip-hands/, 'sem mãos extras sobrepostas aos braços do boneco');
 
   // Encerra Cabo de Guerra -> Relâmpago (2 rodadas) -> testa placar intermediário e pódio Top-3!
   room.control('game', { do: 'end' });

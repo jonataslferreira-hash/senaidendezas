@@ -405,3 +405,19 @@ html[data-appearance=light] #app[data-role=student] .callout p{color:#6d5287}
   html[data-ui-style] body #app .editor-shell .designer-insert-more>summary{justify-content:center}
   html[data-ui-style] body #app .editor-shell .designer-toolbar svg{flex:none;width:17px;height:17px}
 }
+
+/* ===== Jogos ao vivo no celular do aluno ===== */
+@media (max-width:800px){
+  /* Pergunta grande não corta: a fonte acompanha a largura da tela */
+  #app[data-role=student] .sv-text{font-size:clamp(18px,5.2vw,25px)}
+  /* A/B/C/D gigantes ocupando a tela */
+  #app[data-role=student] .game-stage .game-options.bare{min-height:58dvh;grid-auto-rows:minmax(0,1fr);align-content:stretch}
+  #app[data-role=student] .game-stage .game-options.bare .game-option{min-height:0}
+  #app[data-role=student] .game-stage .game-options.bare .game-option b{font-size:clamp(44px,16vw,84px)}
+  #app[data-role=student] .answer-options.bare-answers .answer-option{min-height:clamp(110px,20dvh,180px)}
+  /* Experimento: simulador em cima e o botão de tentar sempre ao alcance do dedo */
+  #app .challenge-layout{grid-template-columns:1fr}
+  #app .challenge-sim .simulation-widget{min-height:min(42dvh,380px)}
+  #app .challenge-submit-row{position:sticky;bottom:10px;z-index:6}
+  #app .challenge-live-grid{grid-template-columns:repeat(auto-fill,minmax(140px,1fr))}
+}
