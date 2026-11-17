@@ -529,8 +529,15 @@ function applyRender() {
   studio.editorMusic.setEditing(!state && studio.view === 'editor');
   const form = document.querySelector('#join-form');
   const draftName = form?.querySelector('#player-name')?.value;
-  // O que a pessoa digitou nunca é sobrescrito pelo perfil da conta.
-  if (form && draftName !== undefined) { joinNameDraft = draftName; joinNameTouched = true; selectedAvatar = selectedAvatar || avatars[0]; }
+  // O que a pessoa digitou nunca é sobrescrito pelo perfil da conta — mas só
+  // quando ela REALMENTE digitou algo. Antes, todo render marcava o nome como
+  // "tocado" mesmo com o campo vazio: o valor digitado logo antes de entrar
+  // era ignorado e a pessoa entrava com o nome antigo/da conta ("o nome tá
+  // indo errado"). Campo vazio agora não conta como escolha.
+  if (form && typeof draftName === 'string' && draftName.trim()) {
+    joinNameDraft = draftName; joinNameTouched = true;
+  }
+  if (form) selectedAvatar = selectedAvatar || avatars[0];
   if (form) codeDraft = form.querySelector('#room-code').value;
   viewer.el.remove();
   app.dataset.readOnly = String(readOnlyPresentation);

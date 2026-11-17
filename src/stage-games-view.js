@@ -57,7 +57,7 @@ function teamsView(state, g, host, player) {
     <button type="button" class="btn primary small" data-team-save>Salvar</button>
   </div>` : '';
   const badge = player ? (leading ? '' : mine ? `<p class="team-mine" style="--team:${esc(mine.color)}">Você é do <b>Time ${esc(mine.name)}</b></p>` : picking ? '<p class="game-wait">Toque no time que você quer entrar.</p>' : '') : '';
-  const countControl = host ? `<div class="team-count-control"><label for="team-count-live">Quantos times</label><div class="team-count-row"><select id="team-count-live" data-team-count-select aria-label="Quantos times">${Array.from({ length: 9 }, (_, i) => i + 2).map(n => `<option value="${n}" ${state.teams.length === n ? 'selected' : ''}>${n}</option>`).join('')}</select><button type="button" class="btn secondary small" data-game-do="team-count">Aplicar</button></div></div>` : '';
+  const countControl = host ? `<div class="team-count-control"><label for="team-count-live">Quantos times</label><div class="team-count-row"><select id="team-count-live" data-team-count-select aria-label="Quantos times">${Array.from({ length: 9 }, (_, i) => i + 2).map(n => `<option value="${n}" ${(g.teams?.length || 0) === n ? 'selected' : ''}>${n}</option>`).join('')}</select><button type="button" class="btn secondary small" data-game-do="team-count">Aplicar</button></div></div>` : '';
   return live(badge + choose + leaderTools + teamsBoard(state, { hostTools: host })) +
     live(host ? `${countControl}<p class="game-note">${picking ? 'Os alunos estão escolhendo o time no celular. Quem não escolher entra no time com menos gente.' : 'Os pontos do quiz e das dinâmicas de cada aluno somam para o time. Toque no nome de um aluno para torná-lo líder: o líder pode trocar o nome e a foto do time no celular dele.'}</p>${hostActions(state, [picking ? ['end', 'Fechar escolha', 'primary'] : null, ['shuffle', 'Sortear os times']], { showNext: !picking })}` : `<p class="game-note">${picking ? 'Dá para trocar de time até o professor fechar a escolha.' : 'Cada ponto seu soma para o time. Boa sorte!'}</p>`);
 }
@@ -187,26 +187,33 @@ function applyChallengeMirror(g) {
 
 // Escreve os valores nos campos do experimento na ordem em que aparecem.
 function applySimValues(sim, values, interactive) {
+  if (!sim || !Array.isArray(values)) return false;
   const fields = [...sim.querySelectorAll(':is([data-param],[data-sim-select],[data-sim-text],[data-sim-toggle])')];
   let changed = false;
-    person.values.forEach((value, i) => {
-      const field = fields[i];
-      if (!field) return;
-      const next = String(value);
-      if (field.dataset.simToggle !== undefined) {
-        if (String(field.dataset.value) !== next) { field.dataset.value = next; changed = true; }
-        // Botões de liga/desliga guardam o estado em data-value; refletimos no
-        // aria para leitor de tela e no visual.
-        const on = next === '1' || next === 'true';
-        field.setAttribute('aria-pressed', String(on));
-        field.dataset.on = String(on);
-      } else if (String(field.value) !== next) {
-        field.value = next; changed = true;
-      }
-    });
-    // Repinta a cena da miniatura com os valores novos (o simulador escuta
-    // input/change nos campos; o telão é só leitura).
+  // `values` é a lista de valores do experimento, na ordem dos campos. Antes
+  // esta função lia `person.values` — variável que não existe no escopo —
+  // então o espelho quebrava com ReferenceError e nunca refletia nada.
+  values.forEach((value, i) => {
+    const field = fields[i];
+    if (!field) return;
+    const next = String(value ?? '');
+    if (field.dataset.simToggle !== undefined) {
+      if (String(field.dataset.value) !== next) { field.dataset.value = next; changed = true; }
+      // Botões de liga/desliga guardam o estado em data-value; refletimos no
+      // aria para leitor de tela e no visual.
+      const on = next === '1' || next === 'true';
+      field.setAttribute('aria-pressed', String(on));
+      field.dataset.on = String(on);
+    } else if (field.dataset.simSelect !== undefined || field.tagName === 'SELECT') {
+      if (String(field.value) !== next) { field.value = next; changed = true; }
+    } else if (String(field.value) !== next) {
+      field.value = next; changed = true;
+    }
+  });
+  // Repinta a cena da miniatura com os valores novos (o simulador escuta
+  // input/change nos campos; o telão é só leitura).
   if (changed) for (const field of fields) field.dispatchEvent(new Event('change', { bubbles: true }));
+  return changed;
 }
 
 function challengeView(state, g, host, player) {
@@ -411,7 +418,14 @@ export function keepGame(root, markup, state) {
   if (before.length !== after.length || Boolean(formNow) !== Boolean(formNext)) return false;
   before.forEach((node, index) => {
     const fresh = after[index];
+    if (!fresh) return;
     if (node.innerHTML === fresh.innerHTML) return;
+    // O experimento do desafio (e o quadro do slide) roda animação montada
+    // sobre o nó real: trocar o innerHTML dele mata a animação e ela recomeça
+    // do zero — era o "espelho ao vivo reiniciando toda hora". Esse bloco
+    // nunca é trocado; os campos são atualizados por applyChallengeMirror,
+    // que escreve valor a valor e dispara change, preservando o quadro.
+    if (node.querySelector('[data-challenge-sim] [data-simulation]') || node.matches('[data-challenge-sim]')) return;
     // Corrida: as raias ficam no lugar e só a posição muda, para o boneco deslizar em vez de pular.
     if (node.dataset.soft && node.dataset.soft === fresh.dataset.soft) {
       const fromList = [...node.querySelectorAll('[data-k]')], toList = [...fresh.querySelectorAll('[data-k]')];
