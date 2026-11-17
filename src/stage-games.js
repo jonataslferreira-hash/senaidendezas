@@ -38,7 +38,7 @@ export function defaultGame(type) {
   if (type === 'race') return { type, text: 'Corrida do saber', seconds: 15, questions: [1, 2, 3].map(n => ({ text: 'Pergunta ' + n, options: ['Opção A', 'Opção B'], correct: 0 })) };
   if (type === 'flash') return { type, text: 'Desafio relâmpago', seconds: 10, questions: [1, 2, 3].map(n => ({ text: 'Pergunta ' + n, options: ['Opção A', 'Opção B'], correct: 0 })) };
   if (type === 'survival') return { type, text: 'Uma vida só. Quem sobrevive?', seconds: 15, questions: [{ text: 'Primeira pergunta', options: ['Opção A', 'Opção B'], correct: 0 }] };
-  if (type === 'challenge') return { type, text: 'Ajuste o experimento até chegar à meta.', simulation: 'projectile', answer: [], tolerance: 5 };
+  if (type === 'challenge') return { type, text: 'Ajuste os controles do experimento até a meta. Depois de errar, a dica diz o quão perto você chegou — você tem 3 tentativas!', simulation: 'projectile', answer: [], tolerance: 5 };
   if (type === 'raffle') return { type, text: 'Quem vai responder?' };
   return { type: 'tug', text: 'Cabo de guerra!', options: ['Lado A', 'Lado B'], seconds: 15, tolerance: 10, rounds: [1, 2, 3].map(n => [{ text: 'Pergunta ' + n, options: ['Opção A', 'Opção B'], correct: 0 }]) };
 }
@@ -172,7 +172,7 @@ export function startGame(room, random = Math.random) {
   }
   else if (config.type === 'flash') Object.assign(game, { state: 'ready', round: -1, answers: {}, times: {}, gain: {}, score: {}, wins: {}, fastest: '', deadline: 0 });
   else if (config.type === 'survival') { game.alive = online(room).map(p => p.id); game.fallen = {}; game.round = -1; game.answers = {}; game.deadline = 0; game.state = 'ready'; }
-  else if (config.type === 'challenge') { game.solved = []; game.tries = {}; }
+  else if (config.type === 'challenge') { game.solved = []; game.tries = {}; game.live = {}; }
   else if (config.type === 'raffle') { game.picked = []; game.current = ''; game.drawAt = 0; game.revealAt = 0; }
   else if (config.type === 'tug') {
     // Rodada por rodada: cada rodada possui até 3 perguntas e cada participante recebe 1 sorteada aleatoriamente.
@@ -310,6 +310,8 @@ export function tickGame(room) {
 export function revealFlash(room) {
   const game = room.data.game;
   if (!game || game.type !== 'flash' || game.state !== 'open') return;
+  game.streak = game.streak || {};
+  for (const p of room.data.players) if (p.online && !Object.hasOwn(game.answers, p.id)) game.streak[p.id] = 0;
   game.state = 'reveal'; game.revealAt = room.now();
 }
 function advanceFlash(room) {
@@ -406,7 +408,10 @@ function finishRace(room) {
 export function gameInput(room, playerId, payload) {
   const d = room.data, game = d.game, config = room.slides[d.slide]?.game, player = d.players.find(p => p.id === playerId);
   if (!player || d.phase !== 'game' || !game || !config) throw Error('Esta etapa já mudou.');
-  if (game.state !== 'open') throw Error(['survival', 'tug', 'race', 'flash'].includes(game.type) && game.state !== 'done' ? 'Aguarde a próxima pergunta.' : 'Esta rodada já terminou.');
+  // Times já formados (state 'done') continuam editáveis pelo líder: nome e foto
+  // são personalização da equipe, não resposta de rodada.
+  const teamsCustom = game.type === 'teams' && payload && typeof payload === 'object' && payload.teamCustom;
+  if (game.state !== 'open' && !teamsCustom) throw Error(['survival', 'tug', 'race', 'flash'].includes(game.type) && game.state !== 'done' ? 'Aguarde a próxima pergunta.' : 'Esta rodada já terminou.');
   if (!payload || typeof payload !== 'object') throw Error('Resposta inválida.');
   if (game.type === 'survival') {
     const question = config.questions[game.round], choice = payload.choice;
@@ -484,20 +489,39 @@ export function gameInput(room, playerId, payload) {
     if (!Number.isInteger(choice) || choice < 0 || choice >= question.options.length) throw Error('Resposta inválida.');
     if (Object.hasOwn(game.answers, playerId)) throw Error('Você já respondeu.');
     game.answers[playerId] = choice; game.times[playerId] = room.now() - game.startedAt;
+    game.streak = game.streak || {};
     if (choice === question.correct) {
       const span = Math.max(1, config.seconds * 1000), took = Math.max(0, Math.min(span, game.times[playerId]));
       let gain = FLASH_HIT + Math.round(FLASH_SPEED * (1 - took / span));
       if (!game.fastest) { game.fastest = playerId; gain += FLASH_FIRST; game.wins[playerId] = (game.wins[playerId] || 0) + 1; }
       game.gain[playerId] = gain; game.score[playerId] = (game.score[playerId] || 0) + gain; bonus(player, gain);
-    }
+      game.streak[playerId] = (game.streak[playerId] || 0) + 1; // ofensiva: acertos seguidos
+    } else game.streak[playerId] = 0; // errou: a ofensiva zera
     if (online(room).every(p => Object.hasOwn(game.answers, p.id))) revealFlash(room);
   } else if (game.type === 'challenge') {
     if (game.solved.some(item => item.player === playerId)) throw Error('Você já acertou!');
-    const now = room.now();
+    const now = room.now(), values = Array.isArray(payload.values) ? payload.values.slice(0, 16) : null;
+    // Prévia ao vivo: o apresentador vê os controles de cada time mexendo em
+    // tempo real, sem contar como tentativa.
+    if (payload.peek) {
+      if (now - (game.live?.[playerId]?.at || 0) < 1200) return;
+      game.live = game.live || {};
+      game.live[playerId] = { values, at: now };
+      return;
+    }
     if (now - (game.tries[playerId]?.at || 0) < 1500) throw Error('Espere um instante antes de tentar de novo.');
+    if ((game.tries[playerId]?.n || 0) >= 3) throw Error('Suas 3 tentativas acabaram!');
     const tries = (game.tries[playerId]?.n || 0) + 1;
-    const ok = challengeMatches(config, Array.isArray(payload.values) ? payload.values.slice(0, 16) : null);
-    game.tries[playerId] = { n: tries, at: now, ok };
+    const ok = challengeMatches(config, values);
+    // Dica por controle depois de errar: o quão perto cada ajuste está da meta.
+    const hints = ok ? null : (config.answer || []).map((item, index) => {
+      if (item.skip || item.k === 'text') return null;
+      if (item.k !== 'range') return String(values?.[index]) === String(item.v) ? 'hot' : 'cold';
+      const sent = Number(values?.[index]), wanted = Number(item.v), span = Math.abs((item.max ?? 100) - (item.min ?? 0)) || 1;
+      const off = Math.abs(sent - wanted) / span * 100;
+      return off <= (config.tolerance || 5) ? 'hot' : off <= (config.tolerance || 5) * 3 ? 'warm' : 'cold';
+    });
+    game.tries[playerId] = { n: tries, at: now, ok, hints };
     if (ok) { game.solved.push({ player: playerId, at: now - game.startedAt, tries }); bonus(player, game.solved.length === 1 ? CHALLENGE_FIRST : CHALLENGE_POINTS); }
   } else throw Error('Esta etapa não recebe respostas.');
 }
@@ -530,9 +554,9 @@ export function gameSnapshot(room, playerId, bare = false) {
     return { ...base, round: game.round, rounds: config.questions.length, seconds: config.seconds, deadline: game.deadline,
       question: ask(question, { ...(shown || presenter ? { correct: question?.correct } : {}), ...(shown ? { counts: question?.options.map((_, i) => Object.values(game.answers).filter(v => v === i).length) } : {}) }),
       answered: Object.keys(game.answers).length, total: online(room).length, fastest: game.state === 'reveal' ? who(game.fastest) : null, points: [FLASH_HIT, FLASH_HIT + FLASH_SPEED, FLASH_FIRST],
-      board: order.slice(0, 30).map(id => ({ ...who(id), score: game.score[id], gain: game.gain[id] || 0, wins: game.wins[id] || 0 })).filter(item => item.id),
+      board: order.slice(0, 30).map(id => ({ ...who(id), score: game.score[id], gain: game.gain[id] || 0, wins: game.wins[id] || 0, streak: (game.streak || {})[id] || 0 })).filter(item => item.id),
       ...(teamBoard ? { teamBoard } : {}),
-      me: playerId ? { choice: Object.hasOwn(game.answers, playerId) ? game.answers[playerId] : null, gain: shown ? (game.gain[playerId] || 0) : 0, right: shown ? Object.hasOwn(game.gain, playerId) : false, first: shown ? game.fastest === playerId : false, score: game.score[playerId] || 0, rank: order.indexOf(playerId) + 1 } : null };
+      me: playerId ? { choice: Object.hasOwn(game.answers, playerId) ? game.answers[playerId] : null, gain: shown ? (game.gain[playerId] || 0) : 0, right: shown ? Object.hasOwn(game.gain, playerId) : false, first: shown ? game.fastest === playerId : false, score: game.score[playerId] || 0, rank: order.indexOf(playerId) + 1, streak: (game.streak || {})[playerId] || 0 } : null };
   }
   if (game.type === 'survival') {
     const question = game.round >= 0 ? config.questions[game.round] : null, shown = game.state === 'reveal' || done;
@@ -545,9 +569,12 @@ export function gameSnapshot(room, playerId, bare = false) {
   }
   if (game.type === 'challenge') {
     const mine = playerId ? game.tries[playerId] : null, place = game.solved.findIndex(item => item.player === playerId);
-    return { ...base, simulation: config.simulation, solved: game.solved.slice(0, 10).map(item => ({ ...who(item.player), at: item.at, tries: item.tries })), solvedCount: game.solved.length, trying: Object.keys(game.tries).length,
-      me: playerId ? { tries: mine?.n || 0, ok: place >= 0, place: place + 1, points: place === 0 ? CHALLENGE_FIRST : CHALLENGE_POINTS } : null,
-      ...(done || presenter ? { answer: config.answer.filter(item => !item.skip && item.k !== 'text').map(item => ({ label: item.label, v: item.v })) } : {}) };
+    // Experimentos ao vivo no telão: cada time aparecendo com os controles
+    // atuais enquanto mexe (prévia enviada pelos alunos, sem contar tentativa).
+    const live = Object.entries(game.live || {}).map(([id, item]) => ({ ...who(id), values: item.values, at: item.at, tries: game.tries[id]?.n || 0, ok: game.solved.some(s => s.player === id) })).filter(item => item.id && item.values).slice(0, 12);
+    return { ...base, simulation: config.simulation, solved: game.solved.slice(0, 10).map(item => ({ ...who(item.player), at: item.at, tries: item.tries })), solvedCount: game.solved.length, trying: Object.keys(game.tries).length, maxTries: 3, live,
+      me: playerId ? { tries: mine?.n || 0, ok: place >= 0, place: place + 1, points: place === 0 ? CHALLENGE_FIRST : CHALLENGE_POINTS, hints: mine?.hints || null } : null,
+      ...(done ? { answer: config.answer.filter(item => !item.skip && item.k !== 'text').map(item => ({ label: item.label, v: item.v })) } : {}) };
   }
   if (game.type === 'raffle') return { ...base, current: who(game.current), drawAt: game.drawAt, revealAt: game.revealAt || (game.drawAt ? game.drawAt + 2800 : 0), draws: game.draws || 0, left: online(room).filter(p => !game.picked.includes(p.id)).length, names: online(room).slice(0, 40).map(p => p.name), me: playerId ? game.current === playerId : false };
   if (game.type === 'race') {
