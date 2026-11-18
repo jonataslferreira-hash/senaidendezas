@@ -483,6 +483,12 @@ function stageHead(g) {
   if (g.type === 'challenge') {
     return `<div class="game-head-row game-head-single"><span class="game-eyebrow">${gameIcon('challenge')} ${typeName.toUpperCase()}</span>${meta}</div>`;
   }
+  // Equipes: o placar dos times já diz do que se trata, não precisa do título
+  // "Que comecem os jogos!" como cabeçalho gigante na tela do aluno nem no
+  // telão/PC conectado.
+  if (g.type === 'teams') {
+    return `<div class="game-head-row game-head-single"><span class="game-eyebrow">${gameIcon('teams')} ${typeName.toUpperCase()}</span>${meta}</div>`;
+  }
   if (duplicatesType) {
     return `<div class="game-head-row game-head-single"><h1 class="game-hero-title"><span class="game-hero-icon" aria-hidden="true">${gameIcon(g.type)}</span>${esc(titleText || typeName)}</h1>${meta}</div>`;
   }

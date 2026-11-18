@@ -901,7 +901,7 @@ html[data-theme][data-ui-style][data-appearance] body #app dialog.remote-v2 :is(
 #app .tug-tap small{font-size:13px;opacity:.9;max-width:20ch;margin:0 auto}
 #app .tug-tap.pulse{animation:tug-pulse .16s}
 @keyframes tug-pulse{50%{transform:scale(.93)}}
-@media (max-width:760px){#app .game-stage{padding:12px 14px 22px;gap:12px}#app .game-options{grid-template-columns:1fr}#app .game-option{min-height:68px}#app .team-board{grid-template-columns:repeat(2,minmax(0,1fr))}#app .challenge-layout{grid-template-columns:1fr}#app .tug-rope{grid-template-columns:1fr 1fr}#app .tug-track{grid-column:1/-1;grid-row:1}#app .cloud-form{flex-direction:column}}
+@media (max-width:760px){#app .game-stage{padding:12px 14px 22px;gap:12px;overflow-y:auto}#app .game-options{grid-template-columns:1fr}#app .game-option{min-height:68px}#app .team-board{grid-template-columns:1fr;gap:10px}#app .team-board.compact{grid-template-columns:1fr}#app .team-card{padding:10px 12px}#app .challenge-layout{grid-template-columns:1fr}#app .tug-rope{grid-template-columns:1fr 1fr}#app .tug-track{grid-column:1/-1;grid-row:1}#app .cloud-form{flex-direction:column}}
 @media (prefers-reduced-motion:reduce){:root:not([data-motion=normal]):not([data-play]) #app .game-stage *{animation:none!important;transition:none!important}}
 
 /* 34. Editor das etapas interativas */
