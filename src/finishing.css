@@ -3614,3 +3614,65 @@ button.connection:hover{background:#ffffff14}
 #app .game-character[data-mood="working"] .buddy-hand{animation:working-hands .55s ease-in-out infinite alternate}
 @keyframes character-working{0%,100%{transform:translateY(0)}50%{transform:translateY(-5px)}}
 @keyframes working-hands{from{transform:rotate(-12deg) translateY(3px)}to{transform:rotate(12deg) translateY(-3px)}}
+
+/* Equipes e desafio: a altura é rolável em vez de comprimir e sobrepor blocos. */
+#app.quiz-party > main.game-stage[data-game-type="teams"],
+#app.quiz-party > main.game-stage[data-game-type="challenge"] {
+  overflow-y:auto; overflow-x:hidden; min-height:0; height:100%;
+  justify-content:flex-start; overscroll-behavior:contain;
+  -webkit-overflow-scrolling:touch;
+}
+#app .game-stage:is([data-game-type="teams"],[data-game-type="challenge"]) > * { flex-shrink:0; }
+#app .game-stage:is([data-game-type="teams"],[data-game-type="challenge"]) > .game-head { margin-top:auto; }
+#app .game-stage:is([data-game-type="teams"],[data-game-type="challenge"]) > :last-child { margin-bottom:auto; }
+#app .game-stage[data-game-type="teams"] .game-live { flex-shrink:0; }
+#app .game-stage[data-game-type="teams"] .team-board { min-height:max-content; }
+#app .team-card > header.has-photo { display:flex; flex-wrap:nowrap; align-items:center; }
+#app .team-card > header.has-photo .team-photo { width:44px; height:44px; flex:none; }
+#app .team-card > header.has-photo > b { font-size:clamp(17px,2.4vh,22px); }
+#app .team-card > header.has-photo > strong { flex:1; min-width:0; }
+#app .team-card > header.has-photo .team-rename { flex:none; }
+@media (max-width:800px) {
+  #app .game-stage[data-game-type="teams"] .team-leader-tools { width:100%; box-sizing:border-box; }
+  #app .game-stage[data-game-type="teams"] .team-leader-actions { display:grid; grid-template-columns:repeat(auto-fit,minmax(125px,1fr)); gap:10px; }
+  #app .game-stage[data-game-type="teams"] .team-leader-actions .btn { min-width:0; min-height:44px; }
+  #app .game-stage[data-game-type="teams"] .game-note { padding:4px 2px; }
+}
+
+/* No computador do aluno, o experimento fica centralizado e sem coluna vazia. */
+#app .challenge-layout { max-height:none; overflow:visible; }
+#app[data-role="student"] .challenge-layout { display:block; width:min(100%,1000px); margin-inline:auto; }
+#app[data-role="student"] .challenge-stage { width:100%; }
+#app[data-role="student"] .challenge-sim .simulation-widget {
+  height:auto; max-height:none; min-height:0; overflow:visible;
+  grid-template-rows:auto auto auto auto auto auto;
+}
+#app[data-role="student"] .challenge-sim .simulation-widget > svg {
+  height:clamp(200px,30dvh,340px); min-height:200px;
+}
+#app .challenge-goal { text-align:center; background:none; border:0; padding:0; }
+#app .game-live.game-command .challenge-goal { padding:0; }
+#app[data-role="presenter"] .challenge-layout .challenge-side { display:flex; width:100%; }
+#app[data-role="presenter"] .game-command { text-align:center; }
+#app[data-role="presenter"] .challenge-goal { width:100%; }
+#app .challenge-live { width:100%; min-width:0; }
+#app .challenge-live-grid { grid-template-columns:repeat(2,minmax(0,1fr)); }
+#app .challenge-live-grid[data-teams="3"] { grid-template-columns:repeat(3,minmax(0,1fr)); }
+#app .challenge-live-grid[data-teams="4"] { grid-template-columns:repeat(2,minmax(0,1fr)); }
+#app .challenge-live-card { min-width:0; }
+#app .challenge-live-identity { display:flex; align-items:center; gap:8px; flex:1; min-width:0; }
+#app .challenge-live-identity strong { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+#app .challenge-live-card .team-photo-fallback { display:grid; place-items:center; background:var(--team,#66538f); color:white; font-weight:800; }
+#app .challenge-live-sim { overflow:visible; }
+#app .challenge-live-sim .simulation-widget { transform:none; width:100%; height:auto; overflow:visible; }
+#app .challenge-live-sim .simulation-widget > svg { width:100%; height:clamp(190px,31dvh,360px); min-height:190px; flex:none; }
+#app .challenge-live-sim [data-sim-play] { display:none; }
+#app .challenge-live-sim .simulation-result { font-size:11px; }
+@media (max-width:800px) {
+  #app .challenge-live-grid[data-teams="3"] { grid-template-columns:repeat(2,minmax(0,1fr)); }
+  #app .challenge-submit-row { position:static; grid-template-columns:auto minmax(0,1fr); }
+  #app .challenge-submit-row .challenge-tries { grid-column:1 / -1; justify-content:center; }
+}
+@media (max-width:480px) {
+  #app .challenge-live-grid, #app .challenge-live-grid[data-teams="3"], #app .challenge-live-grid[data-teams="4"] { grid-template-columns:minmax(0,1fr); }
+}
