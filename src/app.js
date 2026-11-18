@@ -950,7 +950,7 @@ async function action(name) {
     case 'leave': focusView.close(); leave(); break;
     case 'focus-item': if(state?.phase==='lesson'&&slides[state.slide])focusView.open(slides[state.slide]); break;
     case 'toggle-qr': presenterSettings.qrVisible=!presenterSettings.qrVisible;savePresenterSettings(presenterSettings);render();showPresentationControls();break;
-    case 'next-stage':music=true;control('next-stage');break;
+    case 'next-stage':shareOpen=false;music=true;control('next-stage');break;
     case 'next-slide': if(pendingPptxBuild()){control('animation',nextBuildStep());break;}if(state.activity){const ids=state.activity.slideIndices,next=ids[ids.indexOf(state.slide)+1];if(next===undefined)control('next-stage');else control('slide',next);}else control('slide', Math.min(slides.length - 1, state.slide + 1)); break;
     case 'previous': if(state.animationStep>0){control('animation',animationGroups().filter(group=>group<state.animationStep).at(-1)||0);break;}control('slide',state.activity?state.activity.slideIndices[Math.max(0,state.activity.slideIndices.indexOf(state.slide)-1)]:Math.max(0,state.slide-1)); break;
     case 'quiz': gameAudio.unlock();music = true; control('quiz'); break;
