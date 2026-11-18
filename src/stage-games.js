@@ -23,6 +23,25 @@ export const gameHints = {
   race: 'Cada acerto faz o boneco correr. Resposta rápida vai mais longe'
 };
 export const teamPalette = [['Azul', '#3b82f6'], ['Laranja', '#f97316'], ['Verde', '#22c55e'], ['Rosa', '#ec4899'], ['Roxo', '#a855f7'], ['Ciano', '#06b6d4'], ['Amarelo', '#eab308'], ['Vermelho', '#ef4444'], ['Lima', '#84cc16'], ['Magenta', '#d946ef']];
+// Gradiente do time: a cor do time + uma segunda cor derivada (roda o matiz).
+// Usado no cabo de guerra quando 4 times formam 2 duplas ("azul e verde").
+export function teamGradient(color, shift = 95) {
+  const hex = String(color || '').replace('#', '');
+  if (!/^[0-9a-f]{6}$/i.test(hex)) return { a: color, b: color };
+  const n = parseInt(hex, 16);
+  const r = (n >> 16 & 255) / 255, g = (n >> 8 & 255) / 255, b = (n & 255) / 255;
+  const max = Math.max(r, g, b), min = Math.min(r, g, b), d = max - min, l = (max + min) / 2;
+  const sat = d === 0 ? 0 : d / (1 - Math.abs(2 * l - 1));
+  let h = 0;
+  if (d) h = max === r ? 60 * (((g - b) / d) % 6) : max === g ? 60 * ((b - r) / d + 2) : 60 * ((r - g) / d + 4);
+  h = (h + 360) % 360;
+  const hsl = deg => {
+    const dd = ((deg % 360) + 360) % 360, c = (1 - Math.abs(2 * l - 1)) * sat, x = c * (1 - Math.abs((dd / 60) % 2 - 1)), m = l - c / 2;
+    const [rr, gg, bb] = dd < 60 ? [c, x, 0] : dd < 120 ? [x, c, 0] : dd < 180 ? [0, c, x] : dd < 240 ? [0, x, c] : dd < 300 ? [x, 0, c] : [c, 0, x];
+    return [rr + m, gg + m, bb + m].map(v => Math.round(Math.max(0, Math.min(1, v)) * 255).toString(16).padStart(2, '0')).join('');
+  };
+  return { a: '#' + hex.toLowerCase(), b: '#' + hsl(h + shift) };
+}
 export const SURVIVAL_POINTS = 500;
 export const FLASH_POINTS = 500, CHALLENGE_FIRST = 500, CHALLENGE_POINTS = 300, TUG_POINTS = 200;
 export const TUG_ROUNDS = 12, TUG_VARIANTS = 3, TUG_QUESTIONS_PER_PLAYER = 3, TUG_HIT = 100, TUG_PULL_MS = 5800, TUG_BETWEEN_MS = 2200;
@@ -38,7 +57,10 @@ export function defaultGame(type) {
   if (type === 'race') return { type, text: 'Corrida do saber', seconds: 15, questions: [1, 2, 3].map(n => ({ text: 'Pergunta ' + n, options: ['Opção A', 'Opção B'], correct: 0 })) };
   if (type === 'flash') return { type, text: 'Desafio relâmpago', seconds: 10, questions: [1, 2, 3].map(n => ({ text: 'Pergunta ' + n, options: ['Opção A', 'Opção B'], correct: 0 })) };
   if (type === 'survival') return { type, text: 'Uma vida só. Quem sobrevive?', seconds: 15, questions: [{ text: 'Primeira pergunta', options: ['Opção A', 'Opção B'], correct: 0 }] };
-  if (type === 'challenge') return { type, text: 'Ajuste os controles do experimento até a meta. Depois de errar, a dica diz o quão perto você chegou — você tem 3 tentativas!', simulation: 'projectile', answer: [], tolerance: 5 };
+  if (type === 'challenge') return { type, text: 'Cheguem juntos na resposta do experimento!', simulation: 'projectile', answer: [], tolerance: 5,
+    // Dicas padrão (o professor troca no editor): uma por tentativa do líder.
+    hints: ['O valor certo está mais alto do que está agora.', 'Está quase: ajuste fino, pouca coisa acima.', 'O último passo é pequeno — confie no palpite do time.'],
+    hintSeconds: 20, leaderMode: true };
   if (type === 'raffle') return { type, text: 'Quem vai responder?' };
   return { type: 'tug', text: 'Cabo de guerra!', options: ['Lado A', 'Lado B'], seconds: 15, tolerance: 10, rounds: [1, 2, 3].map(n => [{ text: 'Pergunta ' + n, options: ['Opção A', 'Opção B'], correct: 0 }]) };
 }
@@ -98,6 +120,12 @@ export function validateGame(game, draft = false, simulationIds = null) {
       ...(item.skip ? { skip: true } : {})
     }));
     if (!draft && !result.answer.some(item => !item.skip && item.k !== 'text')) throw Error('No desafio do experimento, ajuste os controles e marque a resposta certa.');
+    // Dicas por rodada: o líder mexe, o time adivinha. Texto livre, curto.
+    // `hints` pode vir como string (uma dica por linha) ou lista.
+    const hintList = Array.isArray(game.hints) ? game.hints : String(game.hints || '').split('\n');
+    result.hints = hintList.map(item => text(item, 160).trim()).filter(Boolean).slice(0, 12);
+    result.hintSeconds = Math.max(5, Math.min(90, Math.round(Number(game.hintSeconds) || 20)));
+    result.leaderMode = game.leaderMode !== false; // padrão: só o líder mexe
   }
   return result;
 }
@@ -143,9 +171,17 @@ export function settleTeams(room) {
   room.data.teamPick = false;
   for (const p of room.data.players) assignTeam(room, p);
 }
+// Cores dos times sorteadas, não na ordem fixa do palette (azul, laranja…).
+// Sempre que possível ninguém repete cor: o sorteio só insiste quando a turma
+// tem mais times do que cores.
+export function drawTeamColors(count, random = Math.random) {
+  const pool = [...teamPalette], picked = [];
+  for (let i = 0; i < count; i++) { const at = Math.floor(random() * pool.length); picked.push(pool.splice(at, 1)[0]); }
+  return picked;
+}
 export function formTeams(room, count, random = Math.random) {
   const d = room.data;
-  d.teams = teamPalette.slice(0, Math.max(2, Math.min(10, count))).map(([name, color]) => ({ name, color }));
+  d.teams = drawTeamColors(Math.max(2, Math.min(10, count)), random).map(([name, color]) => ({ name, color }));
   const players = [...d.players];
   for (let i = players.length - 1; i > 0; i--) { const j = Math.floor(random() * (i + 1)); [players[i], players[j]] = [players[j], players[i]]; }
   players.forEach((player, index) => { player.team = index % d.teams.length; });
@@ -172,11 +208,16 @@ export function startGame(room, random = Math.random) {
   }
   else if (config.type === 'flash') Object.assign(game, { state: 'ready', round: -1, answers: {}, times: {}, gain: {}, score: {}, wins: {}, fastest: '', deadline: 0 });
   else if (config.type === 'survival') { game.alive = online(room).map(p => p.id); game.fallen = {}; game.round = -1; game.answers = {}; game.deadline = 0; game.state = 'ready'; }
-  else if (config.type === 'challenge') { game.solved = []; game.tries = {}; game.live = {}; }
+  else if (config.type === 'challenge') {
+    // Desafio em rodadas: o líder de cada time mexe no experimento; o resto do
+    // time recebe uma dica e escreve a resposta. Cada rodada tem seu palpite.
+    Object.assign(game, { solved: [], tries: {}, live: {}, hint: '', hintAt: 0, guesses: {}, guessesAt: {}, round: -1,
+      openForGuess: false, hintCount: (config.hints || []).length || 1, lastGuess: null });
+  }
   else if (config.type === 'raffle') { game.picked = []; game.current = ''; game.drawAt = 0; game.revealAt = 0; }
   else if (config.type === 'tug') {
     // Rodada por rodada: cada rodada possui até 3 perguntas e cada participante recebe 1 sorteada aleatoriamente.
-    Object.assign(game, { state: 'ready', sides: {}, round: -1, rounds: config.rounds.length, picks: {}, answers: {}, hits: [0, 0], tries: [0, 0], playerHits: {}, playerAnswered: {}, lastFeedback: {}, lastPull: null, winner: -1, deadline: 0, betweenAt: 0, pullAt: 0, roundFinalized: false });
+    Object.assign(game, { state: 'ready', sides: {}, round: -1, rounds: config.rounds.length, roundAnswers: {}, answers: {}, hits: [0, 0], tries: [0, 0], playerHits: {}, playerAnswered: {}, lastFeedback: {}, lastPull: null, winner: -1, deadline: 0, betweenAt: 0, pullAt: 0, roundFinalized: false });
     for (const p of online(room)) tugSide(room, p);
   }
   else if (config.type === 'race') Object.assign(game, { state: 'ready', round: -1, answers: {}, times: {}, dist: {}, gain: {}, spent: {}, order: [], deadline: 0 });
@@ -188,15 +229,13 @@ export function syncGameJoin(room, player) {
   if (d.phase !== 'game' || !game || !player) return;
   if (game.type === 'tug') {
     if (!Object.hasOwn(game.sides, player.id)) tugSide(room, player);
-    if (game.state === 'open' && game.round >= 0 && !Object.hasOwn(game.picks || {}, player.id)) {
-      const roundQs = config?.rounds?.[game.round] || [];
-      if (roundQs.length) game.picks[player.id] = Math.floor(Math.random() * roundQs.length);
-    }
   }
   if (game.type === 'survival' && game.state === 'ready' && !game.alive.includes(player.id)) game.alive.push(player.id);
 }
 
 export function gameControl(room, value, random = Math.random) {
+  // Nunca derruba a dinâmica por um valor inesperado: o erro sobe limpo e o
+  // apresentador vê o aviso, a sala continua de pé.
   const d = room.data, game = d.game, config = room.slides[d.slide]?.game, action = value?.do;
   if (d.phase !== 'game' || !game || !config) throw Error('Esta ação não está disponível agora.');
   if (action === 'restart') { startGame(room, random); return; }
@@ -207,12 +246,34 @@ export function gameControl(room, value, random = Math.random) {
     game.state = 'done'; game.resultStartedAt = room.now(); return;
   }
   if (game.type === 'teams' && action === 'shuffle') { d.teamPick = false; formTeams(room, config.count, random); game.state = 'done'; return; }
+  // Desafio: o professor decide se só o líder mexe ou se todo mundo pode mexer,
+  // e pode disparar a próxima dica na mão quando a turma travar.
+  if (game.type === 'challenge' && action === 'challenge-mode') {
+    game.leaderMode = value.mode !== 'all';
+    game.freeForAll = value.mode === 'all';
+    return;
+  }
+  if (game.type === 'challenge' && action === 'next-hint') {
+    const list = config.hints || [];
+    game.round = Math.min(Math.max(0, list.length - 1), (game.round || 0) + 1);
+    game.hint = list[game.round] || '';
+    game.hintAt = room.now();
+    game.openForGuess = true;
+    return;
+  }
   // O apresentador pode mudar a quantidade de times na hora: preserva nome,
   // foto e líder dos times que continuam e realoca quem ficou fora.
   if (game.type === 'teams' && action === 'team-count') {
     const count = Math.max(2, Math.min(10, Math.floor(Number(value?.count) || 2)));
     const previous = d.teams || [];
-    d.teams = Array.from({ length: count }, (_, i) => previous[i] || { name: teamPalette[i][0], color: teamPalette[i][1] });
+    const used = new Set(previous.map(team => team.color));
+    const spare = drawTeamColors(teamPalette.length, random).filter(([, color]) => !used.has(color));
+    let next = 0;
+    d.teams = Array.from({ length: count }, (_, i) => {
+      if (previous[i]) return previous[i];
+      const picked = spare[next++] || teamPalette[i];
+      return { name: picked[0], color: picked[1] };
+    });
     config.count = count;
     for (const p of d.players) {
       if (Number.isInteger(p.team) && p.team >= count) p.team = null;
@@ -330,15 +391,14 @@ function openTugRound(room, roundIndex, random = Math.random) {
   game.round = roundIndex;
   game.state = 'open';
   game.answers = {};
-  game.picks = {};
+  game.roundAnswers = {};
   game.roundFinalized = false;
   game.betweenAt = 0;
   game.startedAt = room.now();
   game.deadline = room.now() + Math.max(config.seconds || 15, 5) * 1000;
-  for (const p of online(room)) {
-    tugSide(room, p);
-    game.picks[p.id] = Math.floor(random() * roundQs.length);
-  }
+  // Nada de sorteio: todo mundo do time recebe as mesmas perguntas da rodada,
+  // todas em sequência — o placar fica justo entre os lados.
+  for (const p of online(room)) tugSide(room, p);
 }
 // Com times formados, os times 1 e 3 ficam de um lado e os 2 e 4 do outro.
 function tugSide(room, player) {
@@ -348,14 +408,27 @@ function tugSide(room, player) {
   return game.sides[player.id] = room.data.teams?.length && Number.isInteger(player.team) ? player.team % 2 : size(0) <= size(1) ? 0 : 1;
 }
 export function tugScore(game) { return [0, 1].map(side => game.tries[side] ? Math.round(game.hits[side] / game.tries[side] * 100) : 0); }
+// Rodada encerra quando todos os que estão online responderam todas as
+// perguntas daquela rodada.
+function roundFinished(room) {
+  const d = room.data, game = d.game, config = room.slides[d.slide]?.game;
+  const total = (config?.rounds?.[game.round] || []).length;
+  if (!total) return true;
+  const everyone = online(room);
+  if (!everyone.length) return false;
+  return everyone.every(p => (game.roundAnswers?.[p.id] || []).length >= total);
+}
 // Ao encerrar a rodada pelo tempo ou comando do professor, quem está online e não respondeu conta como tentativa perdida.
 function finalizeTugRound(room) {
-  const d = room.data, game = d.game;
+  const d = room.data, game = d.game, config = room.slides[d.slide]?.game;
   if (!game || game.type !== 'tug' || game.roundFinalized) return;
   game.roundFinalized = true;
   for (const p of online(room)) {
     const side = tugSide(room, p);
-    if (!Object.hasOwn(game.answers, p.id)) game.tries[side]++;
+    const answered = (game.roundAnswers?.[p.id] || []).length;
+    const total = (config?.rounds?.[game.round] || []).length || 1;
+    // Cada pergunta não respondida conta como erro do lado.
+    game.tries[side] += Math.max(0, total - answered);
   }
 }
 function concludeTugRound(room) {
@@ -445,13 +518,19 @@ export function gameInput(room, playerId, payload) {
     const side = tugSide(room, player);
     const roundQs = config.rounds[game.round] || [];
     if (room.now() >= game.deadline) throw Error('O tempo desta pergunta acabou.');
-    if (Object.hasOwn(game.answers, playerId)) throw Error('Você já respondeu esta rodada.');
     const sentRound = payload.round ?? payload.step;
     if (sentRound !== undefined && sentRound !== game.round) throw Error('Esta rodada já avançou.');
-    if (!Object.hasOwn(game.picks, playerId)) game.picks[playerId] = Math.floor(Math.random() * Math.max(1, roundQs.length));
-    const question = roundQs[game.picks[playerId]], choice = payload.choice;
+    // Cada pessoa responde as perguntas da rodada em ordem: o índice vem no
+    // envio (v) e a mesma pergunta não pode ser respondida duas vezes.
+    const index = Number.isInteger(payload.v) ? payload.v : 0;
+    const question = roundQs[index], choice = payload.choice;
     if (!question || !Number.isInteger(choice) || choice < 0 || choice >= question.options.length) throw Error('Resposta inválida.');
+    game.roundAnswers = game.roundAnswers || {};
+    game.roundAnswers[playerId] = game.roundAnswers[playerId] || [];
+    if (game.roundAnswers[playerId].includes(index)) throw Error('Você já respondeu esta pergunta.');
+    game.roundAnswers[playerId].push(index);
     game.answers[playerId] = choice;
+    // Conta a tentativa (e o acerto) no lado assim que a resposta chega.
     game.tries[side]++;
     game.playerAnswered[playerId] = (game.playerAnswered[playerId] || 0) + 1;
     const right = choice === question.correct;
@@ -461,10 +540,8 @@ export function gameInput(room, playerId, payload) {
       bonus(player, TUG_HIT);
       game.lastPull = { side, name: player.name, round: game.round, at: room.now() };
     }
-    game.lastFeedback[playerId] = { right, choice, correct: question.correct, round: game.round, at: room.now() };
-    if (online(room).every(p => Object.hasOwn(game.answers, p.id))) {
-      concludeTugRound(room);
-    }
+    game.lastFeedback[playerId] = { right, choice, correct: question.correct, round: game.round, at: room.now(), index };
+    if (roundFinished(room)) concludeTugRound(room);
     return;
   }
   if (game.type === 'race') {
@@ -499,8 +576,20 @@ export function gameInput(room, playerId, payload) {
     } else game.streak[playerId] = 0; // errou: a ofensiva zera
     if (online(room).every(p => Object.hasOwn(game.answers, p.id))) revealFlash(room);
   } else if (game.type === 'challenge') {
-    if (game.solved.some(item => item.player === playerId)) throw Error('Você já acertou!');
     const now = room.now(), values = Array.isArray(payload.values) ? payload.values.slice(0, 16) : null;
+    // Palpite de quem não está mexendo: cada pessoa escreve o que acha da
+    // resposta, quantas vezes quiser (o telão mostra os palpites ao vivo).
+    if (payload.guess !== undefined) {
+      if (game.solved.some(item => item.player === playerId)) throw Error('Você já acertou!');
+      if (now - (game.guessesAt?.[playerId] || 0) < 700) throw Error('Espere um instante para palpitar de novo.');
+      const guess = String(payload.guess || '').slice(0, 120);
+      if (game.state !== 'open') throw Error('Este desafio já encerrou.');
+      game.guesses = game.guesses || {}; game.guessesAt = game.guessesAt || {};
+      game.guesses[playerId] = guess; game.guessesAt[playerId] = now;
+      game.lastGuess = { player: playerId, guess, at: now };
+      return;
+    }
+    if (game.solved.some(item => item.player === playerId)) throw Error('Você já acertou!');
     // Prévia ao vivo: o apresentador vê os controles de cada time mexendo em
     // tempo real, sem contar como tentativa.
     if (payload.peek) {
@@ -509,6 +598,8 @@ export function gameInput(room, playerId, payload) {
       game.live[playerId] = { values, at: now };
       return;
     }
+    // Só o líder mexe no experimento; o resto do time palpita.
+    if (!challengeLeader(room.data, game, playerId)) throw Error('Só o líder do time mexe no experimento — escreva seu palpite abaixo!');
     if (now - (game.tries[playerId]?.at || 0) < 1500) throw Error('Espere um instante antes de tentar de novo.');
     if ((game.tries[playerId]?.n || 0) >= 3) throw Error('Suas 3 tentativas acabaram!');
     const tries = (game.tries[playerId]?.n || 0) + 1;
@@ -522,8 +613,28 @@ export function gameInput(room, playerId, payload) {
       return off <= (config.tolerance || 5) ? 'hot' : off <= (config.tolerance || 5) * 3 ? 'warm' : 'cold';
     });
     game.tries[playerId] = { n: tries, at: now, ok, hints };
+    // Cada tentativa do líder libera a próxima dica do time (se o professor
+    // cadastrou dicas) e mantém a rodada aberta para palpites.
+    const hintList = config.hints || [];
+    if (hintList.length) {
+      game.round = Math.min(hintList.length - 1, (game.round || 0) + 1);
+      game.hint = hintList[game.round];
+      game.hintAt = now;
+      game.openForGuess = true;
+    }
     if (ok) { game.solved.push({ player: playerId, at: now - game.startedAt, tries }); bonus(player, game.solved.length === 1 ? CHALLENGE_FIRST : CHALLENGE_POINTS); }
   } else throw Error('Esta etapa não recebe respostas.');
+}
+
+// Quem está no comando do experimento: com times é o líder de cada time, sem
+// times é a primeira pessoa conectada (ou todos, se o professor liberar).
+function challengeLeader(d, game, playerId) {
+  if (!playerId) return false;
+  if (game.freeForAll) return true;
+  if (game.leaderMode === false) return true;
+  if (!d.teams?.length) return d.players.find(p => p.online !== false)?.id === playerId;
+  const team = d.players.find(p => p.id === playerId)?.team;
+  return d.teams[team]?.leader === playerId;
 }
 
 // Retrato da etapa para um aluno (id) ou para o professor (sem id).
@@ -572,8 +683,26 @@ export function gameSnapshot(room, playerId, bare = false) {
     // Experimentos ao vivo no telão: cada time aparecendo com os controles
     // atuais enquanto mexe (prévia enviada pelos alunos, sem contar tentativa).
     const live = Object.entries(game.live || {}).map(([id, item]) => ({ ...who(id), values: item.values, at: item.at, tries: game.tries[id]?.n || 0, ok: game.solved.some(s => s.player === id) })).filter(item => item.id && item.values).slice(0, 12);
+    // Quem está no comando: com times, o líder de cada time mexe; sem times,
+    // só quem abriu o desafio (o professor marca em `leaderOnly`). O líder pode
+    // liberar o experimento para todos pelo botão do telão.
+    const isLeader = challengeLeader(d, game, playerId);
+    // Espelho: quem só assiste vê o experimento do líder do seu time se
+    // mexendo. O telão (sem playerId) espelha o primeiro líder que estiver
+    // com o experimento na mão.
+    const myTeam = playerId ? d.players.find(p => p.id === playerId)?.team : undefined;
+    const myLead = playerId
+      ? (d.teams?.length ? d.teams[myTeam]?.leader : d.players.find(p => p.online !== false)?.id)
+      : (d.teams?.length ? d.teams.find(item => item.leader)?.leader || d.players.find(p => p.online !== false)?.id : d.players.find(p => p.online !== false)?.id);
+    const mirror = game.freeForAll || game.leaderMode === false ? null : (game.live?.[myLead]?.values || null);
+    const hintIndex = game.hint ? game.round : -1;
+    const guesses = Object.entries(game.guesses || {}).map(([id, guess]) => ({ ...who(id), guess })).filter(item => item.id).slice(0, 24);
     return { ...base, simulation: config.simulation, solved: game.solved.slice(0, 10).map(item => ({ ...who(item.player), at: item.at, tries: item.tries })), solvedCount: game.solved.length, trying: Object.keys(game.tries).length, maxTries: 3, live,
-      me: playerId ? { tries: mine?.n || 0, ok: place >= 0, place: place + 1, points: place === 0 ? CHALLENGE_FIRST : CHALLENGE_POINTS, hints: mine?.hints || null } : null,
+      hint: game.hint || '', hintIndex, hintCount: (config.hints || []).length, hintAt: game.hintAt || 0, hintSeconds: config.hintSeconds || 20,
+      guesses, guessesCount: guesses.length, openForGuess: Boolean(game.openForGuess || game.state === 'open'), leaderMode: game.leaderMode !== false, freeForAll: Boolean(game.freeForAll),
+      mirror,
+      me: playerId ? { tries: mine?.n || 0, ok: place >= 0, place: place + 1, points: place === 0 ? CHALLENGE_FIRST : CHALLENGE_POINTS, hints: mine?.hints || null,
+        leader: isLeader, guess: game.guesses?.[playerId] || '' } : null,
       ...(done ? { answer: config.answer.filter(item => !item.skip && item.k !== 'text').map(item => ({ label: item.label, v: item.v })) } : {}) };
   }
   if (game.type === 'raffle') return { ...base, current: who(game.current), drawAt: game.drawAt, revealAt: game.revealAt || (game.drawAt ? game.drawAt + 2800 : 0), draws: game.draws || 0, left: online(room).filter(p => !game.picked.includes(p.id)).length, names: online(room).slice(0, 40).map(p => p.name), me: playerId ? game.current === playerId : false };
@@ -597,19 +726,27 @@ export function gameSnapshot(room, playerId, bare = false) {
     return person ? { ...person, answered: Object.hasOwn(game.answers || {}, id), doneCount: game.playerAnswered?.[id] || 0, totalRounds } : null;
   }).filter(Boolean);
   const roundQs = game.round >= 0 ? (config.rounds[game.round] || []) : [];
-  const myPick = playerId && Object.hasOwn(game.picks || {}, playerId) ? game.picks[playerId] : 0;
-  const myAnswered = Boolean(playerId && Object.hasOwn(game.answers || {}, playerId));
-  const myRawQuestion = playerId && game.state === 'open' && !myAnswered ? roundQs[myPick] : null;
-  // No Cabo de Guerra cada rodada sorteia 1 de até 3 perguntas daquela rodada para cada participante.
-  const myQuestion = myRawQuestion ? { text: myRawQuestion.text, options: [...myRawQuestion.options], round: game.round, rounds: totalRounds, variant: myPick, poolSize: roundQs.length } : null;
+  const mySent = playerId ? (game.roundAnswers?.[playerId] || []) : [];
+  const myAnswered = playerId ? Object.hasOwn(game.answers || {}, playerId) : false;
+  // Todas as perguntas da rodada, em sequência: o aluno responde uma por vez.
+  const myQuestions = playerId && game.state === 'open' ? roundQs.map((item, index) => ({ text: item.text, options: [...item.options], index })) : [];
+  const myQuestion = myQuestions.length ? myQuestions[Math.min(mySent.length, myQuestions.length - 1)] : null;
   const onlinePlayers = online(room);
   const answeredThisRound = onlinePlayers.filter(p => Object.hasOwn(game.answers || {}, p.id)).length;
   const fb = playerId ? game.lastFeedback?.[playerId] : null;
   // Com times formados o lado leva o nome e a cor dos times; sem times, os nomes do editor.
-  const label = side => { const list = (d.teams || []).filter((_, i) => i % 2 === side); return list.length ? { name: list.map(team => 'Time ' + team.name).join(' + '), color: list[0].color } : { name: config.options[side], color: teamPalette[side][1] }; };
+  const label = side => {
+    const list = (d.teams || []).filter((_, i) => i % 2 === side);
+    if (!list.length) return { name: config.options[side], color: teamPalette[side][1], gradient: null };
+    // Dois times no mesmo lado viram um gradiente com a cor de cada um.
+    const gradient = list.length > 1 ? { a: list[0].color, b: list[1].color } : null;
+    const name = list.map(team => 'Time ' + team.name).join(' + ');
+    // Um lado pode ficar com um time a mais (número ímpar): fica dito na tela.
+    return { name, color: list[0].color, gradient, count: list.length };
+  };
   // Mantém porcentagens e acertos ocultos até o fim da puxada da corda (state === 'done') para preservar o suspense!
   return { ...base, bare: false, round: game.round, rounds: totalRounds, seconds: Math.max(config.seconds || 15, 5), deadline: game.deadline, betweenAt: game.betweenAt || 0, betweenMs: TUG_BETWEEN_MS, tolerance: config.tolerance ?? 10,
-    question: myQuestion,
+    question: myQuestion, questions: myQuestions, answeredInRound: mySent.length, roundQuestions: roundQs.length,
     answered: answeredThisRound, total: onlinePlayers.length || (count(0) + count(1)), lastPull: done ? null : (game.lastPull || null),
     labels: [label(0), label(1)], revealScores: done, score: done ? tugScore(game) : [0, 0], hits: done ? game.hits : [0, 0], tries: done ? game.tries : [0, 0], sides: [count(0), count(1)], crews: [crew(0), crew(1)],
     winner: ['pull', 'done'].includes(game.state) ? game.winner : -1, pullAt: game.pullAt, pullMs: TUG_PULL_MS,

@@ -2,7 +2,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { shouldOfferTour, markTourSeen, tourSteps, TOUR_STORAGE_KEY, kuroMascot } from '../src/tour.js';
+import { shouldOfferTour, markTourSeen, noteFirstVisit, tourSteps, TOUR_STORAGE_KEY, VISIT_STORAGE_KEY, kuroMascot } from '../src/tour.js';
 
 const storage = () => { const data = new Map(); return { getItem: k => data.get(k) ?? null, setItem: (k, v) => data.set(k, v), data }; };
 
@@ -50,4 +50,33 @@ test('trilha nova em loop e narração com caminho relativo (sem 404 no Pages)',
   assert.ok(code.includes('duckMusic'), 'trilha abaixa volume e velocidade só enquanto a narração fala');
   const css = readFileSync(new URL('../src/tour.css', import.meta.url), 'utf8');
   assert.ok(!css.includes('.site-tour.has-target .tour-backdrop{background:'), 'backdrop não escurece o alvo do spotlight');
+});
+
+test('tour automático só na primeira visita deste navegador', () => {
+  const s = storage();
+  assert.equal(noteFirstVisit(s), true, 'primeira abertura marca a visita');
+  assert.equal(s.data.get(VISIT_STORAGE_KEY), '1');
+  assert.equal(noteFirstVisit(s), false, 'segunda abertura não é mais primeira visita');
+  // Consequência do bug: quem abria o site de novo dias depois e nunca tinha
+  // concluído o tour via a Kuro aparecer do nada outra vez.
+  assert.equal(shouldOfferTour(s), true, 'o tour em si continua disponível para "Rever tour"');
+  assert.equal(noteFirstVisit(storage()), true, 'outro navegador é outra primeira visita');
+  const broken = { getItem: () => { throw Error('modo privado'); }, setItem: () => { throw Error('modo privado'); } };
+  assert.equal(noteFirstVisit(broken), false, 'modo privado não quebra a abertura');
+});
+
+test('etapa sem alvo na tela é exibida, nunca pulada em silêncio', async () => {
+  const { readFileSync } = await import('node:fs');
+  const code = readFileSync(new URL('../src/tour.js', import.meta.url), 'utf8');
+  // O antigo showStep(index + 1) engolia o texto e a narração da etapa.
+  assert.equal(/this\.showStep\(index \+ 1\)/.test(code), false, 'não pula etapa sem alvo');
+  assert.match(code, /NUNCA pular a etapa/, 'comportamento documentado');
+  // Etapas que trocam de aba (Entrar/Compartilhados) não podem deixar as
+  // seguintes sem alvo: o tour volta para a biblioteca.
+  assert.match(code, /data-studio-action="library"/, 'volta para a biblioteca entre etapas');
+  const nav = tourSteps.filter(s => s.nav).map(s => s.id);
+  assert.deepEqual(nav, ['join', 'shared'], 'só Entrar e Compartilhados trocam de aba');
+  const joinIndex = tourSteps.findIndex(s => s.id === 'join');
+  assert.equal(tourSteps[joinIndex + 1].id, 'shared', 'as duas trocas de aba são consecutivas');
+  assert.equal(tourSteps[joinIndex + 2].id, 'editor', 'depois delas o editor abre a partir da biblioteca');
 });

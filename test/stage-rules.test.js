@@ -128,3 +128,17 @@ test('remoção só vira banimento na terceira vez', () => {
   Room.prototype.kick.call(room, 'a3');
   assert.deepEqual(room.data.removedTokens, ['tk'], 'terceira: banida');
 });
+
+test('ofensiva é desenhada em CSS: nenhum emoji de fogo nas telas', async () => {
+  // O "tchau emoji" da ofensiva: placar, corrida e selo do aluno usam a chama
+  // animada (.streak-flame/.rank-fire/.streak-badge), então o HTML não pode
+  // voltar a carregar 🔥.
+  const { readFileSync } = await import('node:fs');
+  const ui = readFileSync(new URL('../src/game-ui.js', import.meta.url), 'utf8');
+  assert.ok(!ui.includes('🔥'), 'game-ui.js sem emoji de fogo');
+  assert.ok(ui.includes('class="rank-fire"') && ui.includes('data-n="${p.streak}"'), 'corrida marca a chama com o número da ofensiva');
+  assert.ok(ui.includes('class="streak-badge" data-n="${state.me.streak}"'), 'selo do aluno carrega o número da ofensiva');
+  const css = readFileSync(new URL('../src/finishing.css', import.meta.url), 'utf8');
+  assert.ok(css.includes('@keyframes streak-flicker'), 'chama tem animação própria');
+  assert.ok(/\.streak-flame,.rank-fire,.streak-badge\)::before/.test(css), 'mesma chama nos três lugares');
+});

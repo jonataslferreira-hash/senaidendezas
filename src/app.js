@@ -1,6 +1,6 @@
 import {studioIcon} from './studio-icons.js';
 import { reconcileStageSafely, tagStageSources, setStageCache } from './stage-keep.js';
-import { SiteTour, shouldOfferTour, markTourSeen } from './tour.js';
+import { SiteTour, shouldOfferTour, markTourSeen, noteFirstVisit } from './tour.js';
 import './tour.css';
 import { BUILTIN_MODELS, HARDWARE_MODEL_IDS, modelMeta } from './model-catalog.js';
 import {routeParams} from './editor-route.js';
@@ -13,7 +13,7 @@ import { gameMarkup, keepGame, animateRaffle, gameIcon } from './stage-games-vie
 import { gameNames } from './stage-games.js';
 import { blockNames } from './activity-blocks.js';
 import { optimizeImage } from './image-optimize.js';
-import { applyAudioPlayback } from './audio-data.js';
+import { applyAudioPlayback, audioGraph } from './audio-data.js';
 import {Simulations} from './simulations.js';
 import {loadSlideFonts} from './fonts.js';
 import {editParticipant,participantPhoto,manageParticipants} from './participant-profile.js';
@@ -230,8 +230,14 @@ let codeDraft = (params.get('s') || '').replace(/\D/g, '').slice(0, 6);
 const studio = new Studio(app, { render, toast, joinForm, preview, remoteAction:(name,value)=>{if(name==='sim')remoteInteract(value);else action(name);}, present: (lesson,startIndex,fromEditor) => connectSession({host:true,lesson,startIndex,fromEditor}) });
 const tour = new SiteTour(studio);
 document.addEventListener('start-tour', () => tour.start());
+// Só a PRIMEIRA visita deste navegador recebe o tour sozinho. Antes o critério
+// era apenas "o tour já foi concluído?": quem entrava, saía sem terminar e
+// voltava depois via a Kuro aparecer do nada de novo. Agora o marcador de
+// visita é gravado na abertura do site (e quem já visitou não é incomodado —
+// o tour continua disponível em "Rever tour", no painel da conta).
+const firstVisit = noteFirstVisit();
 queueMicrotask(() => {
-  if (!shouldOfferTour() || state || studio.view !== 'library') return;
+  if (!firstVisit || !shouldOfferTour() || state || studio.view !== 'library') return;
   // O tour é só para quem chegou agora de verdade: quem já tem conta (ativa
   // ou lembrada neste navegador) não recebe a oferta — e nunca recebe.
   const account = studio.account;
@@ -251,7 +257,19 @@ function soundButton() {
   return `<button class="icon-btn" data-action="sound" aria-label="${enabled?'Desativar':'Ativar'} áudio" title="Áudio da apresentação">${icon(enabled?'volume':'mute')}</button>`;
 }
 function header() {
-  return `<header class="header">${brand()}<div class="header-right">${state?`${!host&&state.phase==='lesson'?'':participantCount()}${host&&!readOnlyPresentation&&!demo&&state.phase==='lesson'?'<button class="btn secondary small" data-action="edit-current-slide">Editar slide</button>':''}${!host&&state.me&&state.phase!=='lesson'?'<button class="my-room-avatar" data-action="edit-player" aria-label="Editar meu perfil na sala">'+avatarContent(state.me.avatar||selectedAvatar)+'</button>':''}${!host?`<span data-room-controller data-room-code="${esc(state.code)}">${studio.remote.roomButton(state.code)}</span>`:''}${state&&!readOnlyPresentation?`<button type="button" class="connection ${status==='online'||demo?'connected':''}" data-action="participants" title="Participantes da sala" aria-label="Ver participantes da sala"><span></span>${demo?'Prévia':status==='online'?'Ao vivo':'Reconectando'}</button>`:`<span class="connection ${status==='online'||demo?'connected':''}"><span></span>${readOnlyPresentation&&demo?'Apresentação':demo?'Prévia':status==='online'?'Ao vivo':'Reconectando'}</span>`}${host||state.me?soundButton():''}`:''}</div></header>`;
+  // Uma única barra para TODAS as etapas (aula, enquete, quiz, jogos, pódio):
+  // os mesmos botões no mesmo lugar. "Conectados" abre a lista de pessoas e
+  // "Ao vivo" abre o convite com QR — os dois funcionam em qualquer tela.
+  // `header()` roda em TODAS as telas, inclusive antes do snapshot chegar
+  // (editor, prévia, reconexão). Sem a guarda, a tela inteira caía com
+  // "Cannot read properties of undefined (reading 'ranking')".
+  const connected = state?.ranking?.filter(person => person.online).length || 0;
+  const live = status === 'online' || demo;
+  const chip = readOnlyPresentation ? '' : `<button type="button" class="stage-people" data-action="participants" aria-label="${connected} conectado${connected === 1 ? '' : 's'} · ver participantes" title="Ver participantes">${icon('users')}<b>${connected}</b></button>`;
+  const pill = state && !readOnlyPresentation
+    ? `<button type="button" class="connection ${live ? 'connected' : ''}" data-action="room-invite" title="${host ? 'Abrir o convite e o QR da sala' : 'Ver participantes'}" aria-label="${host ? 'Abrir o convite e o QR da sala' : 'Ver participantes'}"><span></span>${demo ? 'Prévia' : live ? 'Ao vivo' : 'Reconectando'}</button>`
+    : `<span class="connection ${live ? 'connected' : ''}"><span></span>${readOnlyPresentation && demo ? 'Apresentação' : demo ? 'Prévia' : live ? 'Ao vivo' : 'Reconectando'}</span>`;
+  return `<header class="header">${brand()}<div class="header-right">${state ? `${chip}${host && !readOnlyPresentation && !demo && state.phase === 'lesson' ? '<button class="btn secondary small" data-action="edit-current-slide">Editar slide</button>' : ''}${!host && state.me && state.phase !== 'lesson' ? `<button class="my-room-avatar" data-action="edit-player" aria-label="Editar meu perfil na sala">${avatarContent(state.me.avatar || selectedAvatar)}</button>` : ''}${!host ? `<span data-room-controller data-room-code="${esc(state.code)}">${studio.remote.roomButton(state.code)}</span>` : ''}${pill}${host || state.me ? soundButton() : ''}` : ''}</div></header>`;
 }
 function modelPanel(landing = false) {
   const custom = state && slides[state.slide]?.customModel;
@@ -280,27 +298,37 @@ function nextBuildStep(){return animationGroups().find(group=>group>(state.anima
 function pendingPptxBuild(){return state&&nextBuildStep()!==undefined;}
 function joinForm() {
   const user=studio.account.user,photo=studio.account.vault.list().find(s=>s.user.id===user?.id)?.avatar_thumbnail;
-  if(user||!avatarChanged)selectedAvatar=isPhotoAvatar(photo)?photo:avatars[0];
+  // Sem conta (anônimo): o nome e a foto escolhidos aqui são soberanos. Antes,
+  // um valor antigo da conta voltava por cima da escolha feita sem login.
+  if(user) { if(!avatarChanged) selectedAvatar=isPhotoAvatar(photo)?photo:avatars[0]; }
+  else if(!avatarChanged && !isPhotoAvatar(selectedAvatar)) selectedAvatar=avatars[0];
   const name=joinNameTouched?joinNameDraft:user?.user_metadata?.display_name||'';
-  return `<form id="join-form" class="join-card compact-join">
+  const chosen=isPhotoAvatar(selectedAvatar);
+  return `<form id="join-form" class="join-card join-card-v2 compact-join">
     <div class="join-card-head"><span class="join-card-mark">${studioIcon('join')}</span><div><h2>Entrar na sala<span>.</span></h2><p>Digite o código de 6 números que o professor mostrou.</p></div></div>
-    <label for="room-code">Código da sala</label><input id="room-code" name="code" inputmode="numeric" autocomplete="off" pattern="[0-9]{6}" maxlength="6" placeholder="000 000" value="${esc(codeDraft)}" required>
-    <label for="player-name">Como podemos chamar você?</label><input id="player-name" name="name" autocomplete="nickname" maxlength="24" placeholder="Seu nome ou apelido" value="${esc(name.slice(0,24))}" required>
-    ${user?'':`<label id="avatar-label">Avatar no ranking</label><div class="avatar-picker" role="group" aria-labelledby="avatar-label">${isPhotoAvatar(selectedAvatar)?`<button type="button" class="avatar active" data-avatar="${selectedAvatar}" aria-label="Minha foto enviada" aria-pressed="true">${avatarContent(selectedAvatar)}</button>`:''}${avatars.map(a=>`<button type="button" class="avatar ${a===selectedAvatar?'active':''}" data-avatar="${a}" aria-label="Avatar ${a}" aria-pressed="${a===selectedAvatar}">${avatarContent(a)}</button>`).join('')}</div>`}
+    <div class="join-code-field"><label for="room-code">Código da sala</label><input id="room-code" name="code" inputmode="numeric" autocomplete="off" pattern="[0-9]{6}" maxlength="6" placeholder="000 000" value="${esc(codeDraft)}" required></div>
+    <div class="join-identity">
+      <div class="join-identity-photo ${chosen?'has-photo':''}" data-join-photo>${chosen?`<img src="${esc(selectedAvatar)}" alt="Sua foto">`:`<span class="join-photo-hint">${studioIcon('image')}</span>`}</div>
+      <div class="join-identity-fields">
+        <label for="player-name">Como podemos chamar você?</label><input id="player-name" name="name" autocomplete="nickname" maxlength="24" placeholder="Seu nome ou apelido" value="${esc(name.slice(0,24))}" required>
+      </div>
+    </div>
+    ${user?'':`<label id="avatar-label">Escolha seu avatar</label><div class="avatar-picker join-avatar-picker" role="group" aria-labelledby="avatar-label">${chosen?`<button type="button" class="avatar active" data-avatar="${esc(selectedAvatar)}" aria-label="Minha foto enviada" aria-pressed="true">${avatarContent(selectedAvatar)}</button>`:''}${avatars.map(a=>`<button type="button" class="avatar ${a===selectedAvatar?'active':''}" data-avatar="${a}" aria-label="Avatar ${a}" aria-pressed="${a===selectedAvatar}">${avatarContent(a)}</button>`).join('')}</div>`}
     <div class="join-utilities ${user?'signed-in':''}">
       ${user?'':`<button class="btn secondary" type="button" data-action="choose-guest-photo">${studioIcon('image')}<span>Escolher minha foto</span></button>
       <input type="file" data-guest-photo accept="image/png,image/jpeg,image/webp,image/gif" hidden>
       <button class="btn secondary" type="button" data-action="take-guest-photo">${studioIcon('camera')}<span>Tirar minha foto</span></button>`}
       <button class="btn secondary" type="button" data-action="scan-qr">${studioIcon('qr')}<span>Ler QR Code</span></button>
     </div>
-    <button class="btn primary full" type="submit" ${busy||guestPhotoPending?'disabled':''}>${busy?'Conectando…':'Entrar na sala'} ${icon('arrow')}</button>
+    <button class="btn primary full join-submit" type="submit" ${busy||guestPhotoPending?'disabled':''}>${busy?'Conectando…':'Entrar na sala'} ${icon('arrow')}</button>
+    <p class="join-note">Ao entrar você aparece no ranking com o seu nome e avatar.</p>
   </form>`;
 }
 function participantCount() {
-  if(demo)return '';
-  const count=state.ranking.filter(person=>person.online).length;
-  const label=`${icon('users')} ${count} conectado${count===1?'':'s'}`;
-  return count?`<button class="live-participants" data-action="participants" aria-label="${count} conectado${count===1?'':'s'} · Ver participantes">${label}</button>`:`<span class="live-participants">${label}</span>`;
+  if (demo) return '';
+  const count = state?.ranking?.filter(person => person.online).length || 0;
+  const label = `${icon('users')} ${count} conectado${count === 1 ? '' : 's'}`;
+  return count ? `<button class="live-participants" data-action="participants" aria-label="${count} conectado${count === 1 ? '' : 's'} · Ver participantes">${label}</button>` : `<span class="live-participants">${label}</span>`;
 }
 function slideMedia(slide) {
   if (slide.kind === 'model') return modelPanel();
@@ -338,12 +366,15 @@ function pollMarkup() {
   }).join('')}</div><p role="status">${p.total} voto${p.total === 1 ? '' : 's'} recebido${p.total === 1 ? '' : 's'}${p.choice !== null ? ' · Seu voto está registrado!' : ''}</p>${host ? `<div class="poll-actions">${!closed ? '<button class="btn primary" data-action="close-poll">Encerrar votação</button>' : ''}<button class="btn secondary" data-action="${state.activity?.type==='poll'?'next-stage':'back-lesson'}">${state.activity?.type==='poll'?(state.activity.hasNext?'Próxima etapa →':'Concluir enquete'):'Voltar ao slide '+(state.slide+1)}</button></div>` : `<p>${closed ? 'Aguarde o professor voltar à apresentação.' : 'Escolha uma opção. Você pode votar uma vez nesta rodada.'}</p>`}</main>`;
 }
 function rankingTable(full = false) {
-  const rank = full ? state.ranking : state.ranking.slice(0, 5);
+  // Snapshot pode chegar sem a lista (aba em segundo plano, jogo em andamento);
+  // sem a guarda a tela inteira caía com "reading 'ranking'".
+  const all = Array.isArray(state?.ranking) ? state.ranking : [];
+  const rank = full ? all : all.slice(0, 5);
   return `<div class="ranking-list">${rank.length ? rank.map((p, i) => `<div class="rank-row ${state.me?.id === p.id ? 'is-me' : ''}"><span class="rank-position">${i === 0 ? '♛' : String(i + 1).padStart(2, '0')}</span><span class="rank-avatar">${avatarContent(p.avatar)}</span><div class="rank-person"><strong>${esc(p.name)}${state.me?.id === p.id ? ' <small>você</small>' : ''}</strong><span>${p.correct} acerto${p.correct === 1 ? '' : 's'}${p.online ? '' : ' · offline'}</span></div><strong class="rank-score">${p.score.toLocaleString('pt-BR')}<small> pts</small></strong></div>`).join('') : '<p class="empty-state">O ranking começa com a primeira resposta.</p>'}</div>`;
 }
 function quiz(){return quizMarkup(state,{header,host,demo,status,shareDialog,shareOpen});}
 function finished() {
-  return leaderboardMarkup(state,{header,host,offset:timerOffset,final:true});
+  return leaderboardMarkup(state,{header,host,offset:timerOffset,final:true,shareDialog,shareOpen});
 }
 
 function joinUrl() {
@@ -472,7 +503,7 @@ function stageIntro() {
   overlay.innerHTML = `<div class="stage-intro-card"><span class="stage-intro-icon">${icon}</span><strong>${esc(label)}</strong><span class="stage-intro-sub">${esc(activeLesson?.title || '')}</span></div>`;
   document.body.append(overlay);
   setTimeout(() => overlay.remove(), 2100);
-  gameAudio.playStageIntro();
+  gameAudio.playStageIntro(state?.game?.type || state?.activity?.type || (state?.phase === 'quiz' ? 'quiz' : ''));
 }
 // Última visualização do studio renderizada: trocar de visualização (editor,
 // Storage AI, biblioteca…) entra com transição suave de cross-fade do
@@ -498,6 +529,15 @@ function applyRender() {
   studio.editorMusic.setEditing(!state && studio.view === 'editor');
   const form = document.querySelector('#join-form');
   const draftName = form?.querySelector('#player-name')?.value;
+  // O que a pessoa digitou nunca é sobrescrito pelo perfil da conta — mas só
+  // quando ela REALMENTE digitou algo. Antes, todo render marcava o nome como
+  // "tocado" mesmo com o campo vazio: o valor digitado logo antes de entrar
+  // era ignorado e a pessoa entrava com o nome antigo/da conta ("o nome tá
+  // indo errado"). Campo vazio agora não conta como escolha.
+  if (form && typeof draftName === 'string' && draftName.trim()) {
+    joinNameDraft = draftName; joinNameTouched = true;
+  }
+  if (form) selectedAvatar = selectedAvatar || avatars[0];
   if (form) codeDraft = form.querySelector('#room-code').value;
   viewer.el.remove();
   app.dataset.readOnly = String(readOnlyPresentation);
@@ -511,7 +551,7 @@ function applyRender() {
   // Aula sem atividades pontuadas (nem quiz nem jogos) volta direto ao encerrar.
   if (state?.phase === 'finished' && !state.totalQuestions && !state.hasScoredStages) { focusView.close(); leave(); return; }
   app.classList.toggle('quiz-party', Boolean(state && state.phase !== 'lesson'));
-  const markup = sharedLoading || busy && host && !state ? `${header()}<main class="public-loading"><p role="status">Carregando apresentação…</p></main>` : sharedError ? `${header()}<main class="public-loading"><h1>Apresentação indisponível</h1><p>${esc(sharedError)}</p><button class="btn secondary" data-action="home">Voltar</button></main>` : !state ? studio.markup() : state.phase === 'lesson' ? lesson() : ['lobby', 'countdown'].includes(state.phase) ? lobbyMarkup(state, { host, demo, header, shareDialog, shareOpen }) : state.phase === 'finished' ? finished() : state.phase==='leaderboard'?leaderboardMarkup(state,{header,host,offset:timerOffset}):state.game ? gameMarkup(state, { host, demo, header, now: Date.now() + timerOffset }) : state.poll ? pollMarkup() : quiz();
+  const markup = sharedLoading || busy && host && !state ? `${header()}<main class="public-loading"><p role="status">Carregando apresentação…</p></main>` : sharedError ? `${header()}<main class="public-loading"><h1>Apresentação indisponível</h1><p>${esc(sharedError)}</p><button class="btn secondary" data-action="home">Voltar</button></main>` : !state ? studio.markup() : state.phase === 'lesson' ? lesson() : ['lobby', 'countdown'].includes(state.phase) ? lobbyMarkup(state, { host, demo, header, shareDialog, shareOpen }) : state.phase === 'finished' ? finished() : state.phase==='leaderboard'?leaderboardMarkup(state,{header,host,offset:timerOffset,shareDialog,shareOpen}):state.game ? gameMarkup(state, { host, demo, header, now: Date.now() + timerOffset, shareDialog, shareOpen }) : state.poll ? pollMarkup() : quiz();
   const chatSlots = '[data-chat-slot], [data-social-slot]';
   const currentAIPage = app.querySelector('.storage-ai-page');
   const keepAI = !state && !sharedLoading && !sharedError && !(busy && host) &&
@@ -602,6 +642,8 @@ function applyRender() {
     ? `${activeLesson.id}:${state.phase}:${state.slide}:${state.questionIndex}`
     : studio.view==='editor'?`editor:${studio.draft?.id||''}`:studio.view;
   pageMotion.mount(app, {key:motionKey,kind:state?.phase||studio.view,slide:state?.slide||0});
+  // Espelho do experimento: liga/desliga com a etapa do desafio.
+  syncChallengeMirror();
   pageMotion.showOutgoingSlide(app, outgoingSlide);
   gameLayout.mount(app);
   updateClock();
@@ -633,11 +675,19 @@ function control(action, value) {
   try {
     if (demo) { classroom.control(action, value); receive({ ...classroom.snapshot(demoPlayer), lesson: classroom.publicLesson(true) }); }
     else classroom.control(action, value);
-  } catch (err) { toast(err.message); }
+  } catch (err) {
+    // O texto do erro fica visível na tela (antes sumia e a etapa "muda").
+    const message = String(err?.message || 'Não foi possível agora.').slice(0, 180);
+    toast(message);
+    console.warn('[etapa]', message);
+  }
 }
 let demoPlayer;
 function preview(lesson = demoLesson(), options = {}) {
   leave(false); activeLesson = lesson; slides = lesson.slides; demo = true; host = true; status = 'online';
+  // Prévia também tem som: sem isso o professor testava o experimento mudo e
+  // achava que a trilha da etapa não existia.
+  gameAudio.unlock(); music = true;
   readOnlyPresentation=Boolean(options.readOnly);publicPresentationToken=options.token||'';
   if (!options.token) studio.writeRoute('preview', lesson.id);
   classroom = new Room('PREVIA', undefined, Date.now, lesson, options?.startIndex);
@@ -757,8 +807,36 @@ async function sendGame(payload, quiet = false) {
     if (!quiet) { gameAudio.unlock(); gameAudio.cue('answer'); }
     if (demo) { classroom.answer(demoPlayer, { choice: payload, questionIndex: state.game.id }); receive({ ...classroom.snapshot(demoPlayer), lesson: classroom.publicLesson(true) }); }
     else await classroom.answer(payload, state.game.id);
-  } catch (err) { if (!quiet) toast(err.message); }
+  } catch (err) { if (!quiet) toast(String(err?.message || 'Não foi possível agora. Tente de novo.').slice(0, 160)); }
 }
+function challengeValues() {
+  return [...app.querySelectorAll('[data-challenge-sim] :is([data-param],[data-sim-select],[data-sim-text],[data-sim-toggle])')]
+    .map(field => field.dataset.simToggle !== undefined ? field.dataset.value || '0' : String(field.value).slice(0, 80));
+}
+// Espelhamento ao vivo: quem está mexendo manda o estado do experimento a cada
+// ~700 ms, e o telão redesenha. Sem isso o apresentador só via o valor quando
+// alguém tocava em "tentar".
+let challengeMirror = 0, challengeLast = '';
+function syncChallengeMirror() {
+  clearInterval(challengeMirror);
+  if (!state?.game || state.game.type !== 'challenge' || state.game.state !== 'open') return;
+  const sim = app.querySelector('[data-challenge-sim]');
+  if (!sim || host) return;
+  challengeMirror = setInterval(() => {
+    if (!app.querySelector('[data-challenge-sim]')) return clearInterval(challengeMirror);
+    // Quem manda o espelho é só quem está no comando — se o professor liberar
+    // todo mundo no meio do caminho, o próximo tique já assume.
+    const g = state?.game;
+    if (!g || g.type !== 'challenge' || g.state !== 'open') return;
+    const leader = !g.leaderMode || g.freeForAll || g.me?.leader;
+    if (!leader) return;
+    const values = challengeValues(), key = values.join('|');
+    if (key === challengeLast) return;
+    challengeLast = key;
+    sendGame({ values, peek: true }, true);
+  }, 700);
+}
+app.addEventListener('input', () => { if (state?.game?.type === 'challenge') challengeLast = ''; });
 let tugTaps = 0, tugTimer = 0;
 function tugTap(button) {
   tugTaps++; navigator.vibrate?.(8);
@@ -786,10 +864,16 @@ app.addEventListener('click', event => {
   if (button.dataset.gameDo === 'team-rename') { if (host) control('game', { do: 'team-rename', team: Number(button.dataset.team), name: button.closest('.team-rename')?.querySelector('[data-team-rename-input]')?.value || '' }); return; }
   if (button.dataset.gameDo === 'team-leader') { if (host) control('game', { do: 'team-leader', team: Number(button.dataset.team), player: button.dataset.player || '' }); return; }
   if (button.dataset.gameDo === 'team-count') { if (host) control('game', { do: 'team-count', count: Number(button.closest('.team-count-control')?.querySelector('[data-team-count-select]')?.value) || 2 }); return; }
+  // Desafio: alternar entre "só o líder mexe" e "todos mexem". O label do
+  // botão reflete o estado atual (vem de g.freeForAll), mas o clique precisa
+  // enviar o modo contrário, senão o botão nunca muda de fato.
+  if (button.dataset.gameDo === 'challenge-mode') {
+    if (host) control('game', { do: 'challenge-mode', mode: state.game.freeForAll ? 'leader' : 'all' });
+    return;
+  }
   if (button.dataset.gameDo) { control('game', { do: button.dataset.gameDo, id: button.dataset.id }); return; }
   if (button.hasAttribute('data-challenge-send')) {
-    const values = [...app.querySelectorAll('[data-challenge-sim] :is([data-param],[data-sim-select],[data-sim-text],[data-sim-toggle])')].map(field => field.dataset.simToggle !== undefined ? field.dataset.value || '0' : String(field.value).slice(0, 80));
-    // Prévia silenciosa: o telão vê os controles mexendo em tempo real.
+    const values = challengeValues();
     sendGame({ values, peek: true }, true);
     sendGame({ values }); return;
   }
@@ -832,7 +916,14 @@ app.addEventListener('change', async event => {
     if (teamPhotoDraft.length > 30000) { teamPhotoDraft = undefined; toast('Escolha uma foto menor.'); }
     else {
       const preview = input.closest('.team-leader-tools')?.querySelector('[data-team-preview]');
-      if (preview) preview.innerHTML = `<img src="${teamPhotoDraft}" alt="Nova foto do time">`;
+      if (preview) {
+        // A foto é o botão: troca só a imagem, mantendo o botão (e o toque).
+        preview.replaceChildren(Object.assign(document.createElement('img'), { src: teamPhotoDraft, alt: 'Nova foto do time' }));
+        preview.setAttribute('aria-label', 'Trocar a foto do time');
+        preview.title = 'Trocar a foto do time';
+        const hint = input.closest('.team-leader-tools')?.querySelector('.team-leader-hint');
+        if (hint) hint.textContent = 'Toque na foto para trocar.';
+      }
       toast('Foto pronta. Toque em Salvar.');
     }
   } catch (error) { toast(error?.message || 'Não foi possível abrir a imagem.'); }
@@ -846,8 +937,9 @@ async function action(name) {
     case 'choose-guest-photo':app.querySelector('[data-guest-photo]')?.click();break;
     case 'take-guest-photo':{const file=await takePhoto();if(file){selectedAvatar=await participantPhoto(file);avatarChanged=true;render();}break;}
     case 'scan-qr':{const code=await scanRoomCode();if(code){codeDraft=code;const field=app.querySelector('#room-code');if(field)field.value=code;studio.view='join';render();}break;}
-    case 'participants':if(state){if(host){shareOpen=true;render();}else manageParticipants(state,null);}break;
-    case 'manage-people':if(state)manageParticipants(state,host&&!demo?id=>control('kick',id):null);break;
+    case 'participants':if(state)manageParticipants(state,host&&!demo?id=>control('kick',id):null,control);break;
+    case 'room-invite':if(state){if(host){shareOpen=true;render();}else manageParticipants(state,null);}break;
+    case 'manage-people':if(state)manageParticipants(state,host&&!demo?id=>control('kick',id):null,control);break;
     case 'edit-player':await editParticipant(state.me,async(name,avatar)=>{selectedAvatar=avatar;avatarChanged=true;joinNameDraft=name;joinNameTouched=true;if(demo){classroom.updateProfile(demoPlayer,{name,avatar});receive({...classroom.snapshot(demoPlayer),lesson:classroom.publicLesson(true)});}else await classroom.updateProfile(name,avatar);});break;
     case 'show-ranking':control('ranking');break;
     case 'podium-all':control('podium-all');break;
@@ -858,7 +950,7 @@ async function action(name) {
     case 'leave': focusView.close(); leave(); break;
     case 'focus-item': if(state?.phase==='lesson'&&slides[state.slide])focusView.open(slides[state.slide]); break;
     case 'toggle-qr': presenterSettings.qrVisible=!presenterSettings.qrVisible;savePresenterSettings(presenterSettings);render();showPresentationControls();break;
-    case 'next-stage':music=true;control('next-stage');break;
+    case 'next-stage':shareOpen=false;music=true;control('next-stage');break;
     case 'next-slide': if(pendingPptxBuild()){control('animation',nextBuildStep());break;}if(state.activity){const ids=state.activity.slideIndices,next=ids[ids.indexOf(state.slide)+1];if(next===undefined)control('next-stage');else control('slide',next);}else control('slide', Math.min(slides.length - 1, state.slide + 1)); break;
     case 'previous': if(state.animationStep>0){control('animation',animationGroups().filter(group=>group<state.animationStep).at(-1)||0);break;}control('slide',state.activity?state.activity.slideIndices[Math.max(0,state.activity.slideIndices.indexOf(state.slide)-1)]:Math.max(0,state.slide-1)); break;
     case 'quiz': gameAudio.unlock();music = true; control('quiz'); break;
@@ -946,7 +1038,7 @@ app.addEventListener('input', e => {
   if (key === 'title' && editDraft.kind === 'canvas') { const title = editDraft.elements.find(el => el.role === 'title'); if (title) title.text = editDraft.title; }
 });
 app.addEventListener('change', async e => {
-  if(e.target.matches('[data-guest-photo]')){guestPhotoPending=true;const submit=app.querySelector('#join-form [type=submit]');if(submit)submit.disabled=true;try{selectedAvatar=await participantPhoto(e.target.files[0]);avatarChanged=true;const choice=app.querySelector('.avatar-picker');if(!choice)return;choice.querySelector('[aria-label="Minha foto enviada"]')?.remove();choice.insertAdjacentHTML('afterbegin','<button type="button" class="avatar active" data-avatar="'+selectedAvatar+'" aria-label="Minha foto enviada">'+avatarContent(selectedAvatar)+'</button>');for(const b of choice.querySelectorAll('[data-avatar]')){b.classList.toggle('active',b.dataset.avatar===selectedAvatar);b.setAttribute('aria-pressed',String(b.dataset.avatar===selectedAvatar));}}catch(error){toast(error.message);}finally{guestPhotoPending=false;if(submit?.isConnected)submit.disabled=false;}return;}
+  if(e.target.matches('[data-guest-photo]')){guestPhotoPending=true;const submit=app.querySelector('#join-form [type=submit]');if(submit)submit.disabled=true;try{selectedAvatar=await participantPhoto(e.target.files[0]);avatarChanged=true;const choice=app.querySelector('.avatar-picker');if(!choice){guestPhotoPending=false;if(submit?.isConnected)submit.disabled=false;return;}choice.querySelector('[aria-label="Minha foto enviada"]')?.remove();choice.insertAdjacentHTML('afterbegin','<button type="button" class="avatar active" data-avatar="'+selectedAvatar+'" aria-label="Minha foto enviada">'+avatarContent(selectedAvatar)+'</button>');for(const b of choice.querySelectorAll('[data-avatar]')){b.classList.toggle('active',b.dataset.avatar===selectedAvatar);b.setAttribute('aria-pressed',String(b.dataset.avatar===selectedAvatar));}const frame=app.querySelector('[data-join-photo]');if(frame){frame.classList.add('has-photo');frame.innerHTML=`<img src="${selectedAvatar}" alt="Sua foto">`;}}catch(error){toast(error.message);}finally{guestPhotoPending=false;if(submit?.isConnected)submit.disabled=false;}return;}
 
   if (e.target.id === 'live-image-file') { replaceLiveImage(e.target.files[0]); return; }
   if (state?.phase === 'lesson' && host && !demo) {
@@ -956,6 +1048,14 @@ app.addEventListener('change', async e => {
 });
 app.addEventListener('submit', async e => {
   if (e.target.id === 'live-edit-form') { e.preventDefault(); saveLiveSlide(); return; }
+  // Desafio: palpite de quem não está mexendo no experimento.
+  if (e.target.matches('[data-challenge-guess]')) {
+    e.preventDefault();
+    const input = e.target.querySelector('[name=guess]'), guess = input?.value.trim();
+    if (!guess) { toast('Escreva o seu palpite antes de enviar.'); return; }
+    sendGame({ guess });
+    return;
+  }
   if (e.target.id !== 'join-form') return;
   e.preventDefault(); if (busy||guestPhotoPending) return;
   const form = new FormData(e.target);
@@ -1092,7 +1192,7 @@ import './lively.css';
 import './personalization.css';
 import './interface-system.css';
 
-app.addEventListener('pointerdown',e=>{gameAudio.unlock();if(document.fullscreenElement&&(e.clientY<48||e.target.closest('.document-top')))showPresentationControls();});
+app.addEventListener('pointerdown',e=>{gameAudio.unlock();audioGraph(trackPlayer)?.ctx?.resume?.().catch(()=>{});if(document.fullscreenElement&&(e.clientY<48||e.target.closest('.document-top')))showPresentationControls();});
 // Celular do aluno que ainda não conseguiu a tela cheia: o primeiro toque
 // completa (o navegador exige um gesto para liberar o fullscreen).
 app.addEventListener('pointerdown',()=>{enterImmersiveRoom();},{passive:true});
@@ -1126,7 +1226,12 @@ app.addEventListener('profile-updated',()=>{
     if(name&&!joinNameTouched&&preferred)name.value=preferred.slice(0,24);
   }
 });
-app.addEventListener('account-changed',()=>{avatarChanged=false;joinNameTouched=false;joinNameDraft='';selectedAvatar=avatars[0];if(!state&&studio.view==='join')queueMicrotask(render);});
+app.addEventListener('account-changed',()=>{
+  // Só uma conta logada reaplica o perfil dela. No anônimo, a escolha local
+  // (nome + foto) continua valendo.
+  if(studio.account.user){avatarChanged=false;joinNameTouched=false;joinNameDraft='';selectedAvatar=avatars[0];}
+  if(!state&&studio.view==='join')queueMicrotask(render);
+});
 
 import './account-live.css';
 import './workspace-styles.css';

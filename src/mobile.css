@@ -42,7 +42,7 @@
   #app[data-role=student] .lesson-bottom{margin-top:18px;display:flex;flex-direction:column;gap:16px;align-items:stretch}#app[data-role=student] .slide-controls{position:sticky;bottom:8px;z-index:4;justify-content:space-between;gap:10px;min-height:56px;border-radius:16px;border:1px solid #a687bc40;padding:12px 15px;background:#303237ee;box-shadow:0 5px 20px #1112;backdrop-filter:blur(12px);box-sizing:border-box}#app[data-role=student] .slide-dots{display:none}#app[data-role=student] .slide-counter{font-size:12px;color:#ddcaef}#app[data-role=student] .following-label{font-size:11px;line-height:1.4;color:#d2bfdc}#app[data-role=student] .participants-strip{justify-content:center;gap:16px}#app[data-role=student] .participant-count{font-size:11px}#app[data-role=student] .participant-avatars>span:nth-child(n+5){display:none}
   #app[data-role=student] .document-top{display:block;margin-bottom:20px}#app[data-role=student] .document-top h1{font-size:21px;line-height:1.3;margin:10px 0}#app[data-role=student] .document-top-actions{justify-content:space-between;gap:12px}#app[data-role=student] .document-stage{border-radius:12px;overflow:hidden;min-height:0;box-shadow:0 12px 26px #15101f18}#app[data-role=student] .document-discussion{border-radius:16px;padding:18px;font-size:15px;line-height:1.6}#app[data-role=student] .document-footer{flex-wrap:wrap;gap:18px;justify-content:center}#app[data-role=student] .document-nav{width:100%;justify-content:space-between;border-radius:14px;padding:14px;background:#303237}
   #app[data-role=student] .quiz-top{flex-wrap:wrap;gap:12px;margin-bottom:18px}#app[data-role=student] .quiz-top>.eyebrow{font-size:9px}#app[data-role=student] .quiz-count{font-size:10px}#app[data-role=student] .quiz-layout{display:flex;flex-direction:column;gap:20px}#app[data-role=student] .question-card{padding:22px 17px;border-radius:22px}#app[data-role=student] .question-card h1{font-size:25px;line-height:1.3;margin:24px 0}#app[data-role=student] .answer-options{grid-template-columns:1fr;gap:12px}#app[data-role=student] .answer-option{padding:15px 13px;min-height:68px;font-size:16px;line-height:1.4;border-radius:15px;text-align:left;touch-action:manipulation}#app[data-role=student] .answer-letter{flex-shrink:0}#app[data-role=student] .answer-status{font-size:13px;line-height:1.6}#app[data-role=student] .question-footer{font-size:11px;gap:10px;flex-wrap:wrap}#app[data-role=student] .quiz-sidebar{width:auto;padding:20px;border-radius:20px}#app[data-role=student] .quiz-sidebar .ranking-row{padding:12px 0}
-  .studio-join{padding:28px 18px!important;gap:28px!important}.studio-shell .studio-join h1{font-size:38px;line-height:1.12}.studio-join .join-illustration{display:none}.studio-shell .join-card{padding:26px 22px;border-radius:24px}.studio-shell .join-card input{min-height:50px;font-size:17px}.studio-shell .avatar-picker{gap:10px;grid-template-columns:repeat(4,1fr)}.studio-shell .avatar{min-height:50px;min-width:48px;font-size:25px}.studio-shell .join-card button[type=submit]{min-height:54px;font-size:16px}
+  .studio-join{padding:18px 14px calc(22px + env(safe-area-inset-bottom))!important;gap:14px!important}.studio-shell .studio-join h1{font-size:clamp(26px,7.2vw,34px);line-height:1.1}.studio-join .join-illustration{display:none}.studio-shell .join-card{padding:26px 22px;border-radius:24px}.studio-shell .join-card input{min-height:50px;font-size:17px}.studio-shell .avatar-picker{gap:10px;grid-template-columns:repeat(4,1fr)}.studio-shell .avatar{min-height:50px;min-width:48px;font-size:25px}.studio-shell .join-card button[type=submit]{min-height:54px;font-size:16px}
 }
 /* Keep controls readable inside the dark 3D card even when the page is light. */
 #app[data-role=student] .model-panel :is(.subtle-btn,.icon-btn){color:#ddc8f1;background:#ffffff08;border-color:#bda1e538}
@@ -415,9 +415,30 @@ html[data-appearance=light] #app[data-role=student] .callout p{color:#6d5287}
   #app[data-role=student] .game-stage .game-options.bare .game-option{min-height:0}
   #app[data-role=student] .game-stage .game-options.bare .game-option b{font-size:clamp(44px,16vw,84px)}
   #app[data-role=student] .answer-options.bare-answers .answer-option{min-height:clamp(110px,20dvh,180px)}
-  /* Experimento: simulador em cima e o botão de tentar sempre ao alcance do dedo */
+  /* Experimento: simulador em cima (grande) e o botão de tentar sempre ao alcance do dedo.
+     A altura do simulador no celular é decidida em finishing.css (§58); aqui
+     só garantimos uma coluna e cartões do espelho mais estreitos. */
   #app .challenge-layout{grid-template-columns:1fr}
-  #app .challenge-sim .simulation-widget{min-height:min(42dvh,380px)}
-  #app .challenge-submit-row{position:sticky;bottom:10px;z-index:6}
   #app .challenge-live-grid{grid-template-columns:repeat(auto-fill,minmax(140px,1fr))}
+}
+
+/* ===== Logo do menu lateral: mesmo tamanho e posição da barra do topo =====
+   Antes, ao abrir o menu, a marca aparecia maior e deslocada (o cartão do
+   drawer usava o estilo do desktop). Agora ela fica idêntica ao cabeçalho. */
+@media (max-width:900px){
+  /* A marca do menu é a MESMA da barra do topo: mesma altura de linha (62px),
+     mesmo tamanho de logo e mesma margem à esquerda — assim ela não "salta"
+     ao abrir o menu. */
+  #app .studio-drawer .studio-rail{padding-inline:14px!important}
+  #app .studio-drawer .ai-rail-brand{align-items:center;justify-content:space-between;gap:8px;height:62px;min-height:62px;max-height:62px;padding:0;margin:0 0 2px}
+  #app .studio-drawer .ai-rail-brand .studio-wordmark{font-size:19px;gap:8px;padding:0;min-width:0;display:inline-flex;align-items:center}
+  #app .studio-drawer .ai-rail-brand .studio-wordmark .lab-logo{width:34px;height:34px;border-radius:10px;flex:none}
+  #app .studio-drawer .ai-rail-brand .studio-wordmark>span{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  #app .studio-drawer>.studio-rail{padding-top:calc(10px + env(safe-area-inset-top))!important}
+  /* O menu não duplica a barra do topo: o cabeçalho do drawer é a própria marca. */
+  #app .studio-drawer .ai-rail-brand .ai-nav-toggle{flex:0 0 38px;width:38px;height:38px}
+}
+@media (max-width:380px){
+  #app .studio-drawer .ai-rail-brand .studio-wordmark{font-size:16px;gap:5px}
+  #app .studio-drawer .ai-rail-brand .studio-wordmark .lab-logo{width:29px;height:29px}
 }

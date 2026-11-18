@@ -1,6 +1,7 @@
 import {AccountVault} from './account-vault.js';
 import { prefersReducedMotion } from './motion-preference.js';
 import { appearancePicker } from './appearance.js';
+import { writeLocalMotion } from './motion-storage.js';
 import { cloudConfigured, disconnectCloud } from './cloud-files.js';
 import { ProfileSettings } from './profile.js';
 import { createClient } from '@supabase/supabase-js';
@@ -58,7 +59,11 @@ export class Account {
       else if (action === 'remove-photo') this.settings.removePhoto();
       else this.show(action === 'open' ? (this.user ? 'account' : 'login') : action);
     });
-    root.addEventListener('click',e=>{const swatch=e.target.closest('[data-profile-theme]');if(swatch){const select=root.querySelector('#profile-theme');if(select){select.value=swatch.dataset.profileTheme;for(const b of root.querySelectorAll('[data-profile-theme]'))b.setAttribute('aria-pressed',String(b===swatch));this.settings.capture(root.querySelector('#account-form'));}}});
+    root.addEventListener('click',e=>{
+      // Animação: a escolha vale na hora e fica salva no navegador (sem conta também).
+      const motion=e.target.closest('[data-profile-motion]');
+      if(motion){writeLocalMotion(motion.dataset.profileMotion);for(const b of root.querySelectorAll('[data-profile-motion]'))b.setAttribute('aria-pressed',String(b===motion));return;}
+      const swatch=e.target.closest('[data-profile-theme]');if(swatch){const select=root.querySelector('#profile-theme');if(select){select.value=swatch.dataset.profileTheme;for(const b of root.querySelectorAll('[data-profile-theme]'))b.setAttribute('aria-pressed',String(b===swatch));this.settings.capture(root.querySelector('#account-form'));}}});
     root.addEventListener('change', e => { if(e.target.id==='profile-theme')for(const b of root.querySelectorAll('[data-profile-theme]'))b.setAttribute('aria-pressed',String(b.dataset.profileTheme===e.target.value));if (['profile-photo', 'profile-camera-file'].includes(e.target.id)) this.settings.photo.choose(e.target.files[0]).catch(error => { this.error = error.userMessage || error.message; this.paint(); }); });
     root.addEventListener('submit', e => { if (e.target.id === 'account-form') { e.preventDefault(); this.submit(e.target); } });
     root.addEventListener('keydown', e => { if (this.mode && e.key === 'Escape' && !this.busy && this.mode !== 'recovery') { e.preventDefault(); this.close(); } });
