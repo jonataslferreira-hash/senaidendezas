@@ -887,15 +887,17 @@ app.addEventListener('click', async event => {
   const clearButton = event.target.closest('[data-team-photo-clear]');
   if (clearButton) {
     const tools = clearButton.closest('.team-leader-tools');
-    if (tools) { teamPhotoDraft = ''; sendGame({ teamCustom: { team: Number(tools.dataset.leaderTeam), name: tools.querySelector('[data-team-name]')?.value || '', photo: '' } }, true); toast('Foto do time removida.'); }
+    if (tools) { teamPhotoDraft = undefined; delete tools.dataset.editing; sendGame({ teamCustom: { team: Number(tools.dataset.leaderTeam), name: tools.querySelector('[data-team-name]')?.value || '', photo: '' } }, true); toast('Foto do time removida.'); }
     return;
   }
   const saveButton = event.target.closest('[data-team-save]');
   if (saveButton) {
     const tools = saveButton.closest('.team-leader-tools');
     if (!tools) return;
-    sendGame({ teamCustom: { team: Number(tools.dataset.leaderTeam), name: tools.querySelector('[data-team-name]')?.value || '', ...(teamPhotoDraft !== undefined ? { photo: teamPhotoDraft } : {}) } }, true);
+    const custom = { team: Number(tools.dataset.leaderTeam), name: tools.querySelector('[data-team-name]')?.value || '', ...(teamPhotoDraft !== undefined ? { photo: teamPhotoDraft } : {}) };
     teamPhotoDraft = undefined;
+    delete tools.dataset.editing;
+    sendGame({ teamCustom: custom }, true);
     toast('Time atualizado.');
   }
 });
@@ -905,6 +907,8 @@ app.addEventListener('change', async event => {
   const file = input.files?.[0];
   input.value = '';
   if (!file) return;
+  const tools = input.closest('.team-leader-tools');
+  if (tools) tools.dataset.editing = 'true';
   try {
     const optimized = await optimizeImage(file, { avatar: true });
     teamPhotoDraft = await new Promise((resolve, reject) => {
@@ -1028,6 +1032,7 @@ app.addEventListener('click', async e => {
   else if (button.dataset.action) await action(button.dataset.action);
 });
 app.addEventListener('input', e => {
+  if (e.target.matches('[data-team-name]')) e.target.closest('.team-leader-tools').dataset.editing = 'true';
   if(e.target.id==='player-name'){joinNameTouched=true;joinNameDraft=e.target.value;}if(e.target.id==='room-code')codeDraft=e.target.value.replace(/\D/g,'').slice(0,6);
   const key = e.target.dataset.liveField;
   if (editDraft && e.target.dataset.liveElement) { const el = editDraft.elements.find(el => el.id === e.target.dataset.liveElement); if (el) { el.text = e.target.value; if (el.role === 'title') editDraft.title = el.text.slice(0, 200); } return; }

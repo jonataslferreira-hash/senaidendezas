@@ -439,14 +439,9 @@ test('barra do topo não quebra quando o snapshot ainda não chegou', async () =
 test('tela de Equipes não quebra e o convite abre em qualquer etapa', async () => {
   const { readFileSync } = await import('node:fs');
   const view = readFileSync(new URL('../src/stage-games-view.js', import.meta.url), 'utf8');
-  // O seletor "Quantos times" lia state.teams.length — state.teams não existe
-  // no snapshot de jogo, então a tela inteira caía com TypeError e o clique em
-  // "Ao vivo" nunca chegava a pintar o QR.
-  // O seletor "Quantos times" é montado dentro de teamsView, onde a lista
-  // vem do jogo (g), não do snapshot da sala.
+  // A lista de times vem do snapshot da sala, não do snapshot do jogo.
   const countControl = view.slice(view.indexOf('const countControl'), view.indexOf('const countControl') + 900);
-  assert.equal(/state\.teams/.test(countControl), false, 'seletor não lê state.teams');
-  assert.match(countControl, /g\.teams\?\.length \|\| 0/, 'o seletor usa a lista do jogo');
+  assert.match(countControl, /state\.teams\?\.length \|\| 0/, 'o seletor usa a lista da sala com proteção');
   // O convite é um bloco vivo em toda tela de jogo.
   assert.match(view, /<\/main>\$\{shareOpen \? shareDialog\(\) : ''\}/, 'convite aparece nas etapas de jogo');
 });

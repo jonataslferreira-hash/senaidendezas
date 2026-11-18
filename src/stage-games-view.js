@@ -76,9 +76,9 @@ function teamsView(state, g, host, player) {
     </div>
   </section>` : '';
   const badge = player ? (leading ? '' : mine ? `<p class="team-mine" style="--team:${esc(mine.color)}">Você é do <b>Time ${esc(mine.name)}</b></p>` : picking ? '<p class="game-wait">Toque no time que você quer entrar.</p>' : '') : '';
-  const countControl = host ? `<div class="team-count-control"><label for="team-count-live">Quantos times</label><div class="team-count-row"><select id="team-count-live" data-team-count-select aria-label="Quantos times">${Array.from({ length: 9 }, (_, i) => i + 2).map(n => `<option value="${n}" ${(g.teams?.length || 0) === n ? 'selected' : ''}>${n}</option>`).join('')}</select><button type="button" class="btn secondary small" data-game-do="team-count">Aplicar</button></div></div>` : '';
+  const countControl = host ? `<div class="team-count-control"><label for="team-count-live">Quantos times</label><div class="team-count-row"><select id="team-count-live" data-team-count-select aria-label="Quantos times">${Array.from({ length: 9 }, (_, i) => i + 2).map(n => `<option value="${n}" ${(state.teams?.length || 0) === n ? 'selected' : ''}>${n}</option>`).join('')}</select><button type="button" class="btn secondary small" data-game-do="team-count">Aplicar</button></div></div>` : '';
   return live(badge + choose + leaderTools + teamsBoard(state, { hostTools: host })) +
-    live(host ? `${countControl}<p class="game-note">${picking ? 'Os alunos estão escolhendo o time no celular. Quem não escolher entra no time com menos gente.' : 'Os pontos do quiz e das dinâmicas de cada aluno somam para o time. Toque no nome de um aluno para torná-lo líder: o líder pode trocar o nome e a foto do time no celular dele.'}</p>${hostActions(state, [picking ? ['end', 'Fechar escolha', 'primary'] : null, ['shuffle', 'Sortear os times']], { showNext: !picking })}` : `<p class="game-note">${picking ? 'Dá para trocar de time até o professor fechar a escolha.' : 'Cada ponto seu soma para o time. Boa sorte!'}</p>`);
+    live(host ? `${countControl}<p class="game-note">${picking ? 'Os alunos estão escolhendo o time nos seus dispositivos. Quem não escolher entra no time com menos gente.' : 'Os pontos do quiz e das dinâmicas de cada aluno somam para o time. Toque no nome de um aluno para torná-lo líder: o líder pode trocar o nome e a foto do time no seu dispositivo.'}</p>${hostActions(state, [picking ? ['end', 'Fechar escolha', 'primary'] : null, ['shuffle', 'Sortear os times']], { showNext: !picking })}` : `<p class="game-note">${picking ? 'Dá para trocar de time até o professor fechar a escolha.' : 'Cada ponto seu soma para o time. Boa sorte!'}</p>`);
 }
 
 // Botões de resposta. No celular do aluno (g.bare) vão só as letras: a pergunta fica no telão.
@@ -292,6 +292,7 @@ function challengeView(state, g, host, player) {
   const me = player && g.me;
   const left = me ? Math.max(0, max - me.tries) : max;
   const leader = me?.leader || host;
+  const myTeam = state.teams?.find(team => team.index === state.me?.team);
   const hintLeft = Math.max(0, Math.ceil((g.hintSeconds || 20) - (g.hintAt ? (Date.now() - g.hintAt) / 1000 : 0)));
   // Dica por controle depois de errar: verde = quase lá, âmbar = perto, cinza =
   // longe — com legenda, porque só as barrinhas não diziam nada.
@@ -303,7 +304,7 @@ function challengeView(state, g, host, player) {
   // Rodada de dicas: o líder tenta, o time lê a dica e palpita a resposta.
   const teamHint = g.hint
     ? `<div class="challenge-team-hint"><span>Dica ${g.hintIndex + 1} de ${g.hintCount}</span><p>${esc(g.hint)}</p>${leader ? '' : `<small>O líder está ajustando o experimento. Escreva o que você acha que é a resposta certa.</small>`}</div>`
-    : `<div class="challenge-team-hint quiet">${leader ? '' : `<p>O líder do time está ajustando o experimento. Fique de olho e palpite quando a dica aparecer.</p>`}</div>`;
+    : !leader ? `<div class="challenge-team-hint quiet"><p>O líder do time está ajustando o experimento. Fique de olho e palpite quando a dica aparecer.</p></div>` : '';
   const guessBox = !leader && me && !me.ok && !done
     ? `<form class="challenge-guess" data-challenge-guess><label for="challenge-guess-field">Seu palpite para a turma</label>
         <div><input id="challenge-guess-field" name="guess" maxlength="80" value="${esc(me.guess || '')}" placeholder="Ex.: 45 graus" autocomplete="off"><button class="btn secondary small" type="submit">Enviar</button></div>
@@ -313,12 +314,15 @@ function challengeView(state, g, host, player) {
     ? `<p class="game-winner"><span>🎯</span>Você chegou à meta! <small>${me.place}º lugar · +${me.points} pts</small></p>`
     : done ? '<p class="game-wait">Tempo encerrado.</p>'
     : left <= 0 ? `<p class="sv-dead">As ${max} tentativas acabaram. Acompanhe a turma!</p>`
-    : leader ? `${controlHints}<div class="challenge-submit-row">${character({ avatar: '', color: 'var(--ui-accent)' }, 0, 'working')}<button class="btn primary game-submit" data-challenge-send>${stageIcon('challenge')} Tentar acertar</button><span class="challenge-tries" data-left="${left}" aria-label="${left} de ${max} tentativas restantes">${Array.from({ length: max }, (_, i) => `<i data-used="${i >= left}"></i>`).join('')}</span></div>`
+    : leader ? `${controlHints}<div class="challenge-submit-row">${character({ avatar: state.me?.avatar || '🤖', teamPhoto: myTeam?.photo, color: myTeam?.color }, 0, 'working')}<button class="btn primary game-submit" data-challenge-send>${stageIcon('challenge')} Tentar acertar</button><span class="challenge-tries" data-left="${left}" aria-label="${left} de ${max} tentativas restantes">${Array.from({ length: max }, (_, i) => `<i data-used="${i >= left}"></i>`).join('')}</span></div>`
     : `<p class="game-wait">Você está no time de quem mexe: acompanhe a dica e palpite.</p>`)
     : '';
   const podium = g.solved.length ? `<ol class="challenge-podium">${g.solved.slice(0, 5).map((item, i) => `<li><b>${['🥇', '🥈', '🥉'][i] || i + 1 + 'º'}</b><span>${esc(item.name)}</span><small>${(item.at / 1000).toFixed(1)} s · ${plural(item.tries, 'tentativa', 'tentativas')}</small></li>`).join('')}</ol>` : '';
   const answer = g.answer ? `<p class="challenge-answer"><b>Resposta:</b> ${g.answer.map(item => `${esc(item.label)} = ${esc(item.v)}`).join(' · ')}</p>` : '';
-  const goal = g.text ? `<p class="challenge-goal">${esc(g.text)}</p>` : '';
+  // A instrução genérica não precisa ocupar uma caixa no dispositivo do aluno;
+  // objetivos personalizados continuam visíveis. No telão o texto fica centralizado.
+  const genericGoal = /^ajuste o experimento até chegar à meta[.!]?$/i.test((g.text || '').trim());
+  const goal = g.text && (host || !genericGoal) ? `<p class="challenge-goal">${esc(g.text)}</p>` : '';
   // Telão: cada time espelhado ao vivo (os controles de quem está mexendo).
   // Cada cartão é identificado por pessoa (data-k) e o bloco é "soft": quando
   // alguém mexe no experimento, o keepGame troca só o número de tentativas e a
@@ -328,7 +332,7 @@ function challengeView(state, g, host, player) {
   // a foto do time e "Time <nome>" em vez do avatar da pessoa.
   const teamOf = item => state.teams?.find(t => (t.members || []).some(m => m.id === item.id));
   const liveLab = host && !done && g.live?.length
-    ? `<div class="game-live game-mirror" data-game-live data-soft="mirror:${esc(g.simulation)}"><div class="challenge-live"><h2>Espelho ao vivo <small>${g.live.length}</small></h2><div class="challenge-live-grid" data-teams="${g.live.length}">${g.live.map(item => { const tm = teamOf(item); const dead = !item.ok && item.tries >= max; const lead = tm ? `<img class="team-photo" src="${esc(tm.photo)}" alt="Foto do time ${tm.name}"><strong>Time ${esc(tm.name)}</strong>` : `${character(item, 0, item.ok ? 'win-0' : 'idle')}<strong>${esc(item.name)}</strong>`; return `<div class="challenge-live-card" data-k="${esc(item.id)}" data-ok="${item.ok}"${dead ? ' data-dead' : ''}><header>${lead}<small data-soft-slot="tries">${item.tries}/${max}</small></header><div class="challenge-live-sim">${simulationMarkup(g.simulation)}</div><div class="challenge-live-values" data-soft-slot="values">${item.values.map(value => `<i>${esc(String(value ?? '').slice(0, 6))}</i>`).join('')}</div></div>`}).join('')}</div></div></div>`
+    ? `<div class="game-live game-mirror" data-game-live data-soft="mirror:${esc(g.simulation)}"><div class="challenge-live"><h2>Espelho ao vivo <small>${g.live.length}</small></h2><div class="challenge-live-grid" data-teams="${g.live.length}">${g.live.map(item => { const tm = teamOf(item); const dead = !item.ok && item.tries >= max; const lead = tm ? `${tm.photo ? `<img class="team-photo" src="${esc(tm.photo)}" alt="">` : `<span class="team-photo team-photo-fallback" style="--team:${esc(tm.color)}">${esc((tm.name || '?').slice(0,1).toUpperCase())}</span>`}<strong>Time ${esc(tm.name)}</strong>` : `${character(item, 0, item.ok ? 'win-0' : 'idle')}<strong>${esc(item.name)}</strong>`; return `<div class="challenge-live-card" data-k="${esc(item.id)}" data-ok="${item.ok}"${dead ? ' data-dead' : ''}><header><span class="challenge-live-identity" data-soft-slot="identity">${lead}</span><small data-soft-slot="tries">${item.tries}/${max}</small></header><div class="challenge-live-sim">${simulationMarkup(g.simulation)}</div><div class="challenge-live-values" data-soft-slot="values">${item.values.map(value => `<i>${esc(String(value ?? '').slice(0, 6))}</i>`).join('')}</div></div>`}).join('')}</div></div></div>`
     : '';
   // O espelho de verdade: aplica no experimento grande (e nas miniaturas do
   // telão) os valores que o líder está usando agora.
@@ -348,8 +352,8 @@ function challengeView(state, g, host, player) {
   const results = '';
   return `<div class="challenge-layout"><div class="challenge-stage">
       <div class="challenge-sim" data-challenge-sim data-locked="${!host && !leader}">${simulationMarkup(g.simulation)}</div>
-      ${live(goal + teamHint + mine + guessBox, 'command')}
-    </div><aside class="challenge-side">${results}${liveLab}${live(guessWall, 'guesses')}</aside></div>` + actionBar;
+      ${live(goal + teamHint + (host ? '' : mine + guessBox), 'command')}
+    </div>${host ? `<aside class="challenge-side">${results}${liveLab}${live(guessWall, 'guesses')}</aside>` : ''}</div>` + actionBar;
 }
 
 function raffleView(state, g, host, player) {
@@ -548,7 +552,15 @@ export function keepGame(root, markup, state) {
         return;
       }
     }
-    node.innerHTML = fresh.innerHTML;
+    const draft = node.querySelector('.team-leader-tools[data-editing="true"]');
+    const replacement = fresh.querySelector('.team-leader-tools');
+    if (draft && replacement && draft.dataset.leaderTeam === replacement.dataset.leaderTeam) {
+      const active = draft.contains(document.activeElement) ? document.activeElement : null;
+      const selection = active && typeof active.selectionStart === 'number' ? [active.selectionStart, active.selectionEnd] : null;
+      replacement.replaceWith(draft);
+      node.replaceChildren(...fresh.childNodes);
+      if (active) { active.focus({preventScroll:true}); if (selection) active.setSelectionRange(...selection); }
+    } else node.innerHTML = fresh.innerHTML;
     if (fresh.dataset.soft !== undefined) node.dataset.soft = fresh.dataset.soft;
   });
   if (formNow) formNow.dataset.left = formNext.dataset.left;
