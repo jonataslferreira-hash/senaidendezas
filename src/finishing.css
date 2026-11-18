@@ -2417,6 +2417,7 @@ dialog.storage-image-search.image-replacement .image-inline-search button svg{wi
 
 /* 43.2 Cabeçalho limpo sem duplicar o nome do jogo */
 #app .game-head-row.game-head-single{gap:12px}
+#app .game-stage[data-game-type="teams"] .teams-host-heading{flex-direction:column;gap:8px}
 #app .game-hero-title{
   display:inline-flex;align-items:center;justify-content:center;gap:10px;
   margin:0;font-size:clamp(24px,4.4vh,42px);line-height:1.1;letter-spacing:-.02em;
