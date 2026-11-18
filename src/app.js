@@ -712,7 +712,7 @@ async function connectSession(mode) {
   liveInteraction = null;
   try {
     if (host) { await classroom.create(Boolean(mode.resume), mode.lesson, mode.startIndex,editorLaunch);shareOpen=!mode.resume; }
-    else {music=true;gameAudio.unlock();await classroom.join(mode.code, mode.name, mode.avatar);enterImmersiveRoom();}
+    else {music=true;gameAudio.unlock();const user=studio.account.user, photo=studio.account.vault.list().find(s=>s.user.id===user?.id)?.avatar_thumbnail;await classroom.join(mode.code, mode.name, mode.avatar, isPhotoAvatar(photo) ? photo : mode.accountPhoto);enterImmersiveRoom();}
     if (!readOnlyPresentation) studio.writeRoute('present', activeLesson.id);
   } catch (err) {
     classroom.stop(); if (!state) host = false;

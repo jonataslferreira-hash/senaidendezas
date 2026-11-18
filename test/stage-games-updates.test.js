@@ -66,11 +66,13 @@ test('dicas do experimento indicam direção correta e resultado aparece depois 
   assert.match(html,/game-live game-challenge-result-live/);
 });
 
-test('classificação usa foto do time em vez de retrato pessoal e respeita fallback', () => {
+test('personagem usa foto do time e classificação completa usa foto pessoal', () => {
   const personal='data:image/png;base64,BBBB', team='data:image/png;base64,'+'A'.repeat(25000);
   const p={id:'a',name:'Ana',score:100,avatar:personal}, state={ranking:[p],teams:[{name:'Equipe',photo:team,members:[p]}],me:{id:'a'}};
   const html=leaderboardMarkup(state,{header:()=>'',host:false});
-  assert.ok(html.includes(team)); assert.ok(!html.includes(personal));
+  assert.ok(html.includes(team));
+  const list=html.split('class="standings-list"')[1];
+  assert.ok(list.includes(personal)); assert.ok(!list.includes(team));
   const noTeam=leaderboardMarkup({...state,teams:[]},{header:()=>'',host:false});
   assert.ok(noTeam.includes(personal));
 });
@@ -81,4 +83,44 @@ test('dicas genéricas antigas são atualizadas sem substituir dicas escritas pe
   const base={...defaultGame('challenge'),answer:[{k:'range',label:'A',v:'30',min:0,max:100}]};
   assert.notDeepEqual(validateGame({...base,hints:old}).hints,old);
   assert.deepEqual(validateGame({...base,hints:['Dica própria']}).hints,['Dica própria']);
+});
+
+test('experimento espera todos os líderes terminarem, inclusive quem esgotou as tentativas', () => {
+  const {room,a,b,advance} = setup('challenge', {answer:[{k:'range',label:'Dia',v:'14',min:0,max:29}]});
+  room.data.teams=[{name:'Sol',color:'#facc15',leader:a.id},{name:'Lua',color:'#60a5fa',leader:b.id}];
+  room.data.players.find(p=>p.id===a.id).team=0;
+  room.data.players.find(p=>p.id===b.id).team=1;
+  room.answer(a.id,{choice:{values:['14']}});
+  assert.equal(room.snapshot().game.state,'open');
+  for(let i=0;i<3;i++){advance(2000);room.answer(b.id,{choice:{values:['0']}});}
+  assert.equal(room.snapshot().game.state,'done');
+  const html=gameMarkup(room.snapshot(),{host:true,header:()=>''});
+  assert.match(html,/challenge-result-card is-winner/); assert.match(html,/Time Sol/);
+  assert.match(html,/challenge-result-card is-other/); assert.match(html,/data-mood="lose"/);
+  assert.doesNotMatch(html,/challenge-mode-state|Só o líder mexe/);
+});
+
+test('experimento com todos liberados espera todos e só termina quando concluírem', () => {
+  const {room,a,b,advance} = setup('challenge', {leaderMode:false,answer:[{k:'range',label:'Dia',v:'14',min:0,max:29}]});
+  room.answer(a.id,{choice:{values:['14']}});
+  assert.equal(room.snapshot().game.state,'open');
+  advance(2000); room.answer(b.id,{choice:{values:['14']}});
+  assert.equal(room.snapshot().game.state,'done');
+});
+
+test('foto da conta permanece no placar completo mesmo ao trocar o avatar da sala', () => {
+  const lesson=newLesson();
+  const room=new Room('111222',null,()=>20000,lesson);
+  const photo='data:image/png;base64,AAAA', joined=room.join({name:'Ana',avatar:'🚀',accountPhoto:photo});
+  room.updateProfile(joined.id,{name:'Ana',avatar:'🐱'});
+  const state=room.snapshot(joined.id);
+  assert.equal(state.ranking[0].avatar,'🐱');
+  assert.equal(state.ranking[0].accountPhoto,photo);
+  assert.equal(state.quizRanking[0].accountPhoto,photo);
+  const html=leaderboardMarkup(state,{header:()=>'',host:false});
+  assert.ok(html.split('class="standings-list"')[1].includes(photo));
+  room.disconnect(joined.id); room.join({name:'Ana',avatar:'🐱',token:joined.token});
+  assert.equal(room.snapshot().ranking[0].accountPhoto,photo);
+  const invalid=room.join({name:'Bia',avatar:'🚀',accountPhoto:'https://example.test/imagem'});
+  assert.equal(room.snapshot(invalid.id).ranking.find(p=>p.id===invalid.id).accountPhoto,undefined);
 });

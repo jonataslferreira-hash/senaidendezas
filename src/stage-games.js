@@ -216,7 +216,7 @@ export function startGame(room, random = Math.random) {
     // Desafio em rodadas: o líder de cada time mexe no experimento; o resto do
     // time recebe uma dica e escreve a resposta. Cada rodada tem seu palpite.
     Object.assign(game, { solved: [], tries: {}, live: {}, hint: '', hintAt: 0, guesses: {}, guessesAt: {}, round: -1,
-      openForGuess: false, hintCount: (config.hints || []).length || 1, lastGuess: null });
+      openForGuess: false, hintCount: (config.hints || []).length || 1, lastGuess: null, leaderMode: config.leaderMode !== false, freeForAll: config.leaderMode === false });
   }
   else if (config.type === 'raffle') { game.picked = []; game.current = ''; game.drawAt = 0; game.revealAt = 0; }
   else if (config.type === 'tug') {
@@ -361,6 +361,7 @@ export function tickGame(room) {
   const game = room.data.game;
   if (room.data.phase !== 'game' || !game) return;
   if (game.type === 'survival' && game.state === 'open' && room.now() >= game.deadline) revealSurvival(room);
+  if (game.type === 'challenge' && game.state === 'open') finishChallengeIfComplete(room);
   if (game.type === 'tug' && game.state === 'open' && room.now() >= game.deadline) concludeTugRound(room);
   if (game.type === 'tug' && game.state === 'between' && room.now() >= (game.betweenAt || 0) + TUG_BETWEEN_MS) openTugRound(room, game.round + 1);
   if (game.type === 'race' && game.state === 'open' && room.now() >= game.deadline) revealRace(room);
@@ -631,7 +632,18 @@ export function gameInput(room, playerId, payload) {
       game.openForGuess = true;
     }
     if (ok) { game.solved.push({ player: playerId, at: now - game.startedAt, tries }); bonus(player, game.solved.length === 1 ? CHALLENGE_FIRST : CHALLENGE_POINTS); }
+    finishChallengeIfComplete(room);
   } else throw Error('Esta etapa não recebe respostas.');
+}
+
+// Termina quando todas as pessoas que podem ajustar o experimento concluírem:
+// acertaram ou usaram as três tentativas. Quem apenas dá palpites não bloqueia.
+function finishChallengeIfComplete(room) {
+  const game = room.data.game;
+  const eligible = online(room).filter(p => challengeLeader(room.data, game, p.id));
+  if (eligible.length && eligible.every(p => game.solved.some(item => item.player === p.id) || (game.tries[p.id]?.n || 0) >= 3)) {
+    game.state = 'done'; game.resultStartedAt = room.now();
+  }
 }
 
 // Quem está no comando do experimento: com times é o líder de cada time, sem

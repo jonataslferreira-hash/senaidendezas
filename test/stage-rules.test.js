@@ -26,7 +26,8 @@ test('experimento: três tentativas e só', () => {
   room.clock.tick(2000); gameInput(room, 'p1', wrong);
   room.clock.tick(2000);
   assert.equal(room.data.game.tries.p1.n, 3);
-  assert.throws(() => gameInput(room, 'p1', wrong), /3 tentativas acabaram/);
+  assert.equal(room.data.game.state, 'done');
+  assert.throws(() => gameInput(room, 'p1', wrong), /rodada já terminou/);
 });
 
 test('experimento: errar entrega dica de proximidade por controle', () => {
@@ -67,7 +68,8 @@ test('experimento: aluno que acertou vê o próprio lugar e dicas não vazam a r
   const snap = gameSnapshot(room, 'p1');
   assert.equal(snap.me.ok, true);
   assert.equal(snap.me.place, 1);
-  assert.equal(snap.answer, undefined);
+  assert.equal(snap.state, 'done');
+  assert.ok(snap.answer, 'a resposta aparece após todos terminarem');
 });
 
 const flashRoom = () => ({

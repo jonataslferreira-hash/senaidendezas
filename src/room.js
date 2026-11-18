@@ -37,7 +37,7 @@ export class Room {
   selectQuestions(index){const block=this.blocks?.[index];if(!block)return;const quiz=block.type==='quiz'?block:this.blocks.slice(index+1).find(b=>b.type==='quiz');this.questions=quiz?this.lesson.questions.filter(q=>quiz.items.includes(q.id)):[];}
   enterBlock(index){const block=this.blocks?.[index];if(!block)throw Error('Etapa não encontrada.');settleTeams(this);this.data.blockIndex=index;this.selectQuestions(index);this.data.questionIndex=-1;this.data.startedAt=0;this.data.deadline=0;if(block.type==='quiz')this.data.phase='lobby';else{const slide=this.slides.findIndex(s=>block.items.includes(s.id));this.data.slide=Math.max(0,slide);this.data.model=this.slides[this.data.slide].model;this.data.animationStep=0;this.data.phase=block.type==='poll'?'poll':'lesson';if(block.type==='poll'){this.data.pollId=newToken();this.data.votes={};}else if(isGameType(block.type))startGame(this);}}
   activity(){if(!this.blocks)return null;const index=this.data.blockIndex||0,block=this.blocks[index];return {id:block.id,index,type:block.type,slideIndices:this.slides.flatMap((s,i)=>block.items.includes(s.id)?[i]:[]),hasNext:index+1<this.blocks.length||((block.type==='poll'||isGameType(block.type))&&block.items.indexOf(this.slides[this.data.slide]?.id)<block.items.length-1),nextType:this.blocks[index+1]?.type||''};}
-  join({ name, avatar, token } = {}) {
+  join({ name, avatar, accountPhoto, token } = {}) {
     if(token&&(this.data.removedTokens||[]).includes(token))throw Error('Você foi removido desta sala pelo professor.');
     let p = token && this.data.players.find(p => p.token === token);
     if (!p) {
@@ -50,6 +50,7 @@ export class Room {
       p = { id: newToken(), token: String(token || '') || newToken(), name, avatar: avatars.includes(avatar)||isPhotoAvatar(avatar) ? avatar : avatars[0], score: 0, correct: 0, streak:0, answers: {}, online: true };
       this.data.players.push(p);
     }
+    if (isPhotoAvatar(accountPhoto)) p.accountPhoto = accountPhoto;
     p.online = true;assignTeam(this,p);syncGameJoin(this,p);
     return { id: p.id, token: p.token };
   }
@@ -169,8 +170,8 @@ export class Room {
     const bare = Boolean(id) && !this.fullText;
     const hasScoredStages = this.lesson.questions.length > 0 || this.slides.some(s => s.game && !['teams', 'raffle'].includes(s.game.type));
     const slideTransition = this.slides[d.slide]?.transition || 'slide';
-    const quizRanking = d.players.map(({ id, name, avatar, score, answers, online, streak, team }) => ({
-      id, name, avatar,
+    const quizRanking = d.players.map(({ id, name, avatar, accountPhoto, score, answers, online, streak, team }) => ({
+      id, name, avatar, ...(accountPhoto ? { accountPhoto } : {}),
       ...(Number.isInteger(team) ? { team } : {}),
       ...(d.teams?.[team] ? { color: d.teams[team].color } : {}),
       score,
@@ -187,7 +188,7 @@ export class Room {
       game: gameSnapshot(this, id, bare), teams: teamScores(this),
       poll: ['poll', 'poll-results'].includes(d.phase) ? { ...this.slides[d.slide].poll, id: d.pollId, total: Object.keys(d.votes).length, choice: p && Object.hasOwn(d.votes, id) ? d.votes[id] : null, counts: this.slides[d.slide].poll.options.map((_, i) => Object.values(d.votes).filter(v => v === i).length) } : null,
       ...(includeLesson ? { lesson: this.publicLesson(!id) } : {}),
-      ranking: d.players.map(({ id, name, avatar, score, bonus, correct, online,streak,team }) => ({ id, name, avatar,...(Number.isInteger(team)?{team}:{}),...(d.teams?.[team]?{color:d.teams[team].color}:{}), score:score+(bonus||0), correct, online,streak:streak||0,previousScore:(d.previousScores?.[id]||0)+(d.previousBonus?.[id]||0),previousRank:(d.previousRanking||[]).indexOf(id)+1 })).sort((a, b) => b.score - a.score || b.correct - a.correct || a.name.localeCompare(b.name, 'pt-BR')),
+      ranking: d.players.map(({ id, name, avatar, accountPhoto, score, bonus, correct, online,streak,team }) => ({ id, name, avatar,...(accountPhoto?{accountPhoto}:{}),...(Number.isInteger(team)?{team}:{}),...(d.teams?.[team]?{color:d.teams[team].color}:{}), score:score+(bonus||0), correct, online,streak:streak||0,previousScore:(d.previousScores?.[id]||0)+(d.previousBonus?.[id]||0),previousRank:(d.previousRanking||[]).indexOf(id)+1 })).sort((a, b) => b.score - a.score || b.correct - a.correct || a.name.localeCompare(b.name, 'pt-BR')),
       quizRanking,
       answeredCount: d.players.filter(p => p.answers[d.questionIndex]).length,
       question: q && d.phase !== 'lesson' ? { text: bare ? '' : q.text, options: q.options.map(o => bare ? '' : o), bare, difficulty: q.difficulty, base: q.base, startedAt: d.startedAt, deadline: d.deadline, ...(revealed ? { correct: q.correct, explanation: bare ? '' : q.explanation } : {}) } : null,

@@ -117,11 +117,22 @@ test('edições de dois times e desafio cabem e permanecem sincronizados',async(
     expect(sticky.top).toBeLessThanOrEqual(sticky.viewBottom+1);
     expect(sticky.bottom).toBeLessThanOrEqual(sticky.viewBottom+1);
     expect(sticky.scroll).toBeGreaterThan(0);
-    // Encerrar ao vivo deve atualizar o resultado mesmo sem remontar a tela.
-    await page.getByRole('button',{name:'Encerrar jogo'}).click();
+    // Os dois líderes terminam no dispositivo: o resultado aparece sozinho no telão.
+    await expect(page.locator('.challenge-mode-state')).toHaveCount(0);
+    for(const p of [phone,pc]) {
+      await p.locator('[data-challenge-sim] [data-param]').first().evaluate(el=>{el.value='14';el.dispatchEvent(new Event('input',{bubbles:true}));el.dispatchEvent(new Event('change',{bubbles:true}));});
+      await p.locator('[data-challenge-send]').click();
+      if(p===phone) await expect(page.locator('.game-stage')).toHaveAttribute('data-game-state','open');
+    }
+    await expect(page.locator('.game-stage')).toHaveAttribute('data-game-state','done');
     await expect(page.locator('.challenge-results')).toContainText('Resultados do experimento');
     await expect(page.locator('.challenge-results')).toContainText('Dia = 14');
-    await expect(page.locator('.challenge-results')).toContainText('Ninguém chegou');
+    await expect(page.locator('.challenge-result-card.is-winner .character-head img')).toBeVisible();
+    await expect(page.locator('.challenge-result-card.is-other .game-character')).toHaveAttribute('data-mood','lose');
+    await expect(page.locator('.challenge-results')).toContainText('Time');
+    const resultBounds=await page.locator('.game-stage').evaluate(stage=>({scroll:stage.scrollHeight-stage.clientHeight, top:stage.getBoundingClientRect().top,head:stage.querySelector('.game-head').getBoundingClientRect().top}));
+    expect(resultBounds.scroll).toBeLessThanOrEqual(2);
+    expect(resultBounds.head-resultBounds.top).toBeLessThan(30);
     expect(errors).toEqual([]);
   }finally{await phoneContext.close();await pcContext.close();}
 });
