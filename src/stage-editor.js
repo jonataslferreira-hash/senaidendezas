@@ -163,9 +163,9 @@ export class StageEditor {
     if (g.type === 'raffle') body += '<p class="stage-help">Uma roleta com o nome de quem está na sala. Ninguém é sorteado duas vezes até todos terem saído.</p>';
     if (g.type === 'tug') {
       body += field('Os dois lados', `<div class="stage-options two">${[0, 1].map(i => `<input type="text" data-game-field="option" data-index="${i}" maxlength="60" value="${esc(g.options[i] || '')}" placeholder="Lado ${'AB'[i]}" ${off}>`).join('')}</div>`, 'Se a aula tiver uma etapa "Equipes" antes, os lados viram os próprios times (com o nome e a cor deles). Sem equipes, a turma é dividida ao meio com estes nomes.');
-      body += field('Tempo por pergunta', `<select data-game-field="seconds" ${off}>${[8, 10, 15, 20, 30, 45].map(n => `<option value="${n}" ${g.seconds === n ? 'selected' : ''}>${n} segundos</option>`).join('')}</select>`);
+      body += field('Tempo por pergunta', `<select data-game-field="seconds" ${off}>${[8, 10, 15, 20, 30, 45].map(n => `<option value="${n}" ${g.seconds === n ? 'selected' : ''}>${n} segundos</option>`).join('')}</select>`, 'A rodada termina quando todos responderem, quando o tempo acabar ou pelo comando do apresentador.');
       body += field('Tolerância para vencer', `<select data-game-field="tug-tolerance" ${off}>${[0, 5, 10, 15, 20, 30].map(n => `<option value="${n}" ${g.tolerance === n ? 'selected' : ''}>${n === 0 ? 'Qualquer diferença vence' : n + ' pontos de diferença'}</option>`).join('')}</select>`, 'A força de cada lado é a porcentagem de acertos (0 a 100). Se a diferença entre os lados não passar da tolerância, dá empate e ninguém puxa a corda.');
-      body += roundList('Cada rodada pode ter até 3 perguntas, e todos respondem todas em sequência — mesmo tempo, mesmas perguntas para os dois lados. Cada acerto vale 100 pontos para o aluno, e o lado que vencer ganha mais 200 por pessoa.');
+      body += roundList('Cada rodada pode ter até 3 perguntas: uma delas é sorteada para todos os participantes. Cada acerto vale 100 pontos para o aluno, e o lado que vencer ganha mais 200 por pessoa.');
     }
     if (g.type === 'challenge') {
       const marked = (g.answer || []).filter(item => !item.skip && item.k !== 'text');
@@ -176,7 +176,7 @@ export class StageEditor {
       // Dicas do time: o líder mexe no experimento e cada tentativa dele libera
       // a próxima dica para o resto do time palpitar.
       const hints = (g.hints || []).join('\n');
-      body += field('Dicas para o time (uma por linha)', `<textarea rows="4" maxlength="900" data-game-field="hints" ${off} placeholder="O valor certo está mais alto do que está agora.…">${esc(hints)}</textarea>`,
+      body += field('Dicas para o time (uma por linha)', `<textarea rows="4" maxlength="900" data-game-field="hints" ${off} placeholder="Observe como o experimento muda ao ajustar o controle.">${esc(hints)}</textarea>`,
         'Cada tentativa do líder libera a próxima dica. O resto do time lê e escreve o palpite — tudo aparece no telão. Deixe em branco para desligar.');
       body += field('Tempo de cada dica', `<select data-game-field="hintSeconds" ${off}>${[10, 15, 20, 30, 45, 60].map(n => `<option value="${n}" ${(g.hintSeconds || 20) === n ? 'selected' : ''}>${n} segundos</option>`).join('')}</select>`);
       body += field('Quem mexe no experimento', `<select data-game-field="leaderMode" ${off}><option value="1" ${g.leaderMode !== false ? 'selected' : ''}>Só o líder do time</option><option value="0" ${g.leaderMode === false ? 'selected' : ''}>Todos podem mexer</option></select>`, 'Você pode trocar isso ao vivo pelo telão, sem sair da apresentação.');

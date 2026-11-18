@@ -3676,3 +3676,62 @@ button.connection:hover{background:#ffffff14}
 @media (max-width:480px) {
   #app .challenge-live-grid, #app .challenge-live-grid[data-teams="3"], #app .challenge-live-grid[data-teams="4"] { grid-template-columns:minmax(0,1fr); }
 }
+
+/* Telas roláveis: nenhum pódio, placar ou pergunta é comprimido sobre outro. */
+#app.quiz-party > main.game-stage:is([data-game-type="flash"],[data-game-type="tug"],[data-game-type="race"]) {
+  height:100%; min-height:0; overflow-y:auto!important; overflow-x:hidden!important;
+  justify-content:flex-start; overscroll-behavior:contain; -webkit-overflow-scrolling:touch;
+}
+#app .game-stage:is([data-game-type="flash"],[data-game-type="tug"],[data-game-type="race"]) > * { flex-shrink:0; }
+#app .game-stage:is([data-game-type="flash"],[data-game-type="tug"],[data-game-type="race"]) > .game-head { margin-top:auto; }
+#app .game-stage:is([data-game-type="flash"],[data-game-type="tug"],[data-game-type="race"]) > :last-child { margin-bottom:auto; }
+#app .game-stage[data-game-type="flash"] .game-flash { flex-shrink:0; }
+#app .flash-board li { grid-template-columns:32px minmax(0,1fr) auto auto; }
+#app .flash-board-who > span { white-space:normal; overflow-wrap:anywhere; line-height:1.2; }
+#app .flash-board li > strong { grid-column:4; white-space:nowrap; justify-self:end; }
+#app .flash-board li > small { grid-column:3; }
+#app .survival-heading { flex-direction:column; gap:8px; }
+#app .survival-heading h1 { margin:0; }
+#app .tug-names > span { min-width:0; padding:10px 44px 10px 10px; overflow-wrap:anywhere; }
+#app .tug-names > span b { display:block; white-space:normal; overflow-wrap:anywhere; line-height:1.25; }
+#app .tug-names > span strong { right:8px; }
+#app .game-stage[data-game-type="race"] .game-race,
+#app .game-stage[data-game-type="tug"] .game-rope { min-height:max-content; flex-shrink:0; }
+#app .challenge-results { width:100%; display:grid; gap:10px; text-align:center; }
+#app .challenge-results h2 { margin:0; }
+#app .challenge-results .challenge-podium { width:min(720px,100%); margin:auto; }
+#app .challenge-hint-box ul { text-align:left; margin:4px 0 0; padding-left:20px; line-height:1.4; font-size:13px; }
+#app .game-stage[data-game-type="challenge"] > .game-submit { flex-shrink:0; }
+@media (max-width:800px) {
+  #app .game-stage[data-game-type="challenge"] > .game-submit {
+    position:sticky; bottom:calc(8px + env(safe-area-inset-bottom)); z-index:8;
+    width:100%; margin-top:0; align-self:stretch;
+  }
+  #app .game-stage[data-game-type="challenge"] .challenge-submit-row {
+    width:100%; box-sizing:border-box; padding:8px; margin:0;
+    background:#17122bf2; border:1px solid #ffffff24; box-shadow:0 -6px 22px #00000055;
+  }
+  #app .flash-board li { grid-template-columns:24px minmax(0,1fr) auto auto; gap:5px; padding:8px; }
+  #app .flash-board-who { gap:3px; }
+  #app .flash-board li > strong { grid-column:4; }
+  #app .flash-board li > small { grid-column:3; }
+  #app .game-stage[data-game-type="tug"] .tug-scene { width:100%; box-sizing:border-box; }
+  #app .game-stage[data-game-type="tug"] .tug-names { width:100%; grid-template-columns:minmax(0,1fr) auto minmax(0,1fr); }
+  #app .game-stage[data-game-type="race"] .game-options { grid-template-columns:repeat(2,minmax(0,1fr)); }
+  #app .game-stage[data-game-type="race"] .game-option { min-height:64px; }
+}
+
+/* Este diálogo é anexado ao body, portanto as regras não podem depender de #app. */
+dialog.participants-sheet { box-sizing:border-box; width:min(460px,calc(100vw - 24px)); max-height:min(680px,calc(100dvh - 24px)); overflow-y:auto; overflow-x:hidden; }
+dialog.participants-sheet > header { flex:none; }
+dialog.participants-sheet .ps-teams { display:flex; flex-wrap:wrap; gap:8px; padding:0 18px 12px; }
+dialog.participants-sheet .ps-teams > span { display:flex; align-items:center; gap:6px; max-width:100%; min-width:0; border-radius:10px; background:var(--team,#7652a5); }
+dialog.participants-sheet .ps-teams b { min-width:0; overflow-wrap:anywhere; }
+dialog.participants-sheet .ps-teams img { width:28px; height:28px; object-fit:cover; border-radius:7px; flex:none; }
+dialog.participants-sheet .ps-teams-actions { display:flex; flex-wrap:wrap; gap:8px; padding:0 18px 12px; }
+dialog.participants-sheet :is(.ps-teams-actions button,footer button) { min-height:40px; padding:8px 12px; border-radius:10px; border:1px solid #a593c8; background:#7950b4; color:white; font:inherit; font-weight:700; cursor:pointer; }
+dialog.participants-sheet .ps-list { flex:none; min-height:0; overflow:visible; }
+dialog.participants-sheet .ps-team-edit { display:flex; align-items:center; gap:8px; min-width:0; padding:8px; }
+dialog.participants-sheet .ps-team-edit label { display:grid; gap:4px; flex:1; min-width:0; }
+dialog.participants-sheet .ps-team-edit input { width:100%; box-sizing:border-box; min-width:0; padding:8px; }
+dialog.participants-sheet footer { display:flex; flex-wrap:wrap; justify-content:flex-end; gap:8px; padding:12px 18px; }

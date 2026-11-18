@@ -265,7 +265,7 @@ test('Cabo de Guerra pré-distribui times no lobby, Relâmpago oculta pular-etap
   const tugStudentHtml = studentView(room.snapshot(ana.id));
   assert.match(tugStudentHtml, /data-wide-options="true"/, 'ativa expansão lateral no aparelho do aluno quando há alternativa longa');
   assert.match(tugStudentHtml, /Rodada <b>1<\/b> de 1/, 'aluno vê em que rodada está');
-  assert.match(tugStudentHtml, /Pergunta 1 de \d+/, 'aluno responde as perguntas da rodada em sequência');
+  assert.match(tugStudentHtml, /Pergunta da rodada 1/, 'aluno responde uma pergunta sorteada');
   assert.match(tugOpenHtml, /tug-hidden-score/, 'apresentador oculta porcentagens antes do fim da puxada');
   assert.doesNotMatch(tugOpenHtml, /tug-grip-hands/, 'sem mãos extras sobrepostas aos braços do boneco');
 

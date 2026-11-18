@@ -84,7 +84,7 @@ test('sobrevivência não repete o título da regra no meio do palco', () => {
     if (room.snapshot().phase === 'finished') break;
   }
   const html = gameMarkup(room.snapshot(ana.id), { header: () => '', host: true, now });
-  assert.doesNotMatch(html, /<h1[^>]*>\s*Uma vida só/i, 'título redundante fora do palco');
+  assert.match(html, /survival-heading[\s\S]*game-hero-icon[\s\S]*<h1>Uma vida só\. Quem sobrevive\?<\/h1>[\s\S]*game-eyebrow-meta/, 'ícone, texto e contagem nessa ordem');
 });
 
 test('título que só repete a regra não vira cabeçalho gigante', () => {

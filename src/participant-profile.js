@@ -68,15 +68,15 @@ export function manageParticipants(state,kick,control,{host=false}={}){
   }
   const dialog=document.createElement('dialog');dialog.className='participants-sheet';
   const people=[...(state.ranking||[])].sort((a,b)=>Number(b.online)-Number(a.online)||a.name.localeCompare(b.name,'pt-BR')),online=people.filter(p=>p.online).length,teams=state.teams||[];
-  const teamOf=p=>teams.find(team=>team.members.some(member=>member.id===p.id));
+  const teamOf=p=>teams.find(team=>(team.members||[]).some(member=>member.id===p.id));
   const row=p=>{const team=teamOf(p);return `<li class="ps-person" data-name="${esc(p.name.toLowerCase())}" data-online="${p.online}" data-me="${p.id===state.me?.id}"${team?` style="--team:${esc(team.color)}"`:''}><span class="ps-avatar">${avatarContent(p.avatar)}</span><div class="ps-text"><strong>${esc(p.name)}${p.id===state.me?.id?' <em>você</em>':''}</strong><small>${p.online?'Conectado':'Saiu da sala'}${team?' · Time '+esc(team.name):''}${p.score?' · '+p.score.toLocaleString('pt-BR')+' pts':''}</small></div>${kick?`<button type="button" class="ps-remove" data-remove-player="${esc(p.id)}">Remover</button>`:''}</li>`;};
   // Botão de atalho: editar/criar times sem sair da lista de participantes.
-  const teamsShortcut = (host && teams.length)
+  const teamsShortcut = (host && teams.length && state.game?.type === 'teams')
     ? `<div class="ps-teams-actions"><button type="button" class="btn secondary small" data-action="edit-teams">Editar times</button><button type="button" class="btn secondary small" data-game-do="shuffle">Sortear times de novo</button></div>`
     : '';
   dialog.innerHTML=`<header><div><h2>Participantes</h2><p><b>${online}</b> ${online===1?'conectado':'conectados'}${people.length>online?' · '+(people.length-online)+' fora':''}</p></div><button type="button" data-close aria-label="Fechar participantes">×</button></header>
     ${people.length>6?'<input type="search" class="ps-search" placeholder="Procurar pelo nome" aria-label="Procurar participante">':''}
-    ${teams.length?`<div class="ps-teams">${teams.map(team=>`<span style="--team:${esc(team.color)}">${team.photo?`<img class="team-photo" src="${esc(team.photo)}" alt="">`:''}<b>Time ${esc(team.name)}</b> <small>${team.members.length}</small></span>`).join('')}</div>${teamsShortcut}`:''}
+    ${teams.length?`<div class="ps-teams">${teams.map(team=>`<span style="--team:${esc(team.color)}">${team.photo?`<img class="team-photo" src="${esc(team.photo)}" alt="">`:''}<b>Time ${esc(team.name)}</b> <small>${(team.members||[]).length}</small></span>`).join('')}</div>${teamsShortcut}`:''}
     <ul class="ps-list">${people.map(row).join('')||'<li class="ps-empty">A turma ainda não entrou.</li>'}</ul>`;
   dialog.addEventListener('input',e=>{if(!e.target.matches('.ps-search'))return;const term=e.target.value.trim().toLowerCase();for(const item of dialog.querySelectorAll('.ps-person'))item.hidden=Boolean(term)&&!item.dataset.name.includes(term);});
   dialog.addEventListener('click',e=>{
@@ -102,12 +102,12 @@ function editTeamsDialog(state,control){
   const dialog=document.createElement('dialog');dialog.className='participants-sheet';
   const countInput=`<select name="team-count" data-team-count>${Array.from({length:9},(_,i)=>i+2).map(count=>`<option value="${count}"${count===teams.length?' selected':''}>${count} times</option>`).join('')}</select>`;
   const rows=teams.map((team,i)=>{
-    const kind=team.members.length===1?'pessoa':'pessoas';
-    const meSuffix=team.members.some(m=>m.id===me)?' · você':'';
+    const kind=(team.members||[]).length===1?'pessoa':'pessoas';
+    const meSuffix=(team.members||[]).some(m=>m.id===me)?' · você':'';
     return `<li class="ps-team-edit" style="--team:${esc(team.color)}">
     <span class="ps-avatar">${team.photo?`<img class="team-photo" src="${esc(team.photo)}" alt="">`:`<b>${esc((team.name||'Time').slice(0,1).toUpperCase())}</b>`}</span>
     <label>Nome do time<input type="text" maxlength="24" name="team-name-${i}" value="${esc(team.name)}" data-team-index="${i}"></label>
-    ${team.members?`<small>${team.members.length} ${kind}${meSuffix}</small>`:''}
+    ${team.members?`<small>${(team.members||[]).length} ${kind}${meSuffix}</small>`:''}
   </li>`;
   }).join('');
   dialog.innerHTML=`<header><div><h2>Editar times</h2><p>Quantidade e nomes das equipes.</p></div><button type="button" data-close aria-label="Fechar">×</button></header>
