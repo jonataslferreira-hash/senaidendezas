@@ -824,7 +824,8 @@ html[data-theme][data-ui-style][data-appearance] body #app dialog.remote-v2 :is(
 #app .final-team-champion em{font-style:normal;font-size:13px;opacity:.88;font-weight:600}
 /* equipes */
 #app .team-board{display:grid;grid-template-columns:repeat(var(--teams,2),minmax(0,1fr));gap:14px;width:100%}
-#app .team-card{border-radius:20px;border:2px solid var(--team);background:color-mix(in srgb,var(--team) 18%,rgba(0,0,0,.25));padding:14px 16px;text-align:left;color:#fff;min-width:0}
+#app .team-card{--team2:color-mix(in srgb,var(--team) 50%,#0b0b16);border-radius:20px;border:2px solid var(--team);
+  background:linear-gradient(150deg,color-mix(in srgb,var(--team) 32%,rgba(10,10,20,.55)),color-mix(in srgb,var(--team2) 26%,rgba(10,10,20,.6)));padding:14px 16px;text-align:left;color:#fff;min-width:0}
 #app .team-card header{display:flex;justify-content:space-between;align-items:baseline;gap:8px;flex-wrap:wrap}
 #app .team-card header strong{font-size:clamp(17px,2.6vh,24px)}
 #app .team-card header b{font-size:clamp(22px,3.6vh,36px);font-variant-numeric:tabular-nums}
@@ -851,11 +852,27 @@ html[data-theme][data-ui-style][data-appearance] body #app dialog.remote-v2 :is(
 #app .cloud-form .btn{min-height:54px;font-size:16px}
 #app .cloud-form[data-left="0"]{opacity:.5}
 /* desafio no experimento */
-#app .challenge-layout{display:grid;grid-template-columns:minmax(0,1.6fr) minmax(250px,1fr);gap:18px;width:100%;align-items:start;text-align:left}
-#app .challenge-sim{min-width:0;border-radius:20px;overflow:hidden;background:#fff;color:#171324}
-#app .challenge-sim .simulation-widget{width:100%;min-height:min(60dvh,520px)}
-#app .challenge-layout aside{display:flex;flex-direction:column;gap:14px}
-#app .challenge-layout aside .game-live{align-items:stretch}
+#app .challenge-layout{display:grid;grid-template-columns:minmax(0,1.55fr) minmax(260px,.85fr);gap:18px;width:100%;align-items:stretch;text-align:left}
+#app .challenge-stage{display:flex;flex-direction:column;gap:12px;min-width:0}
+#app .challenge-side{display:flex;flex-direction:column;gap:14px;min-width:0}
+/* Tela do jogo pinta com a cor do time do usuário, pra todo mundo ver
+   a identidade da equipe ao entrar nas etapas. */
+#app .game-stage[data-game-type="teams"]{
+  background: color-mix(in srgb, var(--team, #171c2c) 10%, transparent);
+}
+/* PC: centra o conteúdo do desafio e evita espaço vazio / elementos
+   fora da tela quando a tela é alta. */
+@media (min-width:801px){
+  #app .challenge-layout{align-items:center;max-height:100vh;overflow:hidden}
+  #app .challenge-sim .simulation-widget{max-height:clamp(420px,64dvh,680px)}
+}
+#app .challenge-side .game-live{align-items:stretch}
+#app .challenge-results-head{display:flex;align-items:center;justify-content:space-between;gap:10px}
+#app .challenge-results-head h2{margin:0}
+#app .challenge-results-head small{font-size:13px;font-weight:800;opacity:.75;font-variant-numeric:tabular-nums}
+#app .challenge-sim{min-width:0;border-radius:20px;overflow:hidden;background:#171c2c;color:#e8eefc;display:flex}
+#app .challenge-sim .simulation-widget{width:100%;min-height:clamp(360px,62dvh,660px)}
+
 #app .challenge-layout h2{margin:0;font-size:15px;letter-spacing:1px;text-transform:uppercase;opacity:.8;display:flex;justify-content:space-between}
 #app .challenge-podium{list-style:none;margin:0;padding:0;display:grid;gap:8px}
 #app .challenge-podium li{display:grid;grid-template-columns:auto 1fr;gap:2px 10px;align-items:center;padding:10px 14px;border-radius:14px;background:var(--g-card);border:1px solid var(--g-line);animation:game-pop .4s}
@@ -889,7 +906,7 @@ html[data-theme][data-ui-style][data-appearance] body #app dialog.remote-v2 :is(
 #app .tug-tap small{font-size:13px;opacity:.9;max-width:20ch;margin:0 auto}
 #app .tug-tap.pulse{animation:tug-pulse .16s}
 @keyframes tug-pulse{50%{transform:scale(.93)}}
-@media (max-width:760px){#app .game-stage{padding:12px 14px 22px;gap:12px}#app .game-options{grid-template-columns:1fr}#app .game-option{min-height:68px}#app .team-board{grid-template-columns:repeat(2,minmax(0,1fr))}#app .challenge-layout{grid-template-columns:1fr}#app .challenge-sim .simulation-widget{min-height:0}#app .tug-rope{grid-template-columns:1fr 1fr}#app .tug-track{grid-column:1/-1;grid-row:1}#app .cloud-form{flex-direction:column}}
+@media (max-width:760px){#app .game-stage{padding:12px 14px 22px;gap:12px;overflow-y:auto}#app .game-options{grid-template-columns:1fr}#app .game-option{min-height:68px}#app .team-board{grid-template-columns:1fr;gap:10px}#app .team-board.compact{grid-template-columns:1fr}#app .team-card{padding:10px 12px}#app .challenge-layout{grid-template-columns:1fr}#app .tug-rope{grid-template-columns:1fr 1fr}#app .tug-track{grid-column:1/-1;grid-row:1}#app .cloud-form{flex-direction:column}}
 @media (prefers-reduced-motion:reduce){:root:not([data-motion=normal]):not([data-play]) #app .game-stage *{animation:none!important;transition:none!important}}
 
 /* 34. Editor das etapas interativas */
@@ -1042,7 +1059,6 @@ html[data-appearance=dark] #app .rank-row{--rank-card:#2b2540;box-shadow:0 6px 1
 @keyframes rank-bob{from{transform:translateY(1px) rotate(-5deg)}to{transform:translateY(-3px) rotate(5deg)}}
 #app .rank-main{min-width:0;display:grid;gap:5px}
 #app .rank-main strong{font-size:calc(var(--row)*.27 + 3px);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;text-align:left}
-#app .rank-fire{font-style:normal;font-size:.8em;margin-left:4px}
 #app .rank-bar{height:calc(var(--row)*.16);border-radius:99px;background:color-mix(in srgb,var(--c) 18%,transparent);overflow:hidden}
 #app .rank-bar i{display:block;height:100%;width:100%;border-radius:99px;transform-origin:0 50%;background:linear-gradient(90deg,color-mix(in srgb,var(--c) 70%,#fff),var(--c));transform:scaleX(max(.02,var(--ratio)));animation:rank-grow 1s cubic-bezier(.2,.9,.25,1) both;animation-delay:calc(var(--d) + .6s)}
 @keyframes rank-grow{from{transform:scaleX(max(.02,var(--prev)))}to{transform:scaleX(max(.02,var(--ratio)))}}
@@ -2985,11 +3001,15 @@ dialog.simulation-modal .simulation-modal-foot-tools { display: none; }
 #app .team-rename[open] summary{opacity:1}
 #app .team-rename span{position:absolute;right:0;top:calc(100% + 6px);z-index:5;display:grid;gap:6px;background:#1c1730f2;border:1px solid #ffffff30;padding:8px;border-radius:10px;box-shadow:0 14px 40px #00000070}
 #app .team-rename input{min-width:170px}
-.team-leader-tools{display:grid;gap:10px;justify-items:start;padding:14px 16px;border-radius:16px;border:2px solid var(--team,#7950b4);background:color-mix(in srgb,var(--team,#7950b4) 16%,rgba(0,0,0,.25));margin:10px 0}
-.team-leader-tools strong{color:#fff;font-size:15px}
-.team-leader-tools label{display:grid;gap:4px;font-size:12.5px;color:#e7dcff;width:100%}
-.team-leader-tools input[type=text]{border-radius:8px;border:1px solid #ffffff38;background:#0f0c1cd9;color:#fff;padding:8px 10px;font:inherit}
-.team-leader-row{display:flex;gap:8px;flex-wrap:wrap}
+.team-leader-tools{display:grid;gap:14px;padding:16px;border-radius:18px;border:1px solid color-mix(in srgb,var(--team,#7950b4) 55%,transparent);background:color-mix(in srgb,var(--team,#7950b4) 12%,rgba(10,8,20,.55));margin:0 auto 4px;width:min(100%,520px);text-align:left;box-shadow:0 12px 30px #00000033}
+.team-leader-title{margin:0;font-size:14.5px;font-weight:650;color:#fff;line-height:1.35}
+.team-leader-title b{font-weight:800}
+.team-leader-tools label{display:block;font-size:11.5px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:#d9cdf2;opacity:.85}
+.team-leader-tools input[type=text]{border-radius:12px;border:1px solid #ffffff2e;background:#0f0c1cd9;color:#fff;padding:11px 13px;font:inherit;font-size:16px;width:100%;box-sizing:border-box}
+.team-leader-tools input[type=text]:focus-visible{outline:2px solid color-mix(in srgb,var(--team,#7950b4) 70%,#fff);outline-offset:1px}
+.team-leader-hint{font-size:11.5px;line-height:1.4;color:#cfc4e6;opacity:.8}
+.team-leader-actions{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.team-leader-actions .btn.primary{flex:1;min-width:120px}
 .team-pick-photo{width:54px;height:54px;border-radius:12px;object-fit:cover;border:2px solid #ffffff52;margin-bottom:4px}
 .stage-ai-field .studio-btn.is-loading{opacity:.6;pointer-events:none}
 
@@ -3031,7 +3051,9 @@ dialog.simulation-modal .simulation-modal-foot-tools { display: none; }
 @keyframes challenge-hint-pop{from{transform:scale(0)}to{transform:scale(1)}}
 #app .challenge-live{display:flex;flex-direction:column;gap:8px}
 #app .challenge-live-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(168px,1fr));gap:8px}
-#app .challenge-live-card{padding:10px 12px;border-radius:14px;background:var(--g-card);border:1px solid var(--g-line);display:flex;flex-direction:column;gap:7px;animation:game-pop .4s}
+/* Sem animação de entrada: o cartão se atualiza ao vivo (a cada ~700 ms) e a
+   animação a cada tique era a "intro" piscando na tela o tempo todo. */
+#app .challenge-live-card{padding:10px 12px;border-radius:14px;background:var(--g-card);border:1px solid var(--g-line);display:flex;flex-direction:column;gap:7px}
 #app .challenge-live-card[data-ok="true"]{border-color:#4ade80;background:rgba(34,197,94,.12)}
 #app .challenge-live-card header{display:flex;align-items:center;gap:8px;min-width:0}
 #app .challenge-live-card header strong{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:14px}
@@ -3039,12 +3061,19 @@ dialog.simulation-modal .simulation-modal-foot-tools { display: none; }
 #app .challenge-live-values{display:flex;flex-wrap:wrap;gap:4px}
 #app .challenge-live-values i{font-style:normal;font-size:11px;font-weight:700;padding:2px 7px;border-radius:999px;background:rgba(255,255,255,.09);border:1px solid var(--g-line);font-variant-numeric:tabular-nums}
 
-/* ===== Ofensiva do relâmpago no placar: chama de fogo animada ===== */
+/* ===== Ofensiva: chama de fogo animada (sem emoji) =====
+   Um único desenho de chama serve o placar do relâmpago (.streak-flame), a
+   corrida do ranking (.rank-fire) e o selo do aluno (.streak-badge). */
+#app :is(.streak-flame,.rank-fire,.streak-badge)::before{content:'';width:12px;height:16px;flex:none;background:radial-gradient(circle at 50% 78%,#fff8dc 0 16%,#fde047 34%,#fb923c 60%,#ea580c 85%);border-radius:50% 50% 50% 50%/64% 64% 36% 36%;filter:drop-shadow(0 0 4px #fbbf2490);animation:streak-flicker .48s ease-in-out infinite alternate}
 #app .flash-board .streak-flame{display:inline-flex;align-items:center;gap:4px;min-width:28px;height:22px;padding:0 7px;border-radius:999px;background:linear-gradient(135deg,#9a3412,#7c2d12);border:1px solid #f9731655;color:#fff;font-style:normal;font-size:11px;font-weight:800}
-#app .flash-board .streak-flame::before{content:'';width:12px;height:16px;flex:none;background:radial-gradient(circle at 50% 78%,#fff8dc 0 16%,#fde047 34%,#fb923c 60%,#ea580c 85%);border-radius:50% 50% 50% 50%/64% 64% 36% 36%;filter:drop-shadow(0 0 4px #fbbf2490);animation:streak-flicker .48s ease-in-out infinite alternate}
 #app .flash-board .streak-flame::after{content:attr(data-n);font-variant-numeric:tabular-nums}
+/* Ranking entre perguntas: chama do lado do nome, sem fundo (o nome já é branco) */
+#app .rank-fire{display:inline-flex;align-items:center;gap:4px;vertical-align:-.12em;font-style:normal;font-size:.8em;margin-left:4px}
+#app .rank-fire::after{content:attr(data-n);font-variant-numeric:tabular-nums;font-weight:800}
+/* Selo de ofensiva do aluno (tema claro do quiz): chama na ponta do pill */
+#app .streak-badge{display:inline-flex;align-items:center;gap:6px}
 @keyframes streak-flicker{0%{transform:scale(1,.96) rotate(-2deg)}55%{transform:scale(.86,1.14) rotate(2deg)}100%{transform:scale(1.05,.9) rotate(-1deg)}}
-@media (prefers-reduced-motion:reduce){#app .flash-board .streak-flame::before{animation:none}}
+@media (prefers-reduced-motion:reduce){#app :is(.streak-flame,.rank-fire,.streak-badge)::before{animation:none}}
 
 /* ===== Corrida: comemoração liberada da caixa da pista ===== */
 #app .race-track[data-state="done"]{overflow:visible}
@@ -3058,14 +3087,32 @@ dialog.simulation-modal .simulation-modal-foot-tools { display: none; }
 #app .team-rename summary:hover{background:rgba(255,255,255,.16);transform:translateY(-1px)}
 #app .team-rename summary::-webkit-details-marker{display:none}
 
+/* Card de um time: foto + nome + pontos na mesma linha, sem quebrar. */
+#app .team-card>header{align-items:center}
+#app .team-card>header>strong{flex:1 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+#app .team-card>header>b{flex:none}
+#app .team-card>header .team-rename{flex:none}
+#app .team-card>header.has-photo{display:grid;grid-template-columns:auto minmax(0,1fr) auto;align-items:center;column-gap:10px;row-gap:2px}
+#app .team-card>header.has-photo .team-photo{grid-row:1 / span 2;width:46px;height:46px}
+#app .team-card>header.has-photo>strong{grid-column:2;grid-row:1}
+#app .team-card>header.has-photo>b{grid-column:2;grid-row:2;text-align:left;font-size:clamp(17px,2.4vh,22px)}
+#app .team-card>header.has-photo .team-rename{grid-column:3;grid-row:1 / span 2}
+#app .team-card>header:not(.has-photo) .team-rename{order:3}
+
 /* Editar time (painel do líder): prévia da foto ao lado dos campos,
    com o fundo acompanhando a cor do time. */
 .team-leader-edit{display:flex;gap:12px;align-items:flex-start;width:100%}
-.team-leader-fields{display:grid;gap:10px;flex:1;min-width:0;justify-items:start;width:100%}
-.team-leader-preview{width:64px;height:64px;flex:none;border-radius:14px;overflow:hidden;display:grid;place-items:center;border:2px solid color-mix(in srgb,var(--team,#7950b4) 65%,#fff);background:color-mix(in srgb,var(--team,#7950b4) 32%,#0f0c1c);box-shadow:0 6px 16px #00000042}
-.team-leader-preview img{width:100%;height:100%;object-fit:cover;display:block}
-.team-leader-preview b{font-size:26px;font-weight:800;color:#fff;text-shadow:0 2px 8px #00000073}
-@media (max-width:760px){.team-leader-preview{width:56px;height:56px}}
+.team-leader-fields{display:grid;gap:6px;flex:1;min-width:0;width:100%}
+/* A foto É o botão de trocar a foto: sem texto solto embaixo. */
+.team-leader-photo{width:72px;height:72px;flex:none;padding:0;border-radius:18px;overflow:hidden;position:relative;display:grid;place-items:center;gap:1px;cursor:pointer;font:inherit;color:#fff;
+  border:1px dashed color-mix(in srgb,var(--team,#7950b4) 70%,#fff);background:color-mix(in srgb,var(--team,#7950b4) 26%,#0f0c1c);box-shadow:0 6px 16px #00000042;transition:transform .15s,border-color .15s}
+.team-leader-photo:hover{border-color:#fff}
+.team-leader-photo:active{transform:scale(.97)}
+.team-leader-photo:focus-visible{outline:2px solid #fff;outline-offset:2px}
+.team-leader-photo img{width:100%;height:100%;object-fit:cover;display:block}
+.team-leader-photo b{font-size:26px;font-weight:800;line-height:1;text-shadow:0 2px 8px #00000073}
+.team-leader-photo small{font-size:10px;font-weight:800;letter-spacing:.02em;opacity:.9;line-height:1}
+@media (max-width:760px){.team-leader-photo{width:64px;height:64px}}
 
 /* ===== Transição do slide no PC: o quadro novo carrega data-enter e a
    animação roda direto nele — apresentador e aluno conectado, sempre.
@@ -3083,3 +3130,486 @@ html:not([data-motion=reduced]) #app .document-stage[data-enter="fade"]{animatio
 /* Pill "Ao vivo" do topo: agora é botão (abre participantes/QR da sala). */
 button.connection{cursor:pointer;padding:6px 10px;margin:-6px -10px;border-radius:999px;transition:background .15s}
 button.connection:hover{background:#ffffff14}
+
+/* ===== 41. Ofensiva: fogo grande, com faísca ao redor de quem está subindo =====
+   O raio sai do placar: a chama é a única amostra de combo de acertos.       */
+#app .flash-board li>small .streak-flame{min-width:0;height:auto;padding:0;gap:6px;background:none;border:0;color:inherit;font-size:1em}
+#app .flash-board .streak-flame::before{width:calc(16px + 2px*var(--n,2));height:calc(22px + 2.4px*var(--n,2))}
+#app .flash-board .streak-flame::after{font-size:calc(1em + .1em*var(--n,2))}
+#app .flash-board .streak-flame{--n:2;animation:flame-beat .9s ease-in-out infinite}
+@keyframes flame-beat{0%,100%{transform:scale(1)}50%{transform:scale(1.07)}}
+@keyframes flare-spark{
+  0%{transform:translate(0,0) scale(.5);opacity:0}
+  20%{opacity:1}
+  100%{transform:translate(var(--sx,14px),calc(-1*var(--sy,26px))) scale(.2);opacity:0}
+}
+/* Barra de quem aumentou a ofensiva: faíscas subindo ao redor */
+#app .race-lane[data-streak="up"] .race-road::after,#app .rank-lane[data-streak="up"]::after,
+#app .rank-row[data-streak="up"] .rank-lane::after,
+#app .flash-board li[data-streak="up"]::after{content:'';position:absolute;inset:-6px;border-radius:inherit;pointer-events:none;
+  background:
+   radial-gradient(circle,#fde047 0 2px,transparent 2.5px) 8% 100%/100% 100% no-repeat,
+   radial-gradient(circle,#fb923c 0 2px,transparent 2.5px) 26% 100%/100% 100% no-repeat,
+   radial-gradient(circle,#fef08a 0 1.6px,transparent 2px) 48% 100%/100% 100% no-repeat,
+   radial-gradient(circle,#f97316 0 2.2px,transparent 2.6px) 70% 100%/100% 100% no-repeat,
+   radial-gradient(circle,#fde047 0 1.8px,transparent 2.2px) 90% 100%/100% 100% no-repeat;
+  animation:bar-sparks 1s ease-out infinite}
+@keyframes bar-sparks{from{background-position-y:100%,100%,100%,100%,100%;opacity:0}30%{opacity:1}to{background-position-y:-40%,-55%,-35%,-60%,-45%;opacity:0}}
+#app .rank-lane{position:relative}
+/* Faíscas intensificam com a ofensiva: 2 acertos começam, 5+ viram labareda. */
+#app .rank-row[data-streak="up"] .rank-lane::after{animation-duration:calc(1.2s - min(var(--fire,.3),.7)*.6s)}
+#app .rank-row[data-streak="up"] .rank-lane::before{content:'';position:absolute;inset:-3px;border-radius:inherit;background:radial-gradient(ellipse at 20% 110%,#f9731655,transparent 60%);filter:blur(3px);pointer-events:none}
+/* Chama maior no selo do aluno */
+#app .streak-badge{font-size:15px!important;padding:8px 16px!important}
+#app .streak-badge::before{width:16px;height:22px}
+
+/* ===== 42. Pódio: comemoração não fica presa num bloco ===== */
+#app .flash-podium-wrap{overflow:visible!important}
+#app .flash-podium{overflow:visible!important;align-items:flex-end;min-height:clamp(300px,46vh,430px);padding-top:clamp(56px,12vh,130px)}
+#app .game-stage .game-live.game-flash{overflow:visible}
+#app .game-stage{overflow-x:clip}
+#app .flash-podium-slot .game-character{overflow:visible;margin-bottom:0;transform:scale(.86)}
+#app .flash-podium-slot{min-height:0;overflow:visible}
+/* Confete/fogos por cima, sem cortar */
+#app .game-confetti{overflow:visible}
+
+/* ===== 43. Times: gradiente da cor do time (não o roxo do site) ===== */
+#app .team-card,#app .team-pick-btn,#app .team-mine,#app .tug-team{--team2:color-mix(in srgb,var(--team) 55%,#111)}
+/* O bloco com o nome do time não leva fundo. O card inteiro já é da cor do
+   time, então a faixa sólida no topo era uma cor chapada repetida — sem
+   função. Aqui ela simplesmente some: o nome, os pontos e o botão de
+   renomear ficam direto sobre o card. */
+#app .team-card>header{background:none;width:auto;max-width:100%}
+#app .team-pick-btn,#app .team-card .team-photo{background:linear-gradient(135deg,var(--team),var(--team2))}
+#app .team-mine{background:linear-gradient(120deg,color-mix(in srgb,var(--team) 22%,transparent),color-mix(in srgb,var(--team2) 18%,transparent));border-color:color-mix(in srgb,var(--team) 45%,transparent)}
+#app .team-card{border-color:color-mix(in srgb,var(--team) 40%,transparent)}
+#app .team-card>header>strong{color:#fff;text-shadow:0 1px 2px #0006}
+/* Cabo de guerra: fundo dos bonecos usa o gradiente do lado */
+#app .tug-team[style*="--team2"] .game-character{--player-color:var(--team)}
+#app .tug-names span[style*="--team2"]{background:linear-gradient(120deg,var(--team),var(--team2))!important;border-color:color-mix(in srgb,var(--team) 60%,transparent)}
+#app .tug-names span[style*="--team2"] b{color:#fff}
+#app .tug-meter i[style*="--team2"]{background:linear-gradient(90deg,var(--team),var(--team2))}
+#app .tug-question-count{margin:0 0 6px;font-size:13px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;opacity:.75}
+
+/* ===== 44. Celular: relâmpago, corrida e cabo de guerra inteiros na tela ===== */
+@media (max-width:800px){
+  #app .game-stage{padding:10px 10px calc(14px + env(safe-area-inset-bottom));border-radius:0;min-height:calc(100dvh - 66px);gap:8px}
+  #app .game-stage .game-head-row{flex-wrap:wrap;gap:6px}
+  #app .game-stage h1{font-size:clamp(19px,5.6vw,26px);line-height:1.2}
+  /* Relâmpago no celular: HUD compacto e opções ocupando o resto */
+  #app .game-type-flash .sv-hud{font-size:12px;gap:6px;flex-wrap:wrap;justify-content:center}
+  #app .flash-options{gap:8px}
+  #app .flash-options .game-option{padding:10px 12px;font-size:clamp(15px,4.4vw,19px)}
+  /* Placar: sem estourar a largura */
+  #app .flash-board li{grid-template-columns:30px minmax(0,1fr) auto;gap:8px;padding:8px 10px;font-size:14px}
+  #app .flash-board li>strong{font-size:15px}
+  /* Pódio no celular: cabe na tela */
+  #app .flash-podium{gap:6px;min-height:0;padding-top:clamp(30px,7vh,64px)}
+  #app .flash-podium-slot>strong{font-size:12px}
+  #app .flash-podium-slot>span{font-size:11px}
+  #app .flash-podium-slot .game-character{transform:scale(.58)}
+  #app .flash-podium-pedestal{height:74px;border-radius:14px 14px 0 0}
+  #app .flash-podium-slot.place-1 .flash-podium-pedestal{height:100px}
+  #app .flash-podium-slot.place-3 .flash-podium-pedestal{height:58px}
+  /* Corrida no celular: menos padding e boneco proporcional */
+  #app .race-track{--s:.22!important;padding:8px 6px;border-radius:18px;gap:2px}
+  #app .race-lane{grid-template-columns:48px minmax(0,1fr);height:calc(132px*var(--s) + 8px);gap:4px}
+  #app .race-name{font-size:10px}
+  #app .race-name small{display:block;font-size:9px}
+  #app .race-road{margin-right:calc(92px*var(--s) + 20px)}
+  #app .race-gain{font-size:10px}
+  /* Cabo de guerra no celular: nome no TOPO do cartão, número embaixo bem
+     separado — nada de texto em cima do número. */
+  #app .tug-names{display:grid;grid-template-columns:1fr auto 1fr;align-items:stretch;gap:6px}
+  #app .tug-names span{display:flex;flex-direction:column;justify-content:space-between;align-items:center;gap:6px;padding:8px 8px 9px;position:relative;min-width:0;min-height:78px}
+  #app .tug-names span b{order:1;font-size:clamp(11px,3.3vw,14px);line-height:1.2;max-width:100%;overflow-wrap:anywhere;text-align:center;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+  #app .tug-names span small{order:2;display:block;font-size:10px;line-height:1.25;opacity:.85}
+  #app .tug-names span strong{order:3;position:static!important;font-size:clamp(17px,5vw,22px)!important;margin-top:0;line-height:1}
+  #app .tug-names span::after{content:'';order:4;display:block;width:70%;height:2px;border-radius:2px;background:currentColor;opacity:.18;margin-top:4px}
+  #app .tug-names i{font-size:12px;align-self:center;padding-top:6px}
+  #app .tug-field{height:clamp(96px,15dvh,132px)}
+  #app .tug-scene{padding:8px;border-radius:18px;gap:8px}
+  #app .tug-rounds li{width:20px;height:20px;font-size:10px}
+  /* Sobrevivência: sem o título gigante repetido */
+  #app[data-role=host] .game-stage[data-game-type=survival] .game-head-row h1{font-size:clamp(18px,4.6vw,24px)}
+  #app .sv-arena{min-height:0}
+}
+
+/* ===== 45. Barra do topo única: "conectados" e "Ao vivo" em todas as etapas ===== */
+#app .stage-people{display:inline-flex;align-items:center;gap:6px;min-height:34px;padding:0 11px;border-radius:999px;border:1px solid color-mix(in srgb,currentColor 22%,transparent);background:color-mix(in srgb,currentColor 6%,transparent);font:inherit;font-size:12px;font-weight:700;color:inherit;cursor:pointer;transition:background .15s}
+#app .stage-people:hover{background:color-mix(in srgb,currentColor 13%,transparent)}
+#app .stage-people svg{width:15px;height:15px;opacity:.8}
+#app .stage-people b{font-variant-numeric:tabular-nums}
+@media (max-width:800px){
+  #app .header{padding:10px 14px;min-height:60px;gap:8px}
+  #app .header .header-right{gap:6px;flex-wrap:nowrap}
+  #app .stage-people{min-height:32px;padding:0 9px;font-size:11px}
+  #app .connection{font-size:11px}
+  #app .header .brand{font-size:18px;gap:7px}
+  #app .header .lab-logo{width:28px;height:28px}
+  #app .header .btn.secondary.small{font-size:10px;padding:7px 9px;min-height:32px}
+}
+
+/* ===== 46. Mais animações de idle para os bonecos =====
+   Três novidades: espreguiçar, olhar em volta e pular de alegria. Entram no
+   rodízio do `character()` (dance-4…6) sem pesar o resto.                      */
+#app .dance-4{--beat:3.1s}
+#app .dance-4 .buddy-top{animation-name:buddy-stretch;animation-timing-function:cubic-bezier(.35,0,.25,1)}
+#app .dance-4 .character-head{animation-name:buddy-head-stretch;animation-timing-function:cubic-bezier(.35,0,.25,1)}
+#app .dance-4 .buddy-hand.left{animation-name:buddy-stretch-l}
+#app .dance-4 .buddy-hand.right{animation-name:buddy-stretch-r}
+#app .dance-4 .buddy-shadow{animation:none}
+@keyframes buddy-stretch{0%,72%,100%{transform:none}80%{transform:scale(.94,1.09) translateY(-4px)}88%{transform:scale(1.03,.97)}}
+@keyframes buddy-head-stretch{0%,72%,100%{transform:none}80%{transform:rotate(-6deg) translateY(-3px)}}
+@keyframes buddy-stretch-l{0%,72%,100%{transform:rotate(-8deg)}80%{transform:rotate(-118deg)}90%{transform:rotate(-80deg)}}
+@keyframes buddy-stretch-r{0%,72%,100%{transform:rotate(8deg)}80%{transform:rotate(118deg)}90%{transform:rotate(80deg)}}
+
+#app .dance-5{--beat:4.2s}
+#app .dance-5 .buddy-top{animation-name:buddy-look;animation-timing-function:ease-in-out}
+#app .dance-5 .character-head{animation-name:buddy-head-look;animation-timing-function:ease-in-out}
+#app .dance-5 .buddy-hand.left{animation-name:buddy-rest-l}
+#app .dance-5 .buddy-hand.right{animation-name:buddy-rest-r}
+@keyframes buddy-look{0%,100%{transform:rotate(0)}25%{transform:rotate(-3deg)}75%{transform:rotate(3deg)}}
+@keyframes buddy-head-look{0%,100%{transform:rotate(0) translateX(0)}20%{transform:rotate(-12deg) translateX(-3px)}60%{transform:rotate(10deg) translateX(3px)}}
+@keyframes buddy-rest-r{0%,100%{transform:rotate(-8deg)}50%{transform:rotate(14deg)}}
+
+#app .dance-6{--beat:1.35s}
+#app .dance-6 .buddy-top{animation-name:buddy-jumpjoy;animation-timing-function:cubic-bezier(.3,1.5,.5,1)}
+#app .dance-6 .character-head{animation-name:buddy-head-joy;animation-timing-function:ease-in-out}
+#app .dance-6 .buddy-hand.left{animation-name:buddy-joy-l}
+#app .dance-6 .buddy-hand.right{animation-name:buddy-joy-r}
+@keyframes buddy-jumpjoy{0%,100%{transform:scale(1.05,.9)}18%{transform:translateY(-16px) scale(.94,1.06)}36%{transform:scale(1.08,.86)}54%{transform:translateY(-8px) scale(.98,1.02)}}
+@keyframes buddy-head-joy{0%,100%{transform:rotate(-4deg)}50%{transform:rotate(4deg)}}
+@keyframes buddy-joy-l{0%,100%{transform:rotate(64deg)}50%{transform:rotate(112deg)}}
+@keyframes buddy-joy-r{0%,100%{transform:rotate(-64deg)}50%{transform:rotate(-112deg)}}
+/* No telão/cartões menores, quem manda no ritmo é quem está em cena */
+#app .flash-board-who .dance-4,#app .flash-board-who .dance-5,#app .flash-board-who .dance-6{--beat:2.6s}
+
+/* ===== 47. Desafio do experimento: objetivo e dica legíveis ===== */
+#app .challenge-goal{margin:0;padding:12px 14px;border-radius:14px;font-size:clamp(14px,1.6vw,17px);font-weight:700;line-height:1.45;
+  background:color-mix(in srgb,var(--ui-accent,#a78bfa) 16%,transparent);border:1px solid color-mix(in srgb,var(--ui-accent,#a78bfa) 35%,transparent)}
+#app .challenge-howto{margin:0;font-size:13.5px;line-height:1.5;opacity:.8}
+#app .challenge-hint{display:flex;gap:6px;justify-content:center}
+#app .challenge-hint i{width:22px;height:9px;border-radius:99px;background:color-mix(in srgb,currentColor 18%,transparent)}
+#app .challenge-hint i.hot{background:#22c55e}#app .challenge-hint i.warm{background:#f59e0b}#app .challenge-hint i.cold{background:#94a3b8}
+@media (max-width:800px){
+  #app .challenge-layout{display:flex;flex-direction:column;gap:12px}
+  #app .challenge-goal{font-size:14px;padding:10px 12px}
+  #app .challenge-howto{font-size:12.5px}
+  #app .challenge-submit-row{bottom:calc(10px + env(safe-area-inset-bottom))}
+}
+
+/* ===== 48. Corrida: corre enquanto avança, para em idle, comemora no fim ===== */
+#app .race-lane[data-run="now"] .race-runner{transition:left 1.5s cubic-bezier(.25,.8,.3,1)}
+/* Corrida só na hora do deslocamento — nada de boneco pedalando parado. */
+#app .race-lane:not([data-run="now"]) .game-character[data-mood=run] .buddy,
+#app .race-lane:not([data-run="now"]) .game-character[data-mood=run] .buddy :is(.buddy-body,.character-head,.buddy-hand,.buddy-foot,.buddy-shadow){animation:none!important}
+#app .race-lane[data-run="now"] .race-road::before{opacity:.9}
+/* Chegada: quem completou a pista solta faísca e balança */
+#app .race-lane[data-place="1"] .race-runner .game-character{--beat:.85s}
+#app .race-lane[data-place] .race-road::after{animation-duration:1.1s}
+
+/* ===== 49. Relâmpago e Corrida no celular: nada cortado ===== */
+@media (max-width:600px){
+  /* O palco do jogo rola na vertical (antes o conteúdo era cortado embaixo). */
+  #app .game-stage{overflow-y:auto!important;overflow-x:hidden!important;-webkit-overflow-scrolling:touch;overscroll-behavior:contain;padding-bottom:calc(14px + env(safe-area-inset-bottom))}
+  #app .game-stage .game-live,#app .game-stage .game-flash{min-height:0;overflow:visible}
+  /* Relâmpago: pergunta + opções + placar cabem sem estourar */
+  #app .game-stage[data-game-type=flash]{display:flex;flex-direction:column;gap:8px}
+  #app .game-stage[data-game-type=flash] .sv-text{font-size:clamp(17px,5vw,23px);line-height:1.3;margin:2px 0}
+  #app .flash-options .game-option{min-height:48px}
+  #app .game-stage[data-game-type=flash] .flash-board{max-height:none}
+  #app .flash-board li .rank-fire{transform:scale(.9)}
+  /* Corrida: a pista cresce em vez de cortar o boneco */
+  #app .game-stage[data-game-type=race] .race-track{overflow:visible}
+  #app .race-lane{min-height:calc(132px*var(--s) + 10px)}
+  #app .race-lane .race-runner{max-width:100%}
+  #app .race-name{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  /* Pódio do relâmpago cabe na altura da tela do celular */
+  #app .flash-podium{min-height:0;max-width:none;margin-inline:auto}
+  #app .crowd-celebration{overflow:visible}
+}
+@media (max-width:430px){
+  #app .race-track{--s:.18!important}
+  #app .race-lane{grid-template-columns:42px minmax(0,1fr)}
+  #app .flash-podium-slot .game-character{transform:scale(.5)}
+}
+
+/* Lado com dois times: metade da barra numa cor, metade na outra */
+#app .tug-names span{background:var(--side-paint,color-mix(in srgb,var(--team) 34%,transparent));border-color:transparent;box-shadow:inset 0 0 0 2px color-mix(in srgb,var(--team) 70%,transparent)}
+#app .tug-meter i.a{background:var(--side-paint,var(--team))}
+
+/* ===== 50. Chama do combo: maior e viva, com faísca ao redor da barra ===== */
+/* Fogo = a única marca de combo (sem raio). Cresce com o número de acertos. */
+#app .flash-board .streak-flame::before{width:calc(20px + 2.6px*var(--n,2))!important;height:calc(28px + 3px*var(--n,2))!important}
+#app .flash-board .streak-flame::after{font-size:calc(1.05em + .12em*var(--n,2))!important;font-weight:900}
+#app .rank-fire::before{width:15px!important;height:20px!important}
+#app .rank-fire::after{font-size:1.02em}
+/* Barra de quem está em sequência: brasa por baixo + faíscas subindo. */
+#app .rank-lane::after,#app .rank-lane::before{pointer-events:none}
+#app .rank-row[data-streak="up"] .rank-fill{box-shadow:0 0 0 1px #f9731699,0 0 18px #f9731673}
+#app .flash-board li[data-streak="up"]{box-shadow:0 0 0 1.5px #fb923c66,0 8px 22px #ea580c3d}
+/* Intensidade: quanto maior o combo, mais rápido e mais forte o brilho. */
+#app .rank-row[data-streak="up"] .rank-lane::after{animation-duration:calc(1.15s - min(var(--fire,0),.7)*.65s)!important;opacity:1}
+#app .flash-board li[data-streak="up"]::after{animation-duration:calc(1.1s - min(var(--fire,0),.7)*.6s)}
+@media (prefers-reduced-motion:reduce){
+  html:not([data-motion=normal]) #app :is(.rank-row[data-streak=up] .rank-lane,.flash-board li[data-streak=up])::after{animation:none}
+}
+
+/* Dica do desafio: barras maiores e com legenda embaixo */
+#app .challenge-hint-box{display:grid;gap:4px;justify-items:center;padding:8px 10px;border-radius:12px;background:color-mix(in srgb,currentColor 6%,transparent)}
+#app .challenge-hint i{width:34px;height:11px}
+#app .challenge-hint-box small{font-size:11.5px;opacity:.8}
+
+/* ===== 51. Pódio: a festa vaza do bloco de propósito ===== */
+#app .game-stage :is(.flash-podium-wrap,.flash-podium,.game-live,.game-flash,.flash-ranking-box,.game-confetti){overflow:visible!important}
+#app .game-confetti{position:absolute;inset:-8% -4% auto;pointer-events:none;z-index:6;min-height:150%}
+#app .flash-podium-wrap{position:relative}
+@media (max-width:800px){
+  /* Celular: pódio completo dentro da tela, com a festa passando por cima */
+  #app .flash-podium{width:100%;max-width:100%;padding-inline:2px;gap:4px}
+  #app .flash-podium-slot{min-width:0}
+  #app .flash-podium-slot .game-character{max-width:100%}
+  #app .flash-podium-slot>strong,#app .flash-podium-slot>span{max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;display:block}
+  #app .game-confetti{inset:-6% -6% auto;min-height:160%}
+  #app .flash-podium-pedestal{min-width:0}
+}
+
+/* ===== 52. Idle com variedade: cada boneco escolhe um jeito de esperar =====
+   O índice já muda a coreografia (dance-1…6). Aqui a "espera" também varia:
+   quem olha em volta, quem espreguiça e quem fica só respirando.            */
+#app .game-character[data-mood=idle].dance-4 .buddy .character-head{animation:bd-idle-look 6.5s ease-in-out infinite}
+#app .game-character[data-mood=idle].dance-5 .buddy .buddy-top{animation:bd-idle-breathe 3.6s ease-in-out infinite}
+#app .game-character[data-mood=idle].dance-6 .buddy .buddy-hand.left{animation:bd-idle-scratch 5.4s ease-in-out infinite}
+#app .game-character[data-mood=idle].dance-6 .buddy .buddy-hand.right{animation:bd-idle-hand-r 2.4s ease-in-out infinite}
+@keyframes bd-idle-look{0%,100%{transform:rotate(0)}18%{transform:rotate(-9deg) translateX(-2px)}46%{transform:rotate(7deg) translateX(2px)}72%{transform:rotate(-3deg)}}
+@keyframes bd-idle-breathe{0%,100%{transform:scale(1,1)}50%{transform:scale(1.035,.965)}}
+@keyframes bd-idle-scratch{0%,72%,100%{transform:rotate(-8deg)}80%{transform:rotate(-96deg)}88%{transform:rotate(-58deg)}}
+@media (prefers-reduced-motion:reduce){
+  html:not([data-motion=normal]) #app .game-character[data-mood=idle] .buddy *{animation:none!important}
+}
+
+/* ===== 54. Desafio em rodadas: dica do time, palpite e espelho ===== */
+#app .challenge-team-hint{display:grid;gap:4px;padding:12px 14px;border-radius:14px;
+  background:linear-gradient(135deg,color-mix(in srgb,var(--ui-accent,#a78bfa) 18%,transparent),color-mix(in srgb,#22d3ee 12%,transparent));
+  border:1px solid color-mix(in srgb,var(--ui-accent,#a78bfa) 38%,transparent)}
+#app .challenge-team-hint>span{font-size:10.5px;font-weight:900;letter-spacing:.08em;text-transform:uppercase;opacity:.75}
+#app .challenge-team-hint p{margin:0;font-size:clamp(14px,1.5vw,17px);font-weight:700;line-height:1.4}
+#app .challenge-team-hint small{font-size:12px;opacity:.75;line-height:1.4}
+#app .challenge-team-hint.quiet{background:color-mix(in srgb,currentColor 6%,transparent);border-color:color-mix(in srgb,currentColor 14%,transparent)}
+#app .challenge-team-hint.quiet p{font-weight:600;font-size:13px;opacity:.8}
+#app .challenge-guess{display:grid;gap:6px}
+#app .challenge-guess label{font-size:11px;font-weight:800;letter-spacing:.05em;text-transform:uppercase;opacity:.7}
+#app .challenge-guess>div{display:flex;gap:6px}
+#app .challenge-guess input{flex:1;min-width:0;min-height:42px;border-radius:12px;padding:0 12px;font-size:15px}
+#app .challenge-guess small{font-size:11.5px;opacity:.7}
+#app .challenge-guess-wall ul{list-style:none;margin:6px 0 0;padding:0;display:grid;gap:6px;max-height:34dvh;overflow:auto}
+#app .challenge-guess-wall li{display:flex;gap:8px;align-items:baseline;padding:7px 10px;border-radius:10px;background:color-mix(in srgb,currentColor 7%,transparent);font-size:13px}
+#app .challenge-guess-wall li strong{flex:none;max-width:44%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+#app .challenge-guess-wall li span{opacity:.85;overflow-wrap:anywhere}
+#app .challenge-mode{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+#app .challenge-mode-state{font-size:11.5px;font-weight:800;letter-spacing:.04em;text-transform:uppercase;opacity:.6}
+#app .challenge-live-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:10px}
+#app .challenge-live-sim{overflow:hidden;border-radius:10px;background:#0d0b16aa}
+#app .challenge-live-sim .simulation-widget{transform:scale(.92);transform-origin:top left;pointer-events:none}
+#app .challenge-live-sim .simulation-controls{gap:4px;padding:6px;font-size:9px}
+#app .challenge-live-sim .simulation-controls label{font-size:9px;opacity:.75}
+#app .challenge-live-sim .simulation-controls input[type=range]{height:12px}
+#app .challenge-live-sim .simulation-controls :is(select,input[type=text]){min-height:22px;font-size:10px;padding:0 6px;border-radius:6px}
+#app .challenge-live-sim .simulation-widget>header{padding:5px 7px}
+#app .challenge-live-sim .simulation-widget>header strong,#app .challenge-live-sim .simulation-widget>header span{font-size:9px}
+#app .challenge-live-card{display:grid;gap:6px;padding:8px;border-radius:14px;border:1px solid color-mix(in srgb,currentColor 14%,transparent);background:color-mix(in srgb,currentColor 5%,transparent)}
+#app .challenge-live-card[data-ok="true"]{border-color:#22c55e}
+#app .challenge-live-card>header{display:flex;align-items:center;gap:6px;font-size:12px}
+#app .challenge-live-card>header strong{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+#app .challenge-live-card>header small{margin-left:auto;opacity:.6;font-size:10.5px}
+#app .challenge-live-values{display:flex;flex-wrap:wrap;gap:4px}
+#app .challenge-live-values i{font-style:normal;font-size:10px;font-weight:800;font-variant-numeric:tabular-nums;padding:2px 6px;border-radius:6px;background:color-mix(in srgb,currentColor 10%,transparent)}
+#app .challenge-live :is(h2){font-size:13px}
+/* Quem não é líder vê o experimento espelhado, mas não mexe nele. */
+#app .challenge-sim[data-locked="true"] .simulation-controls{pointer-events:none;opacity:.55}
+#app .challenge-sim[data-locked="true"]::after{content:"Espelho do líder";position:absolute;top:10px;right:10px;z-index:2;
+  font-size:10px;font-weight:900;letter-spacing:.08em;text-transform:uppercase;padding:4px 8px;border-radius:999px;
+  background:#0b0914cc;border:1px solid color-mix(in srgb,currentColor 22%,transparent);opacity:.8}
+#app .challenge-sim{position:relative}
+@media (max-width:800px){
+  #app .challenge-live-grid{grid-template-columns:repeat(auto-fit,minmax(140px,1fr))}
+  #app .challenge-guess input{min-height:46px}
+}
+
+/* ===== 47. Desafio no telão: o apresentador não precisa do experimento grande =====
+   O apresentador controla a etapa, não o experimento. Deixar o simulador
+   grande ao lado empurrava o espelho ao vivo para fora da tela e poluía a
+   tela (era o "esse experimento ainda fica na minha tela"). No telão ele
+   some e o espelho ao vivo ocupa o espaço. O aluno continua vendo o dele. */
+#app[data-role=presenter] .challenge-layout{grid-template-columns:minmax(0,1fr)}
+#app[data-role=presenter] .challenge-layout .challenge-sim{display:none}
+#app[data-role=presenter] .challenge-stage{display:contents}
+#app[data-role=presenter] .challenge-layout .challenge-side{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));align-items:start;gap:16px}
+#app[data-role=presenter] .challenge-live-grid{grid-template-columns:repeat(auto-fit,minmax(260px,1fr))}
+@media (max-width:760px){
+  #app[data-role=presenter] .challenge-layout .challenge-side{display:flex}
+}
+
+/* ===== 57. Desafio no experimento: o experimento ocupa a tela =====
+   Antes o simulador ficava espremido numa coluna ao lado de um bloco de
+   texto e, no celular, os três avisos (objetivo, comando e dica) empurravam
+   "Tentar acertar" para fora. Agora: experimento grande no palco, comandos
+   logo abaixo e, no computador, um painel de apoio separado. */
+@media (min-width:801px){
+  /* Telão: o experimento é a estrela — painel de apoio ao lado, com largura mínima real. */
+  #app .challenge-sim .simulation-widget{gap:10px;padding:16px}
+  #app .challenge-sim .simulation-controls{gap:10px}
+}
+/* Barra de comando embaixo do experimento (aluno e apresentador sem espelho). */
+#app .game-live.game-command{align-items:stretch;gap:10px}
+#app .game-live.game-command .challenge-goal,
+#app .game-live.game-command .challenge-team-hint{margin:0}
+#app .challenge-goal{background:color-mix(in srgb,var(--ui-accent,#a78bfa) 18%,transparent)}
+#app .game-live.game-control{width:100%}
+#app .game-live.game-control .game-actions{justify-content:flex-start}
+#app .challenge-mode{gap:8px 10px}
+#app .challenge-side .game-live.game-board{align-items:stretch}
+#app .challenge-side .challenge-podium li{grid-template-columns:auto minmax(0,1fr)}
+
+@media (max-width:800px){
+  /* O experimento cresce: é nele que o aluno precisa tocar. A altura fica
+     em §58 (um valor só, para não brigar com min-height). */
+  #app .challenge-layout{gap:10px}
+  #app .challenge-stage{gap:10px}
+  /* Os avisos de instrução param de competir com o botão de tentar. */
+  #app .challenge-team-hint{padding:10px 12px}
+  #app .challenge-team-hint.quiet p{font-size:12.5px}
+  #app .game-live.game-command .challenge-goal{padding:10px 12px}
+  #app .challenge-submit-row{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center;position:sticky;bottom:calc(8px + env(safe-area-inset-bottom));z-index:6;gap:10px;
+    padding:8px;margin:0 -2px;border-radius:16px;background:#17122bf2;border:1px solid #ffffff24;box-shadow:0 -6px 22px #00000055}
+  #app .challenge-submit-row .game-submit{min-height:54px;font-size:17px}
+  #app .challenge-tries i{width:14px;height:14px}
+  #app .challenge-tries{flex:none}
+}
+
+/* ===== 58. Experimento do desafio: cena grande de verdade =====
+   A cena SVG crescia com "flex:1 1 0" e ficava minúscula dentro do cartão,
+   com metade do espaço vazia em volta (o "mal formatado" do telão). Aqui a
+   cena recebe uma área mínima proporcional e ocupa a largura toda. */
+#app .challenge-sim .simulation-widget{display:grid;grid-template-rows:auto minmax(0,1fr) auto auto auto;gap:10px;height:clamp(420px,66dvh,720px);box-sizing:border-box}
+#app .challenge-sim .simulation-widget>svg{width:100%;height:100%;min-height:0;max-height:none;flex:none;align-self:stretch;border-radius:12px}
+#app .challenge-sim .simulation-widget>header{padding-bottom:2px}
+#app .challenge-sim .simulation-controls{gap:8px;align-content:start}
+#app .challenge-sim .simulation-result{font-size:12.5px;line-height:1.45}
+#app .challenge-sim .simulation-widget>small{font-size:10px;opacity:.7}
+@media (max-width:800px){
+  /* Celular: a cena ocupa a maior parte do cartão e os controles ficam
+     logo abaixo, grandes o bastante para o dedo. */
+  /* Experimento mais alto no celular para não ficar coisa apertada nem
+     espaço vazio embaixo. */
+  #app .challenge-sim .simulation-widget{height:auto;min-height:clamp(360px,58dvh,620px);grid-template-rows:auto auto auto auto auto;gap:9px;padding:12px}
+  #app .challenge-sim .simulation-widget>svg{width:100%;height:auto;min-height:0;aspect-ratio:420/240;border-radius:10px}
+  #app .challenge-sim .simulation-widget>small{display:none}
+}
+
+/* ===== 59. Desafio: painel de apoio e comandos =====
+   Antes o bloco de comando (objetivo, dica, tentar) dividia a coluna com o
+   experimento e, no telão, "Encerrar jogo" caía solto no canto direito com
+   meia tela vazia. Agora: experimento à esquerda; à direita, comandos,
+   espelho ao vivo e placar. No celular, experimento → comandos → placar. */
+@media (min-width:801px){
+  #app .challenge-layout{grid-template-columns:minmax(0,1.65fr) minmax(300px,.95fr);align-items:start}
+}
+@media (max-width:800px){
+  #app .challenge-submit-row .game-submit{font-size:18px;min-height:58px}
+  #app .challenge-goal{font-size:15px}
+}
+
+/* ===== 60. Celular: nada cortado na direita nem fora da tela =====
+   Dois problemas somados deixavam o desafio "cortado" no celular:
+   1) o palco é um grid com uma coluna implícita. O tamanho automático dessa
+      coluna respeita o min-content do conteúdo e, quando algum pedaço do
+      experimento ficava mais largo que a tela, a coluna crescia e o `overflow`
+      do app escondia a direita — sem barra de rolagem para chegar lá.
+   2) o palco tem `overflow:hidden` com altura de tela: o que passava embaixo
+      (o botão de tentar e o placar) ficava inalcançável.
+   Agora a coluna nunca passa da tela e, no desafio, o palco rola na vertical. */
+#app.quiz-party>main{overflow-x:hidden;grid-column:1;min-width:0}
+#app .game-stage{max-width:100%}
+#app .game-stage :is(.challenge-layout,.challenge-stage,.challenge-side,.challenge-sim,.simulation-widget,.challenge-command,aside){min-width:0;max-width:100%}
+@media (max-width:800px){
+  #app .challenge-layout,#app .challenge-stage,#app .challenge-side{width:100%}
+  #app .challenge-sim{width:100%}
+  /* O desafio rola: experimento, comando e placar, nessa ordem. */
+  #app.quiz-party>main.game-stage[data-game-type=challenge]{height:100%;min-height:0;overflow-y:auto;overflow-x:hidden;
+    -webkit-overflow-scrolling:touch;overscroll-behavior:contain;padding-bottom:calc(14px + env(safe-area-inset-bottom))}
+}
+
+/* ===== 61. Foto do time: prévia com moldura estável =====
+   O seletor de arquivo some (input hidden) e a prévia mostra a foto nova
+   antes de salvar. A moldura não muda de tamanho quando a imagem entra. */
+#app .team-leader-photo{aspect-ratio:1}
+#app .team-leader-photo img{width:100%;height:100%;object-fit:cover;border-radius:inherit}
+#app .team-card .team-photo{border-radius:12px;object-fit:cover;background:#0f0c1c;border:1px solid #ffffff2e}
+
+/* ===== 61. Desafio ao vivo: cartões reflow por quantidade de times =====
+   2 times → lado a lado, 3 → lado a lado, 4 → grade 2×2. O --lg-cols
+   (ou data-teams) controla as colunas e redimensiona sempre que entra um
+   time novo. Status fica na cor: verde = meta atingida, vermelho = as 3
+   tentativas acabaram. */
+#app .challenge-live-grid{display:grid;gap:8px;grid-template-columns:repeat(var(--lg-cols,2),1fr)}
+#app .challenge-live-grid[data-teams="3"]{grid-template-columns:repeat(3,1fr)}
+#app .challenge-live-grid[data-teams="4"]{grid-template-columns:repeat(2,1fr)}
+@media (max-width:800px){
+  #app .challenge-live-grid{grid-template-columns:repeat(var(--lg-cols,2),1fr)}
+  #app .challenge-live-grid[data-teams="3"]{grid-template-columns:repeat(2,1fr)}
+  #app .challenge-live-grid[data-teams="4"]{grid-template-columns:repeat(2,1fr)}
+}
+#app .challenge-live-card[data-ok="true"]{border-color:#22c55e;background:rgba(34,197,94,.10)}
+#app .challenge-live-card[data-dead]{border-color:#f87171;background:rgba(248,113,113,.10)}
+#app .challenge-live-card>header .team-photo{width:34px;height:34px;border-radius:10px;object-fit:cover;flex:none;background:#0f0c1c;border:1px solid #ffffff2e}
+#app[data-role=presenter] .challenge-live-grid{grid-template-columns:repeat(var(--lg-cols,2),1fr)}
+#app[data-role=presenter] .challenge-live-grid[data-teams="3"]{grid-template-columns:repeat(3,1fr)}
+#app[data-role=presenter] .challenge-live-grid[data-teams="4"]{grid-template-columns:repeat(2,1fr)}
+
+/* ===== 61b. Desafio no celular: nada cortado no topo ===== */
+@media (max-width:600px){
+  #app .challenge-layout{padding-top:max(8px,env(safe-area-inset-top))}
+  #app .challenge-sim{min-height:clamp(300px,52dvh,520px)}
+}
+
+/* ===== 1. Líder do time: foto e campos alinhados, sem buraco ===== */
+#app .team-leader-edit{display:flex;gap:14px;align-items:flex-start;flex-wrap:wrap}
+#app .team-leader-photo-col{display:flex;flex-direction:column;gap:6px;align-items:center;flex:none}
+#app .team-leader-label{font-size:11px;opacity:.65}
+#app .team-leader-photo{width:96px;height:96px;border-radius:14px;border:2px solid color-mix(in srgb,currentColor 35%,transparent);background:#0f0c1c}
+#app .team-leader-photo img{width:100%;height:100%;object-fit:cover;border-radius:12px}
+#app .team-leader-fields{display:flex;flex-direction:column;gap:6px;min-width:0;flex:1}
+#app .team-leader-fields label{font-size:12px;font-weight:800;opacity:.9}
+#app .team-leader-hint{font-size:12px;opacity:.75;margin-top:6px}
+
+/* ===== Atalho: editar times direto do telão ===== */
+#app .teams-shortcut{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:10px 14px;border-radius:14px;background:var(--g-card);border:1px solid var(--g-line)}
+#app .teams-shortcut div{display:flex;flex-direction:column;gap:2px}
+#app .teams-shortcut strong{font-size:14px}
+#app .teams-shortcut small{font-size:11.5px;opacity:.75}
+
+/* ===== Participantes: time com foto + botão editar times ===== */
+#app .participants-sheet .ps-teams{display:flex;gap:8px;flex-wrap:wrap;margin:10px 0}
+#app .participants-sheet .ps-teams span{display:flex;align-items:center;gap:8px;padding:8px 12px;border-radius:10px;border:1px solid var(--g-line);background:var(--g-card);font-size:13px;font-weight:700}
+#app .participants-sheet .ps-teams .team-photo{width:28px;height:28px;border-radius:8px;object-fit:cover;border:1px solid rgba(255,255,255,.35)}
+#app .ps-team-list .ps-team-edit{display:flex;align-items:center;gap:10px;padding:8px 12px;border-radius:10px;border:1px solid var(--g-line);background:var(--g-card)}
+#app .ps-team-list .ps-team-edit .team-photo{width:32px;height:32px;border-radius:8px;object-fit:cover;border:1px solid rgba(255,255,255,.35);flex:none}
+#app .ps-team-list .ps-team-edit label{display:flex;flex-direction:column;gap:2px;flex:1;min-width:0}
+#app .ps-team-list .ps-team-edit label input{font-size:13px;padding:6px 8px;border-radius:8px;border:1px solid var(--g-line);background:#0f0c1c;color:#fff}
+#app .ps-team-list .ps-team-edit small{font-size:11.5px;opacity:.7}
+
+/* ===== 2. Música do experimento: controle de volume maior ===== */
+#app .audio-editor-v2 input[type=range]{height:28px}
+#app .audio-editor-v2 input[type=range][data-audio-volume],
+#app .audio-editor-v2 input[type=range][data-audio-volume]::-webkit-slider-thumb{height:28px}
+#app .audio-editor-v2 input[type=range][data-audio-volume]::-webkit-slider-thumb{-webkit-appearance:none;width:26px;height:26px;border-radius:50%;background:#fff;border:3px solid var(--ui-accent,#8b7cf6);box-shadow:0 2px 8px #0005;cursor:grab}
+#app .audio-editor-v2 input[type=range][data-audio-volume]::-moz-range-thumb{width:22px;height:22px;border-radius:50%;background:#fff;border:3px solid var(--ui-accent,#8b7cf6);cursor:grab}
+#app .audio-slider-head{font-size:13px;gap:10px}
+
+/* ===== 12. Bonequinho "trabalhando" enquanto alguém edita o experimento ===== */
+#app .game-character[data-mood="working"]{animation:character-working 1.2s ease-in-out infinite}
+#app .game-character[data-mood="working"] .buddy-hand{animation:working-hands .55s ease-in-out infinite alternate}
+@keyframes character-working{0%,100%{transform:translateY(0)}50%{transform:translateY(-5px)}}
+@keyframes working-hands{from{transform:rotate(-12deg) translateY(3px)}to{transform:rotate(12deg) translateY(-3px)}}
