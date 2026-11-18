@@ -855,6 +855,11 @@ html[data-theme][data-ui-style][data-appearance] body #app dialog.remote-v2 :is(
 #app .challenge-layout{display:grid;grid-template-columns:minmax(0,1.55fr) minmax(260px,.85fr);gap:18px;width:100%;align-items:stretch;text-align:left}
 #app .challenge-stage{display:flex;flex-direction:column;gap:12px;min-width:0}
 #app .challenge-side{display:flex;flex-direction:column;gap:14px;min-width:0}
+/* Tela do jogo pinta com a cor do time do usuário, pra todo mundo ver
+   a identidade da equipe ao entrar nas etapas. */
+#app .game-stage[data-game-type="teams"]{
+  background: color-mix(in srgb, var(--team, #171c2c) 10%, transparent);
+}
 /* PC: centra o conteúdo do desafio e evita espaço vazio / elementos
    fora da tela quando a tela é alta. */
 @media (min-width:801px){
