@@ -59,7 +59,7 @@ export function defaultGame(type) {
   if (type === 'survival') return { type, text: 'Uma vida só. Quem sobrevive?', seconds: 15, questions: [{ text: 'Primeira pergunta', options: ['Opção A', 'Opção B'], correct: 0 }] };
   if (type === 'challenge') return { type, text: 'Cheguem juntos na resposta do experimento!', simulation: 'projectile', answer: [], tolerance: 5,
     // Dicas padrão (o professor troca no editor): uma por tentativa do líder.
-    hints: ['O valor certo está mais alto do que está agora.', 'Está quase: ajuste fino, pouca coisa acima.', 'O último passo é pequeno — confie no palpite do time.'],
+    hints: ['Observe o resultado do experimento e compare com a meta.', 'Mude um controle por vez e veja o que acontece.', 'Peça ao líder para comparar com a meta os controles que ainda faltam.'],
     hintSeconds: 20, leaderMode: true };
   if (type === 'raffle') return { type, text: 'Quem vai responder?' };
   return { type: 'tug', text: 'Cabo de guerra!', options: ['Lado A', 'Lado B'], seconds: 15, tolerance: 10, rounds: [1, 2, 3].map(n => [{ text: 'Pergunta ' + n, options: ['Opção A', 'Opção B'], correct: 0 }]) };
@@ -124,6 +124,10 @@ export function validateGame(game, draft = false, simulationIds = null) {
     // `hints` pode vir como string (uma dica por linha) ou lista.
     const hintList = Array.isArray(game.hints) ? game.hints : String(game.hints || '').split('\n');
     result.hints = hintList.map(item => text(item, 160).trim()).filter(Boolean).slice(0, 12);
+    // Substitui somente a sequência padrão antiga, que presumia uma direção
+    // sem conhecer a resposta; dicas personalizadas do professor são mantidas.
+    const oldDefaults = ['O valor certo está mais alto do que está agora.', 'Está quase: ajuste fino, pouca coisa acima.', 'O último passo é pequeno — confie no palpite do time.'];
+    if (result.hints.length === oldDefaults.length && result.hints.every((hint, i) => hint === oldDefaults[i])) result.hints = defaultGame('challenge').hints;
     result.hintSeconds = Math.max(5, Math.min(90, Math.round(Number(game.hintSeconds) || 20)));
     result.leaderMode = game.leaderMode !== false; // padrão: só o líder mexe
   }
@@ -255,7 +259,7 @@ export function gameControl(room, value, random = Math.random) {
   }
   if (game.type === 'challenge' && action === 'next-hint') {
     const list = config.hints || [];
-    game.round = Math.min(Math.max(0, list.length - 1), (game.round || 0) + 1);
+    game.round = Math.min(Math.max(0, list.length - 1), (game.round ?? -1) + 1);
     game.hint = list[game.round] || '';
     game.hintAt = room.now();
     game.openForGuess = true;
@@ -389,6 +393,7 @@ function openTugRound(room, roundIndex, random = Math.random) {
   const roundQs = config?.rounds?.[roundIndex];
   if (!roundQs?.length) { finishTug(room); game.state = 'pull'; game.pullAt = room.now(); return; }
   game.round = roundIndex;
+  game.variant = Math.min(roundQs.length - 1, Math.floor(Math.max(0, Math.min(0.999999999, random())) * roundQs.length));
   game.state = 'open';
   game.answers = {};
   game.roundAnswers = {};
@@ -396,8 +401,7 @@ function openTugRound(room, roundIndex, random = Math.random) {
   game.betweenAt = 0;
   game.startedAt = room.now();
   game.deadline = room.now() + Math.max(config.seconds || 15, 5) * 1000;
-  // Nada de sorteio: todo mundo do time recebe as mesmas perguntas da rodada,
-  // todas em sequência — o placar fica justo entre os lados.
+  // Sorteia uma pergunta compartilhada pelos dois lados nesta rodada.
   for (const p of online(room)) tugSide(room, p);
 }
 // Com times formados, os times 1 e 3 ficam de um lado e os 2 e 4 do outro.
@@ -408,15 +412,10 @@ function tugSide(room, player) {
   return game.sides[player.id] = room.data.teams?.length && Number.isInteger(player.team) ? player.team % 2 : size(0) <= size(1) ? 0 : 1;
 }
 export function tugScore(game) { return [0, 1].map(side => game.tries[side] ? Math.round(game.hits[side] / game.tries[side] * 100) : 0); }
-// Rodada encerra quando todos os que estão online responderam todas as
-// perguntas daquela rodada.
+// A rodada encerra quando todos os participantes online responderam.
 function roundFinished(room) {
-  const d = room.data, game = d.game, config = room.slides[d.slide]?.game;
-  const total = (config?.rounds?.[game.round] || []).length;
-  if (!total) return true;
-  const everyone = online(room);
-  if (!everyone.length) return false;
-  return everyone.every(p => (game.roundAnswers?.[p.id] || []).length >= total);
+  const game = room.data.game, everyone = online(room);
+  return everyone.length > 0 && everyone.every(p => Object.hasOwn(game.answers || {}, p.id));
 }
 // Ao encerrar a rodada pelo tempo ou comando do professor, quem está online e não respondeu conta como tentativa perdida.
 function finalizeTugRound(room) {
@@ -426,7 +425,7 @@ function finalizeTugRound(room) {
   for (const p of online(room)) {
     const side = tugSide(room, p);
     const answered = (game.roundAnswers?.[p.id] || []).length;
-    const total = (config?.rounds?.[game.round] || []).length || 1;
+    const total = 1;
     // Cada pergunta não respondida conta como erro do lado.
     game.tries[side] += Math.max(0, total - answered);
   }
@@ -520,9 +519,9 @@ export function gameInput(room, playerId, payload) {
     if (room.now() >= game.deadline) throw Error('O tempo desta pergunta acabou.');
     const sentRound = payload.round ?? payload.step;
     if (sentRound !== undefined && sentRound !== game.round) throw Error('Esta rodada já avançou.');
-    // Cada pessoa responde as perguntas da rodada em ordem: o índice vem no
-    // envio (v) e a mesma pergunta não pode ser respondida duas vezes.
-    const index = Number.isInteger(payload.v) ? payload.v : 0;
+    // Só a variante sorteada é válida e cada pessoa responde uma vez.
+    const index = game.variant ?? 0;
+    if (Number.isInteger(payload.v) && payload.v !== index) throw Error('Esta pergunta já mudou.');
     const question = roundQs[index], choice = payload.choice;
     if (!question || !Number.isInteger(choice) || choice < 0 || choice >= question.options.length) throw Error('Resposta inválida.');
     game.roundAnswers = game.roundAnswers || {};
@@ -612,12 +611,21 @@ export function gameInput(room, playerId, payload) {
       const off = Math.abs(sent - wanted) / span * 100;
       return off <= (config.tolerance || 5) ? 'hot' : off <= (config.tolerance || 5) * 3 ? 'warm' : 'cold';
     });
-    game.tries[playerId] = { n: tries, at: now, ok, hints };
+    const guidance = ok ? [] : (config.answer || []).map((item, index) => {
+      if (item.skip || item.k === 'text') return null;
+      const label = item.label || `Controle ${index + 1}`;
+      if (hints[index] === 'hot') return `${label}: dentro da margem.`;
+      if (tries < 2) return `${label}: ${hints[index] === 'warm' ? 'perto' : 'ainda longe'} da meta.`;
+      if (item.k === 'range' && Number.isFinite(Number(values?.[index])))
+        return `${label}: tente ${Number(values[index]) < Number(item.v) ? 'aumentar' : 'diminuir'} o valor.`;
+      return `${label}: experimente outra opção.`;
+    }).filter(Boolean);
+    game.tries[playerId] = { n: tries, at: now, ok, hints, guidance };
     // Cada tentativa do líder libera a próxima dica do time (se o professor
     // cadastrou dicas) e mantém a rodada aberta para palpites.
     const hintList = config.hints || [];
     if (hintList.length) {
-      game.round = Math.min(hintList.length - 1, (game.round || 0) + 1);
+      game.round = Math.min(hintList.length - 1, (game.round ?? -1) + 1);
       game.hint = hintList[game.round];
       game.hintAt = now;
       game.openForGuess = true;
@@ -701,7 +709,7 @@ export function gameSnapshot(room, playerId, bare = false) {
       hint: game.hint || '', hintIndex, hintCount: (config.hints || []).length, hintAt: game.hintAt || 0, hintSeconds: config.hintSeconds || 20,
       guesses, guessesCount: guesses.length, openForGuess: Boolean(game.openForGuess || game.state === 'open'), leaderMode: game.leaderMode !== false, freeForAll: Boolean(game.freeForAll),
       mirror,
-      me: playerId ? { tries: mine?.n || 0, ok: place >= 0, place: place + 1, points: place === 0 ? CHALLENGE_FIRST : CHALLENGE_POINTS, hints: mine?.hints || null,
+      me: playerId ? { tries: mine?.n || 0, ok: place >= 0, place: place + 1, points: place === 0 ? CHALLENGE_FIRST : CHALLENGE_POINTS, hints: mine?.hints || null, guidance: mine?.guidance || [],
         leader: isLeader, guess: game.guesses?.[playerId] || '' } : null,
       ...(done ? { answer: config.answer.filter(item => !item.skip && item.k !== 'text').map(item => ({ label: item.label, v: item.v })) } : {}) };
   }
@@ -728,9 +736,10 @@ export function gameSnapshot(room, playerId, bare = false) {
   const roundQs = game.round >= 0 ? (config.rounds[game.round] || []) : [];
   const mySent = playerId ? (game.roundAnswers?.[playerId] || []) : [];
   const myAnswered = playerId ? Object.hasOwn(game.answers || {}, playerId) : false;
-  // Todas as perguntas da rodada, em sequência: o aluno responde uma por vez.
-  const myQuestions = playerId && game.state === 'open' ? roundQs.map((item, index) => ({ text: item.text, options: [...item.options], index })) : [];
-  const myQuestion = myQuestions.length ? myQuestions[Math.min(mySent.length, myQuestions.length - 1)] : null;
+  // A mesma pergunta sorteada é enviada a todos, sem expor as outras opções.
+  const index = game.variant ?? 0, selected = roundQs[index];
+  const myQuestion = playerId && game.state === 'open' && selected ? { text:selected.text, options:[...selected.options], index } : null;
+  const myQuestions = myQuestion ? [myQuestion] : [];
   const onlinePlayers = online(room);
   const answeredThisRound = onlinePlayers.filter(p => Object.hasOwn(game.answers || {}, p.id)).length;
   const fb = playerId ? game.lastFeedback?.[playerId] : null;
@@ -746,7 +755,7 @@ export function gameSnapshot(room, playerId, bare = false) {
   };
   // Mantém porcentagens e acertos ocultos até o fim da puxada da corda (state === 'done') para preservar o suspense!
   return { ...base, bare: false, round: game.round, rounds: totalRounds, seconds: Math.max(config.seconds || 15, 5), deadline: game.deadline, betweenAt: game.betweenAt || 0, betweenMs: TUG_BETWEEN_MS, tolerance: config.tolerance ?? 10,
-    question: myQuestion, questions: myQuestions, answeredInRound: mySent.length, roundQuestions: roundQs.length,
+    question: myQuestion, questions: myQuestions, answeredInRound: mySent.length, roundQuestions: roundQs.length ? 1 : 0,
     answered: answeredThisRound, total: onlinePlayers.length || (count(0) + count(1)), lastPull: done ? null : (game.lastPull || null),
     labels: [label(0), label(1)], revealScores: done, score: done ? tugScore(game) : [0, 0], hits: done ? game.hits : [0, 0], tries: done ? game.tries : [0, 0], sides: [count(0), count(1)], crews: [crew(0), crew(1)],
     winner: ['pull', 'done'].includes(game.state) ? game.winner : -1, pullAt: game.pullAt, pullMs: TUG_PULL_MS,

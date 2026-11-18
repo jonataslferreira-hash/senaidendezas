@@ -247,10 +247,9 @@ test('etapas interativas: equipes, relâmpago, sobrevivência, desafio, sorteio 
     for (const player of everyone) {
       const snap = room.snapshot(player.id).game;
       const side = snap.side;
-      tugCfg.rounds[round].forEach((raw, v) => {
-        assert.equal(room.snapshot(player.id).game.question.text, raw.text, 'a pergunta da vez segue a ordem da rodada');
-        room.answer(player.id, { choice: { choice: side === 0 ? raw.correct : (raw.correct + 1) % raw.options.length, round, v } });
-      });
+      const q = snap.question, raw = tugCfg.rounds[round][q.index];
+      assert.equal(q.text, raw.text, 'todos recebem a variante sorteada');
+      room.answer(player.id, { choice: { choice: side === 0 ? raw.correct : (raw.correct + 1) % raw.options.length, round, v: q.index } });
     }
     if (round < 2) {
       assert.equal(room.snapshot().game.state, 'between', 'entre rodadas entra em pausa de transição');

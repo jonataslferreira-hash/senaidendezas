@@ -77,6 +77,16 @@ test('edições de dois times e desafio cabem e permanecem sincronizados',async(
     expect(a.right<=b.left || b.right<=a.left || a.bottom<=b.top || b.bottom<=a.top).toBe(true);
     expect(Math.abs(savedLayout.photo-savedLayout.name)).toBeLessThan(45);
     expect(Math.abs(savedLayout.name-savedLayout.points)).toBeLessThan(25);
+    // Fotos dos times no diálogo não devem estourar a aba de participantes.
+    for(const p of [page,phone]) {
+      await p.locator('.stage-people').click();
+      const dialog=p.locator('dialog.participants-sheet[open]');
+      await expect(dialog.locator('.ps-teams img')).toHaveCount(2);
+      const dimensions=await dialog.evaluate(el=>({width:el.getBoundingClientRect().width,scrollWidth:el.scrollWidth,clientWidth:el.clientWidth,photos:[...el.querySelectorAll('.ps-teams img')].map(i=>i.getBoundingClientRect().width)}));
+      expect(dimensions.scrollWidth).toBeLessThanOrEqual(dimensions.clientWidth+1);
+      expect(dimensions.photos.every(width=>width<=32)).toBe(true);
+      await p.getByRole('button',{name:'Fechar participantes'}).click();
+    }
     await page.locator('[data-action="next-stage"]').click();
     for(const p of [page,phone,pc])await expect(p.locator('.game-stage[data-game-type="challenge"]')).toBeVisible();
     for(const p of [phone,pc]){
@@ -96,6 +106,22 @@ test('edições de dois times e desafio cabem e permanecem sincronizados',async(
     expect(svg.height).toBeGreaterThanOrEqual(190);
     const widget=page.locator('.challenge-live-card .simulation-widget').first();
     expect(await widget.evaluate(el=>el.scrollHeight<=el.clientHeight+1)).toBe(true);
+    // O comando fica visível na rolagem e solta no fim do seu contêiner.
+    const sticky=await phone.evaluate(()=>{
+      const stage=document.querySelector('.game-stage'),bar=stage.querySelector(':scope > .game-submit');
+      stage.scrollTop=0; const top=bar.getBoundingClientRect(),view=stage.getBoundingClientRect();
+      stage.scrollTop=stage.scrollHeight; const bottom=bar.getBoundingClientRect();
+      return {position:getComputedStyle(bar).position, top:top.bottom,viewBottom:view.bottom,bottom:bottom.bottom,scroll:stage.scrollTop};
+    });
+    expect(sticky.position).toBe('sticky');
+    expect(sticky.top).toBeLessThanOrEqual(sticky.viewBottom+1);
+    expect(sticky.bottom).toBeLessThanOrEqual(sticky.viewBottom+1);
+    expect(sticky.scroll).toBeGreaterThan(0);
+    // Encerrar ao vivo deve atualizar o resultado mesmo sem remontar a tela.
+    await page.getByRole('button',{name:'Encerrar jogo'}).click();
+    await expect(page.locator('.challenge-results')).toContainText('Resultados do experimento');
+    await expect(page.locator('.challenge-results')).toContainText('Dia = 14');
+    await expect(page.locator('.challenge-results')).toContainText('Ninguém chegou');
     expect(errors).toEqual([]);
   }finally{await phoneContext.close();await pcContext.close();}
 });
