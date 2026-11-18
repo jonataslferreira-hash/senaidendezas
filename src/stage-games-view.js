@@ -488,7 +488,7 @@ function stageHead(g, host) {
   if (g.type === 'teams') {
     const head = `<span class="game-eyebrow">${gameIcon('teams')} ${typeName.toUpperCase()}</span>${meta}`;
     if (!host) return `<div class="game-head-row game-head-single">${head}</div>`;
-    return `<div class="game-head-row game-head-single">${head}<h1 class="game-hero-title">${esc(titleText || typeName)}</h1></div>`;
+    return `<div class="game-head-row game-head-single teams-host-heading">${head}<h1 class="game-hero-title">${esc(titleText || typeName)}</h1></div>`;
   }
   if (duplicatesType) {
     return `<div class="game-head-row game-head-single"><h1 class="game-hero-title"><span class="game-hero-icon" aria-hidden="true">${gameIcon(g.type)}</span>${esc(titleText || typeName)}</h1>${meta}</div>`;
@@ -555,6 +555,12 @@ export function keepGame(root, markup, state) {
   current.dataset.gameState = next.dataset.gameState;
   const head = root.querySelector('.header'), nextHead = template.content.querySelector('.header');
   if (head && nextHead && head.innerHTML !== nextHead.innerHTML) head.innerHTML = nextHead.innerHTML;
+  // O convite é irmão do palco preservado, não um trecho data-game-live.
+  // Sincronize sua presença sem remontar o jogo nem apagar o QR já gerado.
+  const invite = root.querySelector('[data-share-dialog]');
+  const nextInvite = template.content.querySelector('[data-share-dialog]');
+  if (invite && !nextInvite) invite.remove();
+  else if (!invite && nextInvite) root.append(nextInvite);
   return true;
 }
 

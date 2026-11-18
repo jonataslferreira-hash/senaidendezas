@@ -59,7 +59,7 @@ export async function editParticipant(person,save){
  dialog.addEventListener('close',()=>dialog.remove(),{once:true});document.body.append(dialog);paint();paintName();dialog.showModal();
 }
 // Painel "N conectados": lista da turma com busca, time, pontos e (para o professor) remover da sala.
-export function manageParticipants(state,kick,control){
+export function manageParticipants(state,kick,control,{host=false}={}){
   // Nunca deixa de abrir: se a lista não veio (jogo em andamento, snapshot
   // antigo), monta com o que existe em vez de estourar e fechar mudo.
   if(!Array.isArray(state?.ranking)){
@@ -88,6 +88,7 @@ export function manageParticipants(state,kick,control){
     }
     const editTeams=e.target.closest('[data-action="edit-teams"]');
     if(editTeams){dialog.close();editTeamsDialog(state,control);return;}
+    if(e.target.closest('[data-game-do="shuffle"]')){if(host && control)control('game',{do:'shuffle'});dialog.close();return;}
     if(e.target.closest('[data-close]')||e.target===dialog)dialog.close();
   });
   dialog.addEventListener('close',()=>dialog.remove(),{once:true});document.body.append(dialog);
@@ -99,7 +100,7 @@ export function manageParticipants(state,kick,control){
 function editTeamsDialog(state,control){
   const teams=(state.teams||[]).slice(),me=state.me?.id;
   const dialog=document.createElement('dialog');dialog.className='participants-sheet';
-  const countInput=`<select name="team-count" data-team-count>${teams.map((_,i)=>`<option value="${i+1}"${i+1===teams.length?' selected':''}>${i+1} time${i+1>1?'s':''}</option>`).join('')}</select>`;
+  const countInput=`<select name="team-count" data-team-count>${Array.from({length:9},(_,i)=>i+2).map(count=>`<option value="${count}"${count===teams.length?' selected':''}>${count} times</option>`).join('')}</select>`;
   const rows=teams.map((team,i)=>{
     const kind=team.members.length===1?'pessoa':'pessoas';
     const meSuffix=team.members.some(m=>m.id===me)?' · você':'';
