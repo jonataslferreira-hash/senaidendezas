@@ -88,7 +88,7 @@ export class Classroom {
       // de 4 KB ela era descartada em silêncio: o líder salvava, o cartão dele
       // mostrava a prévia e o telão continuava sem foto — e, na renderização
       // seguinte, a prévia voltava para a inicial do nome.
-      const limit = msg?.type === 'answer' ? 48000 : ['join', 'profile'].includes(msg?.type) ? 32768 : 4096;
+      const limit = msg?.type === 'answer' ? 48000 : msg?.type === 'join' ? 56000 : msg?.type === 'profile' ? 32768 : 4096;
       if (!msg || typeof msg !== 'object' || JSON.stringify(msg).length > limit) return;
       const time = Date.now();
       conn.actions = (conn.actions || []).filter(t => t > time - 10_000);
@@ -138,8 +138,8 @@ export class Classroom {
     if (!transient) this.lastLive = message;
     for (const conn of this.connections.values()) if (conn.open && conn.lessonSent) { conn.send(message); if (!transient) conn.liveSent = message; }
   }
-  async join(code, name, avatar) {
-    this.host = false; this.code = code; this.name = name; this.avatar = avatar;
+  async join(code, name, avatar, accountPhoto) {
+    this.host = false; this.code = code; this.name = name; this.avatar = avatar; this.accountPhoto = accountPhoto;
     this.peer = new Peer(options());
     await this.open();
     await this.connect();
@@ -154,15 +154,15 @@ export class Classroom {
       let timeout = setTimeout(() => { conn.close(); reject(Error('A sala não respondeu. Confira se o apresentador está online; tente outra rede se necessário.')); }, 18_000);
       conn.on('open', () => {
         const saved = playerStorage.get('sl-player-' + this.code);
-        conn.send({ type: 'join', payload: { name: this.name, avatar: this.avatar, token: saved?.token } });
+        conn.send({ type: 'join', payload: { name: this.name, avatar: this.avatar, accountPhoto: this.accountPhoto, token: saved?.token } });
       });
       conn.on('data', msg => {
         if (msg.type === 'joined') {
           clearTimeout(timeout);
           timeout = setTimeout(() => { conn.close(); reject(Error('A aula demorou demais para chegar. Tente uma conexão melhor ou uma apresentação menor.')); }, 120_000);
-          playerStorage.set('sl-player-' + this.code, { token: msg.token, name: this.name, avatar: this.avatar });
-          storage.set('sl-mode', { host: false, code: this.code, name: this.name, avatar: this.avatar });
-          playerStorage.set('sl-active-player',{host:false,code:this.code,name:this.name,avatar:this.avatar});
+          playerStorage.set('sl-player-' + this.code, { token: msg.token, name: this.name, avatar: this.avatar, accountPhoto: this.accountPhoto });
+          storage.set('sl-mode', { host: false, code: this.code, name: this.name, avatar: this.avatar, accountPhoto: this.accountPhoto });
+          playerStorage.set('sl-active-player',{host:false,code:this.code,name:this.name,avatar:this.avatar,accountPhoto:this.accountPhoto});
           this.onStatus('online');
         } else if(msg.type==='ended'){this.stopped=true;clearTimeout(timeout);try{localStorage.removeItem('sl-active-player');sessionStorage.removeItem('sl-mode');}catch{}this.onStatus('ended','O professor encerrou a apresentação.');conn.close();
         } else if(msg.type==='kicked'){this.stopped=true;clearTimeout(timeout);try{localStorage.removeItem('sl-active-player');sessionStorage.removeItem('sl-mode');}catch{}this.onStatus('removed','Você foi removido da sala pelo professor.');conn.close();

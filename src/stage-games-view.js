@@ -169,7 +169,7 @@ function survivalView(state, g, host, player, now) {
     : '<p class="sv-safe">Você continua de pé!</p>';
   const roamScale = g.players.length <= 6 ? 1 : g.players.length <= 14 ? .65 : .35;
   const showArena = Boolean(host);
-  const arena = showArena ? `<div class="sv-arena" style="--scale:${scale}" data-state="${g.state}" data-crowd="${g.players.length}"><i class="sv-light a"></i><i class="sv-light b"></i>${done && winners.length ? celebration(28, `${g.id}:${g.resultStartedAt || 0}:survival`) : ''}<div class="sv-crowd">${g.players.map((item, i) => {
+  const arena = showArena ? `<div class="sv-arena" style="--scale:${scale};--original-scale:${scale}" data-state="${g.state}" data-crowd="${g.players.length}"><i class="sv-light a"></i><i class="sv-light b"></i>${done && winners.length ? celebration(28, `${g.id}:${g.resultStartedAt || 0}:survival`) : ''}<div class="sv-crowd">${g.players.map((item, i) => {
     const fell = item.alive ? '' : item.fell === g.round && shown ? 'now' : 'before';
     const dir = i % 2 === 0 ? 1 : -1;
     const roam = Math.round((24 + ((i * 19) % 32)) * roamScale) * dir;
@@ -316,7 +316,6 @@ function challengeView(state, g, host, player) {
     : leader ? `<div class="challenge-submit-row">${character({ avatar: state.me?.avatar || '🤖', teamPhoto: myTeam?.photo, color: myTeam?.color }, 0, 'working')}<button class="btn primary game-submit" data-challenge-send>${stageIcon('challenge')} Tentar acertar</button><span class="challenge-tries" data-left="${left}" aria-label="${left} de ${max} tentativas restantes">${Array.from({ length: max }, (_, i) => `<i data-used="${i >= left}"></i>`).join('')}</span></div>`
     : `<p class="game-wait">Você está no time de quem mexe: acompanhe a dica e palpite.</p>`)
     : '';
-  const podium = g.solved.length ? `<ol class="challenge-podium">${g.solved.slice(0, 5).map((item, i) => `<li><b>${['🥇', '🥈', '🥉'][i] || i + 1 + 'º'}</b><span>${esc(item.name)}</span><small>${(item.at / 1000).toFixed(1)} s · ${plural(item.tries, 'tentativa', 'tentativas')}</small></li>`).join('')}</ol>` : '';
   const answer = g.answer ? `<p class="challenge-answer"><b>Resposta:</b> ${g.answer.map(item => `${esc(item.label)} = ${esc(item.v)}`).join(' · ')}</p>` : '';
   // A instrução genérica não precisa ocupar uma caixa no dispositivo do aluno;
   // objetivos personalizados continuam visíveis. No telão o texto fica centralizado.
@@ -340,13 +339,22 @@ function challengeView(state, g, host, player) {
   const guessWall = host && g.guesses?.length
     ? `<div class="challenge-guess-wall"><h2>Palpites do time <small>${g.guessesCount}</small></h2><ul>${g.guesses.map(item => `<li><strong>${esc(item.name)}</strong><span>${esc(item.guess || '—')}</span></li>`).join('')}</ul></div>`
     : '';
-  const modeSwitch = host && !done ? `<div class="challenge-mode"><button type="button" class="btn secondary small" data-game-do="challenge-mode" data-mode="${g.freeForAll ? 'leader' : 'all'}">${g.freeForAll ? 'Voltar a só o líder mexer' : 'Deixar todos mexerem'}</button><button type="button" class="btn secondary small" data-game-do="next-hint">Próxima dica</button><span class="challenge-mode-state">${g.freeForAll ? 'Todos podem mexer' : 'Só o líder mexe'}</span></div>` : '';
+  const modeSwitch = host && !done ? `<div class="challenge-mode"><button type="button" class="btn secondary small" data-game-do="challenge-mode" data-mode="${g.freeForAll ? 'leader' : 'all'}">${g.freeForAll ? 'Voltar a só o líder mexer' : 'Deixar todos mexerem'}</button><button type="button" class="btn secondary small" data-game-do="next-hint">Próxima dica</button></div>` : '';
   // O experimento é o protagonista: fica no palco grande e o que é comando
   // (objetivo, dica, tentar) fica num bloco logo abaixo — largura de leitura,
   // não uma coluna apertada ao lado que espremia o simulador no celular.
   const actionBar = host ? live(modeSwitch + hostActions(state, [done ? ['restart', '↻ Jogar de novo'] : ['end', 'Encerrar jogo', 'primary']], { showNext: done }), 'control') : '';
   // Resultado discreto só ao encerrar, sem competir com os espelhos ao vivo.
-  const results = host && done ? `<section class="challenge-results"><h2>Resultados do experimento</h2>${answer}${podium || '<p>Ninguém chegou à meta nesta rodada.</p>'}</section>` : '';
+  const resultTeams = (state.teams || []).filter(team => (team.members || []).length).map(team => {
+    const solved = g.solved.find(item => (team.members || []).some(member => member.id === item.id));
+    const person = solved || (team.members || []).find(member => member.leader) || team.members[0];
+    return { person, name: `Time ${team.name}`, photo: team.photo, color: team.color, solved };
+  });
+  const entries = resultTeams.length ? resultTeams : (state.ranking || []).filter(p => g.solved.some(item => item.id === p.id) || p.online).map(person => ({ person, name: person.name, color: person.color, solved: g.solved.find(item => item.id === person.id) }));
+  entries.sort((a,b) => (a.solved?.at ?? Infinity) - (b.solved?.at ?? Infinity));
+  const winner = entries.find(entry => entry.solved);
+  const resultCard = (entry, i, champion) => `<article class="challenge-result-card ${champion ? 'is-winner' : 'is-other'}" style="--team:${esc(entry.color || '#a78bfa')}">${champion ? '<span class="challenge-result-crown" aria-hidden="true">♛</span>' : ''}${character({ ...entry.person, color: entry.color, teamPhoto: entry.photo }, i, champion ? 'win-0' : 'lose')}<strong>${esc(entry.name)}</strong><small>${entry.solved ? `${(entry.solved.at / 1000).toFixed(1)} s · ${plural(entry.solved.tries, 'tentativa', 'tentativas')}` : 'Não chegou à meta'}</small></article>`;
+  const results = host && done ? `<section class="challenge-results"><h2>Resultados do experimento</h2>${answer}<div class="challenge-result-scene">${winner ? celebration(24, `${g.id}:${g.resultStartedAt || 0}:challenge`) : ''}<div class="challenge-result-others">${entries.filter(entry => entry !== winner).map((entry,i) => resultCard(entry,i,false)).join('')}</div>${winner ? resultCard(winner,0,true) : '<p class="game-wait">Ninguém chegou à meta nesta rodada.</p>'}</div></section>` : '';
   return `<div class="challenge-layout"><div class="challenge-stage">
       <div class="challenge-sim" data-challenge-sim data-locked="${!host && !leader}">${simulationMarkup(g.simulation)}</div>
       ${live(goal + teamHint + (host ? '' : controlHints + guessBox), 'command')}
