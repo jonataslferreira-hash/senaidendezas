@@ -156,7 +156,7 @@ export class Room {
     this.data.phase = 'reveal';
   }
   // O pódio é revelado pelo relógio do professor: o aluno só vê o que já apareceu no telão.
-  podiumTick(){const d=this.data;if(d.phase!=='finished'||!d.resultStartedAt||(d.podiumStep||0)>=4)return;const elapsed=(this.now()-d.resultStartedAt)/1000;d.podiumStep=d.podiumRevealed?4:[2,4.5,7,9].filter(t=>elapsed>=t).length;}
+  podiumTick(){const d=this.data;if(d.phase!=='finished'||!d.resultStartedAt||(d.podiumStep||0)>=4)return;const elapsed=(this.now()-d.resultStartedAt)/1000;d.podiumStep=d.podiumRevealed?4:[1,2.5,4,5].filter(t=>elapsed>=t).length;}
   tick() { tickGame(this); this.podiumTick(); if (this.data.phase === 'countdown' && this.now() >= this.data.deadline) this.startQuestion(0); else if (this.data.phase === 'question' && this.now() >= this.data.deadline) this.reveal(); }
   publicLesson(presenter = false) {
     return { id: this.lesson.id, title: this.lesson.title, description: this.lesson.description,...(this.lesson.customFonts?{customFonts:this.lesson.customFonts}:{}),...(this.lesson.activityBlocks?{activityBlocks:this.lesson.activityBlocks}:{}),activityOrder:this.lesson.activityOrder,gameSettings:this.lesson.gameSettings, quizCount: this.questions.length,

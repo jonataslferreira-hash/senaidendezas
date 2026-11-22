@@ -957,3 +957,25 @@ html[data-motion=reduced] #app .studio-btn.ai-tool::before, html[data-motion=red
   #app .studio-join #join-form .join-utilities{display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:8px}
   #app .studio-join #join-form .join-utilities button{width:100%;font-size:12.5px;justify-content:center}
 }
+
+/* Entrada: fundo contínuo, sem ondas cortadas ou faixas de animação. */
+#app .studio-join.join-v3 {
+  max-width:none; width:100%; min-height:calc(100dvh - 86px);
+  grid-template-columns:minmax(0,500px) minmax(320px,420px);
+  justify-content:center; align-content:center;
+  background:radial-gradient(ellipse at 50% 45%, color-mix(in srgb,var(--ui-accent,#8b5cf6) 10%,transparent),transparent 65%);
+}
+#app .studio-join.join-v3::before,#app .studio-join.join-v3::after,#app .join-v3 .join-waves { display:none; }
+/* A aba atual fica mais escura, inclusive sob os estilos personalizados de
+   botões. O texto conserva o mesmo peso e cor das demais abas. */
+html[data-theme][data-ui-style] #app .studio-shell .studio-rail nav > button.studio-btn.rail-link.active {
+  background:color-mix(in srgb,var(--ui-soft,#eee8f2) 65%,#5a3c70 35%)!important;
+  border-color:color-mix(in srgb,var(--ui-accent,#7950b4) 65%,var(--ui-line,#ccc))!important;
+  font-weight:550;
+}
+html[data-theme][data-ui-style][data-appearance=dark] #app .studio-shell .studio-rail nav > button.studio-btn.rail-link.active {
+  background:color-mix(in srgb,var(--ui-soft,#3d4047) 60%,#0c0812 40%)!important;
+}
+@media(max-width:900px) {
+  #app .studio-join.join-v3 { min-height:0; grid-template-columns:minmax(0,410px); justify-content:center; align-content:start; }
+}

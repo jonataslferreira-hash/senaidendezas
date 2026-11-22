@@ -23,7 +23,7 @@ for (const size of [{width:375,height:667},{width:1440,height:850}]) {
         room.answer(a.id,{choice:{round:0,choice:0}});room.answer(b.id,{choice:{round:0,choice:0}});room.control('game',{do:'next'});
       }
       const app=document.querySelector('#app');app.className='quiz-party';app.dataset.role=host?'presenter':'student';
-      app.innerHTML=gameMarkup(room.snapshot(host?null:a.id),{host,header:()=>'',now:50000});
+      app.innerHTML=gameMarkup(room.snapshot(host?null:a.id),{host,header:()=>'<header class="header">Storage Lab</header>',now:50000});
       window.renderedRoom=room;window.renderedPlayer=a;window.renderGame=gameMarkup;
     },{type,host});
     await build('flash');
@@ -36,21 +36,22 @@ for (const size of [{width:375,height:667},{width:1440,height:850}]) {
     expect(flash.points.top).toBeLessThan(flash.name.bottom);
     expect(flash.statusTop).toBeGreaterThanOrEqual(flash.listBottom-1);
     expect(flash.scrollWidth).toBeLessThanOrEqual(size.width);
-    // Pódio final no telão deve poder ser visto inteiro ao rolar.
+    // Pódio final no telão deve ficar visível sem depender de rolagem.
     await page.evaluate(()=>{
       const room=window.renderedRoom,a=window.renderedPlayer,b=room.data.players[1];
       room.control('game',{do:'next'});
       room.answer(a.id,{choice:{round:1,choice:0}});room.answer(b.id,{choice:{round:1,choice:0}});room.control('game',{do:'next'});
-      const app=document.querySelector('#app');app.dataset.role='presenter';app.innerHTML=window.renderGame(room.snapshot(),{host:true,header:()=>'',now:50000});
+      const app=document.querySelector('#app');app.dataset.role='presenter';app.innerHTML=window.renderGame(room.snapshot(),{host:true,header:()=>'<header class="header">Storage Lab</header>',now:50000});
     });
     const podium=await page.evaluate(()=>{
       const stage=document.querySelector('.game-stage'),p=document.querySelector('.flash-podium');
-      stage.scrollTop=0; const top=p.getBoundingClientRect().top,screenTop=stage.getBoundingClientRect().top;
-      stage.scrollTop=stage.scrollHeight; const bottom=p.getBoundingClientRect().bottom,screenBottom=stage.getBoundingClientRect().bottom;
-      return {top,screenTop,bottom,screenBottom};
+      const top=p.getBoundingClientRect().top,screenTop=stage.getBoundingClientRect().top;
+      const bottom=p.getBoundingClientRect().bottom,screenBottom=stage.getBoundingClientRect().bottom;
+      return {top,screenTop,bottom,screenBottom,overflow:stage.scrollHeight-stage.clientHeight};
     });
     expect(podium.top).toBeGreaterThanOrEqual(podium.screenTop-1);
     expect(podium.bottom).toBeLessThanOrEqual(podium.screenBottom+1);
+    expect(podium.overflow).toBeLessThanOrEqual(2);
     await build('race');
     const race=await page.evaluate(()=>{
       const options=document.querySelector('.game-options').getBoundingClientRect(),track=document.querySelector('.race-track').getBoundingClientRect();

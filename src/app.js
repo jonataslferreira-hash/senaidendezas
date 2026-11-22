@@ -128,7 +128,7 @@ function publishRemote() {
   const lesson = state.phase === 'lesson', slide = lesson ? slides[state.slide] : null;
   const frames = lesson ? customSimFrames() : [];
   const customs = frames.slice(0, 3).map((frame, index) => ({ name: String(frame.closest('.custom-sim')?.querySelector('strong')?.textContent || 'Experimento importado').replace(/\s+/g, ' ').trim().slice(0, 60), fields: customSimControls[index]?.fields || [], buttons: customSimControls[index]?.buttons || [] }));
-  studio.remote.setPresentation({ code: state.code, title: activeLesson.title, slide: state.slide, total: slides.length, phase: state.phase, stage: state.activity?.type || '', hasNext: Boolean(state.activity?.hasNext), game: remoteGame(), note: lesson ? slide?.note?.slice(0, 2000) : '',
+  studio.remote.setPresentation({ code: state.code, title: activeLesson.title, documentId: studio.groups.live?.row?.id || null, slide: state.slide, total: slides.length, phase: state.phase, stage: state.activity?.type || '', hasNext: Boolean(state.activity?.hasNext), game: remoteGame(), note: lesson ? slide?.note?.slice(0, 2000) : '',
     sims: lesson ? describeSims(app) : [], customs, models: lesson ? describeModels(app, { canvasModels, slide: slide ? presentationSlide(slide) : null }) : [] });
 }
 function remoteGame() { const g = state?.game; return g ? { type: g.type, state: g.state, drawn: g.current?.name || '', ...(Number.isInteger(g.round) ? { round: g.round, rounds: g.rounds } : {}) } : null; }
