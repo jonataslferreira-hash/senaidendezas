@@ -94,7 +94,7 @@ export class GroupsPanel {
     const [docs,groups]=await Promise.all([this.client.from('sl_group_documents').select('*').order('updated_at',{ascending:false}),this.client.from('sl_groups').select('*')]);
     if(this.studio.account.user?.id!==uid)return;
     if(docs.error||groups.error||!Array.isArray(docs.data)||!Array.isArray(groups.data)){this.message='A colaboração ainda precisa ser ativada pelo administrador do site.';return;}
-    this.documents=docs.data||[];this.groups=groups.data||[];this.message='';
+    this.documents=docs.data||[];this.groups=groups.data||[];this.message='';this.studio.remote.syncShared(this.documents);
     try {
       const cached=new Map(JSON.parse(localStorage.getItem(this.associationKey())||'[]'));
       for(const row of this.documents)if(cached.has(row.id)&&!this.lessonIds.has(row.id))this.lessonIds.set(row.id,cached.get(row.id));
@@ -161,7 +161,7 @@ export class GroupsPanel {
   }
   async enter(row,doc){
     const lesson=validateLesson(readLesson(doc),{draft:true});
-    this.rememberLesson(row.id,lesson.id);this.documents=this.documents.filter(d=>d.id!==row.id);this.documents.unshift(row);
+    this.rememberLesson(row.id,lesson.id);this.documents=this.documents.filter(d=>d.id!==row.id);this.documents.unshift(row);this.studio.remote.syncShared(this.documents);
     this.studio.account.close();this.studio.scrollEditorTop=true;this.studio.draft=lesson;this.studio.view='editor';this.studio.index=0;this.studio.questionIndex=0;this.studio.tab='slides';this.studio.visualMode=true;this.studio.dirty=false;
     this.role='viewer';this.live=new LiveDocument(this.studio,row,doc,()=>this.paint());try{await this.refreshMembers();}catch{this.message='Atualize o SQL para carregar as permissões da equipe.';}this.studio.writeRoute('editor',lesson.id,true);this.studio.callbacks.render();await this.live.connect();
   }

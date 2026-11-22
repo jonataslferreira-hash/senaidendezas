@@ -957,3 +957,21 @@ html[data-motion=reduced] #app .studio-btn.ai-tool::before, html[data-motion=red
   #app .studio-join #join-form .join-utilities{display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:8px}
   #app .studio-join #join-form .join-utilities button{width:100%;font-size:12.5px;justify-content:center}
 }
+
+/* Entrada: fundo contínuo, sem ondas cortadas ou faixas de animação. */
+#app .studio-join.join-v3 {
+  max-width:none; width:100%; min-height:calc(100dvh - 86px);
+  grid-template-columns:minmax(0,500px) minmax(320px,420px);
+  justify-content:center; align-content:center;
+  background:radial-gradient(ellipse at 50% 45%, color-mix(in srgb,var(--ui-accent,#8b5cf6) 10%,transparent),transparent 65%);
+}
+#app .studio-join.join-v3::before,#app .studio-join.join-v3::after,#app .join-v3 .join-waves { display:none; }
+#app .studio-shell .studio-rail .studio-btn.rail-link.active {
+  background:color-mix(in srgb,var(--studio-accent,#7950b4) 32%,var(--ui-panel,#fff))!important;
+  border-color:color-mix(in srgb,var(--studio-accent,#7950b4) 65%,transparent)!important;
+  color:var(--ui-ink,#362147)!important; font-weight:800;
+}
+html[data-appearance=dark] #app .studio-shell .studio-rail .studio-btn.rail-link.active { background:#655078!important; color:#fff!important; }
+@media(max-width:900px) {
+  #app .studio-join.join-v3 { min-height:0; grid-template-columns:minmax(0,410px); justify-content:center; align-content:start; }
+}

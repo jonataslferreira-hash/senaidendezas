@@ -19,17 +19,22 @@ function setup(type, config = {}) {
 }
 const question = n => ({text:`Variante ${n}`, options:['Certo','Errado'], correct:0});
 
-test('cabo sorteia uma variante compartilhada, valida respostas e aguarda todos em cada rodada', () => {
+test('cabo sorteia variantes por pessoa, valida respostas e aguarda todos em cada rodada', () => {
   const {room,a,b} = setup('tug', {seconds:15, rounds:[[question(1),question(2),question(3)],[question(4),question(5)]]});
-  gameControl(room,{do:'next'},()=>0.8);
+  room.data.teams=[{name:'Mesmo time',color:'#abcdef'}];
+  room.data.players.forEach(p=>p.team=0);
+  const draws=[0.8,0.1]; gameControl(room,{do:'next'},()=>draws.shift());
   let qa=room.snapshot(a.id).game.question, qb=room.snapshot(b.id).game.question;
-  assert.equal(qa.index,2); assert.deepEqual(qa,qb);
+  assert.equal(qa.index,2); assert.equal(qb.index,0);
+  assert.deepEqual(room.snapshot(a.id).game.question,qa);
+  assert.deepEqual(room.snapshot(b.id).game.question,qb);
   assert.equal(room.snapshot(a.id).game.questions.length,1);
   assert.throws(()=>room.answer(a.id,{choice:{round:0,v:0,choice:0}}),/mudou/);
   room.answer(a.id,{choice:{round:0,v:2,choice:0}});
   assert.equal(room.snapshot().game.state,'open');
   assert.throws(()=>room.answer(a.id,{choice:{round:0,v:2,choice:0}}),/já respondeu/);
-  room.answer(b.id,{choice:{round:0,v:2,choice:1}});
+  assert.throws(()=>room.answer(b.id,{choice:{round:0,v:2,choice:1}}),/mudou/);
+  room.answer(b.id,{choice:{round:0,v:0,choice:1}});
   assert.equal(room.snapshot().game.state,'between');
   gameControl(room,{do:'next'},()=>0);
   qa=room.snapshot(a.id).game.question; qb=room.snapshot(b.id).game.question;
@@ -66,11 +71,11 @@ test('dicas do experimento indicam direção correta e resultado aparece depois 
   assert.match(html,/game-live game-challenge-result-live/);
 });
 
-test('personagem usa foto do time e classificação completa usa foto pessoal', () => {
+test('personagem e classificação usam foto pessoal em vez da foto do time', () => {
   const personal='data:image/png;base64,BBBB', team='data:image/png;base64,'+'A'.repeat(25000);
   const p={id:'a',name:'Ana',score:100,avatar:personal}, state={ranking:[p],teams:[{name:'Equipe',photo:team,members:[p]}],me:{id:'a'}};
   const html=leaderboardMarkup(state,{header:()=>'',host:false});
-  assert.ok(html.includes(team));
+  assert.ok(!html.includes(team)); assert.ok(html.includes(personal));
   const list=html.split('class="standings-list"')[1];
   assert.ok(list.includes(personal)); assert.ok(!list.includes(team));
   const noTeam=leaderboardMarkup({...state,teams:[]},{header:()=>'',host:false});
@@ -123,4 +128,25 @@ test('foto da conta permanece no placar completo mesmo ao trocar o avatar da sal
   assert.equal(room.snapshot().ranking[0].accountPhoto,photo);
   const invalid=room.join({name:'Bia',avatar:'🚀',accountPhoto:'https://example.test/imagem'});
   assert.equal(room.snapshot(invalid.id).ranking.find(p=>p.id===invalid.id).accountPhoto,undefined);
+});
+
+test('cabo atribui pergunta estável a quem chega durante a rodada', () => {
+  const {room,a,b} = setup('tug', {rounds:[[question(1),question(2)]]});
+  gameControl(room,{do:'next'},()=>0.7);
+  const late=room.join({name:'Caio'});
+  const q=room.snapshot(late.id).game.question;
+  assert.ok(q && [0,1].includes(q.index));
+  assert.deepEqual(room.snapshot(late.id).game.question,q);
+  room.answer(late.id,{choice:{round:0,v:q.index,choice:0}});
+  assert.equal(room.snapshot().game.state,'open');
+  for(const player of [a,b])room.answer(player.id,{choice:{round:0,v:1,choice:0}});
+  assert.equal(room.snapshot().game.state,'pull');
+});
+
+test('pódio de dois times revela vencedor no segundo passo sem indicar terceiro lugar', () => {
+  const state={resultScope:'overall',resultStartedAt:1000,podiumStep:1,activity:{hasNext:false},ranking:[],teams:[{name:'Um',score:20,members:[]},{name:'Dois',score:10,members:[]}]};
+  const first=leaderboardMarkup(state,{header:()=>'',host:true,final:true});
+  assert.match(first,/E quem ficou em 1º/); assert.equal((first.match(/team-podium-slot place-/g)||[]).length,2);
+  const second=leaderboardMarkup({...state,podiumStep:2},{header:()=>'',host:true,final:true});
+  assert.match(second,/Time Um<\/em> venceu/); assert.match(second,/final-confetti/);
 });

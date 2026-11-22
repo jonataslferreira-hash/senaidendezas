@@ -98,7 +98,7 @@ function flashView(state, g, host, player, now) {
   const question = q && !done && !boardPhase ? `${g.bare ? (canAnswer ? screenHint : '') : `<h2 class="sv-text">${esc(q.text)}</h2>`}${optionButtons(q.options, { bare: g.bare, send: i => `{"choice":${i},"round":${g.round}}`, enabled: canAnswer, chosen: me?.choice, correct: q.correct, shown, counts: q.counts, extra: ' flash-options' })}` : '';
   const first = g.state === 'reveal' ? (g.fastest ? `<p class="flash-first">${bolt}<b>${esc(g.fastest.name)}</b> acertou primeiro! <small>+${g.points[2]} pts</small></p>` : '<p class="game-wait">Ninguém acertou esta pergunta.</p>') : '';
   const hasTeams = Boolean(g.teamBoard?.length);
-  const teamPortrait = person => ({ ...person, teamPhoto: state.teams?.find(t => t.members?.some(m => m.id === person.id))?.photo });
+  const teamPortrait = person => person;
   const scoredTeams = hasTeams ? g.teamBoard : [];
   const teamPodiumOrder = scoredTeams.length === 1 ? [0] : scoredTeams.length === 2 ? [1, 0] : [1, 0, 2];
   const indivOrder = g.board.length === 1 ? [0] : g.board.length === 2 ? [1, 0] : [1, 0, 2];
@@ -109,7 +109,7 @@ function flashView(state, g, host, player, now) {
           const members = team.members || [];
           const shownMembers = members.slice(0, 5);
           const crewScale = shownMembers.length <= 1 ? .74 : shownMembers.length === 2 ? .6 : shownMembers.length === 3 ? .5 : .42;
-          const memberChars = shownMembers.map((m, mi) => `<span class="team-podium-member">${character({ ...m, color: team.color, teamPhoto: state.teams?.find(t => t.index === team.index)?.photo }, mi, 'win-' + ((i + mi) % 4))}</span>`).join('');
+          const memberChars = shownMembers.map((m, mi) => `<span class="team-podium-member">${character({ ...m, color: team.color }, mi, 'win-' + ((i + mi) % 4))}</span>`).join('');
           const memberNames = members.map(m => esc(m.name)).join(', ');
           return `<article class="flash-podium-slot team-podium-slot place-${i + 1}" style="--player-color:${esc(team.color)};--crew-scale:${crewScale}">${shownMembers.length ? `<div class="team-podium-crew" data-size="${shownMembers.length}">${memberChars}${members.length > 5 ? `<em class="team-crew-more">+${members.length - 5}</em>` : ''}</div>` : ''}<strong title="Time ${esc(team.name)}">Time ${esc(team.name)}</strong><span>${team.score.toLocaleString('pt-BR')} pts</span>${team.wins ? `<small>${bolt}×${team.wins}</small>` : ''}${memberNames ? `<small class="flash-team-members" title="${memberNames}">${memberNames}</small>` : ''}<div class="flash-podium-pedestal"><b>${i === 0 ? '♛' : i + 1 + 'º'}</b></div></article>`;
         }).join('')}</div></div>`
@@ -119,7 +119,7 @@ function flashView(state, g, host, player, now) {
         }).join('')}</div></div>`)
     : '';
   const multiCols = done && g.board.length > 5;
-  const board = g.board.length && (done || boardPhase) ? `<section class="flash-ranking-box" data-multi="${multiCols}">${boardPhase ? '<h2>Placar da rodada</h2>' : `<h3>${hasTeams ? 'Classificação individual' : 'Classificação completa'}</h3>`}<ol class="flash-board" data-done="${done}" data-multi="${multiCols}">${g.board.map((item, i) => `<li style="--n:${i}" data-me="${Boolean(player && item.id === state.me?.id)}" data-first="${i === 0 && item.score > 0}" data-streak="${item.streak >= 2 && item.gain > 0 ? 'up' : ''}"><b>${i === 0 ? '♛' : i + 1 + 'º'}</b><div class="flash-board-who">${character(teamPortrait(item), i, boardPhase && item.gain > 0 ? 'win-0' : 'idle')}<span>${esc(item.name)}</span></div><small>${item.streak >= 2 ? `<i class="streak-flame" data-n="${item.streak}" style="--n:${Math.min(9, item.streak)}" title="Ofensiva: ${item.streak} acertos seguidos"></i>` : ''}${boardPhase && item.gain > 0 ? ` <em>+${item.gain}</em>` : ''}</small><strong>${item.score.toLocaleString('pt-BR')}<small> pts</small></strong></li>`).join('')}</ol></section>` : '';
+  const board = g.board.length && (done || boardPhase) ? `<section class="flash-ranking-box" data-multi="${multiCols}">${boardPhase ? '<h2>Placar da rodada</h2>' : `<h3>${hasTeams ? 'Classificação individual' : 'Classificação completa'}</h3>`}<ol class="flash-board" data-done="${done}" data-multi="${multiCols}" style="--count:${g.board.length};--cols:${Math.ceil(g.board.length / 5)}">${g.board.map((item, i) => `<li style="--n:${i}" data-me="${Boolean(player && item.id === state.me?.id)}" data-first="${i === 0 && item.score > 0}" data-streak="${item.streak >= 2 && item.gain > 0 ? 'up' : ''}"><b>${i === 0 ? '♛' : i + 1 + 'º'}</b><div class="flash-board-who">${character(teamPortrait(item), i, boardPhase && item.gain > 0 ? 'win-0' : 'idle')}<span>${esc(item.name)}</span></div><small>${item.streak >= 2 ? `<i class="streak-flame" data-n="${item.streak}" style="--n:${Math.min(9, item.streak)}" title="Ofensiva: ${item.streak} acertos seguidos"></i>` : ''}${boardPhase && item.gain > 0 ? ` <em>+${item.gain}</em>` : ''}</small><strong>${item.score.toLocaleString('pt-BR')}<small> pts</small></strong></li>`).join('')}</ol></section>` : '';
   const status = done ? ((hasTeams ? scoredTeams.length : g.board.length) ? '' : '<p class="game-winner none">Ninguém pontuou desta vez.</p>')
     : boardPhase ? ''
     : !player ? (g.state === 'ready' ? `<p class="game-note">Cada pergunta fica ${g.seconds} segundos no ar. Mais rapidez rende mais pontos (${g.points[0]} a ${g.points[1]} pts) e quem acerta primeiro ganha +${g.points[2]} pts.</p>` : '')
@@ -412,7 +412,7 @@ function tugView(state, g, host, player, now) {
 
   const mine = player && g.side !== null && g.side !== undefined ? `<p class="team-mine" style="--team:${colors[g.side]}">Você puxa pelo <b>${esc(names[g.side])}</b></p>` : '';
   const status = over || between ? ''
-    : !player ? `<p class="game-wait">${g.state === 'ready' ? `São ${plural(g.rounds, 'rodada', 'rodadas')}: em cada rodada, todos respondem à mesma pergunta sorteada. O resultado só aparece na puxada final!` : `${g.answered} de ${g.total} já responderam a rodada ${g.round + 1}`}</p>`
+    : !player ? `<p class="game-wait">${g.state === 'ready' ? `São ${plural(g.rounds, 'rodada', 'rodadas')}: em cada rodada, cada pessoa recebe uma pergunta sorteada. O resultado só aparece na puxada final!` : `${g.answered} de ${g.total} já responderam a rodada ${g.round + 1}`}</p>`
     : g.state === 'ready' ? `<p class="game-wait">Prepare-se: são ${plural(g.rounds, 'rodada', 'rodadas')}. Responda as perguntas da rodada para ajudar seu time a puxar a corda!</p>`
     : '';
   const showScene = !studentOpen || me.answered;
@@ -443,7 +443,7 @@ function raceView(state, g, host, player, now) {
     : 'lose';
   const tag = runner => done ? medal(runner.place) : runner.right === undefined ? '' : runner.right ? `<b class="race-gain">+${runner.gain} m</b>` : '<b class="race-gain miss">✕</b>';
   const lanes = g.runners.map((runner, i) => `<div class="race-lane" data-k="${esc(runner.id)}" data-me="${player && runner.id === state.me?.id}" data-place="${runner.place || ''}" data-right="${!done && runner.right !== undefined ? runner.right : ''}" data-streak="${!done && runner.right ? 'up' : ''}" data-run="${!done && !settled && runner.right ? 'now' : ''}" style="--p:${runner.p.toFixed(3)};--i:${i}"><span class="race-name">${esc(runner.name)}<small>${runner.dist} m</small></span><div class="race-road"><div class="race-runner">${character(runner, i, mood(runner, i))}<span data-t>${tag(runner)}</span></div></div></div>`).join('');
-  const track = `<div class="race-track" data-state="${g.state}" style="--lanes:${Math.max(1, count)};--s:${count <= 3 ? .5 : count <= 5 ? .4 : .32}">${done && g.runners.some(runner => runner.place) ? celebration(26, `${g.id}:${g.resultStartedAt || 0}:race`, true) : ''}<i class="race-finish" aria-hidden="true"></i>${lanes || '<p class="game-wait">Aguardando participantes…</p>'}${g.total > count ? `<p class="race-more">+${g.total - count} correndo</p>` : ''}</div>`;
+  const track = `<div class="race-track" data-state="${g.state}" style="--lanes:${Math.max(1, count)};--s:${count <= 3 ? .9 : count <= 5 ? .72 : .48}">${done && g.runners.some(runner => runner.place) ? celebration(26, `${g.id}:${g.resultStartedAt || 0}:race`, true) : ''}<i class="race-finish" aria-hidden="true"></i>${lanes || '<p class="game-wait">Aguardando participantes…</p>'}${g.total > count ? `<p class="race-more">+${g.total - count} correndo</p>` : ''}</div>`;
   const first = g.runners.find(runner => runner.place === 1);
   const status = done ? (first ? `<p class="game-winner"><b>${esc(first.name)}</b> venceu com ${first.dist} m!</p>` : '<p class="game-winner none">Ninguém saiu do lugar desta vez.</p>')
     : !player ? (g.state === 'ready' ? `<p class="game-note">Você só dá a largada: as perguntas seguem sozinhas quando todos respondem ou o tempo acaba. Cada acerto vale de 10 a 20 metros · 1º lugar +${g.points[0]} · 2º +${g.points[1]} · 3º +${g.points[2]} pontos</p>` : '')

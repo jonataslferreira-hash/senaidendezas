@@ -350,7 +350,7 @@ test('rodada 14: escolha de time, pódio guiado pela sala, corrida, textos escon
   // Pódio: os passos vêm do relógio da sala.
   assert.equal(room.data.phase, 'finished'); assert.equal(room.snapshot(ana.id).podiumStep, 0);
   now += 2100; room.tick(); assert.equal(room.snapshot(ana.id).podiumStep, 1);
-  now += 5000; room.tick(); assert.equal(room.snapshot(ana.id).podiumStep, 3);
+  now += 5000; room.tick(); assert.equal(room.snapshot(ana.id).podiumStep, 4);
   room.control('podium-all'); assert.equal(room.snapshot(ana.id).podiumStep, 4);
   assert.ok([0, 1, 2, 3, 4].includes(room.snapshot().victory));
 

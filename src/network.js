@@ -9,10 +9,24 @@ const storage = {
   set(k, v) { try { sessionStorage.setItem(k, JSON.stringify(v)); } catch { /* navegação privada */ } }
 };
 const playerStorage={get(k){try{return JSON.parse(localStorage.getItem(k))||storage.get(k);}catch{return storage.get(k);}},set(k,v){try{localStorage.setItem(k,JSON.stringify(v));}catch{storage.set(k,v);}}};
+// Servidores ICE adicionais são configuráveis para redes que exigem TURN.
+// Valores VITE ficam públicos no navegador: use apenas credenciais temporárias
+// ou dedicadas, nunca uma senha administrativa.
+export function parseIceServers(value) {
+  if (!value) return undefined;
+  try {
+    const servers=JSON.parse(value);
+    if (!Array.isArray(servers) || !servers.length) return undefined;
+    const valid=servers.filter(s=>s && (typeof s.urls==='string'||Array.isArray(s.urls)) &&
+      (Array.isArray(s.urls)?s.urls:[s.urls]).every(url=>typeof url==='string' && /^(stun|stuns|turn|turns):/i.test(url)));
+    return valid.length ? valid.map(s=>({urls:s.urls,...(typeof s.username==='string'?{username:s.username}:{}),...(typeof s.credential==='string'?{credential:s.credential}:{})})) : undefined;
+  } catch { return undefined; }
+}
 function options() {
   // Somente no desenvolvimento: sinalizador local para testes reais de WebRTC.
   if (import.meta.env.DEV && new URLSearchParams(location.search).has('localSignal')) return { host: location.hostname, port: 9000, path: '/', secure: false, debug: 0 };
-  return { debug: 0 };
+  const iceServers=parseIceServers(import.meta.env.VITE_WEBRTC_ICE_SERVERS);
+  return { debug: 0, ...(iceServers ? {config:{iceServers}} : {}) };
 }
 export class Classroom {
   constructor(onState, onStatus) {
@@ -50,7 +64,7 @@ export class Classroom {
       this.peer.on('error', err => {
         if (!opened) {
           clearTimeout(timeout);
-          const text = err.type === 'unavailable-id' ? 'Esta sala ainda está conectada em outra aba. Feche a outra aba ou crie uma nova sala.' : err.type === 'peer-unavailable' ? 'Sala não encontrada ou apresentador desconectado. Confira o código.' : 'Falha de conexão. Verifique a internet; a rede pode bloquear WebRTC.';
+          const text = err.type === 'unavailable-id' ? 'Esta sala ainda está conectada em outra aba. Feche a outra aba ou crie uma nova sala.' : err.type === 'peer-unavailable' ? 'Sala não encontrada ou apresentador desconectado. Confira o código.' : 'Não foi possível conectar ao serviço da sala. Verifique se esta rede permite acessar o serviço de sinalização e WebRTC; tente outra rede.';
           reject(Object.assign(Error(text), { type: err.type }));
           return;
         }

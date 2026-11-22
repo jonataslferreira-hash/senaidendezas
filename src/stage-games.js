@@ -195,7 +195,7 @@ export function teamScores(room) {
   if (!d.teams?.length) return null;
   return d.teams.map((team, index) => {
     const members = d.players.filter(p => p.team === index);
-    return { ...team, index, score: members.reduce((sum, p) => sum + (p.score || 0) + (p.bonus || 0), 0), members: members.map(p => ({ id: p.id, name: p.name, avatar: p.avatar, online: p.online, leader: team.leader === p.id })) };
+    return { ...team, index, score: members.reduce((sum, p) => sum + (p.score || 0) + (p.bonus || 0), 0), members: members.map(p => ({ id: p.id, name: p.name, avatar: p.avatar, accountPhoto: p.accountPhoto, online: p.online, leader: team.leader === p.id })) };
   });
 }
 
@@ -233,6 +233,7 @@ export function syncGameJoin(room, player) {
   if (d.phase !== 'game' || !game || !player) return;
   if (game.type === 'tug') {
     if (!Object.hasOwn(game.sides, player.id)) tugSide(room, player);
+    if (game.state === 'open') assignTugQuestion(game, player.id, config.rounds[game.round]);
   }
   if (game.type === 'survival' && game.state === 'ready' && !game.alive.includes(player.id)) game.alive.push(player.id);
 }
@@ -394,7 +395,8 @@ function openTugRound(room, roundIndex, random = Math.random) {
   const roundQs = config?.rounds?.[roundIndex];
   if (!roundQs?.length) { finishTug(room); game.state = 'pull'; game.pullAt = room.now(); return; }
   game.round = roundIndex;
-  game.variant = Math.min(roundQs.length - 1, Math.floor(Math.max(0, Math.min(0.999999999, random())) * roundQs.length));
+  game.variants = {};
+  for (const p of online(room)) assignTugQuestion(game, p.id, roundQs, random);
   game.state = 'open';
   game.answers = {};
   game.roundAnswers = {};
@@ -402,8 +404,13 @@ function openTugRound(room, roundIndex, random = Math.random) {
   game.betweenAt = 0;
   game.startedAt = room.now();
   game.deadline = room.now() + Math.max(config.seconds || 15, 5) * 1000;
-  // Sorteia uma pergunta compartilhada pelos dois lados nesta rodada.
+  // Cada participante recebe uma pergunta sorteada e estável nesta rodada.
   for (const p of online(room)) tugSide(room, p);
+}
+function assignTugQuestion(game, id, questions, random = Math.random) {
+  game.variants ||= {};
+  if (!Object.hasOwn(game.variants, id) && questions?.length) game.variants[id] = Math.min(questions.length - 1, Math.floor(Math.max(0, Math.min(0.999999999, random())) * questions.length));
+  return game.variants[id];
 }
 // Com times formados, os times 1 e 3 ficam de um lado e os 2 e 4 do outro.
 function tugSide(room, player) {
@@ -521,7 +528,7 @@ export function gameInput(room, playerId, payload) {
     const sentRound = payload.round ?? payload.step;
     if (sentRound !== undefined && sentRound !== game.round) throw Error('Esta rodada já avançou.');
     // Só a variante sorteada é válida e cada pessoa responde uma vez.
-    const index = game.variant ?? 0;
+    const index = assignTugQuestion(game, playerId, roundQs);
     if (Number.isInteger(payload.v) && payload.v !== index) throw Error('Esta pergunta já mudou.');
     const question = roundQs[index], choice = payload.choice;
     if (!question || !Number.isInteger(choice) || choice < 0 || choice >= question.options.length) throw Error('Resposta inválida.');
@@ -661,7 +668,7 @@ function challengeLeader(d, game, playerId) {
 export function gameSnapshot(room, playerId, bare = false) {
   const d = room.data, game = d.game, config = room.slides[d.slide]?.game;
   if (d.phase !== 'game' || !game || !config) return null;
-  const name = id => d.players.find(p => p.id === id), who = id => { const p = name(id); return p ? { id: p.id, name: p.name, avatar: p.avatar, ...(d.teams?.[p.team] ? { color: d.teams[p.team].color } : {}) } : null; };
+  const name = id => d.players.find(p => p.id === id), who = id => { const p = name(id); return p ? { id: p.id, name: p.name, avatar: p.avatar, accountPhoto: p.accountPhoto, ...(d.teams?.[p.team] ? { color: d.teams[p.team].color } : {}) } : null; };
   // Aluno não recebe o texto das perguntas (só os botões), para não dar para pesquisar.
   const ask = (question, extra) => question ? { text: bare ? '' : question.text, options: question.options.map(option => bare ? '' : option), ...extra } : null;
   const done = game.state === 'done', presenter = !playerId;
@@ -671,7 +678,7 @@ export function gameSnapshot(room, playerId, bare = false) {
     const question = game.round >= 0 ? config.questions[game.round] : null, shown = game.state === 'reveal' || game.state === 'leaderboard' || done, order = flashOrder(game);
     const teamBoard = d.teams?.length ? d.teams.map((team, index) => {
       const members = d.players.filter(p => p.team === index).map(p => ({
-        id: p.id, name: p.name, avatar: p.avatar, color: team.color,
+        id: p.id, name: p.name, avatar: p.avatar, accountPhoto: p.accountPhoto, color: team.color,
         score: game.score[p.id] || 0, gain: game.gain[p.id] || 0, wins: game.wins[p.id] || 0
       })).sort((a, b) => b.score - a.score || b.wins - a.wins);
       return {
@@ -748,8 +755,8 @@ export function gameSnapshot(room, playerId, bare = false) {
   const roundQs = game.round >= 0 ? (config.rounds[game.round] || []) : [];
   const mySent = playerId ? (game.roundAnswers?.[playerId] || []) : [];
   const myAnswered = playerId ? Object.hasOwn(game.answers || {}, playerId) : false;
-  // A mesma pergunta sorteada é enviada a todos, sem expor as outras opções.
-  const index = game.variant ?? 0, selected = roundQs[index];
+  // A variante é individual, persistente e não expõe as outras perguntas.
+  const index = playerId ? assignTugQuestion(game, playerId, roundQs) : undefined, selected = roundQs[index];
   const myQuestion = playerId && game.state === 'open' && selected ? { text:selected.text, options:[...selected.options], index } : null;
   const myQuestions = myQuestion ? [myQuestion] : [];
   const onlinePlayers = online(room);

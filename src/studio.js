@@ -589,7 +589,7 @@ export class Studio {
         <ul class="join-steps">
           <li><b>1</b><span>Digite o código</span></li>
           <li><b>2</b><span>Escolha seu nome e avatar</span></li>
-          <li><b>3</b><span>Responda pelo celular</span></li>
+          <li><b>3</b><span>Responda pelo dispositivo</span></li>
         </ul>
         <div class="join-mascots" aria-hidden="true">
           ${['🤖','🦊','🚀','🦉','🎮','👾'].map((icon, i) => `<span style="--i:${i}">${icon}</span>`).join('')}

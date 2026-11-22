@@ -3,14 +3,10 @@ const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&
 // Bonequinho: cabeça com o ícone do aluno, corpo arredondado, mãos e pés soltos.
 // O movimento é todo de "amassa e estica" (CSS), sem juntas duras.
 // mood: '' (dancinha), 'idle', 'run', 'lose' ou 'win-0'…'win-3' (quatro comemorações).
-const validTeamPhoto = value => typeof value === 'string' && value.length <= 30000 && /^data:image\/(?:png|jpeg|webp);base64,[A-Za-z0-9+/=]+$/.test(value);
-const portraitContent = person => validTeamPhoto(person?.teamPhoto) ? `<img class="player-profile-photo" src="${esc(person.teamPhoto)}" alt="">` : avatarContent(person?.avatar);
+const portraitContent = person => avatarContent(person?.accountPhoto || person?.avatar);
 export function character(person,index=0,mood=''){return `<div class="game-character dance-${index%6}"${mood?` data-mood="${mood}"`:''} style="--beat-shift:${(index*37)%100}${/^#[0-9a-f]{6}$/i.test(person.color||'')?';--player-color:'+person.color:''}"${person.color?' data-team-color':''}><div class="character-rig buddy"><i class="buddy-shadow"></i><i class="buddy-foot left"></i><i class="buddy-foot right"></i><div class="buddy-top"><i class="buddy-body"></i><i class="buddy-hand left"></i><i class="buddy-hand right"></i><div class="character-head">${portraitContent(person)}</div></div></div></div>`;}
-// Classificações representam a equipe quando ela tem foto; sem foto usa o retrato do participante.
-export function withTeamPortrait(state, person) {
- const team=(state.teams||[]).find(t=>(t.members||[]).some(m=>m.id===person?.id));
- return team?.photo ? {...person,teamPhoto:team.photo} : person;
-}
+// O personagem representa a pessoa; a cor continua identificando o time.
+export function withTeamPortrait(state, person) { return person; }
 // Ranking entre as perguntas: as linhas entram na posição antiga, as barras
 // crescem com os pontos novos e só então cada um desliza para a posição nova.
 const rankColors=['#a78bfa','#34d399','#fbbf24','#60a5fa','#f472b6','#fb923c','#2dd4bf','#c084fc'];
@@ -89,11 +85,12 @@ export function leaderboardMarkup(state,{header,host,offset=0,final=false,shareD
  const board=((!final||useQuizTowers)?(state.quizRanking||state.ranking):state.ranking)||[];
  const winners=board.slice(0,3),champion=winners[0],me=board.findIndex(p=>p.id===state.me?.id);
  const podiumCount=useTeamPodium?Math.min(3,sortedTeams.length):Math.min(3,winners.length);
- const need=place=>podiumCount<=2?(place===2?1:3):(place===3?1:place===2?2:3);
- const at=place=>podiumCount<=2?(place===2?2:7):(place===3?2:place===2?4.5:7);
+ const need=place=>podiumCount===1?1:podiumCount===2?(place===2?1:2):(place===3?1:place===2?2:3);
+ const at=place=>podiumCount===1?1:podiumCount===2?(place===2?1:2.5):(place===3?1:place===2?2.5:4);
  const grandTitle=isQuizStageEnd?'RESULTADO DO QUIZ':!state.activity?.hasNext?'PLACAR GERAL FINAL':'RESULTADO DA ETAPA';
  const winnerName=useTeamPodium?(teamTie?sortedTeams.filter(t=>t.score===topTeam.score).map(t=>'Time '+t.name).join(' & '):'Time '+topTeam.name):champion?.name;
- const heading=final?(step>=3&&winnerName?`<span>${grandTitle}</span><h1 class="champion-title"><em>${esc(winnerName)}</em> ${useTeamPodium&&teamTie?'empataram':'venceu'}!</h1>`:`<span>${grandTitle}</span><h1>${step===0?'Quem conquistou o topo?':step===1?(podiumCount<=2?'E quem ficou em 1º?':'E em segundo lugar…'):'E quem levou o ouro?'}</h1>`):'<h1>Placar da rodada</h1>';
+ const winnerShown=step>=need(1);
+ const heading=final?(winnerShown&&winnerName?`<span>${grandTitle}</span><h1 class="champion-title"><em>${esc(winnerName)}</em> ${useTeamPodium&&teamTie?'empataram':'venceu'}!</h1>`:`<span>${grandTitle}</span><h1>${step===0?'Quem conquistou o topo?':step===1?(podiumCount===2?'E quem ficou em 1º?':'E em segundo lugar…'):'E quem levou o ouro?'}</h1>`):'<h1>Placar da rodada</h1>';
  const slotOrder=count=>count===1?[0]:count===2?[1,0]:[1,0,2];
  const quizTowersMarkup=()=>{
   const top=board.slice(0,6),max=Math.max(1,...top.map(p=>p.score));
@@ -114,13 +111,13 @@ export function leaderboardMarkup(state,{header,host,offset=0,final=false,shareD
    const members=(team.members||[]);
    const shownMembers=members.slice(0,6);
    const crewScale=shownMembers.length<=1?.82:shownMembers.length===2?.68:shownMembers.length===3?.56:shownMembers.length===4?.48:.4;
-   const memberChars=shownMembers.map((m,mi)=>`<span class="team-podium-member">${character({...m,color:team.color,teamPhoto:team.photo},mi,'win-'+((state.victory||0)+i+mi)%4)}</span>`).join('');
+   const memberChars=shownMembers.map((m,mi)=>`<span class="team-podium-member">${character({...m,color:team.color},mi,'win-'+((state.victory||0)+i+mi)%4)}</span>`).join('');
    const memberNames=members.map(m=>esc(m.name)).join(', ');
    return `<article class="final-contestant team-podium-slot place-${i+1}${isChamp?' final-team-champion':''}" data-shown="${shown}" style="--reveal-delay:${delay(at(i+1))};--player-color:${esc(team.color)};--team:${esc(team.color)};--crew-scale:${crewScale}">${shown?`${isChamp?'<span class="ftc-crown" aria-hidden="true">👑</span>':''}<div class="team-podium-crew" data-size="${shownMembers.length}">${memberChars}${members.length>6?`<em class="team-crew-more">+${members.length-6}</em>`:''}</div><strong>Time ${esc(team.name)}</strong><span>${team.score.toLocaleString('pt-BR')} pts</span><small class="team-podium-names" title="${memberNames}">${memberNames||'Sem integrantes'}</small>`:'<div class="final-mystery" aria-hidden="true">?</div>'}<div class="final-tower"><b>${i===0?'♛':i+1+'º'}</b></div></article>`;
   }).join('')}</div>`;
  };
  const individualPodiumMarkup=()=>`<div class="final-podium" data-step="${step}" data-count="${Math.min(3,winners.length)}">${slotOrder(Math.min(3,winners.length)).filter(i=>winners[i]).map(i=>{const p=winners[i],shown=step>=need(i+1);return `<article class="final-contestant place-${i+1}" data-shown="${shown}" style="--reveal-delay:${delay(at(i+1))};--player-color:${p.color||['#ac8ae8','#78baac','#e9b97e'][i]}">${shown?`${i===0&&p.score>0?'<span class="ftc-crown" aria-hidden="true">👑</span>':''}${character(withTeamPortrait(state,p),i,'win-'+((state.victory||0)+i)%4)}<strong>${esc(p.name)}</strong><span>${p.score.toLocaleString('pt-BR')} pts</span>`:'<div class="final-mystery" aria-hidden="true">?</div>'}<div class="final-tower"><b>${i===0?'♛':i+1+'º'}</b></div></article>`;}).join('')}</div>`;
- const podium=final?`<div class="final-spotlights" aria-hidden="true" data-on="${step>=3}"></div>${useQuizTowers?quizTowersMarkup():useTeamPodium?teamPodiumMarkup():individualPodiumMarkup()}${step>=3?`<div class="final-confetti" data-victory="${victory}" aria-hidden="true" style="--reveal-delay:${delay(7.3)}">${Array.from({length:30},(_,i)=>`<i style="--n:${i};--x:${(i*37+11)%100};--y:${(i*53+7)%70};--h:${(i*47)%360};--t:${(2.6+(i%7)*.35).toFixed(2)}s;--w:${((i*13)%20)/10}s;--r:${i%2?1:-1}"></i>`).join('')}</div>`:''}`:roundSummary(state)+rankRace(state,elapsed);
+ const podium=final?`<div class="final-spotlights" aria-hidden="true" data-on="${winnerShown}"></div>${useQuizTowers?quizTowersMarkup():useTeamPodium?teamPodiumMarkup():individualPodiumMarkup()}${winnerShown?`<div class="final-confetti" data-victory="${victory}" aria-hidden="true" style="--reveal-delay:${delay(7.3)}">${Array.from({length:30},(_,i)=>`<i style="--n:${i};--x:${(i*37+11)%100};--y:${(i*53+7)%70};--h:${(i*47)%360};--t:${(2.6+(i%7)*.35).toFixed(2)}s;--w:${((i*13)%20)/10}s;--r:${i%2?1:-1}"></i>`).join('')}</div>`:''}`:roundSummary(state)+rankRace(state,elapsed);
  const mine=final&&!host&&me>=0&&step>=4?`<p class="final-mine"><b>${me+1}º lugar</b> · ${board[me].score.toLocaleString('pt-BR')} pts</p>`:'';
  const actions=host
   ?(final

@@ -53,6 +53,7 @@ export class AccountPresenter{
   const owner=this.studio.account.user?.id;
   if(!force&&owner&&owner===this.owner&&(this.channel||this.connecting))return;
   const changed=owner!==this.owner,previous=this.channel,epoch=++this.epoch;
+  if(changed){for(const entry of this.sharedChannels?.values()||[])this.studio.account.client.removeChannel(entry.channel);this.sharedChannels=new Map();}
   this.owner=owner;this.channel=null;this.ready=false;this.connecting=Boolean(owner);this.status='';if(changed){this.open='';this.seen.clear();this.statuses.clear();this.sessions=[];this.openBus(owner);}this.paint();
   try{
    if(previous)await this.studio.account.client.removeChannel(previous);
@@ -78,30 +79,50 @@ export class AccountPresenter{
  send(payload){
   const message={...payload,from:this.device};
   try{this.bus?.postMessage(message);}catch{/* canal local indisponível */}
-  if(this.channel&&this.ready)Promise.resolve(this.channel.send({type:'broadcast',event:'remote',payload:message})).catch(()=>{});
+  const targetScope=payload.target && this.seen?.get(payload.target)?.scope;
+  const scope=arguments[1] ?? targetScope;
+  if(!scope && this.channel&&this.ready)Promise.resolve(this.channel.send({type:'broadcast',event:'remote',payload:message})).catch(()=>{});
+  const doc=scope || (!payload.target && this.local?.documentId);
+  const entry=doc && this.sharedChannels?.get(doc);
+  if(entry?.ready)Promise.resolve(entry.channel.send({type:'broadcast',event:'remote',payload:message})).catch(()=>{});
  }
- sawPresenter(p){
+ // Canal privado isolado por documento: só editores/dono autorizados pelo banco.
+ syncShared(documents=[]){
+  const uid=this.studio.account.user?.id;
+  this.sharedChannels ||= new Map();
+  const wanted=new Set(uid?documents.map(d=>d.id).filter(id=>/^[a-f0-9-]{36}$/i.test(id)):[]);
+  for(const [id,entry] of this.sharedChannels)if(!wanted.has(id)){this.studio.account.client.removeChannel(entry.channel);this.sharedChannels.delete(id);}
+  if(!uid)return;
+  for(const id of wanted){
+   if(this.sharedChannels.has(id))continue;
+   const entry={ready:false,channel:null};this.sharedChannels.set(id,entry);
+   entry.channel=this.studio.account.client.channel('sl-live-doc:'+id,{config:{private:true,broadcast:{ack:false}}})
+    .on('broadcast',{event:'remote'},({payload})=>{if(this.sharedChannels?.get(id)===entry)this.receive(payload,id);})
+    .subscribe(state=>{if(this.sharedChannels?.get(id)!==entry)return;entry.ready=state==='SUBSCRIBED';if(entry.ready&&this.local?.documentId===id)this.announce(true);});
+  }
+ }
+ sawPresenter(p,scope=''){
   this.state();
   if(!p||p.role!=='presenter'||p.device===this.device||typeof p.device!=='string'||!/^\d{6}$/.test(p.code||''))return;
-  this.seen.set(p.device,{device:p.device,code:p.code,title:String(p.title||'').slice(0,200),total:Number(p.total)||0,last:Date.now()});
+  this.seen.set(p.device,{device:p.device,code:p.code,title:String(p.title||'').slice(0,200),total:Number(p.total)||0,scope,last:Date.now()});
  }
- receive(message){
+ receive(message,scope=''){
   this.state();
   if(!message||typeof message!=='object'||message.from===this.device)return;
-  if(message.kind==='presence'){this.sawPresenter({...message,role:'presenter',device:message.from});this.refresh();return;}
+  if(message.kind==='presence'){this.sawPresenter({...message,role:'presenter',device:message.from},scope);this.refresh();return;}
   if(message.kind==='gone'){this.seen.delete(message.from);this.statuses.delete(message.from);this.refresh();return;}
   if(message.kind==='status'){
    // Quem apresenta conta em que slide está e quais experimentos há nele.
    if(typeof message.from!=='string')return;
-   if(message.identity)this.sawPresenter({...message.identity,role:'presenter',device:message.from});
+   if(message.identity)this.sawPresenter({...message.identity,role:'presenter',device:message.from},scope);
    const known=this.seen.get(message.from);if(known)known.last=Date.now();
    this.statuses.set(message.from,message.status||{});this.refresh();return;
   }
   if(message.kind==='ack'){if(message.target===this.device){this.waiting.get(message.id)?.done();}return;}
-  if(!this.local||message.target!==this.device)return;
+  if(!this.local||message.target!==this.device||(scope && this.local.documentId!==scope))return;
   if(message.kind==='hello'){this.announce(true);return;}
   if(message.kind==='control'&&commands.has(message.action)){
-   this.send({kind:'ack',target:message.from,id:message.id});
+   this.send({kind:'ack',target:message.from,id:message.id},scope);
    if(this.handled.includes(message.id))return;
    this.handled.push(message.id);if(this.handled.length>80)this.handled.shift();
    this.studio.callbacks.remoteAction?.(message.action,message.value);
@@ -136,7 +157,7 @@ export class AccountPresenter{
  setPresentation(value){
   const key=JSON.stringify(value);if(key===this.last)return;
   const was=this.local;this.last=key;this.local=value;
-  if(!value&&was)this.send({kind:'gone'});
+  if(!value&&was){this.send({kind:'gone'});if(was.documentId)this.send({kind:'gone'},was.documentId);}
   this.track();this.announce(true);
  }
  track(){
@@ -163,7 +184,7 @@ export class AccountPresenter{
    this.waiting.set(id,{done:()=>finish(true)});attempt();
   });
  }
- available(){const p=this.sessions.find(s=>s.device===this.open);return p&&(this.ready||this.bus)?p:null;}
+ available(){const p=this.sessions.find(s=>s.device===this.open);return p&&(p.scope?this.sharedChannels?.get(p.scope)?.ready:(this.ready||this.bus))?p:null;}
  // O aviso só interessa a quem está usando o controle neste aparelho.
  retryMarkup(){return this.status&&!this.ready&&this.open?`<div class="remote-connection-status"><p role="status">${esc(this.status)}</p><button type="button" class="studio-btn quiet" data-remote-action="reconnect">Reconectar controle</button></div>`:'';}
  markup(){return this.retryMarkup()+(this.sessions.length?`<section class="account-live-sessions"><h2>Apresentação em andamento</h2>${this.sessions.map(p=>`<article><div><strong>${esc(p.title)}</strong><small>${Number.isInteger(p.slide)?'Slide '+(p.slide+1)+' de '+Number(p.total)+' · ':''}sala ${esc(p.code)}</small></div><button class="studio-btn accent" type="button" data-remote-action="open" data-device="${esc(p.device)}">Usar este aparelho como controle</button></article>`).join('')}</section>`:'');}

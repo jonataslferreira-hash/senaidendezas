@@ -818,7 +818,7 @@ html[data-theme][data-ui-style][data-appearance] body #app dialog.remote-v2 :is(
 @media (max-width:760px){#app .game-options[data-wide-options="true"]:not(.bare),#app .answer-options[data-wide-options="true"]:not(.bare-answers){grid-template-columns:1fr}}
 #app .final-team-champion{display:inline-flex;align-items:center;gap:14px;padding:12px 22px;margin:4px auto 8px;border-radius:18px;background:color-mix(in srgb,var(--team,#38bdf8) 24%,rgba(15,23,42,.55));border:2px solid color-mix(in srgb,var(--team,#38bdf8) 80%,#fff 20%);box-shadow:0 14px 36px color-mix(in srgb,var(--team,#38bdf8) 35%,transparent);color:#fff;text-align:left;max-width:min(540px,94vw);animation:game-pop .55s cubic-bezier(.2,1.5,.4,1) both;position:relative;z-index:3}
 #app .final-team-champion .ftc-crown{font-size:32px;line-height:1;flex:none}
-#app .final-team-champion div{display:grid;gap:2px;min-width:0}
+#app .final-team-champion > div:not(.team-podium-crew){display:grid;gap:2px;min-width:0}
 #app .final-team-champion small{font-size:11px;font-weight:800;letter-spacing:.12em;text-transform:uppercase;opacity:.88}
 #app .final-team-champion strong{font-size:clamp(18px,2.4vw,26px);line-height:1.15}
 #app .final-team-champion em{font-style:normal;font-size:13px;opacity:.88;font-weight:600}
@@ -3826,3 +3826,54 @@ dialog.profile-sheet .profile-sheet-grid button svg { width:28px; height:28px; m
   #app .game-stage[data-game-type="flash"][data-game-state="done"] .game-actions .btn { min-width:0; min-height:42px; padding:8px 10px; font-size:13px; }
 }
 #app .game-stage .game-confetti { overflow:hidden!important; }
+
+/* Placar, corda e corrida ocupam o centro sem barras internas desnecessárias. */
+#app.quiz-party > main.game-stage:is([data-game-type="flash"],[data-game-type="tug"],[data-game-type="race"]) {
+  overflow:visible!important; justify-content:center; gap:clamp(4px,1.1dvh,12px);
+}
+#app .game-stage:is([data-game-type="flash"],[data-game-type="tug"],[data-game-type="race"]) > .game-head,
+#app .game-stage:is([data-game-type="flash"],[data-game-type="tug"],[data-game-type="race"]) > :last-child { margin-block:0; }
+#app .game-stage[data-game-type="flash"] .game-flash { width:min(100%,1100px); margin-inline:auto; }
+#app .flash-ranking-box { width:100%; max-width:100%; margin:auto; }
+#app .flash-ranking-box :is(h2,h3) { text-align:center; font-size:clamp(20px,3.5dvh,34px); margin:0 0 10px; }
+#app .flash-board, #app .flash-board[data-multi="true"] {
+  max-height:none; overflow:visible; width:100%; margin:0; padding:0;
+  display:grid; grid-auto-flow:row; grid-template-rows:none;
+  grid-template-columns:repeat(var(--cols,1),minmax(0,1fr)); gap:clamp(4px,1dvh,10px);
+}
+#app .flash-board li { min-width:0; position:relative; animation:none; padding:clamp(6px,1.1dvh,14px); }
+#app .flash-board li[data-streak="up"]::after { content:none; }
+#app .flash-board-who > span { overflow:hidden; text-overflow:ellipsis; }
+#app .flash-podium { margin-inline:auto; justify-content:center; }
+#app .game-stage[data-game-type="tug"] .game-rope,
+#app .game-stage[data-game-type="race"] .game-race { min-height:0; width:min(100%,1300px); margin-inline:auto; }
+#app .game-stage[data-game-type="race"] .race-track { margin-inline:auto; }
+#app .grand-finale .team-podium-crew,
+#app .grand-finale .final-team-champion .team-podium-crew { display:flex; flex-direction:row; align-items:flex-end; justify-content:center; gap:2px; }
+#app .grand-finale .team-podium-member { margin:0; }
+#app .grand-finale .results-heading>span { color:#eee8ff; font-size:clamp(12px,1.6dvh,17px); }
+#app .grand-finale .results-heading h1 { font-size:clamp(30px,5.8dvh,60px); }
+@media(max-width:800px) {
+  #app .flash-board, #app .flash-board[data-multi="true"] { grid-template-columns:repeat(min(var(--cols,1),2),minmax(0,1fr)); gap:4px; }
+  #app .flash-board li { font-size:clamp(10px,2.8vw,14px); }
+}
+/* Em telas baixas, o pódio e a classificação dividem a largura disponível. */
+@media (max-height:600px) and (min-width:801px) {
+  #app .game-stage[data-game-type="flash"][data-game-state="done"] .game-flash { display:flex; flex-direction:row; align-items:center; justify-content:center; gap:24px; }
+  #app .game-stage[data-game-type="flash"][data-game-state="done"] .flash-podium-wrap { width:48%; flex:1; }
+  #app .game-stage[data-game-type="flash"][data-game-state="done"] .flash-ranking-box { width:48%; flex:1; }
+  #app .game-stage[data-game-type="flash"][data-game-state="done"] .flash-podium { padding:0; min-height:0; }
+  #app .game-stage[data-game-type="flash"][data-game-state="done"] .flash-podium-slot:not(.team-podium-slot) .game-character { --character-scale:.45; transform:none; }
+  #app .game-stage[data-game-type="flash"][data-game-state="done"] .team-podium-member .game-character { --character-scale:calc(var(--crew-scale,.5) * .65); width:calc(92px * var(--character-scale)); height:calc(145px * var(--character-scale)); }
+  #app .game-stage[data-game-type="flash"][data-game-state="done"] .flash-podium-pedestal { height:48px; }
+  #app .game-stage[data-game-type="flash"][data-game-state="done"] .place-1 .flash-podium-pedestal { height:70px; }
+  #app .game-stage[data-game-type="flash"][data-game-state="done"] .place-3 .flash-podium-pedestal { height:38px; }
+  #app .game-stage[data-game-type="race"] .race-track { --s:.27!important; }
+  #app .game-stage[data-game-type="tug"] .tug-scene { gap:7px; }
+  #app .game-stage[data-game-type="tug"] .tug-field { height:110px; --s:.56; }
+}
+@media(max-width:800px) {
+  #app .game-stage[data-game-type="flash"][data-game-state="done"] .flash-ranking-box { gap:3px; }
+  #app .game-stage[data-game-type="flash"][data-game-state="done"] .flash-ranking-box h3 { margin:0; font-size:18px; }
+  #app .game-stage[data-game-type="flash"][data-game-state="done"] .flash-board li { padding:5px 8px; }
+}
