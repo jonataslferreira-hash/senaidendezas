@@ -545,7 +545,18 @@ export class Studio {
     return `<button class="studio-wordmark" data-studio-action="library" aria-label="Storage Lab, biblioteca"><img class="lab-logo" src="${brandUrl}" alt=""><span>storage<span>lab.</span></span></button>`;
   }
   navigationMarkup() {
-    return `<nav>${button('library', studioIcon('library')+' Biblioteca de aulas', this.view === 'library' ? 'rail-link active' : 'rail-link','aria-label="Biblioteca de aulas"')}${button('templates', studioIcon('templates')+' Catálogo', this.view === 'templates' ? 'rail-link active' : 'rail-link','aria-label="Catálogo de apresentações"')}${button('join', studioIcon('join')+' Entrar em uma sala', this.view === 'join' ? 'rail-link active' : 'rail-link','aria-label="Entrar em uma sala"')}${button('shared',studioIcon('collaborate')+' Compartilhados',this.view==='shared'?'rail-link active':'rail-link','aria-label="Compartilhados"')} ${button('storage-ai',studioIcon('sparkle')+' Storage AI',this.view==='storage-ai'?'rail-link active':'rail-link','aria-label="Storage AI"')}<button type="button" class="studio-btn rail-link" data-social-action="open" aria-label="Chat">${studioIcon('chat')} Chat <b data-chat-badge class="chat-badge" ${this.social.badge?'':'hidden'}>${this.social.badge||''}</b></button></nav>`;
+    const tabs = [
+      ['library', 'library', 'Biblioteca de aulas', 'Biblioteca de aulas'],
+      ['templates', 'templates', 'Catálogo', 'Catálogo de apresentações'],
+      ['join', 'join', 'Entrar em uma sala', 'Entrar em uma sala'],
+      ['shared', 'collaborate', 'Compartilhados', 'Compartilhados'],
+      ['storage-ai', 'sparkle', 'Storage AI', 'Storage AI']
+    ];
+    const links = tabs.map(([action, icon, text, label]) => {
+      const active = this.view === action;
+      return button(action, studioIcon(icon) + ' ' + text, active ? 'rail-link active' : 'rail-link', `aria-label="${label}"${active ? ' aria-current="page"' : ''}`);
+    }).join('');
+    return `<nav>${links}<button type="button" class="studio-btn rail-link" data-social-action="open" aria-label="Chat">${studioIcon('chat')} Chat <b data-chat-badge class="chat-badge" ${this.social.badge?'':'hidden'}>${this.social.badge||''}</b></button></nav>`;
   }
   railMarkup(closeButton = '') {
     const brand = this.brandMarkup();
