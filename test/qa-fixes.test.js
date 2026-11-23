@@ -103,7 +103,7 @@ test('Pódio final mantém 1º no centro sem 3º lugar para 2 jogadores e coloca
   assert.match(twoHtml, /place-1/);
   assert.match(twoHtml, /place-2/);
   assert.doesNotMatch(twoHtml, /place-3/, 'não renderiza 3º lugar quando só há 2 participantes');
-  assert.match(twoHtml, /Baixar resultado \(PNG\)/, 'botão indica exportação em PNG');
+  assert.match(twoHtml, /Baixar relatório \(PDF\)/, 'botão indica exportação em PDF');
 
   // Caso 2: Vitória em equipes com integrantes em cima da barra
   const teamFinal = {

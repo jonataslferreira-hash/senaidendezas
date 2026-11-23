@@ -153,6 +153,13 @@ export class Room {
       const a = p.answers[this.data.questionIndex];
       if (a) { p.score += a.points; if (a.correct) p.correct++; }p.streak=a?.correct?(p.streak||0)+1:0;
     }
+    const question = this.questions[this.data.questionIndex];
+    if (question) {
+      const answers = this.data.players.map(p => p.answers[this.data.questionIndex]).filter(Boolean);
+      (this.data.quizReport ||= []).push({ text:question.text, options:[...question.options], correct:question.correct,
+        answered:answers.length, correctCount:answers.filter(a=>a.correct).length,
+        counts:question.options.map((_,i)=>answers.filter(a=>a.choice===i).length), participants:this.data.players.length });
+    }
     this.data.phase = 'reveal';
   }
   // O pódio é revelado pelo relógio do professor: o aluno só vê o que já apareceu no telão.
@@ -190,6 +197,7 @@ export class Room {
       ...(includeLesson ? { lesson: this.publicLesson(!id) } : {}),
       ranking: d.players.map(({ id, name, avatar, accountPhoto, score, bonus, correct, online,streak,team }) => ({ id, name, avatar,...(accountPhoto?{accountPhoto}:{}),...(Number.isInteger(team)?{team}:{}),...(d.teams?.[team]?{color:d.teams[team].color}:{}), score:score+(bonus||0), correct, online,streak:streak||0,previousScore:(d.previousScores?.[id]||0)+(d.previousBonus?.[id]||0),previousRank:(d.previousRanking||[]).indexOf(id)+1 })).sort((a, b) => b.score - a.score || b.correct - a.correct || a.name.localeCompare(b.name, 'pt-BR')),
       quizRanking,
+      ...(!id && d.phase === 'finished' ? { quizReport: d.quizReport || [] } : {}),
       answeredCount: d.players.filter(p => p.answers[d.questionIndex]).length,
       question: q && d.phase !== 'lesson' ? { text: bare ? '' : q.text, options: q.options.map(o => bare ? '' : o), bare, difficulty: q.difficulty, base: q.base, startedAt: d.startedAt, deadline: d.deadline, ...(revealed ? { correct: q.correct, explanation: bare ? '' : q.explanation } : {}) } : null,
       me: p ? { id: p.id,name:p.name,avatar:p.avatar,streak:p.streak||0,bonus:p.bonus||0,quizScore:p.score,team:Number.isInteger(p.team)?p.team:null, score: p.score+(p.bonus||0), answer: a ? { choice: a.choice, ...(revealed ? { points: a.points, correct: a.correct } : {}) } : null } : null
