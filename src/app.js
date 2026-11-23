@@ -8,7 +8,6 @@ import {takePhoto} from './camera-photo.js';
 import {GameLayout} from './game-layout.js';
 import {GameAudio} from './game-audio.js';
 import {quizMarkup,leaderboardMarkup,animateRanking} from './game-ui.js';
-import { downloadResultsPng } from './results-png.js';
 import { gameMarkup, keepGame, animateRaffle, gameIcon } from './stage-games-view.js';
 import { gameNames } from './stage-games.js';
 import { blockNames } from './activity-blocks.js';
@@ -25,7 +24,7 @@ import {FocusView,focusButton} from './focus-view.js';
 import './classroom-display.css';
 import { avatarContent,isPhotoAvatar } from './player-avatar.js';
 import { PptxAnimations } from './pptx-animations.js';
-import { loadPublicPresentation, validPublicCode, resolvePublicCode } from './public-presentations.js';
+import { loadPublicPresentationInfo, validPublicCode, resolvePublicCode } from './public-presentations.js';
 // Link de apresentação: ?presentation=<token> (antigo) ou ?p=<código curto>.
 function publicLinkParam() { const query = new URLSearchParams(location.search); return query.get('presentation') || (validPublicCode(query.get('p')) ? query.get('p') : ''); }
 import brandUrl from './assets/brand.svg';
@@ -200,7 +199,7 @@ const pptxAnimations=new PptxAnimations();const simulations=new Simulations(),ga
 let classroom, state, host = false, demo = false, busy = false, selectedAvatar = avatars[0];
 let avatarChanged=false,joinNameTouched=false,joinNameDraft='',guestPhotoPending=false;
 let shareOpen = false, solutionOpen = false, lastSlide = -1, localModel = 'ssd', localExploded = true;
-let status = 'offline', statusMessage = '', timerOffset = 0, music = false, audio, musicTimer, audioStep = 0;
+let joinDiagnostic='', status = 'offline', statusMessage = '', timerOffset = 0, music = false, audio, musicTimer, audioStep = 0;
 let editorLaunch=false, readOnlyPresentation=false, publicPresentationToken='', sharedLoading=Boolean(publicLinkParam()), sharedError='';
 let clockTimer;
 const trackPlayer = new Audio(); let playingTrack = null;
@@ -321,7 +320,7 @@ function joinForm() {
       <button class="btn secondary" type="button" data-action="scan-qr">${studioIcon('qr')}<span>Ler QR Code</span></button>
     </div>
     <button class="btn primary full join-submit" type="submit" ${busy||guestPhotoPending?'disabled':''}>${busy?'Conectando…':'Entrar na sala'} ${icon('arrow')}</button>
-    <p class="join-note">Ao entrar você aparece no ranking com o seu nome e avatar.</p>
+    ${joinDiagnostic?`<p role="alert" class="studio-warning">${esc(joinDiagnostic)}</p>`:''}<p class="join-note">Ao entrar você aparece no ranking com o seu nome e avatar.</p>
   </form>`;
 }
 function participantCount() {
@@ -340,19 +339,20 @@ function fullscreenButton() {
   const label=active?'Sair da tela cheia':host?'Apresentar em tela cheia':'Ampliar slide';
   return `<button class="btn secondary small presentation-icon" data-action="fullscreen" aria-label="${label}" title="${label}">${icon(active?'collapse':'expand')}</button>`;
 }
+let publicCopyAllowed=false, publicOriginal=null;
 function presentationTop(){
   return `<div class="document-top"><div class="document-top-actions room-actions">${host?`
     <div class="presentation-start"><select id="document-page" aria-label="Ir para página">${slides.map((slide,i)=>`<option value="${i}" ${state.slide===i?'selected':''}>${i+1} · ${esc(slide.title)}</option>`).join('')}</select>
       ${!demo?`<button class="btn secondary small presentation-icon qr-toggle" data-action="toggle-qr" aria-label="QR Code" aria-pressed="${presenterSettings.qrVisible}">${studioIcon('qr')}</button>`:''}</div>
     ${!demo?`<button class="btn secondary small room-code" data-action="share">SALA <strong>${esc(state.code)}</strong></button>`:'<span></span>'}
-    <div class="presentation-end">${presentationTools({host,demo,state,settings:presenterSettings,imageText,compact:true})}${readOnlyPresentation&&demo?'<button class="btn secondary small" data-action="connect-public-room">Conectar turma</button>':''}${document.fullscreenElement?soundButton():''}${fullscreenButton()}</div>
+    <div class="presentation-end">${presentationTools({host,demo,state,settings:presenterSettings,imageText,compact:true})}${readOnlyPresentation&&demo?'<button class="btn secondary small" data-action="connect-public-room">Conectar turma</button>':''}${readOnlyPresentation&&publicCopyAllowed?'<button class="btn secondary small" data-action="save-public-copy">Salvar cópia</button>':''}${document.fullscreenElement?soundButton():''}${fullscreenButton()}</div>
     `:`<span class="following-label"><span class="status-dot"></span> Acompanhando o professor</span><div class="viewer-tools">${participantCount()}${state.me?'<button class="my-room-avatar" data-action="edit-player" aria-label="Editar meu perfil na sala" title="Editar meu perfil">'+avatarContent(state.me.avatar||selectedAvatar)+'</button>':''}${fullscreenButton()}</div>`}<button class="btn secondary small exit-presentation" data-action="leave">↩ Sair</button></div></div>`;
 }
 function documentLesson(slide) {
   const canvas = slide.kind === 'canvas',mobile=!host&&phoneLayout.matches;
   const audioTrigger = host ? slide.audio?.trigger : '';
   return `${header()}<main class="document-classroom ${mobile?'mobile-companion':''}">${presentationTop()}
-    ${status !== 'online' && !demo ? '<div class="connection-banner" role="status">Reconectando à sala. <button class="text-btn" data-action="reconnect">Reconectar</button></div>' : ''}
+    ${status !== 'online' && !demo ? `<div class="connection-banner" role="status">${esc(statusMessage||'Reconectando à sala.')} <button class="text-btn" data-action="reconnect">Reconectar</button></div>` : ''}
     ${mobile?mobileMarkup(slides[state.slide]):`<figure class="document-stage ${canvas ? 'canvas-stage' : ''}" ${!canvas&&audioTrigger==='background'?'data-play-slide-audio="background" tabindex="0" aria-label="Tocar áudio do slide"':''}>${canvas ? canvasMarkup(slide,{audioTrigger,audioHotspots:host}) : `<img ${slide.image?'src="'+esc(slide.image)+'"':slide.assetId?'data-asset-id="'+esc(slide.assetId)+'"':''} alt="${esc(slide.imageAlt || slide.title)}"><figcaption class="sr-only">${esc(slide.title)}</figcaption>`}${host?'':focusButton(slides[state.slide])}</figure>`}
     ${slide.prompt ? `<section class="document-discussion"><strong>${esc(slide.prompt)}</strong><button class="text-btn" data-action="solution">${solutionOpen ? 'Ocultar' : 'Conferir'} explicação</button>${solutionOpen ? `<p>${esc(slide.answer)}</p>` : ''}</section>` : ''}
     <footer class="document-footer"><div class="document-nav"><span class="slide-counter"><strong>${state.slide + 1}</strong> / ${slides.length}</span>${host ? `${state.totalQuestions?'<button class="text-btn" data-action="quiz">Ir para o quiz</button>':''}<button class="icon-btn bordered" data-action="previous" aria-label="Slide anterior" ${state.slide === 0 && !(state.animationStep>0) ? 'disabled' : ''}>${icon('left')}</button>${state.activity&&state.activity.slideIndices.at(-1)===state.slide&&!pendingPptxBuild()?`<button class="btn primary small" data-action="${state.activity.hasNext?'next-stage':'finish'}">${state.activity.hasNext?'Próxima etapa →':'Encerrar aula'}</button>`:state.slide < slides.length - 1 || pendingPptxBuild() ? `<button class="btn primary small" data-action="next-slide">Próximo ${icon('right')}</button>` : `<button class="btn primary small" data-action="${state.totalQuestions ? 'quiz' : 'finish'}">${state.totalQuestions ? 'Iniciar quiz' : 'Encerrar aula'} ${icon('check')}</button>`}` : '<span class="following-label">Sincronizado com a aula</span>'}</div></footer></main>${shareOpen ? shareDialog() : ''}`;
@@ -611,6 +611,7 @@ function applyRender() {
   if (state?.game?.type === 'raffle') animateRaffle(app, () => Date.now() + timerOffset);
   if(state&&!app.querySelector('[data-remote-dialog]'))app.insertAdjacentHTML('beforeend','<div data-remote-dialog></div>');
   studio.remote.paint();
+  if(state&&readOnlyPresentation&&publicCopyAllowed){if(!app.querySelector('[data-account-dialog]'))app.insertAdjacentHTML('beforeend','<div data-account-dialog></div>');studio.account.afterRender();}
   syncPresentationMode();
   if (editDraft) for (const el of app.querySelectorAll('.header, .classroom, .document-classroom, .presentation-toolbar, .pinned-room-qr')) el.inert = true;
   if (!state && !sharedLoading && !(busy && host)) studio.afterRender();
@@ -701,7 +702,7 @@ function preview(lesson = demoLesson(), options = {}) {
 }
 async function connectSession(mode) {
   if (mode.lesson) { activeLesson = mode.lesson; slides = mode.lesson.slides; }
-  busy = true; host = mode.host; demo = false; editorLaunch=Boolean(mode.fromEditor);music=true; gameAudio.unlock(); render();
+  joinDiagnostic=''; busy = true; host = mode.host; demo = false; editorLaunch=Boolean(mode.fromEditor);music=true; gameAudio.unlock(); render();
   classroom?.stop?.();
   const session = new Classroom(
     next => { if (classroom === session) receive(next); },
@@ -716,7 +717,8 @@ async function connectSession(mode) {
     if (!readOnlyPresentation) studio.writeRoute('present', activeLesson.id);
   } catch (err) {
     classroom.stop(); if (!state) host = false;
-    if (readOnlyPresentation && publicPresentationToken) { const token=publicPresentationToken;preview(activeLesson,{readOnly:true,token}); }
+    if (readOnlyPresentation && publicPresentationToken) { const token=publicPresentationToken,allow=publicCopyAllowed,original=publicOriginal;preview(original||activeLesson,{readOnly:true,token});publicCopyAllowed=allow;publicOriginal=original; }
+    if(!mode.host)joinDiagnostic=err.message;
     toast(err.message);
   } finally { busy = false; render(); }
 }
@@ -728,7 +730,7 @@ function leave(show = true) {
   // Professor saindo: avisa os alunos (eles voltam para a tela inicial) antes de fechar as conexões.
   if (host && !demo && classroom?.end) { const room = classroom; room.end(); clearInterval(room.timer); setTimeout(() => room.stop(), 300); } else classroom?.stop?.();
   classroom = null;
-  readOnlyPresentation=false;publicPresentationToken='';sharedLoading=false;sharedError='';
+  readOnlyPresentation=false;publicCopyAllowed=false;publicOriginal=null;publicPresentationToken='';sharedLoading=false;sharedError='';
   state = null; host = false; demo = false; editorLaunch=false;shareOpen = false; lastSlide = -1; immersiveDone = false; lastStageEnter = null;
   localModel = 'ssd'; localExploded = true; status = 'offline'; stopMusic();
   if (show) { studio.writeRoute(); render(); }
@@ -932,9 +934,10 @@ app.addEventListener('change', async event => {
     }
   } catch (error) { toast(error?.message || 'Não foi possível abrir a imagem.'); }
 });
-function exportResults() {
-  if (!state) return;
-  downloadResultsPng(state, activeLesson?.title || 'Resultado da aula');
+async function exportResults() {
+  if (!state || !host) return;
+  try { const {downloadResultsPdf}=await import('./results-pdf.js'); await downloadResultsPdf({...state, quizReport:state.quizReport||classroom?.room?.data?.quizReport||(demo?classroom?.data?.quizReport:[])}, activeLesson?.title || 'Aula'); }
+  catch (error) { toast(error?.message || 'Não foi possível gerar o PDF.'); }
 }
 async function action(name) {
   switch (name) {
@@ -949,7 +952,23 @@ async function action(name) {
     case 'podium-all':control('podium-all');break;
     case 'create': if (!busy) await connectSession({ host: true }); break;
     case 'preview': preview(); break;
-    case 'connect-public-room': { const lesson=activeLesson;clearInterval(demoTimer);await connectSession({host:true,lesson});break; }
+    case 'save-public-copy': {
+      if(!readOnlyPresentation||!publicCopyAllowed||!publicOriginal)break;
+      if(!studio.account.user){studio.account.show('login');toast('Entre na conta e toque novamente em Salvar cópia.');break;}
+      const uid=studio.account.user.id;
+      try {
+        const {archiveImportedPages,removePageAssets}=await import('./assets.js');
+        const {createUuid}=await import('./uuid.js');
+        const {saveCloudLesson}=await import('./cloud-files.js');
+        const copy={...publicOriginal,id:createUuid(),title:publicOriginal.title+' (cópia)'};
+        const stored=await saveCloudLesson(studio.account.client,copy);
+        if(studio.account.user?.id!==uid)throw Error('A conta mudou. Confira seus arquivos na conta anterior.');
+        const archived=await archiveImportedPages(copy);
+        try {const saved=studio.library.save(archived.lesson);studio.linkCloud(saved.id,stored.path);} catch(error){await removePageAssets(archived.ids).catch(()=>{});throw Error('Cópia salva na nuvem, mas não neste dispositivo: '+error.message);}
+        studio.cloudLoaded=false;toast('Cópia independente salva na sua conta e biblioteca.');
+      }catch(error){toast(error.message||'Não foi possível salvar a cópia.');}break;
+    }
+    case 'connect-public-room': { const lesson=publicOriginal||activeLesson;clearInterval(demoTimer);await connectSession({host:true,lesson});break; }
     case 'home': leave(false);studio.view='library';studio.writeRoute();render();break;
     case 'leave': focusView.close(); leave(); break;
     case 'focus-item': if(state?.phase==='lesson'&&slides[state.slide])focusView.open(slides[state.slide]); break;
@@ -994,7 +1013,7 @@ async function action(name) {
     case 'fullscreen':
       try { if (document.fullscreenElement) await document.exitFullscreen(); else await document.documentElement.requestFullscreen(); } catch { toast('Tela cheia indisponível. Use F11 no computador.'); }
       break;
-    case 'export': exportResults(); break;
+    case 'export': await exportResults(); break;
     case 'reconnect': {
       const saved = Classroom.resume();
       if (saved) await connectSession({ ...saved, resume: true });
@@ -1159,7 +1178,7 @@ else app.innerHTML='<main class="public-loading"><p role="status">Carregando apr
 document.documentElement.dataset.appReady = 'true';
 async function openPublicPresentation(token) {
   leave(false);sharedLoading=true;render();
-  try{if(validPublicCode(token))token=await resolvePublicCode(token);const lesson=await loadPublicPresentation(token);sharedLoading=false;preview(lesson,{readOnly:true,token});}
+  try{if(validPublicCode(token))token=await resolvePublicCode(token);const info=await loadPublicPresentationInfo(token);sharedLoading=false;preview(info.lesson,{readOnly:true,token});publicOriginal=info.lesson;publicCopyAllowed=info.allowCopy;render();}
   catch(error){sharedLoading=false;sharedError=error.message;render();}
 }
 const savedSession = Classroom.resume();

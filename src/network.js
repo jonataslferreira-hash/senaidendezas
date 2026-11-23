@@ -164,8 +164,10 @@ export class Classroom {
       this.onStatus('reconnecting');
       const conn = this.peer.connect(prefix + this.code, { reliable: true });
       this.conn = conn;
-      let ready = false;
-      let timeout = setTimeout(() => { conn.close(); reject(Error('A sala não respondeu. Confira se o apresentador está online; tente outra rede se necessário.')); }, 18_000);
+      let ready = false, closed = false;
+      const unavailable = err => { if(err.type==='peer-unavailable' && !ready && this.conn===conn) { closed=true; clearTimeout(timeout); this.peer.off('error',unavailable); conn.close(); reject(Error('Sala não encontrada na sinalização. Confira o código e se o apresentador está conectado.')); } };
+      this.peer.on('error', unavailable);
+      let timeout = setTimeout(() => { closed=true; this.peer.off('error',unavailable); conn.close(); reject(Error('Sinalização acessada, mas a conexão direta com a sala não foi concluída. Confira o código e o apresentador; teste outra rede ou peça à TI para verificar WebRTC e TURN.')); }, 18_000);
       conn.on('open', () => {
         const saved = playerStorage.get('sl-player-' + this.code);
         conn.send({ type: 'join', payload: { name: this.name, avatar: this.avatar, accountPhoto: this.accountPhoto, token: saved?.token } });
@@ -173,7 +175,7 @@ export class Classroom {
       conn.on('data', msg => {
         if (msg.type === 'joined') {
           clearTimeout(timeout);
-          timeout = setTimeout(() => { conn.close(); reject(Error('A aula demorou demais para chegar. Tente uma conexão melhor ou uma apresentação menor.')); }, 120_000);
+          timeout = setTimeout(() => { closed=true; this.peer.off('error',unavailable); conn.close(); reject(Error('Conexão com a sala aberta, mas a aula não terminou de carregar. Tente novamente, outra rede ou uma apresentação menor.')); }, 120_000);
           playerStorage.set('sl-player-' + this.code, { token: msg.token, name: this.name, avatar: this.avatar, accountPhoto: this.accountPhoto });
           storage.set('sl-mode', { host: false, code: this.code, name: this.name, avatar: this.avatar, accountPhoto: this.accountPhoto });
           playerStorage.set('sl-active-player',{host:false,code:this.code,name:this.name,avatar:this.avatar,accountPhoto:this.accountPhoto});
@@ -187,7 +189,7 @@ export class Classroom {
         else if (msg.type === 'live') this.onLive?.(msg);
         else if (msg.type === 'state') {
           this.onState({ ...msg.state, lesson: this.lesson });
-          if (!ready) { ready = true; clearTimeout(timeout); resolve(); }
+          if (!ready) { ready = true; clearTimeout(timeout); this.peer.off('error', unavailable); resolve(); }
         }
         else if (msg.type === 'ack' || msg.type === 'error') {
           const pending = this.pending.get(msg.request);
@@ -195,10 +197,9 @@ export class Classroom {
           else if (msg.type === 'error') { clearTimeout(timeout); reject(Error(msg.message)); this.onStatus('error', msg.message); }
         }
       });
-      let closed = false;
       const reconnect = () => {
         if (closed || this.stopped || this.conn !== conn) return;
-        closed = true; clearTimeout(timeout); this.onStatus('reconnecting');
+        closed = true; clearTimeout(timeout); this.peer.off('error', unavailable); this.onStatus('reconnecting');
         if (!ready) reject(Error('A conexão foi interrompida ao carregar a aula. Tente entrar novamente.'));
         this.retry = setTimeout(() => this.connect().catch(err => this.onStatus('error', err.message)), 2500);
       };

@@ -1,3 +1,4 @@
+import { reviewMarkup, reviewQuestions } from './review.js';
 import { createUuid } from './uuid.js';
 import { stageCache } from './stage-keep.js';
 import {avatarContent} from './player-avatar.js';
@@ -74,7 +75,7 @@ export class Studio {
       if (this.autoSaveEnabled() && this.view === 'editor' && this.draft && this.needsSave()) this.scheduleAutoSave(300);
       if (this.view === 'editor') this.callbacks.render();
     });
-    root.addEventListener('account-changed', () => { this.cloudRequest++;this.cloudCovers.clear();this.cloudItems=[];this.cloudBusy=false;this.cloudMessage='';this.cloudLoaded=false;this.refreshCloudPanel();if(this.view==='library'&&this.account.user)this.cloudAction('cloud-refresh',{}); });
+    root.addEventListener('account-changed', () => { this.reviewCloudItems=[];this.reviewCloudLesson=null;this.reviewMessage='';this.cloudRequest++;this.cloudCovers.clear();this.cloudItems=[];this.cloudBusy=false;this.cloudMessage='';this.cloudLoaded=false;this.refreshCloudPanel();if(this.view==='library'&&this.account.user)this.cloudAction('cloud-refresh',{}); });
     try { this.library = new LessonLibrary(); }
     catch {
       this.library = Object.create(LessonLibrary.prototype);
@@ -220,7 +221,7 @@ export class Studio {
       this.open(params.get('lesson'), false); this.tab = params.get('tab') === 'quiz' ? 'quiz' : 'slides';
       const selected=Math.max(0,Math.min(this.draft.slides.length-1,(Number(params.get('slide'))||1)-1));if(params.get('block'))this.selectBlock(params.get('block'));if(!this.draft.activityBlocks||this.currentBlock()?.items.includes(this.draft.slides[selected]?.id))this.index=selected;const question=Math.max(0,Math.min(this.draft.questions.length-1,(Number(params.get('question'))||1)-1));if(this.tab==='quiz'&&this.currentBlock()?.items.includes(this.draft.questions[question]?.id))this.questionIndex=question;
     } else {
-      this.view = ['shared','storage-ai','templates'].includes(page)?page:page === 'join' || (!page && params.has('s')) ? 'join' : 'library';
+      this.view = ['shared','storage-ai','templates','review'].includes(page)?page:page === 'join' || (!page && params.has('s')) ? 'join' : 'library';
       if(this.view==='storage-ai')this.ai.freshPending=true;
       if(this.view==='templates'){
         const tplId=params.get('template');
@@ -550,6 +551,7 @@ export class Studio {
       ['templates', 'templates', 'Catálogo', 'Catálogo de apresentações'],
       ['join', 'join', 'Entrar em uma sala', 'Entrar em uma sala'],
       ['shared', 'collaborate', 'Compartilhados', 'Compartilhados'],
+      ['review', 'fields', 'Revisar questões', 'Revisar questões'],
       ['storage-ai', 'sparkle', 'Storage AI', 'Storage AI']
     ];
     const links = tabs.map(([action, icon, text, label]) => {
@@ -590,6 +592,7 @@ export class Studio {
   markup() {
     if (this.view==='ai-generation') return this.shell(this.ai.generationMarkup());
     if (this.view === 'editor') return this.editor();
+    if (this.view === 'review') return this.shell(reviewMarkup(this));
     if (this.view === 'templates') return this.shell(`<main class="studio-templates">${this.templateStore.markup()}</main>`);
     if (this.view === 'join') return this.shell(`<main class="studio-join join-v3">
       <svg class="join-waves" viewBox="0 0 1000 600" preserveAspectRatio="none" aria-hidden="true"><path d="M-50 360C190 180 295 510 525 340S820 165 1050 315"/><path d="M-50 415C180 235 300 540 520 395S805 215 1050 360"/><path d="M-50 470C185 295 315 605 540 450S840 295 1050 410"/></svg>
@@ -1060,7 +1063,7 @@ export class Studio {
     if (action.startsWith('cloud-')) { await this.cloudAction(action, target); return; }
     const id = target.dataset.id;
     const lookup = () => this.library.lessons.find(l => l.id === id);
-    if (['library', 'join', 'shared', 'storage-ai', 'templates'].includes(action)) {
+    if (['library', 'join', 'shared', 'storage-ai', 'templates', 'review'].includes(action)) {
       // Sair com mudanças pendentes pede confirmação em vez de decidir sozinho.
       if (this.view==='editor'&&this.dirty&&!this.groups.live&&this.groups.canEdit&&!this.leaveDecided) {
         this.dialog={type:'leave',target:action};this.callbacks.render();return;
@@ -1073,6 +1076,23 @@ export class Studio {
       this.view = action; this.writeRoute(); this.callbacks.render();
       if(action==='shared'&&this.account.user){await this.groups.refresh();if(this.view==='shared')this.callbacks.render();}
       return;
+    }
+    if (action === 'review-open') { this.reviewCloudLesson=null;this.reviewId=id;this.reviewIndex=0;this.reviewChoice=null;this.callbacks.render();return; }
+    if (action === 'review-back') { this.reviewCloudLesson=null;this.reviewId='';this.callbacks.render();return; }
+    if (action === 'review-cloud-list' || action === 'review-cloud-open') {
+      if(!this.account.user){this.account.show('login');return;}
+      const uid=this.account.user.id,item=this.reviewCloudItems?.[Number(target.dataset.reviewIndex)];this.reviewBusy=true;this.reviewMessage='';this.callbacks.render();
+      try {
+        if(action==='review-cloud-list'){const list=await listCloudLessons(this.account.client);if(this.account.user?.id!==uid)return;this.reviewCloudItems=list;this.reviewMessage=list.length?'Selecione uma aula.':'Nenhuma aula salva na conta.';}
+        else {if(!item)throw Error('Atualize a lista de aulas.');const lesson=validateLesson(await readCloudLesson(this.account.client,item.path),{draft:true});if(this.account.user?.id!==uid)return;if(!reviewQuestions(lesson).length)throw Error('Esta aula não tem questões completas para revisar.');this.reviewCloudLesson=lesson;this.reviewId='';this.reviewIndex=0;this.reviewChoice=null;}
+      }catch(error){if(this.account.user?.id===uid)this.reviewMessage=error.message||'Não foi possível carregar a aula.';}finally{this.reviewBusy=false;this.callbacks.render();}return;
+    }
+    if (['review-answer','review-prev','review-next','review-retry'].includes(action)) {
+      const lesson=this.reviewCloudLesson||this.library.lessons.find(l=>l.id===this.reviewId), questions=lesson?reviewQuestions(lesson):[];
+      if(action==='review-answer'&&this.reviewChoice==null){const n=Number(target.dataset.choice);if(Number.isInteger(n)&&n>=0&&n<questions[this.reviewIndex]?.options.length)this.reviewChoice=n;}
+      if(action==='review-prev'||action==='review-next'){this.reviewIndex=Math.max(0,Math.min(questions.length-1,(this.reviewIndex||0)+(action==='review-next'?1:-1)));this.reviewChoice=null;}
+      if(action==='review-retry')this.reviewChoice=null;
+      this.callbacks.render();return;
     }
     if(action==='list-activities'){this.activityOrder.list();return;}
     if(action==='add-activity'){this.activityOrder.open();return;}
