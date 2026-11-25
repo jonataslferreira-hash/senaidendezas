@@ -22,6 +22,7 @@ export class SocialChat {
  paintTyping(){const node=this.studio.root.querySelector('[data-social-typing]');if(node)node.textContent=this.typing.names.length?this.typing.names.join(', ')+' está digitando…':'';}
  paint(){
   paintChatPanel(this.studio.root.querySelector('[data-social-slot]'),this.markup());
+    this.studio.chatAudio?.mountImages(this.studio.root.querySelector('[data-social-slot]'));
   this.paintBadge();this.paintTyping();
   if(this.open){for(const c of this.contacts)if(c.status==='accepted')this.studio.people.load(c.other_id);for(const m of this.messages)this.studio.people.load(m.author_id);}
  }

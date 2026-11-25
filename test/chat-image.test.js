@@ -37,3 +37,10 @@ test('erros de anexo diferenciam configuração, permissão e arquivo ausente',(
  assert.match(attachmentErrorMessage(403,'forbidden','PUT'),/não tem permissão/);
  assert.match(attachmentErrorMessage(503,undefined,'PUT'),/503/);
 });
+
+test('cartões reconhecem Google Docs e YouTube sem buscar o conteúdo privado',()=>{
+ const doc=chatMessageBody('https://docs.google.com/document/d/123456/edit','dm',id);assert.match(doc,/Documento no Google/);assert.match(doc,/chat-link-document/);assert.doesNotMatch(doc,/>edit</);assert.doesNotMatch(doc,/<img/);
+ const youtube=chatMessageBody('https://youtu.be/abcdef12345','dm',id);assert.match(youtube,/i\.ytimg\.com\/vi\/abcdef12345/);
+ const impostor=chatMessageBody('https://youtube.com.example/shorts/abcdef12345','dm',id);assert.doesNotMatch(impostor,/i\.ytimg/);
+ assert.match(chatMessageBody('https://example.com/Uma-noticia','dm',id),/Uma noticia/);
+});
