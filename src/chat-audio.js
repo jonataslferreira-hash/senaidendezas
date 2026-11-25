@@ -28,7 +28,30 @@ export function chatMessageBody(body,scope,id){const image=parseChatImage(body,s
   if(parts.length>1)return `<div class="chat-link-message">${parts.map((part,i)=>{if(!(i%2))return esc(part);const match=part.match(/^(.*?)([.,!?;:]+)$/);return chatLinkCard(match?match[1]:part)+(match?esc(match[2]):'');}).join('')}</div>`;
   return `<p>${esc(text)}</p>`;}
 export function chatDate(value){const d=new Date(value);return Number.isFinite(d.getTime())?d.toLocaleString('pt-BR',{day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'}):'';}
-async function audioRequest(client,path,options={}){const {data}=await client.auth.getSession();if(!data.session)throw Error('Entre novamente na sua conta.');let response;try{response=await fetch(r2ApiUrl+path,{...options,headers:{...options.headers,Authorization:'Bearer '+data.session.access_token}});}catch{throw Error('Não foi possível conectar ao serviço do chat. Verifique sua conexão.');}if(!response.ok){if(response.status===404||response.status===503)throw Error('Este anexo precisa da atualização do Worker e do chat no servidor.');if(response.status===403)throw Error('Você não tem permissão para esse áudio.');throw Error('Não foi possível acessar o áudio. Confira a conexão.');}return response;}
+// Erros do Worker identificam a falha sem confundir objeto ausente com serviço desatualizado.
+export function attachmentErrorMessage(status, code, method='GET') {
+ const messages={
+  chat_not_configured:'Não foi possível verificar a permissão no servidor do chat. A configuração do Supabase ou o serviço pode estar indisponível.',
+  chat_audio_not_configured:'Não foi possível verificar a permissão no servidor do chat. A configuração do Supabase ou o serviço pode estar indisponível.',
+  storage_not_configured:'O armazenamento de anexos não está configurado no servidor.',
+  forbidden:'Você não tem permissão para acessar esta conversa ou este anexo.',
+  unauthorized:'Sua sessão não foi aceita. Entre novamente na sua conta.',
+  not_found:method==='GET'?'Este anexo não foi encontrado no armazenamento.':'O serviço de anexos não encontrou a rota de envio. Verifique a configuração do Worker.',
+  too_large:'O anexo ultrapassa o limite permitido.',
+  unsupported_image:'Este formato de imagem não é aceito.',
+  invalid_image:'O arquivo não corresponde a um formato de imagem válido.',
+  unsupported_audio:'Este formato de áudio não é aceito.',
+  invalid_audio:'Não foi possível reconhecer o arquivo de áudio.',
+  already_exists:'O anexo já existe. Tente enviar novamente.'
+ };
+ return messages[code]||(status===401?messages.unauthorized:status===403?messages.forbidden:status===404?messages.not_found:`Não foi possível acessar o anexo (servidor: ${status}). Tente novamente.`);
+}
+async function audioRequest(client,path,options={}){
+ const {data}=await client.auth.getSession();if(!data.session)throw Error('Entre novamente na sua conta.');
+ let response;try{response=await fetch(r2ApiUrl+path,{...options,headers:{...options.headers,Authorization:'Bearer '+data.session.access_token}});}catch{throw Error('Não foi possível conectar ao serviço do chat. Verifique sua conexão.');}
+ if(!response.ok){let code;try{code=(await response.json())?.error;}catch{}throw Error(attachmentErrorMessage(response.status,code,options.method||'GET'));}
+ return response;
+}
 export class ChatAudio{
  constructor(studio){this.studio=studio;this.urls=new Map();this.recorder=new ChatRecorder(studio.root);studio.root.addEventListener('account-changed',()=>{this.recorder.cancel();for(const url of this.urls.values())URL.revokeObjectURL(url);this.urls.clear();});studio.root.addEventListener('click',e=>{const b=e.target.closest('[data-chat-audio]');if(b)this.play(b).catch(error=>{b.disabled=false;b.textContent=error.message;});const img=e.target.closest('[data-chat-image]');if(img)this.loadImage(img).catch(error=>{img.disabled=false;img.textContent=error.message;});});}
  async play(button){const path=button.dataset.chatAudio;button.disabled=true;button.textContent='Carregando áudio…';let url=this.urls.get(path);if(!url){const uid=this.studio.account.user?.id,response=await audioRequest(this.studio.account.client,path),blob=await response.blob();if(uid!==this.studio.account.user?.id||!button.isConnected)return;url=URL.createObjectURL(blob);this.urls.set(path,url);}const audio=button.parentElement.querySelector('audio');audio.src=url;audio.hidden=false;button.hidden=true;audio.play().catch(()=>{});}

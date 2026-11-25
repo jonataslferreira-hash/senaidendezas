@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {handleChatImage} from '../cloudflare/chat-image-worker.js';
-import {chatMessageBody,parseChatImage} from '../src/chat-audio.js';
+import {chatMessageBody,parseChatImage,attachmentErrorMessage} from '../src/chat-audio.js';
 const id='33333333-3333-4333-8333-333333333333',file='44444444-4444-4444-8444-444444444444',user={id:'11111111-1111-4111-8111-111111111111'};
 const path=`/chat-image/doc/${id}/${file}`;
 function fixture(){const objects=new Map(),env={FILES:{get:async k=>objects.get(k),put:async(k,body,meta)=>objects.set(k,{body,...meta}),delete:async k=>objects.delete(k)}};return {env,objects};}
@@ -27,4 +27,13 @@ test('prévia só recebe CORS quando sua origem exata está autorizada no Worker
  assert.equal((await worker(req(),{})).status,403);
  const allowed=await worker(req(),{ALLOWED_ORIGINS:`https://jonataslferreira-hash.github.io,${origin}`});
  assert.equal(allowed.status,204);assert.equal(allowed.headers.get('Access-Control-Allow-Origin'),origin);
+});
+
+test('erros de anexo diferenciam configuração, permissão e arquivo ausente',()=>{
+ assert.match(attachmentErrorMessage(503,'chat_not_configured','PUT'),/permissão no servidor do chat/);
+ assert.match(attachmentErrorMessage(503,'storage_not_configured','PUT'),/armazenamento/);
+ assert.match(attachmentErrorMessage(404,'not_found','GET'),/anexo não foi encontrado/);
+ assert.match(attachmentErrorMessage(404,'not_found','PUT'),/rota de envio/);
+ assert.match(attachmentErrorMessage(403,'forbidden','PUT'),/não tem permissão/);
+ assert.match(attachmentErrorMessage(503,undefined,'PUT'),/503/);
 });
