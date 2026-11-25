@@ -159,7 +159,7 @@ test('composeAISlide varia layouts sem repetir, rejeita quadros sobrepostos e re
   assert.equal(transparentSlide.elements.filter(el => el.id?.includes('-card-')).length, 0, 'recorte transparente não ganha cartão sólido atrás');
 });
 
-test('Worker v25 expõe provedores gratuitos, faz fallback e orienta agrupamento inteligente de conteúdo', async t => {
+test('Worker v26 expõe provedores gratuitos, faz fallback e orienta agrupamento inteligente de conteúdo', async t => {
   const user = { id: '11111111-1111-4111-8111-111111111111', email_confirmed_at: '2026-11-01' };
   const auth = { Authorization: 'Bearer test-token-1234567890' };
   const handle = createR2Handler(async () => user);
@@ -169,7 +169,7 @@ test('Worker v25 expõe provedores gratuitos, faz fallback e orienta agrupamento
     GROQ_API_KEY: 'g', GEMINI_API_KEY: 'm', MISTRAL_API_KEY: 'ms', NVIDIA_API_KEY: 'nv'
   });
   const health = await healthRes.json();
-  assert.equal(health.version, 25);
+  assert.equal(health.version, 26);
   assert.equal(health.mistralConfigured, true);
   assert.equal(health.nvidiaConfigured, true);
 
@@ -316,4 +316,3 @@ test('Cabo de Guerra pré-distribui times no lobby, Relâmpago oculta pular-etap
   assert.match(finalHtml, /PLACAR GERAL FINAL/, 'mostra título de placar geral final');
   assert.match(finalHtml, /final-team-champion/, 'destaca a equipe campeã no resultado geral final');
 });
-

@@ -4,17 +4,23 @@ import { esc } from './canvas-view.js';
 export function chatComposer({ id, field, action, draft, placeholder, disabled, sending, reference = '' }) {
   return `<form id="${id}" class="chat-composer" data-chat-part="composer">
     <label class="sr-only" for="${field}">Mensagem</label>
-    <textarea id="${field}" maxlength="2000" rows="2" placeholder="${placeholder}" ${disabled?'disabled':''}>
-${esc(draft)}</textarea>
+    <textarea id="${field}" maxlength="2000" rows="1" placeholder="${placeholder}" ${disabled?'disabled':''}>${esc(draft)}</textarea>
     <div class="chat-compose-actions">
+      <label class="studio-btn quiet chat-image-picker" title="Enviar imagem" aria-label="Enviar imagem">${studioIcon('image')}<input type="file" aria-label="Enviar imagem" data-chat-image-input accept="image/png,image/jpeg,image/webp,image/gif" ${disabled||sending?'disabled':''}></label>
       <button type="button" class="studio-btn quiet" ${action}="voice" aria-label="Gravar áudio" title="Gravar áudio" ${disabled||sending?'disabled':''}>${studioIcon('mic')}</button>
       <button type="submit" class="studio-btn accent" aria-label="${sending?'Enviando…':'Enviar mensagem'}" title="Enviar mensagem" ${disabled||sending?'disabled':''}>${studioIcon('send')}</button>
-    </div>${reference}
+    </div>${reference}<div class="chat-recorder" data-chat-recorder hidden></div>
   </form>`;
 }
 
 // Keep the panel, composer and message nodes mounted while requests and
 // Realtime update their contents. In particular, preserve playing voice notes.
+export function resizeChatField(field) {
+  if (!field) return;
+  field.style.height = 'auto';
+  field.style.height = Math.min(120, Math.max(44, field.scrollHeight)) + 'px';
+}
+
 export function paintChatPanel(slot, markup) {
   if (!slot) return;
   const template = document.createElement('template');
@@ -57,7 +63,7 @@ export function paintChatPanel(slot, markup) {
           const current = fields[index];
           if (!current) continue;
           current.disabled = field.disabled;
-          if (field.matches('textarea,input:not([type=checkbox])') && current.value !== field.value) current.value = field.value;
+          if (field.matches('textarea,input:not([type=checkbox]):not([type=file])') && current.value !== field.value) current.value = field.value;
           if (field.type === 'checkbox') current.checked = field.checked;
           if (field.hasAttribute('aria-label')) current.setAttribute('aria-label',field.getAttribute('aria-label'));
         }
@@ -66,8 +72,10 @@ export function paintChatPanel(slot, markup) {
       }
     }
     if (log && nearBottom) log.scrollTop = log.scrollHeight;
+    resizeChatField(panel.querySelector('.chat-composer textarea'));
     return;
   }
   const log = slot.querySelector('[role=log]');
   if (log) log.scrollTop = log.scrollHeight;
+  resizeChatField(slot.querySelector('.chat-composer textarea'));
 }

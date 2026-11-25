@@ -88,3 +88,13 @@ test('resultado atrasado da conta anterior não substitui arquivos da conta atua
  await page.goto('/');await expect(page.locator('.cloud-status')).toHaveText('Consultando aulas na nuvem…');await page.getByRole('button',{name:'Ana',exact:true}).click();await page.getByRole('button',{name:'+ Adicionar outra conta',exact:true}).click();await page.getByLabel('E-mail',{exact:true}).fill('bia@example.com');await page.getByLabel('Senha',{exact:true}).fill('test-password');await page.getByRole('button',{name:'Entrar na conta',exact:true}).click();
  await expect(page.locator('[data-library-grid]')).toContainText('Arquivo da Bia');release();await page.getByRole('button',{name:'Fechar conta',exact:true}).click();await expect(page.locator('[data-library-grid]')).not.toContainText('Arquivo da Ana');await expect(page.locator('[data-library-grid]')).toContainText('Arquivo da Bia');
 });
+
+test('falha de rede na atualização automática aparece no painel sem toast inesperado e permite tentar de novo',async({page})=>{
+ await mockAccounts(page);await page.route('https://storage-lab-files.lagujf.workers.dev/lessons',route=>route.abort('failed'));
+ await page.goto('/',{waitUntil:'domcontentloaded'});
+ await expect(page.locator('.cloud-status')).toContainText('Não foi possível conectar à nuvem');
+ await expect(page.locator('#toast')).not.toHaveClass(/visible/);
+ await page.getByRole('button',{name:'Recarregar aulas',exact:true}).click();
+ await expect(page.locator('#toast')).toContainText('Não foi possível conectar à nuvem');
+ await expect(page.getByRole('button',{name:'Recarregar aulas',exact:true})).toBeEnabled();
+});

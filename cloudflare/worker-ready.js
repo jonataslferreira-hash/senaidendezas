@@ -647,7 +647,7 @@ async function handleStorageAI(request, env, user, headers) {
     'Para criar um modelo 3D original simples, use model3D:{name:string,parts:[{name:string,shape:"box"|"sphere"|"cylinder"|"cone",position:[x,y,z],size:[width,height,depth],rotation?:[grausX,grausY,grausZ],color:"#rrggbb"}]}. Use de 2 a 8 pe\xE7as simples por modelo, posi\xE7\xF5es pr\xF3ximas de zero, dimens\xF5es positivas e Y como altura. Em create, coloque model3D no slide pertinente. Em edit, adicione um elemento {type:"model",model3D,x,y,w,h} somente se estiver editando o slide inteiro. Para HDD, SSD e NVMe pode usar model em vez de model3D.',
     "Em edit, aceite modelLabel e modelDescription nas altera\xE7\xF5es a um elemento 3D existente. Use estes campos somente quando solicitados. Trate as novas propriedades como extens\xF5es do esquema anterior. Os sons s\xE3o efeitos sint\xE9ticos e os modelos s\xE3o constru\xEDdos de formas geom\xE9tricas; n\xE3o alegue que criou narra\xE7\xE3o, m\xFAsicas comerciais ou modelos realistas."
   ].join(" ");
-  const activityInstructions = "Quiz e enquete s\xE3o etapas da aula independentes dos slides de conte\xFAdo. Quando o pedido solicitar quiz ou a configura\xE7\xE3o pedir quest\xF5es, retorne todas as questions solicitadas, sem reduzir a quantidade: crie novas quest\xF5es originais at\xE9 completar o total exato. Seja criativo e varie entre compreens\xE3o, aplica\xE7\xE3o pr\xE1tica, compara\xE7\xE3o, causa e consequ\xEAncia, interpreta\xE7\xE3o de cen\xE1rios e erros comuns, sempre com base no conte\xFAdo da aula. Cada quest\xe3o deve tratar de um assunto espec\xedfico que aparece nos slides criados (conceito, exemplo, dado ou caso citado), nunca de conhecimento gen\xe9rico que funcionaria em qualquer tema, e nenhuma pergunta pode repetir o mesmo fato ou conceito de outra. N\xE3o substitua quest\xF5es faltantes por perguntas gen\xE9ricas nem por reformula\xE7\xF5es de uma quest\xE3o anterior. Cada quest\xE3o precisa ter 2 a 4 op\xE7\xF5es, \xEDndice correct come\xE7ando em zero, difficulty, seconds e explanation. Use de 3 a 7 quest\xF5es apenas se nenhuma quantidade for especificada. Quando o pedido ou a configura\xE7\xE3o solicitar enquete, retorne polls com pergunta text e 2 a 4 options sem resposta correta. Nunca escreva quest\xF5es ou enquetes apenas no corpo dos slides. No modo revise, acrescente as etapas pedidas na mesma aula, sem repetir questions ou polls j\xE1 presentes em context. Se pedir s\xF3 quiz ou enquete, deixe edits vazio. Quando n\xE3o pedir essas atividades, omita questions e polls.";
+  const activityInstructions = "Quiz e enquete s\xE3o etapas da aula independentes dos slides de conte\xFAdo. Quando o pedido solicitar quiz ou a configura\xE7\xE3o pedir quest\xF5es, retorne todas as questions solicitadas, sem reduzir a quantidade: crie novas quest\xF5es originais at\xE9 completar o total exato. Seja criativo e varie entre compreens\xE3o, aplica\xE7\xE3o pr\xE1tica, compara\xE7\xE3o, causa e consequ\xEAncia, interpreta\xE7\xE3o de cen\xE1rios e erros comuns, sempre com base no conte\xFAdo da aula. Cada quest\xE3o deve tratar de um assunto espec\xEDfico que aparece nos slides criados (conceito, exemplo, dado ou caso citado), nunca de conhecimento gen\xE9rico que funcionaria em qualquer tema, e nenhuma pergunta pode repetir o mesmo fato ou conceito de outra. N\xE3o substitua quest\xF5es faltantes por perguntas gen\xE9ricas nem por reformula\xE7\xF5es de uma quest\xE3o anterior. Cada quest\xE3o precisa ter 2 a 4 op\xE7\xF5es, \xEDndice correct come\xE7ando em zero, difficulty, seconds e explanation. Use de 3 a 7 quest\xF5es apenas se nenhuma quantidade for especificada. Quando o pedido ou a configura\xE7\xE3o solicitar enquete, retorne polls com pergunta text e 2 a 4 options sem resposta correta. Nunca escreva quest\xF5es ou enquetes apenas no corpo dos slides. No modo revise, acrescente as etapas pedidas na mesma aula, sem repetir questions ou polls j\xE1 presentes em context. Se pedir s\xF3 quiz ou enquete, deixe edits vazio. Quando n\xE3o pedir essas atividades, omita questions e polls.";
   const questionCount = generate ? (activities?.quizzes || 0) * (activities?.questions || 0) : 0;
   const pollCount = generate ? activities?.polls || 0 : 0;
   const countInstructions = [
@@ -1457,6 +1457,39 @@ async function handleChatAudio(request, env, user, headers, rpc) {
   return json({ ok: true });
 }
 
+// cloudflare/chat-image-worker.js
+var MAX_IMAGE = 6 * 1024 * 1024;
+async function handleChatImage(request, env, user, headers, rpc) {
+  const match = /^\/chat-image\/(dm|doc)\/([a-f0-9-]{36})\/([a-f0-9-]{36})$/i.exec(new URL(request.url).pathname);
+  if (!match) return null;
+  const json = (data, status = 200) => Response.json(data, { status, headers });
+  if (!["GET", "PUT", "DELETE"].includes(request.method)) return json({ error: "method_not_allowed" }, 405);
+  try {
+    if (await rpc("sl_chat_audio_access", { p_scope: match[1], p_id: match[2], p_write: request.method !== "GET" }) !== true) return json({ error: "forbidden" }, 403);
+  } catch {
+    return json({ error: "chat_not_configured" }, 503);
+  }
+  if (!env.FILES) return json({ error: "storage_not_configured" }, 503);
+  const key = "chat-image/" + match.slice(1).join("/"), existing = await env.FILES.get(key);
+  if (request.method === "GET") return existing ? new Response(existing.body, { headers: { ...headers, "Content-Type": existing.httpMetadata.contentType, "X-Content-Type-Options": "nosniff", "Content-Disposition": "inline" } }) : json({ error: "not_found" }, 404);
+  if (request.method === "DELETE") {
+    if (existing?.customMetadata?.author !== user.id) return json({ error: "forbidden" }, 403);
+    await env.FILES.delete(key);
+    return json({ ok: true });
+  }
+  if (existing) return json({ error: "already_exists" }, 409);
+  const type = request.headers.get("Content-Type")?.split(";")[0];
+  if (!["image/jpeg", "image/png", "image/webp", "image/gif"].includes(type)) return json({ error: "unsupported_image" }, 415);
+  if (Number(request.headers.get("Content-Length")) > MAX_IMAGE) return json({ error: "too_large" }, 413);
+  const bytes = await request.arrayBuffer();
+  if (!bytes.byteLength || bytes.byteLength > MAX_IMAGE) return json({ error: "too_large" }, 413);
+  const b = new Uint8Array(bytes), text = new TextDecoder().decode(b.slice(0, 12));
+  const valid = type === "image/jpeg" && b[0] === 255 && b[1] === 216 && b[2] === 255 || type === "image/png" && [137, 80, 78, 71, 13, 10, 26, 10].every((v, i) => b[i] === v) || type === "image/webp" && text.startsWith("RIFF") && text.slice(8, 12) === "WEBP" || type === "image/gif" && /^GIF8[79]a/.test(text);
+  if (!valid) return json({ error: "invalid_image" }, 415);
+  await env.FILES.put(key, bytes, { httpMetadata: { contentType: type }, customMetadata: { author: user.id } });
+  return json({ ok: true });
+}
+
 // cloudflare/collaboration-worker.js
 var uuid = "[a-f0-9-]{36}";
 var esc = (value) => String(value || "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
@@ -1678,7 +1711,7 @@ function createR2Handler(verifyUser = async (token, env) => {
     if (origin && !allowed.includes(origin)) return new Response("Origin not allowed", { status: 403 });
     const headers = { "Access-Control-Allow-Origin": origin || allowed[0], "Access-Control-Allow-Methods": "GET,POST,PUT,DELETE,OPTIONS", "Access-Control-Allow-Headers": "Authorization,Content-Type,X-Lesson-Title,X-Original-Bytes,X-Lesson-Origin", "Cache-Control": "private, no-store", Vary: "Origin" };
     const json = (body, status = 200) => Response.json(body, { status, headers });
-    if (new URL(request.url).pathname === "/health" && request.method === "GET") return json({ version: 25, cloudflareAI: env.STORAGE_AI_FREE_CONFIRMED === "true" && Boolean(env.AI), storageAI: storageAIEnabled(env), storageAIMedia: storageAIEnabled(env), storageAIHistory: Boolean(env.FILES), imageSearch: true, openRouterConfigured: Boolean(env.OPENROUTER_API_KEY), geminiConfigured: Boolean(env.GEMINI_API_KEY), groqConfigured: Boolean(env.GROQ_API_KEY), mistralConfigured: Boolean(env.MISTRAL_API_KEY), nvidiaConfigured: Boolean(env.NVIDIA_API_KEY), lessonCovers: true, lessonDeletion: true, voiceChat: true, collaboration: true, animatedAvatars: true, roles: true, people: true });
+    if (new URL(request.url).pathname === "/health" && request.method === "GET") return json({ version: 26, imageChat: true, cloudflareAI: env.STORAGE_AI_FREE_CONFIRMED === "true" && Boolean(env.AI), storageAI: storageAIEnabled(env), storageAIMedia: storageAIEnabled(env), storageAIHistory: Boolean(env.FILES), imageSearch: true, openRouterConfigured: Boolean(env.OPENROUTER_API_KEY), geminiConfigured: Boolean(env.GEMINI_API_KEY), groqConfigured: Boolean(env.GROQ_API_KEY), mistralConfigured: Boolean(env.MISTRAL_API_KEY), nvidiaConfigured: Boolean(env.NVIDIA_API_KEY), lessonCovers: true, lessonDeletion: true, voiceChat: true, collaboration: true, animatedAvatars: true, roles: true, people: true });
     if (request.method === "OPTIONS") return new Response(null, { status: 204, headers });
     const publicPresentation = await readPublicPresentation(request, env, headers);
     if (publicPresentation) return publicPresentation;
@@ -1699,6 +1732,8 @@ function createR2Handler(verifyUser = async (token, env) => {
     if (aiHistory) return aiHistory;
     const chatAudio = await handleChatAudio(request, env, user, headers, (name, args) => callRpc(token, env, name, args));
     if (chatAudio) return chatAudio;
+    const chatImage = await handleChatImage(request, env, user, headers, (name, args) => callRpc(token, env, name, args));
+    if (chatImage) return chatImage;
     const person = /^\/people\/([a-f0-9-]{36})\/avatar$/i.exec(new URL(request.url).pathname);
     if (person) {
       if (request.method !== "GET") return json({ error: "method_not_allowed" }, 405);

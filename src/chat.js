@@ -1,4 +1,4 @@
-import { chatComposer, paintChatPanel } from './chat-panel.js';
+import { chatComposer, paintChatPanel, resizeChatField } from './chat-panel.js';
 import {chatMessageBody,chatDate} from './chat-audio.js';
 import { ChatTyping } from './chat-typing.js';
 const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -6,9 +6,11 @@ export class LessonChat {
   constructor(studio){
     this.studio=studio;this.open=false;this.messages=[];this.documentId='';this.draft='';this.status='';this.generation=0;this.typing=new ChatTyping(studio,()=>this.paintTyping());
     studio.root.addEventListener('click',e=>{const button=e.target.closest('[data-chat-action]');if(!button)return;this.action(button).catch(error=>{this.status=error.message;this.paint();});});
-    studio.root.addEventListener('input',e=>{if(e.target.id==='chat-message'){this.draft=e.target.value;this.typing.send(Boolean(this.draft.trim()));}});
+    studio.root.addEventListener('input',e=>{if(e.target.id==='chat-message'){this.draft=e.target.value;resizeChatField(e.target);this.typing.send(Boolean(this.draft.trim()));}});
     studio.root.addEventListener('change',e=>{if(e.target.id==='chat-document')this.select(e.target.value);if(e.target.id==='chat-reference')this.reference=e.target.checked;});
     studio.root.addEventListener('submit',e=>{if(e.target.id==='chat-form'){e.preventDefault();this.send();}});
+    studio.root.addEventListener('keydown',e=>{if(e.target.id==='chat-message'&&e.key==='Enter'&&!e.shiftKey&&!e.isComposing&&!e.repeat){e.preventDefault();e.target.form?.requestSubmit();}});
+    studio.root.addEventListener('change',e=>{if(!e.target.matches('#chat-form [data-chat-image-input]'))return;const file=e.target.files[0],id=this.documentId,generation=this.generation;e.target.value='';if(!file||!id||!this.canComment||this.sending)return;this.sending=true;this.paint();this.studio.chatAudio.sendImage('doc',id,file,async body=>{const {data,error}=await this.studio.account.client.rpc('sl_send_chat_message',{p_document_id:id,p_body:body,p_slide_id:null});if(error)throw error;if(generation===this.generation)this.merge(Array.isArray(data)?data:[data]);}).catch(error=>{if(generation===this.generation)this.status=error.message;}).finally(()=>{if(generation===this.generation){this.sending=false;this.paint();}});});
     studio.root.addEventListener('account-changed',()=>{this.stopConnection();this.open=false;this.messages=[];this.documentId='';this.draft='';this.paint();});
   }
   get canComment(){
@@ -31,7 +33,7 @@ export class LessonChat {
     if(this.open)for(const m of this.messages)this.studio.people.load(m.author_id);
   }
   async action(button){
-    if(button.dataset.chatAction==='voice'){if(!this.canComment)return;const id=this.documentId,generation=this.generation;await this.studio.chatAudio.send('doc',id,async body=>{const {data,error}=await this.studio.account.client.rpc('sl_send_chat_message',{p_document_id:id,p_body:body,p_slide_id:null});if(error)throw error;if(generation===this.generation){this.merge(Array.isArray(data)?data:[data]);this.paint();}});return;}
+    if(button.dataset.chatAction==='voice'){if(!this.canComment)return;const id=this.documentId,generation=this.generation;await this.studio.chatAudio.send('doc',id,async body=>{const {data,error}=await this.studio.account.client.rpc('sl_send_chat_message',{p_document_id:id,p_body:body,p_slide_id:null});if(error)throw error;if(generation===this.generation){this.merge(Array.isArray(data)?data:[data]);this.paint();}},button);return;}
     if(button.dataset.chatAction==='close'){this.typing.send(false);this.stopConnection();this.open=false;this.paint();return;}
     if(button.dataset.chatAction==='open'){
       if(!this.studio.account.user){this.studio.account.show('login');return;}

@@ -77,7 +77,7 @@ export class Studio {
       if (this.autoSaveEnabled() && this.view === 'editor' && this.draft && this.needsSave()) this.scheduleAutoSave(300);
       if (this.view === 'editor') this.callbacks.render();
     });
-    root.addEventListener('account-changed', () => { this.reviewCloudItems=[];this.reviewCloudLesson=null;this.reviewMessage='';this.cloudRequest++;this.cloudCovers.clear();this.cloudItems=[];this.cloudBusy=false;this.cloudMessage='';this.cloudLoaded=false;this.refreshCloudPanel();if(this.view==='library'&&this.account.user)this.cloudAction('cloud-refresh',{}); });
+    root.addEventListener('account-changed', () => { this.reviewCloudItems=[];this.reviewCloudLesson=null;this.reviewMessage='';this.cloudRequest++;this.cloudCovers.clear();this.cloudItems=[];this.cloudBusy=false;this.cloudMessage='';this.cloudLoaded=false;this.refreshCloudPanel();if(this.view==='library'&&this.account.user)this.cloudAction('cloud-refresh',{}, {silent:true}); });
     try { this.library = new LessonLibrary(); }
     catch {
       this.library = Object.create(LessonLibrary.prototype);
@@ -487,7 +487,7 @@ export class Studio {
         catch (error) { await removePageAssets(archived.ids).catch(() => {}); throw error; }
         if(action==='cloud-present')await this.launch(saved,false,false);else if(action==='cloud-cover')this.openCoverDialog(saved);else this.open(saved.id);
       }
-    } catch (error) { if(current()){this.cloudLoaded=true;this.cloudMessage=error.message||'Não foi possível consultar as aulas. Clique em Atualizar arquivos para tentar novamente.';this.callbacks.toast(this.cloudMessage);} }
+    } catch (error) { if(current()){this.cloudLoaded=true;this.cloudMessage=error.message||'Não foi possível consultar as aulas. Clique em Atualizar arquivos para tentar novamente.';if(!silent)this.callbacks.toast(this.cloudMessage);} }
     finally {
       if(current()){
         this.cloudBusy = false;
@@ -943,7 +943,7 @@ export class Studio {
     this.remote.paint();
     this.ai.mountCreate();
     const cloudVisible=this.view==='library';
-    if(cloudVisible&&this.account.user&&!this.cloudBusy&&(!this.cloudLoaded||!this.cloudWasVisible))queueMicrotask(()=>{if(this.view==='library'&&this.account.user&&!this.cloudBusy)this.cloudAction('cloud-refresh',{});});
+    if(cloudVisible&&this.account.user&&!this.cloudBusy&&(!this.cloudLoaded||!this.cloudWasVisible))queueMicrotask(()=>{if(this.view==='library'&&this.account.user&&!this.cloudBusy)this.cloudAction('cloud-refresh',{}, {silent:true});});
     this.cloudWasVisible=cloudVisible;
     this.editorMusic.mountPanel();
     if(this.groups.live&&!this.groups.canEdit)for(const node of this.root.querySelectorAll('.designer-toolbar,.designer-workspace,.editor-field,.quiz-options-editor,.slide-activities'))node.inert=true;

@@ -1,13 +1,15 @@
 import { studioIcon } from './studio-icons.js';
-import { chatComposer, paintChatPanel } from './chat-panel.js';
+import { chatComposer, paintChatPanel, resizeChatField } from './chat-panel.js';
 import {chatMessageBody,chatDate} from './chat-audio.js';
 import { ChatTyping } from './chat-typing.js';
 const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 export class SocialChat {
  constructor(studio){this.studio=studio;this.open=false;this.contacts=[];this.messages=[];this.badge=0;this.generation=0;this.body='';this.email='';this.status='';this.invites=[];this.typing=new ChatTyping(studio,()=>this.paintTyping());
   studio.root.addEventListener('click',e=>{const b=e.target.closest('[data-social-action]');if(b)this.action(b).catch(error=>{this.status=error.message;this.paint();});});
-  studio.root.addEventListener('input',e=>{if(e.target.id==='social-message'){this.body=e.target.value;this.typing.send(Boolean(this.body.trim()));}if(e.target.id==='social-email'){this.email=e.target.value;this.found=null;this.studio.root.querySelector('.social-result')?.remove();}});
+  studio.root.addEventListener('input',e=>{if(e.target.id==='social-message'){this.body=e.target.value;resizeChatField(e.target);this.typing.send(Boolean(this.body.trim()));}if(e.target.id==='social-email'){this.email=e.target.value;this.found=null;this.studio.root.querySelector('.social-result')?.remove();}});
   studio.root.addEventListener('submit',e=>{if(e.target.id==='social-send'||e.target.id==='social-search'){e.preventDefault();this.action({dataset:{socialAction:e.target.id==='social-send'?'send':'search'}}).catch(error=>{this.status=error.message;this.paint();});}});
+  studio.root.addEventListener('keydown',e=>{if(e.target.id==='social-message'&&e.key==='Enter'&&!e.shiftKey&&!e.isComposing&&!e.repeat){e.preventDefault();e.target.form?.requestSubmit();}});
+    studio.root.addEventListener('change',e=>{if(!e.target.matches('#social-send [data-chat-image-input]'))return;const file=e.target.files[0],id=this.active,generation=this.generation;e.target.value='';if(!file||!id||this.busy)return;this.busy=true;this.paint();this.studio.chatAudio.sendImage('dm',id,file,async body=>{const row=await this.rpc('sl_send_direct_message',{p_contact_id:id,p_body:body});if(generation===this.generation&&this.active===id)this.merge(Array.isArray(row)?row:[row]);}).catch(error=>{if(generation===this.generation)this.status=error.message;}).finally(()=>{if(generation===this.generation){this.busy=false;this.paint();}});});
   studio.root.addEventListener('account-changed',()=>{this.reset();if(studio.account.user)this.connect();});
  }
  reset(){this.typing.close();this.invites=[];this.generation++;this.channel?.unsubscribe();this.channel=null;this.contacts=[];this.messages=[];this.active='';this.open=false;this.badge=0;this.body='';this.email='';this.found=null;this.busy=false;this.status='';this.paint();}
@@ -35,7 +37,7 @@ export class SocialChat {
   if(action==='request'){if(!this.found)return;const result=await this.rpc('sl_request_contact',{p_email:this.foundEmail});if(generation!==this.generation)return;this.found=null;this.email='';const row=Array.isArray(result)?result[0]:result;this.status=row?.status==='accepted'?'Vocês já podem conversar.':row?.status==='declined'?'A solicitação anterior foi recusada.':'Solicitação enviada. Aguarde a pessoa aceitar.';await this.refresh();return;}
   if(action==='accept'||action==='decline'){await this.rpc('sl_respond_contact',{p_id:button.dataset.id,p_accept:action==='accept'});if(generation===this.generation)await this.refresh();return;}
   if(action==='conversation'){await this.conversation(button.dataset.id);return;}
-  if(action==='voice'){const id=this.active;await this.studio.chatAudio.send('dm',id,async body=>{const row=await this.rpc('sl_send_direct_message',{p_contact_id:id,p_body:body});if(generation===this.generation&&this.active===id){this.merge(Array.isArray(row)?row:[row]);this.paint();}});return;}
+  if(action==='voice'){const id=this.active;await this.studio.chatAudio.send('dm',id,async body=>{const row=await this.rpc('sl_send_direct_message',{p_contact_id:id,p_body:body});if(generation===this.generation&&this.active===id){this.merge(Array.isArray(row)?row:[row]);this.paint();}},button);return;}
   if(action==='send'){if(this.busy||!this.body.trim()||!this.active)return;const sentBody=this.body.trim();this.typing.send(false);const id=this.active;this.busy=true;this.paint();try{const row=await this.rpc('sl_send_direct_message',{p_contact_id:id,p_body:sentBody});if(generation!==this.generation||this.active!==id)return;this.merge(Array.isArray(row)?row:[row]);if(this.body.trim()===sentBody)this.body='';this.status='';}finally{if(generation===this.generation){this.busy=false;this.paint();}}}
  }
 }

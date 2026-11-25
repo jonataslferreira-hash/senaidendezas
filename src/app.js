@@ -1263,3 +1263,5 @@ import './workspace-styles.css';
 import './finishing.css';
 import './responsive-glass-fixes.css';
 import './study-visuals.css';
+
+import './review-redesign.css';

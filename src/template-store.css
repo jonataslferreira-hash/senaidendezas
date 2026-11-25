@@ -1230,3 +1230,18 @@ html[data-appearance="dark"] .tstore-icon-util.is-active {
 html[data-appearance=dark] .tstore-search { background: #201a2e; border-color: #453760; color: #cbbfe0; }
 html[data-appearance=dark] .tstore-search input { color: #f1ecfb; }
 html[data-appearance=dark] .tstore-search input::placeholder { color: #b2a3c9; opacity: 1; }
+/* Troca somente o conteúdo do slide: o fundo animado do catálogo permanece montado. */
+.eshop-hero-frame {aspect-ratio:var(--preview-ratio,16/9);max-height:70vh;width:min(100%,calc(70vh * var(--preview-ratio,1.7778)));background:var(--ui-panel,#f8f7fc)}
+.tstore-card-media {background:var(--ui-panel,#f8f7fc)}
+.tstore-card-canvas .canvas-frame,.eshop-hero-canvas .canvas-frame,.eshop-peek-canvas .canvas-frame,.eshop-thumb-canvas .canvas-frame {display:grid;place-items:center;overflow:hidden}
+.tstore-card-canvas .slide-canvas,.eshop-hero-canvas .slide-canvas,.eshop-peek-canvas .slide-canvas,.eshop-thumb-canvas .slide-canvas {width:min(100%,calc(100cqh * var(--canvas-ratio,1.7778)));height:auto;max-height:100%;aspect-ratio:var(--canvas-ratio,16/9)}
+.tstore-card-canvas .canvas-frame,.eshop-hero-canvas .canvas-frame,.eshop-peek-canvas .canvas-frame,.eshop-thumb-canvas .canvas-frame {container-type:size}
+.eshop-hero-canvas.is-arriving {animation:eshop-arrive .35s ease both}
+@keyframes eshop-arrive {from{transform:translateX(12px)}to{transform:translateX(0)}}
+@media(prefers-reduced-motion:reduce){html:not([data-motion=normal]) .eshop-hero-canvas.is-arriving{animation:none}}
+html[data-motion=reduced] .eshop-hero-canvas.is-arriving{animation:none}
+.tstore-card-canvas .canvas-frame,.eshop-hero-canvas .canvas-frame,.eshop-peek-canvas .canvas-frame,.eshop-thumb-canvas .canvas-frame {grid-template-columns:100%;grid-template-rows:100%}
+.eshop-hero-frame {justify-self:center}
+.eshop-peek {container-type:size;isolation:isolate}
+.eshop-peek-canvas {width:calc(100cqh * var(--preview-ratio,1.7778));height:100%;aspect-ratio:auto;opacity:.60;filter:blur(2px) saturate(.7);pointer-events:none}
+.eshop-peek::after {content:'';position:absolute;inset:0;pointer-events:none;background:color-mix(in srgb,var(--ui-panel) 24%,transparent)}

@@ -1,0 +1,93 @@
+/* Biblioteca de revisão: cartões navegáveis em vez de um banner explicativo. */
+#app .review-page {max-width:1180px;padding-bottom:64px}
+#app .review-dashboard .review-heading {display:flex;align-items:center;gap:15px;margin-bottom:42px}
+#app .review-dashboard .review-heading h1 {margin:0;font-size:clamp(27px,3vw,38px);line-height:1.1;letter-spacing:-.04em}
+#app .review-heading-icon {width:54px;height:54px;flex:none;display:grid;place-items:center;border-radius:16px;background:var(--ui-tint);color:var(--ui-accent);border:1px solid var(--ui-line)}
+#app .review-heading-icon svg {width:25px;height:25px}
+#app .review-section {margin:0 0 40px}
+#app .review-section-head,#app .review-section-title {display:flex;align-items:center;gap:10px}
+#app .review-section-head {justify-content:space-between;margin-bottom:16px}
+#app .review-section-head h2 {font-size:17px;letter-spacing:-.02em;margin:0}
+#app .review-section-count {display:inline-grid;place-items:center;min-width:24px;height:24px;padding:0 7px;border-radius:8px;font-size:11px;font-weight:800;background:var(--ui-tint);color:var(--ui-ink)}
+#app .review-dashboard .review-list {display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,220px),1fr));gap:16px;margin:0}
+html[data-theme][data-ui-style] #app .studio-shell .review-dashboard button.review-deck {display:flex;flex-direction:column;align-items:stretch;justify-content:initial;gap:0;min-width:0;padding:0;overflow:hidden;text-align:left;white-space:normal;border:1px solid var(--ui-line);border-radius:18px;background:var(--ui-panel);color:var(--ui-ink);box-shadow:0 6px 24px #2820370c;transition:transform .2s ease,box-shadow .2s ease,border-color .2s ease}
+html[data-theme][data-ui-style] #app .studio-shell .review-dashboard button.review-deck:hover:not(:disabled){transform:translateY(-4px);border-color:var(--ui-accent);box-shadow:0 16px 28px #24163824}
+#app .review-deck-art {position:relative;display:grid;place-items:center;height:134px;overflow:hidden;background:linear-gradient(140deg,#e5d4ff,#d8edff);color:#62509c}
+#app .review-deck:nth-child(4n+2) .review-deck-art {background:linear-gradient(140deg,#ffdedc,#fcebbd);color:#9c5268}
+#app .review-deck:nth-child(4n+3) .review-deck-art {background:linear-gradient(140deg,#cceee1,#d7eafc);color:#35766f}
+#app .review-deck:nth-child(4n+4) .review-deck-art {background:linear-gradient(140deg,#f8dfef,#e7dcfb);color:#975a8c}
+#app .review-art-card {position:relative;display:grid;place-items:center;width:68px;height:78px;border-radius:13px;background:#ffffffdc;box-shadow:0 8px 16px #44326126;transform:rotate(-8deg);z-index:1}
+#app .review-art-card svg {width:28px;height:28px}
+#app .review-art-card i {position:absolute;right:-12px;top:-13px;color:#ed9c63;font-style:normal;font-size:23px}
+#app .review-art-shape {position:absolute;border-radius:50%;background:#ffffff55}
+#app .review-art-shape-one {width:124px;height:124px;right:-24px;top:-48px}
+#app .review-art-shape-two {width:70px;height:70px;left:-20px;bottom:-28px}
+#app .review-art-number {position:absolute;left:14px;top:12px;font-size:10px;letter-spacing:.08em;font-weight:800;opacity:.7}
+#app .review-deck-body {display:flex;flex-direction:column;flex:1;min-width:0;gap:18px;padding:16px}
+#app .review-deck-body strong {font-size:15px;line-height:1.35;overflow-wrap:anywhere;white-space:normal}
+#app .review-deck-footer {display:flex;align-items:center;justify-content:space-between;gap:10px;margin-top:auto;font-size:12px;color:var(--ui-muted)}
+#app .review-deck-arrow {width:30px;height:30px;display:grid;place-items:center;border-radius:9px;background:var(--ui-tint);color:var(--ui-accent);flex:none}
+#app .review-deck-arrow svg {width:16px;height:16px}
+#app .review-cloud-action {display:inline-flex;align-items:center;justify-content:center;gap:8px;min-height:40px}
+#app .review-cloud-action svg {width:16px;height:16px}
+#app .review-cloud-message {color:var(--ui-muted);font-size:13px;margin:8px 0}
+#app .review-empty {display:flex;align-items:center;gap:14px;flex-wrap:wrap;min-height:100px;padding:20px;border:1px dashed var(--ui-line);border-radius:18px;color:var(--ui-muted)}
+#app .review-empty>span {display:grid;place-items:center;width:42px;height:42px;border-radius:12px;background:var(--ui-tint);color:var(--ui-accent)}
+#app .review-empty strong {flex:1;font-size:14px;color:var(--ui-ink)}
+#app .review-play {max-width:940px}
+#app .review-play-head,#app .review-play-title {display:flex;align-items:center;justify-content:space-between;gap:16px}
+#app .review-play-head {margin-bottom:30px}
+#app .review-play-head .review-back {display:inline-flex;align-items:center;gap:8px}
+#app .review-play-source {color:var(--ui-accent);font-size:12px;font-weight:750;padding:7px 11px;background:var(--ui-tint);border-radius:9px}
+#app .review-play-title h1 {font-size:clamp(23px,3vw,34px);margin:0;overflow-wrap:anywhere}
+#app .review-play-title>span {font-size:12px;font-weight:700;color:var(--ui-muted);white-space:nowrap}
+#app .review-page .review-card {padding:clamp(22px,4vw,38px)}
+#app .review-page .review-card h2 {font-size:clamp(21px,2.4vw,29px);line-height:1.25;margin:14px 0 28px}
+#app .review-game-label {display:inline-flex;align-items:center;justify-content:center;gap:7px;border-radius:10px;padding:8px 10px;background:var(--ui-tint);letter-spacing:.06em}
+#app .review-game-label i {font-style:normal}
+#app .review-options button {position:relative}
+#app .review-options .review-answer-mark {margin-left:auto;color:#177147;font-weight:900;font-size:20px}
+#app .review-result {display:grid;gap:4px;padding:16px;margin-top:20px;border-radius:14px;background:var(--ui-soft);color:var(--ui-ink)}
+#app .review-result strong {font-size:15px}
+#app .review-result span,#app .review-result p {font-size:13px;line-height:1.5;overflow-wrap:anywhere}
+#app .review-controls {align-items:center;margin-top:18px}
+#app .review-controls button {display:inline-flex;align-items:center;justify-content:center;gap:6px}
+#app .review-controls button:last-child {margin-left:auto}
+@media(max-width:600px){#app .review-dashboard .review-heading{margin-bottom:30px}#app .review-dashboard .review-list{grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}#app .review-deck-art{height:105px}#app .review-deck-body{padding:12px;gap:12px}#app .review-deck-body strong{font-size:13px}#app .review-play-title{align-items:flex-start;flex-direction:column;gap:8px}#app .review-controls button{flex:1}#app .review-controls button:last-child{margin-left:0}}
+@media(max-width:360px){#app .review-dashboard .review-list{grid-template-columns:1fr}}
+@media(prefers-reduced-motion:reduce){html:not([data-motion=normal]) #app .review-deck{transition:none!important}}
+html[data-motion=reduced] #app .review-deck{transition:none!important}
+/* Compositor compacto: os três controles ficam na mesma linha do texto. */
+#app .lesson-chat .chat-composer {display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:end;gap:8px}
+#app .lesson-chat .chat-composer textarea {display:block;width:100%;min-height:44px;height:44px;max-height:120px;resize:none;overflow-y:auto;line-height:1.4;padding:11px 12px;margin:0}
+#app .lesson-chat .chat-compose-actions {display:flex;align-items:center;gap:5px}
+html[data-theme][data-ui-style] #app .lesson-chat .chat-compose-actions :is(button,label.chat-image-picker) {display:grid;place-items:center;flex:none;width:38px;min-width:38px;height:44px;min-height:44px;margin:0;padding:0;border-radius:10px;line-height:1}
+#app .lesson-chat .chat-compose-actions svg {width:18px;height:18px}
+#app .lesson-chat .chat-compose-actions .chat-image-picker {position:relative;overflow:hidden;cursor:pointer}
+#app .lesson-chat .chat-compose-actions .chat-image-picker input {position:absolute;inset:0;width:100%;height:100%;margin:0;padding:0;opacity:0;cursor:pointer}
+#app .lesson-chat .chat-image-picker:focus-within {outline:3px solid var(--ui-accent);outline-offset:2px}
+#app .lesson-chat .chat-reference {grid-column:1/-1;margin:0;font-size:12px}
+@media(max-width:390px){html[data-theme][data-ui-style] #app .lesson-chat .chat-compose-actions :is(button,label.chat-image-picker){width:36px;min-width:36px}}
+html[data-theme][data-ui-style] #app .studio-shell .review-dashboard button.review-deck {--control-radius:18px}
+#app .chat-image-message button {display:inline-flex;align-items:center;gap:6px}
+#app .chat-image-message button svg {width:15px;height:15px}
+/* Gravação de voz integrada ao compositor, sem sobreposição modal. */
+#app .lesson-chat .chat-recorder {grid-column:1/-1;display:grid;gap:10px;padding:12px;border:1px solid var(--ui-line);border-radius:14px;background:var(--ui-soft);color:var(--ui-ink)}
+#app .lesson-chat .chat-recorder[hidden] {display:none}
+#app .chat-recorder-head {display:flex;align-items:center;gap:8px;min-width:0;font-size:12px}
+#app .chat-recorder-head strong {flex:1;min-width:0}
+#app .chat-recorder-head output {font-variant-numeric:tabular-nums;font-weight:750}
+#app .chat-recorder-head button {display:grid;place-items:center;width:30px;height:30px;min-height:30px;padding:0;font-size:19px;line-height:1}
+#app .chat-recorder-dot {width:9px;height:9px;border-radius:50%;background:#e35468;box-shadow:0 0 0 4px #e3546828;flex:none}
+#app .chat-recorder-ready {display:grid;place-items:center;width:22px;height:22px;border-radius:7px;color:#197b52;background:#8de1b34d;font-weight:800}
+#app .chat-recorder-wave {display:flex;align-items:center;justify-content:center;gap:4px;height:36px;overflow:hidden}
+#app .chat-recorder-wave i {width:4px;height:var(--height,12px);border-radius:4px;background:var(--ui-accent);animation:chat-wave .85s ease-in-out infinite alternate;animation-delay:calc(var(--bar) * -.13s);transform-origin:center}
+@keyframes chat-wave {from{transform:scaleY(.5)}to{transform:scaleY(2.2)}}
+#app .chat-recorder-actions {display:flex;justify-content:flex-end;gap:7px}
+#app .lesson-chat .chat-recorder-actions button {display:inline-flex;align-items:center;justify-content:center;gap:6px;min-height:34px;padding:6px 12px;font-size:12px}
+#app .chat-recorder-actions svg {width:15px;height:15px}
+#app .chat-recorder audio {width:100%;height:40px}
+#app .chat-recorder-error {font-size:12px;line-height:1.45;color:var(--ui-ink);margin:0}
+#app .chat-recorder-error[hidden] {display:none}
+@media(prefers-reduced-motion:reduce){html:not([data-motion=normal]) #app .chat-recorder-wave i{animation:none}}
+html[data-motion=reduced] #app .chat-recorder-wave i {animation:none}

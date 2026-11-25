@@ -2,6 +2,7 @@ import { handleStorageAI, storageAIEnabled } from './storage-ai-worker.js';
 import {handleStorageAIImages} from './storage-ai-images-worker.js';
 import {handleStorageAIHistory} from './storage-ai-history-worker.js';
 import {handleChatAudio} from './chat-audio-worker.js';
+import {handleChatImage} from './chat-image-worker.js';
 import { handleCollaboration } from './collaboration-worker.js';
 import { handleMusic } from './music-worker.js';
 import { readPublicPresentation, writePublicPresentation } from './presentation-worker.js';
@@ -19,7 +20,7 @@ export function createR2Handler(verifyUser = async (token, env) => {
     if (origin && !allowed.includes(origin)) return new Response('Origin not allowed', { status: 403 });
     const headers = { 'Access-Control-Allow-Origin': origin || allowed[0], 'Access-Control-Allow-Methods': 'GET,POST,PUT,DELETE,OPTIONS', 'Access-Control-Allow-Headers': 'Authorization,Content-Type,X-Lesson-Title,X-Original-Bytes,X-Lesson-Origin', 'Cache-Control': 'private, no-store', Vary: 'Origin' };
     const json = (body, status = 200) => Response.json(body, { status, headers });
-    if(new URL(request.url).pathname==='/health'&&request.method==='GET')return json({version:25,cloudflareAI:env.STORAGE_AI_FREE_CONFIRMED==='true'&&Boolean(env.AI),storageAI:storageAIEnabled(env),storageAIMedia:storageAIEnabled(env),storageAIHistory:Boolean(env.FILES),imageSearch:true,openRouterConfigured:Boolean(env.OPENROUTER_API_KEY),geminiConfigured:Boolean(env.GEMINI_API_KEY),groqConfigured:Boolean(env.GROQ_API_KEY),mistralConfigured:Boolean(env.MISTRAL_API_KEY),nvidiaConfigured:Boolean(env.NVIDIA_API_KEY),lessonCovers:true,lessonDeletion:true,voiceChat:true,collaboration:true,animatedAvatars:true,roles:true,people:true});
+    if(new URL(request.url).pathname==='/health'&&request.method==='GET')return json({version:26,imageChat:true,cloudflareAI:env.STORAGE_AI_FREE_CONFIRMED==='true'&&Boolean(env.AI),storageAI:storageAIEnabled(env),storageAIMedia:storageAIEnabled(env),storageAIHistory:Boolean(env.FILES),imageSearch:true,openRouterConfigured:Boolean(env.OPENROUTER_API_KEY),geminiConfigured:Boolean(env.GEMINI_API_KEY),groqConfigured:Boolean(env.GROQ_API_KEY),mistralConfigured:Boolean(env.MISTRAL_API_KEY),nvidiaConfigured:Boolean(env.NVIDIA_API_KEY),lessonCovers:true,lessonDeletion:true,voiceChat:true,collaboration:true,animatedAvatars:true,roles:true,people:true});
     if (request.method === 'OPTIONS') return new Response(null, { status: 204, headers });
     const publicPresentation=await readPublicPresentation(request,env,headers);if(publicPresentation)return publicPresentation;
     const token = /^Bearer ([A-Za-z0-9_.-]{20,16384})$/.exec(request.headers.get('Authorization') || '')?.[1];
@@ -33,6 +34,7 @@ export function createR2Handler(verifyUser = async (token, env) => {
     if(images)return images;
     const aiHistory=await handleStorageAIHistory(request,env,user,headers);if(aiHistory)return aiHistory;
     const chatAudio=await handleChatAudio(request,env,user,headers,(name,args)=>callRpc(token,env,name,args));if(chatAudio)return chatAudio;
+    const chatImage=await handleChatImage(request,env,user,headers,(name,args)=>callRpc(token,env,name,args));if(chatImage)return chatImage;
     const person=/^\/people\/([a-f0-9-]{36})\/avatar$/i.exec(new URL(request.url).pathname);
     if(person){
       if(request.method!=='GET')return json({error:'method_not_allowed'},405);

@@ -58,7 +58,7 @@ export class CanvasModels {
       if(!editing){canvas.style.removeProperty('width');canvas.style.removeProperty('height');}
       this.observer = new ResizeObserver(() => {
         if(editing){
-          const ratio=slide?.sourceType&&slide.pageWidth&&slide.pageHeight?slide.pageWidth/slide.pageHeight:16/9;
+          const ratio=slide?.pageWidth&&slide.pageHeight?slide.pageWidth/slide.pageHeight:16/9;
           const width = Math.min(frame.clientWidth, frame.clientHeight * ratio);
           canvas.style.width = width + 'px'; canvas.style.height = width / ratio + 'px';
         }
