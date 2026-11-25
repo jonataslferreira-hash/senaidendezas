@@ -18,3 +18,16 @@ test('aviso de envio de imagem reflete a falha real reportada pelo serviço',asy
  const gif=Buffer.from('R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7','base64');await page.locator('#social-send [data-chat-image-input]').setInputFiles({name:'imagem.gif',mimeType:'image/gif',buffer:gif});
  await expect(page.locator('.social-chat [role=status]')).toContainText('Não foi possível verificar a permissão no servidor do chat');
 });
+test('imagens privadas abrem automaticamente, falhas permitem tentar novamente e cards de link são legíveis',async({page})=>{
+ await mockAccounts(page);await page.addInitScript(()=>localStorage.setItem('sl-tour','done'));const id='33333333-3333-4333-8333-333333333333',file='44444444-4444-4444-8444-444444444444',path=`/chat-image/dm/${id}/${file}`;let gets=0;
+ const gif=Buffer.from('R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7','base64');
+ const rows=[{id:'55555555-5555-4555-8555-555555555555',contact_id:id,author_id:ids[0],author_name:'Ana',body:'https://docs.google.com/document/d/123456/edit',created_at:'2026-01-01T12:00:00Z'},{id:'66666666-6666-4666-8666-666666666666',contact_id:id,author_id:ids[0],author_name:'Ana',body:'[storage-lab-image]'+JSON.stringify({path}),created_at:'2026-01-01T12:01:00Z'}];
+ await page.route('**/rest/v1/rpc/sl_list_contacts',route=>route.fulfill({json:[{id,status:'accepted',other_id:ids[1],other_name:'Bia'}]}));
+ await page.route('**/rest/v1/sl_direct_messages*',route=>route.fulfill({json:rows}));
+ await page.route('**/chat-image/**',route=>{gets++;expect(route.request().headers().authorization).toMatch(/^Bearer /);return gets===1?route.fulfill({status:503,json:{error:'storage_not_configured'}}):route.fulfill({contentType:'image/gif',body:gif});});
+ await page.goto('/',{waitUntil:'domcontentloaded'});await page.locator('.studio-shell > .studio-rail [data-social-action=open]').click();await page.getByRole('button',{name:'Conversar com Bia'}).click();
+ await expect(page.getByRole('button',{name:'Não foi possível carregar. Toque para tentar novamente.'})).toBeVisible();await page.getByRole('button',{name:'Não foi possível carregar. Toque para tentar novamente.'}).click();await expect(page.locator('.chat-image-message img')).toBeVisible();expect(gets).toBe(2);
+ const card=page.locator('.chat-link-card');await expect(card).toContainText('Documento no Google');await expect(card).toHaveAttribute('href','https://docs.google.com/document/d/123456/edit');
+ await page.setViewportSize({width:390,height:844});await expect(card).toBeVisible();expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);await page.screenshot({path:'test-results/chat-cards.png',animations:'disabled'});
+ await page.setViewportSize({width:1280,height:720});await page.getByRole('button',{name:'Fechar conversas'}).click();await page.locator('.studio-shell > .studio-rail [data-social-action=open]').click();await expect(page.locator('.chat-image-message img')).toBeVisible();expect(gets).toBe(2);
+});

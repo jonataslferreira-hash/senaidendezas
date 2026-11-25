@@ -29,6 +29,7 @@ export class LessonChat {
   paintTyping(){const node=this.studio.root.querySelector('[data-lesson-typing]');if(node)node.textContent=this.typing.names.length?this.typing.names.join(', ')+' está digitando…':'';}
   paint(){
     paintChatPanel(this.studio.root.querySelector('[data-chat-slot]'),this.markup());
+    this.studio.chatAudio?.mountImages(this.studio.root.querySelector('[data-chat-slot]'));
     this.paintTyping();
     if(this.open)for(const m of this.messages)this.studio.people.load(m.author_id);
   }
