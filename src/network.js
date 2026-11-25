@@ -26,7 +26,14 @@ function options() {
   // Somente no desenvolvimento: sinalizador local para testes reais de WebRTC.
   if (import.meta.env.DEV && new URLSearchParams(location.search).has('localSignal')) return { host: location.hostname, port: 9000, path: '/', secure: false, debug: 0 };
   const iceServers=parseIceServers(import.meta.env.VITE_WEBRTC_ICE_SERVERS);
-  return { debug: 0, ...(iceServers ? {config:{iceServers}} : {}) };
+  // Um sinalizador próprio pode ser autorizado pela TI; sem configuração mantém PeerJS público.
+  let signaling = {};
+  try {
+    const url = new URL(import.meta.env.VITE_PEER_SIGNAL_URL);
+    if (['https:', 'http:'].includes(url.protocol) && !url.username && !url.password && !url.search && !url.hash)
+      signaling = {host:url.hostname,port:Number(url.port)||(url.protocol==='https:'?443:80),path:url.pathname,secure:url.protocol==='https:'};
+  } catch { /* valor ausente ou inválido: mantém o padrão */ }
+  return { debug: 0, ...signaling, ...(iceServers ? {config:{iceServers}} : {}) };
 }
 export class Classroom {
   constructor(onState, onStatus) {

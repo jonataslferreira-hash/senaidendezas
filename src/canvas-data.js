@@ -27,6 +27,9 @@ export const canvasThemes = {
   // slide sem prejudicar a leitura do título e do corpo.
   pastel: { name: 'Azul, verde e rosa pastel', background: '#f7fbff', end: '#fdf2f7', color: '#243244', accent: '#2a66c9',
     tints: ['#a8d5ff', '#a9e5c6', '#ffc3da'], heading: 'Segoe UI', body: 'Segoe UI' },
+  'candy-cloud': {name:'Nuvem de algodão',background:'#fff4fa',color:'#503551',accent:'#b84786',end:'#f2ecff',tints:['#f5afd3','#b9c4f6','#f9d694']},
+  'citrus-party': {name:'Festa cítrica',background:'#fff8e5',color:'#493328',accent:'#dc634a',end:'#fff0d2',tints:['#ffb89e','#f6da79','#b4d4b1']},
+  'night-dream': {name:'Sonho noturno',background:'#262046',color:'#fff4fb',accent:'#f2a9d5',end:'#34305b',tints:['#d6a8e8','#89bde6','#f9d89d']},
   ...openSlideThemes,
   ...communitySlideThemes,
   ...studioSlideThemes

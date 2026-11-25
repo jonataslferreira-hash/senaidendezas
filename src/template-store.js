@@ -2,6 +2,7 @@ import { canvasMarkup, esc } from './canvas-view.js';
 import { presentationSlide } from './slide-display.js';
 import { canvasThemes } from './canvas-data.js';
 import { mountCatalogFluid } from './catalog-fluid.js';
+import {prefersReducedMotion} from './motion-preference.js';
 import {
   deckTemplates,
   templateCategories as deckCategories,
@@ -91,12 +92,14 @@ export function createTemplateStore({ render, useDeck, downloadDeckPptx, onRoute
     detailId: '',
     detailTheme: '',
     detailSlide: 0,
+    manualNavigation: false,
     favorites: loadFavorites(),
     busy: ''
   };
 
   let observer = null;
   let fluidController = null;
+  let carouselTimer = null;
   let persistentSim = null;
   let boundCanvas = null;
 
@@ -114,11 +117,11 @@ export function createTemplateStore({ render, useDeck, downloadDeckPptx, onRoute
     const cover = deckCoverPreview(deck);
     const fav = state.favorites.has(deck.id);
     return `<article class="tstore-card" data-deck-id="${esc(deck.id)}">
-      <div class="tstore-card-media" role="button" tabindex="0" data-tstore-action="open-detail" data-deck-id="${esc(deck.id)}" aria-label="Ver detalhes de ${esc(deck.name)}">
+      <div class="tstore-card-media" style="--preview-ratio:${cover.pageWidth/cover.pageHeight||16/9}" role="button" tabindex="0" data-tstore-action="open-detail" data-deck-id="${esc(deck.id)}" aria-label="Ver detalhes de ${esc(deck.name)}">
         <div class="tstore-card-canvas" inert aria-hidden="true">${renderSlideBox(cover)}</div>
         <div class="tstore-card-badges">
           ${deck.hasQuiz ? '<span class="tstore-pill tstore-pill-quiz">Quiz</span>' : ''}
-          <span class="tstore-pill">${deck.slideCount} slides</span>
+          <span class="tstore-pill">${deck.slideCount} slides</span>${deck.width?`<span class="tstore-pill">${deck.width===deck.height?'1:1':deck.width<deck.height?'9:16':'16:9'}</span>`:''}
         </div>
         <button type="button" class="tstore-fav-btn ${fav ? 'is-saved' : ''}" data-tstore-action="toggle-favorite" data-deck-id="${esc(deck.id)}" aria-label="${fav ? 'Remover dos salvos' : 'Salvar apresentação'}" aria-pressed="${fav}">${heartIcon(fav)}</button>
       </div>
@@ -258,8 +261,8 @@ export function createTemplateStore({ render, useDeck, downloadDeckPptx, onRoute
 
         <div class="eshop-main">
           <div class="eshop-gallery">
-            <div class="eshop-hero-stage ${nextSlide ? 'has-peek' : ''}">
-              <div class="eshop-hero-frame">
+            <div class="eshop-hero-stage ${nextSlide ? 'has-peek' : ''}" style="--preview-ratio:${currentSlide.pageWidth/currentSlide.pageHeight||16/9}">
+              <div class="eshop-hero-frame" style="--preview-ratio:${currentSlide.pageWidth/currentSlide.pageHeight||16/9}">
                 <div class="eshop-hero-canvas" inert aria-hidden="true">${renderSlideBox(currentSlide)}</div>
                 ${slides.length > 1 ? `<button type="button" class="eshop-nav eshop-prev" data-tstore-action="detail-prev" aria-label="Slide anterior">‹</button>
                   <button type="button" class="eshop-nav eshop-next" data-tstore-action="detail-next" aria-label="Próximo slide">›</button>` : ''}
@@ -330,7 +333,7 @@ export function createTemplateStore({ render, useDeck, downloadDeckPptx, onRoute
                 <div><dt>Origem</dt><dd>${esc(deck.collectionLabel)}</dd></div>
                 <div><dt>Licença</dt><dd>${deck.credit?.licenseUrl ? `<a href="${esc(deck.credit.licenseUrl)}" target="_blank" rel="noopener noreferrer">${esc(deck.license)} ↗</a>` : esc(deck.license)}</dd></div>
                 <div><dt>Autoria</dt><dd>${deck.credit?.sourceUrl ? `<a href="${esc(deck.credit.sourceUrl)}" target="_blank" rel="noopener noreferrer">${esc(deck.author)} ↗</a>` : esc(deck.author)}</dd></div>
-                <div><dt>Formato</dt><dd>16:9 · Editável + PPTX + PDF</dd></div>
+                <div><dt>Formato</dt><dd>${deck.width&&deck.height&&deck.width===deck.height?'1:1':deck.width&&deck.width<deck.height?'9:16':'16:9'} · Editável + PPTX + PDF</dd></div>
               </dl>
             </div>
           </aside>
@@ -416,6 +419,7 @@ export function createTemplateStore({ render, useDeck, downloadDeckPptx, onRoute
     state.detailId = deck.id;
     state.detailTheme = deck.theme;
     state.detailSlide = 0;
+    state.manualNavigation = false;
     onRouteChange?.();
     render();
     window.scrollTo?.({ top: 0, behavior: 'instant' });
@@ -425,6 +429,20 @@ export function createTemplateStore({ render, useDeck, downloadDeckPptx, onRoute
     state.detailId = '';
     state.detailSlide = 0;
     onRouteChange?.();
+  }
+
+  function updateDetailSlide(root) {
+    const page=root?.querySelector('[data-detail-id]');if(!page)return;
+    const deck=getDeckTemplate(state.detailId),slides=deckPreviewSlides(deck,state.detailTheme||deck.theme).slides;
+    if(!slides.length)return;
+    const index=Math.max(0,Math.min(state.detailSlide,slides.length-1));
+    const hero=page.querySelector('.eshop-hero-canvas'),peek=page.querySelector('.eshop-peek-canvas');
+    if(hero){hero.innerHTML=renderSlideBox(slides[index]);hero.classList.remove('is-arriving');void hero.offsetWidth;hero.classList.add('is-arriving');}
+    if(peek)peek.innerHTML=renderSlideBox(slides[(index+1)%slides.length]);
+    const counter=page.querySelector('.eshop-slide-counter');if(counter)counter.textContent=`${index+1} / ${slides.length}`;
+    page.querySelectorAll('[data-tstore-action="detail-slide"]').forEach(button=>{const active=Number(button.dataset.index)===index;button.classList.toggle('is-active',active);if(button.classList.contains('eshop-thumb'))button.setAttribute('aria-current',String(active));});
+    const strip=page.querySelector('.eshop-thumbs'),active=strip?.querySelector('.eshop-thumb.is-active');
+    if(strip&&active)strip.scrollTo({left:active.offsetLeft-strip.offsetLeft-strip.clientWidth/2+active.offsetWidth/2,behavior:prefersReducedMotion()?'instant':'smooth'});
   }
 
   function handleClick(target, root) {
@@ -486,16 +504,18 @@ export function createTemplateStore({ render, useDeck, downloadDeckPptx, onRoute
       return true;
     }
     if (action === 'detail-slide') {
+      state.manualNavigation = true;
       state.detailSlide = Number(el.dataset.index) || 0;
-      render();
+      updateDetailSlide(root);
       return true;
     }
     if (action === 'detail-prev' || action === 'detail-next') {
+      state.manualNavigation = true;
       const deck = getDeckTemplate(state.detailId);
       const total = deckPreviewSlides(deck, state.detailTheme || deck.theme).slides.length;
       if (total > 1) {
         state.detailSlide = (state.detailSlide + (action === 'detail-next' ? 1 : -1) + total) % total;
-        render();
+        updateDetailSlide(root);
       }
       return true;
     }
@@ -568,8 +588,16 @@ export function createTemplateStore({ render, useDeck, downloadDeckPptx, onRoute
     mount: root => {
       observeSentinel(root);
       bindPointer(root);
+      clearInterval(carouselTimer);
+      if(state.detailId)carouselTimer=setInterval(()=>{
+        const page=root.querySelector('[data-detail-id]');
+        if(!page||document.hidden||state.manualNavigation||prefersReducedMotion())return;
+        const slides=deckPreviewSlides(getDeckTemplate(state.detailId),state.detailTheme).slides;
+        if(slides.length>1){state.detailSlide=(state.detailSlide+1)%slides.length;updateDetailSlide(root);}
+      },3000);
     },
     unmount: () => {
+      clearInterval(carouselTimer);
       disconnectObserver();
       unbindPointer();
       persistentSim = null;

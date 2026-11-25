@@ -1339,6 +1339,9 @@ export const deckGalleryTabs = [
 ];
 
 export const templateThemeChoices = [
+  ['candy-cloud', 'Nuvem de algodão', 'native'],
+  ['citrus-party', 'Festa cítrica', 'native'],
+  ['night-dream', 'Sonho noturno', 'native'],
   ['studio-orbit', 'Órbita (Storage Lab)', 'native'],
   ['studio-journal', 'Caderno (Storage Lab)', 'native'],
   ['studio-signal', 'Sinal Escuro (Storage Lab)', 'native'],

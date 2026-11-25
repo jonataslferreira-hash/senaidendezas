@@ -1,7 +1,7 @@
 import {decodeRealtime} from './realtime-fixture.js';
 import {test,expect} from '@playwright/test';
 test('chat entrega mensagens entre duas contas, escapa HTML e recupera histórico',async({browser})=>{
-  const documentId='33333333-3333-4333-8333-333333333333',groupId='44444444-4444-4444-8444-444444444444',rows=[],sockets=new Set(),contexts=[];
+  const documentId='33333333-3333-4333-8333-333333333333',groupId='44444444-4444-4444-8444-444444444444',rows=[],sockets=new Set(),contexts=[],uploads=new Map();
   async function user(name,n){
     const uid=`11111111-1111-4111-8111-${String(n).padStart(12,'0')}`,person={id:uid,email:name+'@example.com',aud:'authenticated',app_metadata:{},user_metadata:{display_name:name}};
     const token=[Buffer.from('{"alg":"HS256"}').toString('base64url'),Buffer.from(JSON.stringify({sub:uid,exp:Math.floor(Date.now()/1000)+3600})).toString('base64url'),'test'].join('.');
@@ -26,13 +26,19 @@ test('chat entrega mensagens entre duas contas, escapa HTML e recupera históric
       }
       return route.fulfill({json:[]});
     });
-    await page.goto('/');await expect(page.getByRole('button',{name,exact:true})).toBeVisible();await page.locator('.studio-rail [data-social-action=open]').click();await page.getByRole('button',{name:'Conversas de aulas',exact:true}).click();await expect(page.locator('#chat-message')).toBeEnabled();return page;
+    await page.route('https://storage-lab-files.lagujf.workers.dev/chat-image/**',route=>{const req=route.request(),key=new URL(req.url()).pathname;if(req.method()==='PUT'){uploads.set(key,req.postDataBuffer());return route.fulfill({json:{ok:true}});}if(req.method()==='GET'&&uploads.has(key))return route.fulfill({contentType:'image/gif',body:uploads.get(key)});return route.fulfill({status:404});});
+    await page.goto('/',{waitUntil:'domcontentloaded'});await expect(page.getByRole('button',{name,exact:true})).toBeVisible();await page.locator('.studio-shell > .studio-rail [data-social-action=open]').click();await page.getByRole('button',{name:'Conversas de aulas',exact:true}).click();await expect(page.locator('#chat-message')).toBeEnabled();return page;
   }
   try{
     const ana=await user('Ana',1),bia=await user('Bia',2);
-    await ana.getByLabel('Mensagem',{exact:true}).fill('Vamos melhorar este slide?');await ana.getByRole('button',{name:'Enviar mensagem',exact:true}).click();await expect(bia.locator('.chat-messages')).toContainText('Vamos melhorar este slide?');
+    const composer=ana.locator('#chat-form');await expect(composer.locator('[data-chat-image-input]')).toHaveCount(1);await expect(composer.locator('.chat-image-picker svg')).toBeVisible();
+    const sizes=await composer.evaluate(form=>{const text=form.querySelector('textarea').getBoundingClientRect(),buttons=[...form.querySelectorAll('.chat-compose-actions > *')].map(b=>b.getBoundingClientRect());return {height:text.height,buttons:buttons.map(b=>({height:b.height,top:b.top})),textTop:text.top};});expect(sizes.height).toBeLessThanOrEqual(50);for(const b of sizes.buttons){expect(b.height).toBeLessThanOrEqual(50);expect(Math.abs(b.top-sizes.textTop)).toBeLessThan(3);}
+    await ana.locator('#chat-message').fill('linha');await ana.locator('#chat-message').press('Shift+Enter');await expect(ana.locator('#chat-message')).toHaveValue('linha\n');
+
+    await ana.getByLabel('Mensagem',{exact:true}).fill('Vamos melhorar este slide?');await ana.locator('#chat-message').press('Enter');await expect(bia.locator('.chat-messages')).toContainText('Vamos melhorar este slide?');
     await bia.getByLabel('Mensagem',{exact:true}).fill('<img src=x onerror=alert(1)>');await bia.getByRole('button',{name:'Enviar mensagem',exact:true}).click();await expect(ana.locator('.chat-messages')).toContainText('<img src=x onerror=alert(1)>');await expect(ana.locator('.chat-messages img')).toHaveCount(0);
-    await ana.reload();await ana.locator('.studio-rail [data-social-action=open]').click();await ana.getByRole('button',{name:'Conversas de aulas',exact:true}).click();await expect(ana.locator('.chat-message')).toHaveCount(2);await ana.setViewportSize({width:390,height:844});expect(await ana.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
+    const gif=Buffer.from('R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7','base64');await ana.locator('#chat-form [data-chat-image-input]').setInputFiles({name:'imagem.gif',mimeType:'image/gif',buffer:gif});await expect(ana.getByRole('button',{name:'Ver imagem'})).toBeVisible();await expect(bia.getByRole('button',{name:'Ver imagem'})).toBeVisible();await bia.getByRole('button',{name:'Ver imagem'}).click();await expect(bia.locator('.chat-image-message img')).toBeVisible();
+    await ana.reload({waitUntil:'domcontentloaded'});await ana.locator('.studio-shell > .studio-rail [data-social-action=open]').click();await ana.getByRole('button',{name:'Conversas de aulas',exact:true}).click();await expect(ana.locator('.chat-message')).toHaveCount(3);await ana.setViewportSize({width:390,height:844});expect(await ana.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
     await ana.screenshot({path:'test-results/chat-mobile.png',animations:'disabled'});
   }finally{for(const context of contexts)await context.close();}
 });

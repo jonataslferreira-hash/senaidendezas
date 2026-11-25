@@ -85,7 +85,13 @@ export async function deleteCloudLesson(client, path) {
 
 async function r2Request(s, path, options = {}) {
   if (!r2ApiUrl || !r2ApiUrl.startsWith('https://')) throw Error('O endereço seguro do R2 ainda não foi configurado.');
-  const response = await fetch(r2ApiUrl + path, { ...options, headers: { ...options.headers, Authorization: 'Bearer ' + s.token } });
+  let response;
+  try { response = await fetch(r2ApiUrl + path, { ...options, headers: { ...options.headers, Authorization: 'Bearer ' + s.token } }); }
+  catch (error) {
+    if (error.name === 'AbortError') throw error;
+    const preview = typeof location !== 'undefined' && location.hostname.endsWith('.e2b.app');
+    throw Error(preview ? 'Não foi possível conectar à nuvem nesta prévia. Verifique a conexão e a autorização de origem no Worker.' : 'Não foi possível conectar à nuvem. Verifique a conexão e tente novamente.');
+  }
   unchanged(s);if(response.status===405&&options.method==='DELETE'&&path.startsWith('/lessons/'))throw Error('Atualize o Worker do Cloudflare para habilitar a exclusão de aulas.');if(response.status===415&&options.body?.type==='image/gif')throw Error('Para salvar GIFs, publique o Worker atualizado no Cloudflare.');if(!response.ok)throw Error('Não foi possível acessar o R2. Confira a conexão e a configuração da conta.'); return response;
 }
 export async function putAvatar(client, file) {

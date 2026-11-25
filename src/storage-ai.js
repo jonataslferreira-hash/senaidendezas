@@ -534,7 +534,7 @@ export class StorageAI {
     });
     studio.root.addEventListener('keydown',event=>{
       if(event.key==='Escape'&&this.showCount){this.closeCount();return;}
-      if(event.target.id!=='storage-ai-create-prompt'||event.key!=='Enter'||event.shiftKey||event.isComposing)return;
+      if(!['storage-ai-create-prompt','storage-ai-prompt'].includes(event.target.id)||event.key!=='Enter'||event.shiftKey||event.isComposing||event.repeat)return;
       event.preventDefault();event.target.form?.requestSubmit();
     });
     // Ctrl+V: imagens (print, foto copiada) viram anexos; um .pptx copiado é importado. Texto cola normal.

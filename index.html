@@ -30,17 +30,15 @@
     <div id="app"><p style="padding:3rem;font:18px system-ui;color:#d6c4ed">Preparando seu espaço de ensino…</p></div>
     <div id="toast" role="status" aria-live="polite"></div>
     <script>
-      window.addEventListener('load', function () {
-        setTimeout(function () {
+      setTimeout(function () {
           if (document.documentElement.dataset.appReady === 'true') return;
           var app = document.getElementById('app');
           app.textContent = '';
           var box = document.createElement('div'); box.style.cssText = 'padding:3rem;font:18px system-ui;color:#d6c4ed';
-          var text = document.createElement('p'); text.textContent = 'O site não terminou de carregar. Tente recarregar para buscar a versão atual.';
+          var text = document.createElement('p'); text.textContent = 'O site está demorando para carregar. Confira sua conexão ou se esta rede permite o GitHub Pages e tente recarregar. Recursos como chat e salas também dependem de outros serviços.';
           var button = document.createElement('button'); button.textContent = 'Recarregar site'; button.style.cssText = 'padding:12px 20px;cursor:pointer'; button.onclick = function () { var url = new URL(location.href); url.searchParams.set('reload', Date.now()); location.replace(url.href); };
           box.append(text, button); app.append(box);
-        }, 12000);
-      });
+      }, 8000);
     </script>
     <script type="module" src="./src/app.js"></script>
   </body>

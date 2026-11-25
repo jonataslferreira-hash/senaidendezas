@@ -13,7 +13,7 @@ test('revisão reúne quiz e questões das dinâmicas, sem modificar a aula',()=
  const original=JSON.stringify(lesson),questions=reviewQuestions(lesson);
  assert.equal(questions.length,lesson.questions.length+1);assert.equal(questions.at(-1).source,'Cabo de guerra');
  const studio={library:{lessons:[lesson]},reviewId:lesson.id,reviewChoice:1,reviewIndex:0};
- assert.match(reviewMarkup(studio),/Sem alterar placar/);assert.match(reviewMarkup(studio),/role="status"/);assert.equal(JSON.stringify(lesson),original);
+ assert.match(reviewMarkup(studio),/Progresso das questões/);assert.match(reviewMarkup(studio),/role="status"/);assert.equal(JSON.stringify(lesson),original);
 });
 
 test('histórico de quiz sobrevive à limpeza de respostas, não é enviado aos participantes e PDF é paginado',async()=>{
