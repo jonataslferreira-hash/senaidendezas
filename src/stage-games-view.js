@@ -12,6 +12,7 @@ const paths = {
   quiz: '<circle cx="12" cy="12" r="9"/><path d="M9.6 9.6a2.5 2.5 0 1 1 3.6 2.2c-.8.5-1.2 1-1.2 1.9"/><path d="M12 17v.2"/>',
   teams: '<circle cx="9" cy="8" r="3.2"/><path d="M3 20c0-3.3 2.7-6 6-6s6 2.7 6 6"/><circle cx="17.5" cy="9" r="2.4"/><path d="M17 14.3c2.5.2 4 2.4 4 5.7"/>',
   flash: '<path d="M13 2.5 5 13.5h6l-1 8 8-11h-6z"/>',
+  flashcards: '<rect x="3" y="8" width="14" height="12" rx="2"/><path d="M7 8V5h12a2 2 0 0 1 2 2v10h-4M7 12h6M7 16h4"/>',
   survival: '<path d="M12 20.5s-7.5-4.6-7.5-10.3a4.2 4.2 0 0 1 7.5-2.6 4.2 4.2 0 0 1 7.5 2.6c0 5.7-7.5 10.3-7.5 10.3z"/>',
   challenge: '<path d="M9 3h6M10 3v6l-5 9a2 2 0 0 0 1.8 3h10.4a2 2 0 0 0 1.8-3l-5-9V3M7.6 15h8.8"/>',
   raffle: '<rect x="4" y="4" width="16" height="16" rx="3.5"/><path d="M8.8 8.8v.1M15.2 15.2v.1M12 12v.1M15.2 8.8v.1M8.8 15.2v.1"/>',
@@ -458,7 +459,14 @@ function raceView(state, g, host, player, now) {
     (host ? live(hostActions(state, [g.state === 'ready' ? ['next', '▶ Largada!', 'primary'] : g.state === 'open' ? ['next', 'Pular pergunta'] : g.state === 'reveal' ? ['next', 'Avançar já'] : ['restart', '↻ Correr de novo']], { showNext: done })) : '');
 }
 
-const views = { teams: teamsView, flash: flashView, survival: survivalView, challenge: challengeView, raffle: raffleView, tug: tugView, race: raceView };
+function flashcardsView(state,g,host) {
+  const nextStage=state.activity?.hasNext?'Próxima etapa →':state.hasScoredStages?'Ver placar geral →':'Concluir apresentação';
+  const card=`<section class="flashcard-stage-card" data-side="${g.flipped?'back':'front'}" aria-label="Cartão ${g.index+1} de ${g.total}" aria-live="polite"><span class="flashcard-stage-side">${g.flipped?'VERSO · RESPOSTA':'FRENTE · PERGUNTA'}</span><p>${esc(g.flipped?g.back:g.front)}</p><span class="flashcard-stage-count">${g.index+1} / ${g.total}</span></section>`;
+  const controls=host?`<div class="flashcard-stage-controls"><button type="button" class="btn secondary" data-game-do="card-prev" ${g.index===0?'disabled':''}>← Anterior</button><button type="button" class="btn primary" data-game-do="card-flip">${g.flipped?'Ver pergunta':'Revelar resposta'}</button><button type="button" class="btn secondary" data-game-do="card-next" ${g.index>=g.total-1?'disabled':''}>Próximo →</button></div><button type="button" class="btn secondary flashcard-stage-next" data-action="next-stage">${nextStage}</button>`:`<p class="flashcard-stage-hint">Acompanhe os cartões com o apresentador · sem pontuação</p>`;
+  return live(card+controls,'flashcards');
+}
+
+const views = { teams: teamsView, flash: flashView, survival: survivalView, challenge: challengeView, raffle: raffleView, tug: tugView, race: raceView, flashcards: flashcardsView };
 
 const normTitle = value => String(value ?? '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]+/gi, ' ').trim().toLowerCase();
 

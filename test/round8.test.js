@@ -289,7 +289,7 @@ test('rodada 14: escolha de time, pódio guiado pela sala, corrida, textos escon
   const { defaultGame, gameTypes } = await import('../src/stage-games.js');
   const { writeLesson, readLesson } = await import('../src/collaboration-core.js');
   const Y = await import('yjs');
-  assert.equal(gameTypes.length, 7, 'com slides, enquete e quiz são 10 tipos de etapa');
+  assert.equal(gameTypes.length, 8, 'flashcards também é uma etapa disponível');
   let now = 1000;
   const base = newLesson(), question = { ...newQuestion(), text: 'Quanto é 2+2?', options: ['3', '4'], correct: 1, explanation: 'Conta simples.' };
   const stage = (type, extra = {}) => ({ id: 's-' + type, title: type, kind: 'text', game: { ...defaultGame(type), ...extra } });

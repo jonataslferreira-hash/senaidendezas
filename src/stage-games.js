@@ -10,9 +10,9 @@
 // a sala do professor aplicar e os testes conferirem.
 import { createUuid } from './uuid.js';
 
-export const gameTypes = ['teams', 'flash', 'survival', 'challenge', 'raffle', 'tug', 'race'];
+export const gameTypes = ['teams', 'flash', 'survival', 'challenge', 'raffle', 'tug', 'race', 'flashcards'];
 export const isGameType = type => gameTypes.includes(type);
-export const gameNames = { teams: 'Equipes', flash: 'Relâmpago', survival: 'Sobrevivência', challenge: 'Desafio no experimento', raffle: 'Sorteio', tug: 'Cabo de guerra', race: 'Corrida' };
+export const gameNames = { teams: 'Equipes', flash: 'Relâmpago', survival: 'Sobrevivência', challenge: 'Desafio no experimento', raffle: 'Sorteio', tug: 'Cabo de guerra', race: 'Corrida', flashcards: 'Flashcards' };
 export const gameHints = {
   teams: 'Divide a turma em times e mostra o placar',
   flash: 'Perguntas com tempo curto: acerto rápido vale mais',
@@ -20,7 +20,8 @@ export const gameHints = {
   challenge: 'Quem atinge a meta no experimento?',
   raffle: 'Roleta com os nomes de quem está na sala',
   tug: 'Dois lados respondem por rodadas; quem acerta mais puxa a corda',
-  race: 'Cada acerto faz o boneco correr. Resposta rápida vai mais longe'
+  race: 'Cada acerto faz o boneco correr. Resposta rápida vai mais longe',
+  flashcards: 'Cartões de pergunta e resposta para revisar com a turma, sem pontuação'
 };
 export const teamPalette = [['Azul', '#3b82f6'], ['Laranja', '#f97316'], ['Verde', '#22c55e'], ['Rosa', '#ec4899'], ['Roxo', '#a855f7'], ['Ciano', '#06b6d4'], ['Amarelo', '#eab308'], ['Vermelho', '#ef4444'], ['Lima', '#84cc16'], ['Magenta', '#d946ef']];
 // Gradiente do time: a cor do time + uma segunda cor derivada (roda o matiz).
@@ -53,6 +54,7 @@ const text = (value, max) => String(value ?? '').replace(/[\u0000-\u0008\u000b-\
 const line = (value, max) => text(value, max).replace(/\s+/g, ' ').trim();
 
 export function defaultGame(type) {
+  if (type === 'flashcards') return { type, text: 'Flashcards', cards: [{ front: '', back: '' }] };
   if (type === 'teams') return { type, text: 'Que comecem os jogos!', count: 2, pick: false };
   if (type === 'race') return { type, text: 'Corrida do saber', seconds: 15, questions: [1, 2, 3].map(n => ({ text: 'Pergunta ' + n, options: ['Opção A', 'Opção B'], correct: 0 })) };
   if (type === 'flash') return { type, text: 'Desafio relâmpago', seconds: 10, questions: [1, 2, 3].map(n => ({ text: 'Pergunta ' + n, options: ['Opção A', 'Opção B'], correct: 0 })) };
@@ -70,6 +72,14 @@ export function validateGame(game, draft = false, simulationIds = null) {
   if (game == null || typeof game !== 'object' || !isGameType(game.type)) return null;
   const result = { type: game.type, text: text(game.text, 300) };
   if (!draft && !result.text.trim()) throw Error('Escreva o enunciado da etapa "' + gameNames[game.type] + '".');
+  if (game.type === 'flashcards') {
+    result.cards=(Array.isArray(game.cards)?game.cards:[]).slice(0,100).filter(card=>card&&typeof card==='object').map((card,i)=>{
+      const front=text(card.front,700),back=text(card.back,1500);
+      if(!draft&&(!front.trim()||!back.trim()))throw Error('Flashcards: preencha a frente e o verso do cartão '+(i+1)+'.');
+      return {front,back};
+    });
+    if(!result.cards.length){if(!draft)throw Error('Flashcards: adicione pelo menos um cartão.');result.cards=[{front:'',back:''}];}
+  }
   if (game.type === 'teams') { result.count = Math.max(2, Math.min(10, Math.floor(Number(game.count) || 2))); result.pick = Boolean(game.pick); }
   const questionList = (label, source = game.questions, max = 25) => {
     const list = (Array.isArray(source) ? source : []).slice(0, max).filter(q => q && typeof q === 'object').map((q, index) => {
@@ -137,7 +147,8 @@ export function validateGame(game, draft = false, simulationIds = null) {
 // O que os alunos recebem: sem a resposta.
 export function publicGame(game) {
   if (!game) return game;
-  const { correct, answer, questions, rounds, options, ...rest } = game;
+  const { correct, answer, questions, rounds, options, cards, ...rest } = game;
+  if (game.type === 'flashcards') return { ...rest, cardCount: (cards || []).length };
   if (game.type === 'tug') return { ...rest, options, rounds: (rounds || []).length };
   if (game.type === 'survival' || game.type === 'race' || game.type === 'flash') return { ...rest, rounds: (questions || []).length };
   if (options) rest.options = options;
@@ -206,7 +217,8 @@ export function startGame(room, random = Math.random) {
   settleTeams(room);
   d.phase = 'game';
   const game = d.game = { id: createUuid(), type: config.type, state: 'open', startedAt: room.now() };
-  if (config.type === 'teams') {
+  if (config.type === 'flashcards') Object.assign(game, { index: 0, flipped: false });
+  else if (config.type === 'teams') {
     if (config.pick) { d.teams = teamPalette.slice(0, config.count).map(([name, color]) => ({ name, color })); d.teamPick = true; for (const p of d.players) if (!(Number.isInteger(p.team) && p.team < config.count)) p.team = null; game.state = 'open'; }
     else { if (d.teams?.length !== config.count) formTeams(room, config.count, random); else for (const p of d.players) assignTeam(room, p); game.state = 'done'; }
   }
@@ -243,6 +255,11 @@ export function gameControl(room, value, random = Math.random) {
   // apresentador vê o aviso, a sala continua de pé.
   const d = room.data, game = d.game, config = room.slides[d.slide]?.game, action = value?.do;
   if (d.phase !== 'game' || !game || !config) throw Error('Esta ação não está disponível agora.');
+  if (game.type === 'flashcards' && ['card-flip','card-prev','card-next'].includes(action)) {
+    if(action==='card-flip')game.flipped=!game.flipped;
+    else {const next=(game.index||0)+(action==='card-next'?1:-1);if(next<0||next>=config.cards.length)throw Error('Não há outro cartão nessa direção.');game.index=next;game.flipped=false;}
+    return;
+  }
   if (action === 'restart') { startGame(room, random); return; }
   if (action === 'end') {
     if (game.type === 'tug' && game.state !== 'done') { if (game.state === 'open') finalizeTugRound(room); finishTug(room); }
@@ -673,6 +690,10 @@ export function gameSnapshot(room, playerId, bare = false) {
   const ask = (question, extra) => question ? { text: bare ? '' : question.text, options: question.options.map(option => bare ? '' : option), ...extra } : null;
   const done = game.state === 'done', presenter = !playerId;
   const base = { id: game.id, type: game.type, state: game.state, text: config.text, startedAt: game.startedAt, resultStartedAt: game.resultStartedAt || 0, bare };
+  if (game.type === 'flashcards') {
+    const index=Math.max(0,Math.min(config.cards.length-1,Number(game.index)||0)), card=config.cards[index];
+    return {...base,index,total:config.cards.length,flipped:Boolean(game.flipped),front:card?.front||'',...(game.flipped?{back:card?.back||''}:{})};
+  }
   if (game.type === 'teams') return { ...base, pick: Boolean(d.teamPick) };
   if (game.type === 'flash') {
     const question = game.round >= 0 ? config.questions[game.round] : null, shown = game.state === 'reveal' || game.state === 'leaderboard' || done, order = flashOrder(game);

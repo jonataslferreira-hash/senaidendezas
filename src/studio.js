@@ -1,3 +1,5 @@
+import { Flashcards } from './flashcards.js';
+import './flashcards.css';
 import { reviewMarkup, reviewQuestions } from './review.js';
 import { createUuid } from './uuid.js';
 import { stageCache } from './stage-keep.js';
@@ -81,6 +83,7 @@ export class Studio {
       this.library = Object.create(LessonLibrary.prototype);
       this.library.lessons = []; this.library.warning = 'O armazenamento do navegador está indisponível. Permita o armazenamento para salvar aulas.';
     }
+    this.flashcards = new Flashcards(this);
     this.sharing = new PresentationSharing(this);
     this.editorMusic = new EditorMusic(this);
     try{this.cloudLinks=JSON.parse(localStorage.getItem('sl-cloud-links')||'{}');}catch{this.cloudLinks={};}
@@ -221,7 +224,7 @@ export class Studio {
       this.open(params.get('lesson'), false); this.tab = params.get('tab') === 'quiz' ? 'quiz' : 'slides';
       const selected=Math.max(0,Math.min(this.draft.slides.length-1,(Number(params.get('slide'))||1)-1));if(params.get('block'))this.selectBlock(params.get('block'));if(!this.draft.activityBlocks||this.currentBlock()?.items.includes(this.draft.slides[selected]?.id))this.index=selected;const question=Math.max(0,Math.min(this.draft.questions.length-1,(Number(params.get('question'))||1)-1));if(this.tab==='quiz'&&this.currentBlock()?.items.includes(this.draft.questions[question]?.id))this.questionIndex=question;
     } else {
-      this.view = ['shared','storage-ai','templates','review'].includes(page)?page:page === 'join' || (!page && params.has('s')) ? 'join' : 'library';
+      this.view = ['shared','storage-ai','templates','review','flashcards'].includes(page)?page:page === 'join' || (!page && params.has('s')) ? 'join' : 'library';
       if(this.view==='storage-ai')this.ai.freshPending=true;
       if(this.view==='templates'){
         const tplId=params.get('template');
@@ -552,6 +555,7 @@ export class Studio {
       ['join', 'join', 'Entrar em uma sala', 'Entrar em uma sala'],
       ['shared', 'collaborate', 'Compartilhados', 'Compartilhados'],
       ['review', 'fields', 'Revisar questões', 'Revisar questões'],
+      ['flashcards', 'flashcards', 'Flashcards', 'Flashcards'],
       ['storage-ai', 'sparkle', 'Storage AI', 'Storage AI']
     ];
     const links = tabs.map(([action, icon, text, label]) => {
@@ -593,6 +597,7 @@ export class Studio {
     if (this.view==='ai-generation') return this.shell(this.ai.generationMarkup());
     if (this.view === 'editor') return this.editor();
     if (this.view === 'review') return this.shell(reviewMarkup(this));
+    if (this.view === 'flashcards') return this.shell(this.flashcards.markup());
     if (this.view === 'templates') return this.shell(`<main class="studio-templates">${this.templateStore.markup()}</main>`);
     if (this.view === 'join') return this.shell(`<main class="studio-join join-v3">
       <svg class="join-waves" viewBox="0 0 1000 600" preserveAspectRatio="none" aria-hidden="true"><path d="M-50 360C190 180 295 510 525 340S820 165 1050 315"/><path d="M-50 415C180 235 300 540 520 395S805 215 1050 360"/><path d="M-50 470C185 295 315 605 540 450S840 295 1050 410"/></svg>
@@ -1063,7 +1068,7 @@ export class Studio {
     if (action.startsWith('cloud-')) { await this.cloudAction(action, target); return; }
     const id = target.dataset.id;
     const lookup = () => this.library.lessons.find(l => l.id === id);
-    if (['library', 'join', 'shared', 'storage-ai', 'templates', 'review'].includes(action)) {
+    if (['library', 'join', 'shared', 'storage-ai', 'templates', 'review', 'flashcards'].includes(action)) {
       // Sair com mudanças pendentes pede confirmação em vez de decidir sozinho.
       if (this.view==='editor'&&this.dirty&&!this.groups.live&&this.groups.canEdit&&!this.leaveDecided) {
         this.dialog={type:'leave',target:action};this.callbacks.render();return;

@@ -56,6 +56,7 @@ import './quiz-layout.css';
 import './font-picker.css';
 import './studio-polish.css';
 import './studio-workflows.css';
+import './flashcard-stage.css';
 import './storage-ai-remake.css';
 
 const icons = {
@@ -1260,3 +1261,5 @@ app.addEventListener('account-changed',()=>{
 import './account-live.css';
 import './workspace-styles.css';
 import './finishing.css';
+import './responsive-glass-fixes.css';
+import './study-visuals.css';

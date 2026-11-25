@@ -1,6 +1,7 @@
 const paths = {
   sequence: 'M8 6h12M8 12h12M8 18h12M4 6h.01M4 12h.01M4 18h.01',
   fields: 'M4 5h16v14H4zM8 9h8m-8 5h5',
+  flashcards: 'M6 7V4h13a2 2 0 0 1 2 2v12h-3M4 8h12a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2v-9a2 2 0 0 1 2-2Zm2 4h8M6 16h5',
   undo: 'm8 5-5 5 5 5m-5-5h11a5 5 0 0 1 0 10h-2',
   redo: 'm16 5 5 5-5 5m5-5H10a5 5 0 0 0 0 10h2',
   settings:'M4 6h16M4 12h16M4 18h16M8 4v4m8 2v4m-6 2v4',
