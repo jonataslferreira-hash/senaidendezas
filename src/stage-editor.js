@@ -2,6 +2,7 @@
 import { gameNames, gameHints, defaultGame, isGameType } from './stage-games.js';
 import { gameIcon } from './stage-games-view.js';
 import { studioIcon } from './studio-icons.js';
+import {flashcardRequest,cardsFromQuestions} from './flashcards.js';
 import { Simulations, simulationMarkup, simulationGroups, simulationNames } from './simulations.js';
 
 const esc = value => String(value ?? '').replace(/[&<>"']/g, char => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[char]);
@@ -35,6 +36,7 @@ export class StageEditor {
       if (key === 'text') { game.text = field.value; this.studio.draft.slides[this.studio.index].title = field.value.slice(0, 160) || gameNames[game.type]; }
       else if (key === 'options') game.options = field.value.split('\n').slice(0, game.type === 'tug' ? 2 : 4);
       else if (key === 'option') game.options[Number(field.dataset.index)] = field.value;
+      else if (key === 'fc-front' || key === 'fc-back') { const card=game.cards?.[Number(field.dataset.index)];if(!card)return;card[key==='fc-front'?'front':'back']=field.value; }
       else if (key === 'sv-text') this.list(game, field)[Number(field.dataset.q)].text = field.value;
       else if (key === 'sv-option') this.list(game, field)[Number(field.dataset.q)].options[Number(field.dataset.index)] = field.value;
       else if (key === 'tolerance') { game.tolerance = Number(field.value) || 5; const out = field.parentElement.querySelector('output'); if (out) out.textContent = game.tolerance + '%'; }
@@ -70,6 +72,17 @@ export class StageEditor {
       if (action === 'capture') {
         game.answer = captureAnswer(root.querySelector('[data-game-answer-sim]'), game.answer);
         this.studio.callbacks.toast('Resposta marcada com os valores atuais do experimento.');
+      } else if (action === 'fc-add' && game.type==='flashcards') {
+        if(game.cards.length>=100)return;game.cards.push({front:'',back:''});
+      } else if (action === 'fc-remove' && game.type==='flashcards') {
+        if(game.cards.length<=1)return;game.cards.splice(Number(button.dataset.index),1);
+      } else if (action === 'fc-import' && game.type==='flashcards') {
+        if(!this.studio.groups.canEdit)return;
+        const id=root.querySelector('[data-fc-import-select]')?.value,deck=this.studio.flashcards.decks.find(d=>d.id===id);
+        if(!deck?.cards.length){this.studio.callbacks.toast('Escolha um conjunto com cartões.');return;}
+        if(game.cards.some(c=>c.front.trim()||c.back.trim())&&!confirm('Substituir os cartões desta etapa pelo conjunto escolhido?'))return;
+        game.cards=deck.cards.slice(0,100).map(c=>({front:c.front.slice(0,700),back:c.back.slice(0,1500)}));
+      } else if (action === 'fc-ai' && game.type==='flashcards') { this.aiFlashcards(); return;
       } else if (action.startsWith('sv-')) {
         // No cabo de guerra as perguntas ficam dentro de rodadas (data-r); nas outras etapas, numa lista só.
         const inRound = button.dataset.r !== undefined, list = this.list(game, button), index = Number(button.dataset.q), q = list?.[index];
@@ -95,6 +108,7 @@ export class StageEditor {
   aiAssist() {
     const s = this.studio, slide = s.draft?.slides?.[s.index], g = slide?.game;
     if (!s.groups.canEdit) return;
+    if (g?.type==='flashcards') return this.aiFlashcards();
     if (g && ['flash', 'survival', 'race', 'tug'].includes(g.type)) return this.aiQuestions();
     if (g || slide?.poll) { s.action('storage-ai'); return; }
   }
@@ -127,6 +141,23 @@ export class StageEditor {
     }
     s.callbacks.render();
   }
+  async aiFlashcards() {
+    const s=this.studio,lesson=s.draft,slide=lesson?.slides?.[s.index],g=slide?.game;
+    if(!g||g.type!=='flashcards'||!s.groups.canEdit||this.flashcardBusy)return;
+    if(!s.account.user){s.account.show('login');s.callbacks.toast('Entre na conta para gerar flashcards com o Storage AI.');return;}
+    if(g.cards.some(c=>c.front.trim()||c.back.trim())&&!confirm('O Storage AI vai substituir os cartões desta etapa. Continuar?'))return;
+    const uid=s.account.user.id,original=JSON.stringify(g.cards),button=s.root.querySelector('[data-game-edit="fc-ai"]'),note=s.root.querySelector('[data-fc-ai-note]');
+    this.flashcardBusy=true;if(button)button.disabled=true;if(note)note.textContent='O Storage AI está preparando os cartões…';
+    try {
+      const result=await s.ai.ask(flashcardRequest(g.text==='Flashcards'?'':g.text,lesson,6),AbortSignal.timeout(90000));
+      if(s.account.user?.id!==uid||s.draft!==lesson||!s.groups.canEdit||!lesson.slides.includes(slide)||slide.game!==g)throw Error('A aula ou a conta mudou. Os cartões não foram aplicados.');
+      if(JSON.stringify(g.cards)!==original)throw Error('Os cartões foram alterados durante a geração. O resultado não foi aplicado.');
+      const cards=cardsFromQuestions(result?.questions,6).map(({front,back})=>({front,back}));
+      if(!cards.length)throw Error('A IA não retornou cartões válidos. Tente novamente.');
+      g.cards=cards;s.markDirty();s.callbacks.toast(`${cards.length} cartões gerados. Revise as respostas antes de apresentar.`);s.callbacks.render();
+    }catch(error){const message=error?.name==='TimeoutError'?'A geração demorou demais. Tente novamente.':error?.message||'Não foi possível gerar os cartões.';s.callbacks.toast(message);if(note?.isConnected)note.textContent=message;}
+    finally{this.flashcardBusy=false;if(button?.isConnected)button.disabled=false;}
+  }
   markup() {
     const s = this.studio, slide = s.draft.slides[s.index];
     if (!slide.game) slide.game = defaultGame(s.currentBlock()?.type);
@@ -135,7 +166,12 @@ export class StageEditor {
     if (g.type === 'flash' && !Array.isArray(g.questions)) { g.questions = [{ text: g.text || '', options: Array.isArray(g.options) && g.options.length >= 2 ? g.options : ['', ''], correct: g.correct || 0 }]; g.text = 'Desafio relâmpago'; g.seconds = 10; delete g.options; delete g.correct; }
     if (g.type === 'tug' && !Array.isArray(g.rounds)) { g.rounds = (Array.isArray(g.questions) && g.questions.length ? g.questions : [{ text: '', options: ['', ''], correct: 0 }]).slice(0, 12).map(q => [q]); delete g.questions; }
     const field = (label, html, hint = '') => `<div class="stage-field"><label>${label}</label>${html}${hint ? `<small>${hint}</small>` : ''}</div>`;
-    let body = field(g.type === 'teams' ? 'Frase de abertura' : g.type === 'raffle' ? 'Título do sorteio' : g.type === 'tug' || g.type === 'race' || g.type === 'flash' ? 'Título no telão' : g.type === 'challenge' ? 'Meta que os alunos devem atingir' : 'Pergunta', `<input type="text" data-game-field="text" maxlength="300" value="${esc(g.text)}" ${off}>`);
+    let body = field(g.type === 'teams' ? 'Frase de abertura' : g.type === 'raffle' ? 'Título do sorteio' : g.type === 'tug' || g.type === 'race' || g.type === 'flash' || g.type === 'flashcards' ? 'Título no telão' : g.type === 'challenge' ? 'Meta que os alunos devem atingir' : 'Pergunta', `<input type="text" data-game-field="text" maxlength="300" value="${esc(g.text)}" ${off}>`);
+    if (g.type === 'flashcards') {
+      const decks=s.flashcards.decks.filter(d=>d.cards.length);
+      body+=`<div class="stage-field fc-stage-editor"><label>Cartões (${g.cards.length} de 100)</label><small>Durante a apresentação, você vira os cartões para toda a turma. Esta etapa não altera o placar.</small>${g.cards.map((card,i)=>`<fieldset class="stage-question fc-stage-fields"><legend>Cartão ${i+1}</legend><label>Frente<textarea data-game-field="fc-front" data-index="${i}" maxlength="700" rows="2" placeholder="Pergunta ou conceito" ${off}>${esc(card.front)}</textarea></label><label>Verso<textarea data-game-field="fc-back" data-index="${i}" maxlength="1500" rows="3" placeholder="Resposta ou explicação" ${off}>${esc(card.back)}</textarea></label>${g.cards.length>1?`<button type="button" class="studio-btn quiet" data-game-edit="fc-remove" data-index="${i}" ${off}>Excluir cartão</button>`:''}</fieldset>`).join('')}${g.cards.length<100?`<button type="button" class="studio-btn accent" data-game-edit="fc-add" ${off}>+ Adicionar cartão</button>`:''}</div>`;
+      if(!off)body+=`<div class="stage-field fc-stage-tools"><label>Usar um conjunto de Flashcards</label>${decks.length?`<select data-fc-import-select aria-label="Escolher conjunto de flashcards">${decks.map(d=>`<option value="${esc(d.id)}">${esc(d.title)} · ${d.cards.length} cartões</option>`).join('')}</select><button type="button" class="studio-btn quiet" data-game-edit="fc-import">Copiar para esta etapa</button><small>A cópia fica salva na apresentação e é independente do conjunto original.</small>`:'<small>Crie um conjunto em Flashcards no menu para poder copiá-lo aqui.</small>'}</div><div class="stage-field stage-ai-field"><button type="button" class="studio-btn quiet" data-game-edit="fc-ai">${studioIcon('sparkle')} Gerar cartões com Storage AI</button><small data-fc-ai-note>A IA usa o título da aula e o texto visível dos slides; imagens e notas não são lidas. Substitui os cartões atuais. Confira as respostas.</small></div>`;
+    }
     if (g.type === 'teams') body += field('Quantos times', `<select data-game-field="count" ${off}>${Array.from({ length: 9 }, (_, i) => i + 2).map(n => `<option value="${n}" ${g.count === n ? 'selected' : ''}>${n} times</option>`).join('')}</select>`, 'Os pontos do quiz e das outras dinâmicas somam para o time, e o placar aparece nos rankings. Coloque esta etapa antes do quiz; se quiser mostrar o placar final, adicione outra etapa "Equipes" no fim. Na apresentação dá para mudar a quantidade na hora, sem perder nome, foto e líder dos times. Toque no nome de um aluno para torná-lo líder: o líder pode trocar o nome e a foto da equipe pelo próprio celular.');
     if (g.type === 'teams') body += field('Como formar os times', `<select data-game-field="pick" ${off}><option value="0" ${g.pick ? '' : 'selected'}>Sorteio automático</option><option value="1" ${g.pick ? 'selected' : ''}>Cada aluno escolhe o seu time</option></select>`, g.pick ? 'Os alunos tocam no time que querem no celular. Quando você fechar a escolha (ou passar de etapa), quem não escolheu entra no time com menos gente.' : 'Os alunos são distribuídos automaticamente, sempre equilibrando os times.');
     // Um cartão por pergunta. `r` é a rodada (só no cabo de guerra).

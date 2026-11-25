@@ -175,7 +175,7 @@ export class Room {
     const revealed = ['reveal','leaderboard', 'finished'].includes(d.phase);
     // Aluno só recebe os botões (sem o texto da pergunta e das alternativas). Na prévia o texto aparece.
     const bare = Boolean(id) && !this.fullText;
-    const hasScoredStages = this.lesson.questions.length > 0 || this.slides.some(s => s.game && !['teams', 'raffle'].includes(s.game.type));
+    const hasScoredStages = this.lesson.questions.length > 0 || this.slides.some(s => s.game && !['teams', 'raffle', 'flashcards'].includes(s.game.type));
     const slideTransition = this.slides[d.slide]?.transition || 'slide';
     const quizRanking = d.players.map(({ id, name, avatar, accountPhoto, score, answers, online, streak, team }) => ({
       id, name, avatar, ...(accountPhoto ? { accountPhoto } : {}),

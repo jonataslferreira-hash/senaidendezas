@@ -1,0 +1,14 @@
+/* Os flashcards da aula são uma etapa sem pontuação, sincronizada pelo apresentador. */
+#app .fc-stage-editor{gap:12px}
+#app .fc-stage-fields{display:grid;gap:12px;min-width:0}
+#app .fc-stage-fields label{display:grid;gap:6px;font-size:13px;font-weight:650}
+#app .fc-stage-fields textarea{width:100%;box-sizing:border-box;resize:vertical;min-height:65px;border-radius:10px;padding:10px 12px;font:inherit}
+#app .fc-stage-fields button,#app .fc-stage-editor>button,#app .fc-stage-tools button{justify-self:start}
+#app .game-stage[data-game-type="flashcards"] .game-live.game-flashcards{gap:clamp(12px,2vh,22px)}
+#app .flashcard-stage-card{box-sizing:border-box;width:min(860px,100%);min-height:clamp(200px,39vh,350px);padding:clamp(20px,4vw,42px);border:1px solid #ffffff50;border-radius:26px;background:linear-gradient(145deg,#ffffffef,#f1e9fbef);box-shadow:0 18px 55px #180a3c35;color:#39254b;display:flex;flex-direction:column;justify-content:space-between;align-items:center;gap:16px}
+#app .flashcard-stage-side,#app .flashcard-stage-count{font-size:clamp(11px,1.1vw,14px);font-weight:750;letter-spacing:.12em;color:#795694}
+#app .flashcard-stage-card p{margin:0;font-size:clamp(21px,3.2vw,40px);line-height:1.32;font-weight:700;white-space:pre-wrap;overflow-wrap:anywhere;max-width:100%}
+#app .flashcard-stage-controls{display:flex;justify-content:center;gap:10px;flex-wrap:wrap}
+#app .flashcard-stage-controls .btn,#app .flashcard-stage-next{min-height:44px}
+#app .flashcard-stage-hint{font-size:13px;opacity:.8;margin:0}
+@media(max-width:700px){#app .game-stage[data-game-type="flashcards"]{padding:10px 14px 20px;gap:10px}#app .game-stage[data-game-type="flashcards"] .game-live.game-flashcards{gap:12px}#app .flashcard-stage-card{min-height:clamp(180px,30vh,240px);padding:20px;border-radius:20px}#app .flashcard-stage-card p{font-size:clamp(20px,5vw,25px)}#app .flashcard-stage-controls{gap:6px;width:100%;flex-wrap:nowrap}#app .flashcard-stage-controls .btn{flex:1;min-width:0;padding:9px 6px;font-size:12px}}

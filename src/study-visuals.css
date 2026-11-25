@@ -1,0 +1,49 @@
+/* Revisão acompanha a aparência atual, em vez de usar branco fixo no escuro. */
+html[data-theme][data-appearance] #app .studio-shell .review-page .review-card {
+  background:var(--ui-panel);color:var(--ui-ink);border-color:var(--ui-line);
+}
+html[data-theme][data-appearance] #app .studio-shell .review-page .review-card :is(h2,p,strong) {color:var(--ui-ink)}
+html[data-theme][data-appearance] #app .studio-shell .review-page .review-options button {color:var(--ui-ink)!important;opacity:1}
+
+/* Uma pequena mesa de estudo: cartões com frente e verso reais e profundidade. */
+#app .flashcards-page .fc-hero {background:radial-gradient(circle at 82% 18%,#f3b5dd 0,transparent 30%),radial-gradient(circle at 66% 95%,#a9caff 0,transparent 35%),linear-gradient(125deg,#f7f0ff,#e8defc);border-color:#d8c5ee;box-shadow:0 16px 45px #543a7b19}
+#app .flashcards-page .fc-hero-art {perspective:850px}
+#app .flashcards-page .fc-hero-art>span {background:linear-gradient(135deg,#8071dd,#eaa0c9);box-shadow:0 16px 28px #46286633;transform:rotate(10deg) rotateY(-15deg)}
+#app .flashcards-page .fc-hero-art>div {background:linear-gradient(145deg,#fff,#f2e8ff);border:1px solid #ffffffcc;box-shadow:0 18px 35px #5237743b,0 3px 0 #cbb4df;transform:rotate(-6deg) rotateY(12deg)}
+#app .flashcards-page .fc-collections {margin-top:36px}
+#app .flashcards-page .fc-section-title {margin-bottom:18px}
+#app .flashcards-page .fc-deck {background:linear-gradient(145deg,#fff,#f7f1ff);border-color:#e5d7ef;box-shadow:0 8px 24px #563d7012;transition:transform .2s,box-shadow .2s}
+#app .flashcards-page .fc-deck:hover {transform:translateY(-3px);box-shadow:0 14px 28px #563d7024}
+#app .flashcards-page .fc-study {max-width:820px;perspective:1400px}
+#app .flashcards-page .fc-counter {color:#826a9b;margin-bottom:14px}
+html[data-theme][data-ui-style] #app .flashcards-page button.fc-card {
+  display:block;width:100%;min-height:0;padding:0;border:0!important;border-radius:24px!important;
+  background:transparent!important;box-shadow:none!important;cursor:pointer;text-align:inherit;
+  perspective:1400px;overflow:visible;color:inherit!important;
+}
+#app .fc-card-inner {display:grid;grid-template-columns:minmax(0,1fr);transform-style:preserve-3d;transition:transform .65s cubic-bezier(.2,.7,.15,1);border-radius:24px}
+#app .fc-card.is-flipped .fc-card-inner {transform:rotateY(180deg)}
+#app .fc-face {grid-area:1/1;box-sizing:border-box;min-height:300px;width:100%;padding:clamp(22px,4vw,38px);display:flex;flex-direction:column;align-items:stretch;justify-content:space-between;gap:28px;border:1px solid #ffffffad;border-radius:24px;backface-visibility:hidden;-webkit-backface-visibility:hidden;text-align:center;color:#37264a;box-shadow:0 20px 45px #52387526,0 6px 0 #d6c4e6,inset 0 1px 0 #fff}
+#app .fc-face-front {background:radial-gradient(circle at 88% 15%,#e6cbff 0,transparent 34%),radial-gradient(circle at 10% 100%,#d5e8ff 0,transparent 40%),linear-gradient(145deg,#fff,#f8f1ff)}
+#app .fc-face-back {transform:rotateY(180deg);background:radial-gradient(circle at 8% 15%,#bba8f5 0,transparent 35%),radial-gradient(circle at 95% 100%,#f2b9d4 0,transparent 38%),linear-gradient(145deg,#f3e8ff,#e7dcfb)}
+#app .fc-face .fc-card-label {display:flex;align-items:center;justify-content:space-between;gap:10px;text-align:left;font-size:11px;letter-spacing:.12em;font-weight:800;color:#74518f}
+#app .fc-face .fc-card-label i {font-style:normal;font-size:19px;letter-spacing:0;color:#9e79c9}
+#app .fc-face .fc-card-text {display:block;margin:auto 0;font-size:clamp(21px,2.7vw,32px);line-height:1.35;font-weight:700;overflow-wrap:anywhere;white-space:pre-wrap;color:inherit}
+#app .fc-face .fc-card-hint {font-size:12px;letter-spacing:0;color:#705984}
+#app .fc-card:focus-visible {outline:3px solid #ad82d5;outline-offset:5px}
+html[data-appearance=dark] #app .flashcards-page .fc-hero {background:radial-gradient(circle at 82% 12%,#5e386c,transparent 35%),radial-gradient(circle at 70% 100%,#304d79,transparent 38%),linear-gradient(135deg,#282039,#221a30);border-color:#664d78}
+html[data-appearance=dark] #app .flashcards-page .fc-deck {background:linear-gradient(145deg,#34273f,#261d31);border-color:#594967}
+html[data-appearance=dark] #app .flashcards-page .fc-face {color:#f7efff;border-color:#af91c775;box-shadow:0 22px 45px #09041070,0 6px 0 #291a35,inset 0 1px 0 #ffffff4d}
+html[data-appearance=dark] #app .flashcards-page .fc-face-front {background:radial-gradient(circle at 90% 8%,#68508b 0,transparent 35%),radial-gradient(circle at 10% 100%,#314b71 0,transparent 40%),linear-gradient(145deg,#3c2d50,#271d36)}
+html[data-appearance=dark] #app .flashcards-page .fc-face-back {background:radial-gradient(circle at 10% 10%,#725091 0,transparent 35%),radial-gradient(circle at 95% 100%,#70445e 0,transparent 42%),linear-gradient(145deg,#4a3559,#30213e)}
+html[data-appearance=dark] #app .flashcards-page .fc-face :is(.fc-card-label,.fc-card-hint) {color:#e1c9f2}
+/* Na aula, o verso ainda só chega ao aluno quando é revelado. */
+#app .game-stage[data-game-type=flashcards] .game-flashcards {perspective:1400px}
+#app .game-stage[data-game-type=flashcards] .flashcard-stage-card {background:radial-gradient(circle at 90% 15%,#d5c2f8,transparent 34%),radial-gradient(circle at 8% 100%,#cce3fb,transparent 40%),linear-gradient(145deg,#fff,#f7efff);border-color:#ffffffb8;box-shadow:0 22px 50px #10072250,0 7px 0 #b8a0d0,inset 0 1px 0 #fff;transform-origin:center;animation:fc-stage-reveal .5s cubic-bezier(.2,.7,.2,1) both}
+#app .game-stage[data-game-type=flashcards] .flashcard-stage-card[data-side=back] {background:radial-gradient(circle at 10% 10%,#c9b1f2,transparent 38%),radial-gradient(circle at 95% 100%,#f5c7dc,transparent 40%),linear-gradient(145deg,#f5ecff,#e3d8f6)}
+@keyframes fc-stage-reveal {from{opacity:.5;transform:rotateY(-75deg) scale(.96)}to{opacity:1;transform:rotateY(0) scale(1)}}
+@media(max-width:650px){#app .flashcards-page .fc-face{min-height:230px;padding:22px;gap:20px}#app .fc-face .fc-card-text{font-size:clamp(19px,5vw,24px)}}
+@media(prefers-reduced-motion:reduce){html:not([data-motion=normal]) #app .fc-card-inner{transition:none}html:not([data-motion=normal]) #app .flashcard-stage-card{animation:none}html:not([data-motion=normal]) #app .fc-deck{transition:none}}
+html[data-motion=reduced] #app .fc-card-inner{transition:none}
+html[data-motion=reduced] #app .flashcard-stage-card{animation:none}
+html[data-motion=reduced] #app .fc-deck{transition:none}
