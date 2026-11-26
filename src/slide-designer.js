@@ -9,7 +9,7 @@ import {presentationSlide} from './slide-display.js';
 import { audioEditor } from './audio-editor.js';
 import { applyAudioPlayback } from './audio-data.js';
 import { optimizeImage } from './image-optimize.js';
-import { MAX_CANVAS_ELEMENTS, canvasFromSlide, newElement, canvasThemes, applyCanvasTheme, slideBackground, normalizeBackground, imageZoomValue } from './canvas-data.js';
+import { MAX_CANVAS_ELEMENTS, canvasFromSlide, newElement, canvasThemes, applyCanvasTheme, hasCreativeArtwork, slideBackground, normalizeBackground, imageZoomValue } from './canvas-data.js';
 import {openLayouts, applyOpenLayout} from './open-slide-layouts.js';
 import {slideStylePicker,localLayouts} from './slide-style-picker.js';
 import { canvasMarkup, CanvasModels, esc } from './canvas-view.js';
@@ -196,7 +196,7 @@ export class SlideDesigner {
   }
   applyStyle(slide, kind, value) {
     if(kind==='theme'){
-      if(applyCanvasTheme(slide,value)&&canvasThemes[value].layout)applyOpenLayout(slide,canvasThemes[value].layout);
+      if(applyCanvasTheme(slide,value)&&canvasThemes[value].layout&&!hasCreativeArtwork(slide))applyOpenLayout(slide,canvasThemes[value].layout);
       return;
     }
     if(applyOpenLayout(slide,value)||!Object.hasOwn(localLayouts,value))return;

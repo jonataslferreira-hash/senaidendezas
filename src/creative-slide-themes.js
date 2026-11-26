@@ -1,0 +1,20 @@
+export const creativeSlideThemes = {
+  'atelier-tomate': {name: 'Tinta de feira', background: '#fa603d', end: '#f97955', color: '#292021', accent: '#392024', tints: ['#ffcfb5', '#19573e', '#ffdfaf'], heading: 'Impact', body: 'Arial'},
+  'atelier-caderno': {name: 'Caderno azul', background: '#e6f0f2', end: '#d4e6e8', color: '#33485c', accent: '#94364d', tints: ['#d7be90', '#cf8c94', '#849eab'], heading: 'Georgia', body: 'Georgia'},
+  'atelier-berry': {name: 'Geleia de morango', background: '#fff4ef', end: '#ffdae5', color: '#562636', accent: '#9f2851', tints: ['#ff94ae', '#ffc88f', '#a5bc84'], heading: 'Georgia', body: 'Trebuchet MS'},
+  'atelier-matcha': {name: 'Matchá & baunilha', background: '#f7f6e4', end: '#e0e9c8', color: '#2a3822', accent: '#4a642c', tints: ['#b7cd7a', '#efbf81', '#d89dae'], heading: 'Georgia', body: 'Trebuchet MS'},
+  'atelier-lilac': {name: 'Lavanda com leite', background: '#f8f1ff', end: '#e7ddfa', color: '#3b2d56', accent: '#6844a0', tints: ['#bca2eb', '#f7b7cf', '#f7d998'], heading: 'Trebuchet MS', body: 'Verdana'},
+  'atelier-sky': {name: 'Céu de algodão', background: '#edfaff', end: '#dce6ff', color: '#223954', accent: '#295d8d', tints: ['#91d4ed', '#ffb7ce', '#ffe099'], heading: 'Trebuchet MS', body: 'Arial'},
+  'atelier-night': {name: 'Mirtilo à meia-noite', background: '#1d1639', end: '#302056', color: '#f8eaff', accent: '#ffbadb', tints: ['#ac88f2', '#ef92c4', '#f5cb8e'], heading: 'Georgia', body: 'Trebuchet MS'},
+  'atelier-sunset': {name: 'Pôr do sol de goiaba', background: '#fff0dc', end: '#ffd6b6', color: '#522c2b', accent: '#9e372a', tints: ['#f48465', '#ffb756', '#df89a4'], heading: 'Georgia', body: 'Arial'},
+  'atelier-soda': {name: 'Soda de limão', background: '#f6ffd9', end: '#d9efaf', color: '#263615', accent: '#415c16', tints: ['#abd55f', '#ffc36f', '#a8d8e8'], heading: 'Verdana', body: 'Trebuchet MS'},
+  'atelier-blue': {name: 'Azul vinil', background: '#182445', end: '#253765', color: '#f3f3ff', accent: '#c6dbff', tints: ['#8daaf2', '#f6af79', '#f3aee2'], heading: 'Trebuchet MS', body: 'Arial'},
+  'atelier-clay': {name: 'Argila & damasco', background: '#fcf4df', end: '#ecd8c1', color: '#482e24', accent: '#84452e', tints: ['#d48b6f', '#dcad64', '#8ca895'], heading: 'Georgia', body: 'Trebuchet MS'},
+  'atelier-neon': {name: 'Neon de bolso', background: '#211c34', end: '#302740', color: '#fff2f9', accent: '#e5fa89', tints: ['#deff73', '#ad9cff', '#fa9ac9'], heading: 'Courier New', body: 'Verdana'},
+  'atelier-sakura': {name: 'Sakura doce', background: '#ffe4ec', end: '#ffc9d9', color: '#5a2a3a', accent: '#d45a7a', tints: ['#ffb3c6', '#ffd6a5', '#b5ead7'], heading: 'Georgia', body: 'Trebuchet MS'},
+  'atelier-mint': {name: 'Menta fresca', background: '#e8f7f0', end: '#d0efe0', color: '#1f3a2e', accent: '#3fa37a', tints: ['#9fe3c1', '#ffe0a3', '#f7b7cf'], heading: 'Trebuchet MS', body: 'Arial'},
+  'atelier-peach': {name: 'Pêssego macio', background: '#fff0e6', end: '#ffd9c2', color: '#4a2a1f', accent: '#e87a4f', tints: ['#ffc4a3', '#ffe8a3', '#d7b5ff'], heading: 'Georgia', body: 'Verdana'},
+  'atelier-cloud': {name: 'Nuvem fofa', background: '#eef3ff', end: '#dde6ff', color: '#2a2f4a', accent: '#6b7cff', tints: ['#b8c6ff', '#ffc9e3', '#c9f0e6'], heading: 'Trebuchet MS', body: 'Arial'},
+  'atelier-candy': {name: 'Algodão doce', background: '#fff5fb', end: '#ffe0f2', color: '#4a2340', accent: '#e85ca8', tints: ['#ffb3dd', '#ffe8a3', '#b3e5ff'], heading: 'Impact', body: 'Trebuchet MS'},
+  'atelier-honey': {name: 'Mel & girassol', background: '#fff7dc', end: '#ffe9a8', color: '#4a3a10', accent: '#c9a227', tints: ['#ffe082', '#ffb3c6', '#b5e3d8'], heading: 'Georgia', body: 'Trebuchet MS'}
+};

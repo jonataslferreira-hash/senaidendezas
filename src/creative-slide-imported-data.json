@@ -1,0 +1,578 @@
+{
+  "indie-arcade": {
+    "collection": "slidescarnival",
+    "collectionLabel": "SlidesCarnival",
+    "author": "SlidesCarnival",
+    "license": "CC BY 4.0",
+    "licenseShort": "CC BY 4.0",
+    "sourceTitle": "Cute Y2K Game Console Background Slides",
+    "sourceUrl": "https://www.slidescarnival.com/download/sc03207/cute-y2k-game-console-background-slides/pptx",
+    "licenseUrl": "https://creativecommons.org/licenses/by/4.0/",
+    "sourceDeckUrl": "assets/slidescarnival/decks/indie-arcade.json",
+    "sourceSlideCount": 18,
+    "selectedSlideIndexes": [
+      0,
+      1,
+      2,
+      3,
+      4,
+      5,
+      6,
+      16,
+      17
+    ],
+    "format": "16:9",
+    "pageWidth": 1920,
+    "pageHeight": 1080,
+    "slideTitles": [
+      "Y2K",
+      "Agenda",
+      "Add a title here",
+      "Write a main title here",
+      "01",
+      "Write a main idea here",
+      "Did You Know?",
+      "Slide 17",
+      "Slide 18"
+    ],
+    "previewSlides": [
+      {
+        "title": "Y2K",
+        "url": "assets/slidescarnival/previews/indie-arcade-01.webp"
+      },
+      {
+        "title": "Agenda",
+        "url": "assets/slidescarnival/previews/indie-arcade-02.webp"
+      },
+      {
+        "title": "Add a title here",
+        "url": "assets/slidescarnival/previews/indie-arcade-03.webp"
+      },
+      {
+        "title": "Write a main title here",
+        "url": "assets/slidescarnival/previews/indie-arcade-04.webp"
+      },
+      {
+        "title": "01",
+        "url": "assets/slidescarnival/previews/indie-arcade-05.webp"
+      },
+      {
+        "title": "Write a main idea here",
+        "url": "assets/slidescarnival/previews/indie-arcade-06.webp"
+      },
+      {
+        "title": "Did You Know?",
+        "url": "assets/slidescarnival/previews/indie-arcade-07.webp"
+      },
+      {
+        "title": "Slide 17",
+        "url": "assets/slidescarnival/previews/indie-arcade-08.webp"
+      },
+      {
+        "title": "Slide 18",
+        "url": "assets/slidescarnival/previews/indie-arcade-09.webp"
+      }
+    ]
+  },
+  "morning-vlog": {
+    "collection": "slidescarnival",
+    "collectionLabel": "SlidesCarnival",
+    "author": "SlidesCarnival",
+    "license": "CC BY 4.0",
+    "licenseShort": "CC BY 4.0",
+    "sourceTitle": "Aesthetic Life Wrapped Presentation",
+    "sourceUrl": "https://www.slidescarnival.com/download/sc04309/life-wrapped-presentation/pptx",
+    "licenseUrl": "https://creativecommons.org/licenses/by/4.0/",
+    "sourceDeckUrl": "assets/slidescarnival/decks/morning-vlog.json",
+    "sourceSlideCount": 14,
+    "selectedSlideIndexes": [
+      0,
+      1,
+      2,
+      3,
+      4,
+      5,
+      6,
+      13
+    ],
+    "format": "16:9",
+    "pageWidth": 1920,
+    "pageHeight": 1080,
+    "slideTitles": [
+      "Wrapped",
+      "Episodes",
+      "Opening Credits",
+      "Pilot Episode",
+      "Plot Twist #1",
+      "Running Gags",
+      "Crossover Episode",
+      "Slide 14"
+    ],
+    "previewSlides": [
+      {
+        "title": "Wrapped",
+        "url": "assets/slidescarnival/previews/morning-vlog-01.webp"
+      },
+      {
+        "title": "Episodes",
+        "url": "assets/slidescarnival/previews/morning-vlog-02.webp"
+      },
+      {
+        "title": "Opening Credits",
+        "url": "assets/slidescarnival/previews/morning-vlog-03.webp"
+      },
+      {
+        "title": "Pilot Episode",
+        "url": "assets/slidescarnival/previews/morning-vlog-04.webp"
+      },
+      {
+        "title": "Plot Twist #1",
+        "url": "assets/slidescarnival/previews/morning-vlog-05.webp"
+      },
+      {
+        "title": "Running Gags",
+        "url": "assets/slidescarnival/previews/morning-vlog-06.webp"
+      },
+      {
+        "title": "Crossover Episode",
+        "url": "assets/slidescarnival/previews/morning-vlog-07.webp"
+      },
+      {
+        "title": "Slide 14",
+        "url": "assets/slidescarnival/previews/morning-vlog-08.webp"
+      }
+    ]
+  },
+  "concert-pocket": {
+    "collection": "slidescarnival",
+    "collectionLabel": "SlidesCarnival",
+    "author": "SlidesCarnival",
+    "license": "CC BY 4.0",
+    "licenseShort": "CC BY 4.0",
+    "sourceTitle": "Minimal Pop Music Festival Slides",
+    "sourceUrl": "https://www.slidescarnival.com/download/sc00830/pop-music-festival/pptx",
+    "licenseUrl": "https://creativecommons.org/licenses/by/4.0/",
+    "sourceDeckUrl": "assets/slidescarnival/decks/concert-pocket.json",
+    "sourceSlideCount": 19,
+    "selectedSlideIndexes": [
+      0,
+      1,
+      2,
+      3,
+      4,
+      5,
+      6,
+      17,
+      18
+    ],
+    "format": "16:9",
+    "pageWidth": 1920,
+    "pageHeight": 1080,
+    "slideTitles": [
+      "POP MUSIC",
+      "HOW TO USE THIS PRESENTATION",
+      "01 - INTRODUCTION",
+      "INTRODUCTION",
+      "WELCOME TO PRESENTATION",
+      "OUR COMPANY",
+      "MISSION",
+      "Slide 18",
+      "Slide 19"
+    ],
+    "previewSlides": [
+      {
+        "title": "POP MUSIC",
+        "url": "assets/slidescarnival/previews/concert-pocket-01.webp"
+      },
+      {
+        "title": "HOW TO USE THIS PRESENTATION",
+        "url": "assets/slidescarnival/previews/concert-pocket-02.webp"
+      },
+      {
+        "title": "01 - INTRODUCTION",
+        "url": "assets/slidescarnival/previews/concert-pocket-03.webp"
+      },
+      {
+        "title": "INTRODUCTION",
+        "url": "assets/slidescarnival/previews/concert-pocket-04.webp"
+      },
+      {
+        "title": "WELCOME TO PRESENTATION",
+        "url": "assets/slidescarnival/previews/concert-pocket-05.webp"
+      },
+      {
+        "title": "OUR COMPANY",
+        "url": "assets/slidescarnival/previews/concert-pocket-06.webp"
+      },
+      {
+        "title": "MISSION",
+        "url": "assets/slidescarnival/previews/concert-pocket-07.webp"
+      },
+      {
+        "title": "Slide 18",
+        "url": "assets/slidescarnival/previews/concert-pocket-08.webp"
+      },
+      {
+        "title": "Slide 19",
+        "url": "assets/slidescarnival/previews/concert-pocket-09.webp"
+      }
+    ]
+  },
+  "bloom-feed": {
+    "collection": "slidescarnival",
+    "collectionLabel": "SlidesCarnival",
+    "author": "SlidesCarnival",
+    "license": "CC BY 4.0",
+    "licenseShort": "CC BY 4.0",
+    "sourceTitle": "Amazing Botanical Slides",
+    "sourceUrl": "https://www.slidescarnival.com/download/sc00039/constance-free-presentation-template/pptx",
+    "licenseUrl": "https://creativecommons.org/licenses/by/4.0/",
+    "sourceDeckUrl": "assets/slidescarnival/decks/bloom-feed.json",
+    "sourceSlideCount": 30,
+    "selectedSlideIndexes": [
+      0,
+      1,
+      2,
+      3,
+      4,
+      5,
+      6,
+      26,
+      27
+    ],
+    "format": "16:9",
+    "pageWidth": 960,
+    "pageHeight": 540,
+    "slideTitles": [
+      "Your Title Goes Here",
+      "How to Use this Presentation",
+      "‹#›",
+      "Add an Agenda Page",
+      "Add a Section Header",
+      "Write an original statement or inspiring quote",
+      "Elaborate on what you want to discuss.",
+      "Resource Page",
+      "Resource Page"
+    ],
+    "previewSlides": [
+      {
+        "title": "Your Title Goes Here",
+        "url": "assets/slidescarnival/previews/bloom-feed-01.webp"
+      },
+      {
+        "title": "How to Use this Presentation",
+        "url": "assets/slidescarnival/previews/bloom-feed-02.webp"
+      },
+      {
+        "title": "‹#›",
+        "url": "assets/slidescarnival/previews/bloom-feed-03.webp"
+      },
+      {
+        "title": "Add an Agenda Page",
+        "url": "assets/slidescarnival/previews/bloom-feed-04.webp"
+      },
+      {
+        "title": "Add a Section Header",
+        "url": "assets/slidescarnival/previews/bloom-feed-05.webp"
+      },
+      {
+        "title": "Write an original statement or inspiring quote",
+        "url": "assets/slidescarnival/previews/bloom-feed-06.webp"
+      },
+      {
+        "title": "Elaborate on what you want to discuss.",
+        "url": "assets/slidescarnival/previews/bloom-feed-07.webp"
+      },
+      {
+        "title": "Resource Page",
+        "url": "assets/slidescarnival/previews/bloom-feed-08.webp"
+      },
+      {
+        "title": "Resource Page",
+        "url": "assets/slidescarnival/previews/bloom-feed-09.webp"
+      }
+    ]
+  },
+  "after-dark-gallery": {
+    "collection": "slidescarnival",
+    "collectionLabel": "SlidesCarnival",
+    "author": "SlidesCarnival",
+    "license": "CC BY 4.0",
+    "licenseShort": "CC BY 4.0",
+    "sourceTitle": "Classic Perfect Slides for a Movie Review",
+    "sourceUrl": "https://www.slidescarnival.com/download/sc00978/perfect-slides-for-a-movie-review/pptx",
+    "licenseUrl": "https://creativecommons.org/licenses/by/4.0/",
+    "sourceDeckUrl": "assets/slidescarnival/decks/after-dark-gallery.json",
+    "sourceSlideCount": 19,
+    "selectedSlideIndexes": [
+      0,
+      1,
+      2,
+      3,
+      4,
+      5,
+      6,
+      18
+    ],
+    "format": "16:9",
+    "pageWidth": 1920,
+    "pageHeight": 1080,
+    "slideTitles": [
+      "PERFECT SLIDE",
+      "BIOGRAPHY",
+      "JOHN SMITH",
+      "1",
+      "HOW TO DO A MOVIE REVIEW?",
+      "HOW TO DO A MOVIE REVIEW?",
+      "TITLE 3",
+      "Slide 19"
+    ],
+    "previewSlides": [
+      {
+        "title": "PERFECT SLIDE",
+        "url": "assets/slidescarnival/previews/after-dark-gallery-01.webp"
+      },
+      {
+        "title": "BIOGRAPHY",
+        "url": "assets/slidescarnival/previews/after-dark-gallery-02.webp"
+      },
+      {
+        "title": "JOHN SMITH",
+        "url": "assets/slidescarnival/previews/after-dark-gallery-03.webp"
+      },
+      {
+        "title": "1",
+        "url": "assets/slidescarnival/previews/after-dark-gallery-04.webp"
+      },
+      {
+        "title": "HOW TO DO A MOVIE REVIEW?",
+        "url": "assets/slidescarnival/previews/after-dark-gallery-05.webp"
+      },
+      {
+        "title": "HOW TO DO A MOVIE REVIEW?",
+        "url": "assets/slidescarnival/previews/after-dark-gallery-06.webp"
+      },
+      {
+        "title": "TITLE 3",
+        "url": "assets/slidescarnival/previews/after-dark-gallery-07.webp"
+      },
+      {
+        "title": "Slide 19",
+        "url": "assets/slidescarnival/previews/after-dark-gallery-08.webp"
+      }
+    ]
+  },
+  "sunset-invite": {
+    "collection": "slidescarnival",
+    "collectionLabel": "SlidesCarnival",
+    "author": "SlidesCarnival",
+    "license": "CC BY 4.0",
+    "licenseShort": "CC BY 4.0",
+    "sourceTitle": "Watercolor All About Holi Festival Slides",
+    "sourceUrl": "https://www.slidescarnival.com/download/sc04114/all-about-holi-festival-slides/pptx",
+    "licenseUrl": "https://creativecommons.org/licenses/by/4.0/",
+    "sourceDeckUrl": "assets/slidescarnival/decks/sunset-invite.json",
+    "sourceSlideCount": 15,
+    "selectedSlideIndexes": [
+      0,
+      1,
+      2,
+      3,
+      4,
+      5,
+      6,
+      14
+    ],
+    "format": "16:9",
+    "pageWidth": 1920,
+    "pageHeight": 1080,
+    "slideTitles": [
+      "HOLI FESTIVAL",
+      "CONTENTS",
+      "01",
+      "INTRODUCTION",
+      "02",
+      "TIMELINE",
+      "03",
+      "Slide 15"
+    ],
+    "previewSlides": [
+      {
+        "title": "HOLI FESTIVAL",
+        "url": "assets/slidescarnival/previews/sunset-invite-01.webp"
+      },
+      {
+        "title": "CONTENTS",
+        "url": "assets/slidescarnival/previews/sunset-invite-02.webp"
+      },
+      {
+        "title": "01",
+        "url": "assets/slidescarnival/previews/sunset-invite-03.webp"
+      },
+      {
+        "title": "INTRODUCTION",
+        "url": "assets/slidescarnival/previews/sunset-invite-04.webp"
+      },
+      {
+        "title": "02",
+        "url": "assets/slidescarnival/previews/sunset-invite-05.webp"
+      },
+      {
+        "title": "TIMELINE",
+        "url": "assets/slidescarnival/previews/sunset-invite-06.webp"
+      },
+      {
+        "title": "03",
+        "url": "assets/slidescarnival/previews/sunset-invite-07.webp"
+      },
+      {
+        "title": "Slide 15",
+        "url": "assets/slidescarnival/previews/sunset-invite-08.webp"
+      }
+    ]
+  },
+  "lemonade-cards": {
+    "collection": "slidescarnival",
+    "collectionLabel": "SlidesCarnival",
+    "author": "SlidesCarnival",
+    "license": "CC BY 4.0",
+    "licenseShort": "CC BY 4.0",
+    "sourceTitle": "Illustrated Food and Nutrition Slides",
+    "sourceUrl": "https://www.slidescarnival.com/download/sc04226/food-and-nutrition-slides/pptx",
+    "licenseUrl": "https://creativecommons.org/licenses/by/4.0/",
+    "sourceDeckUrl": "assets/slidescarnival/decks/lemonade-cards.json",
+    "sourceSlideCount": 15,
+    "selectedSlideIndexes": [
+      0,
+      1,
+      2,
+      3,
+      4,
+      5,
+      6,
+      14
+    ],
+    "format": "16:9",
+    "pageWidth": 1920,
+    "pageHeight": 1080,
+    "slideTitles": [
+      "Food and",
+      "Today,",
+      "Ask a question or share a fun fact to engage your students.",
+      "A balanced diet",
+      "Introduction",
+      "Brain bite",
+      "Food labels",
+      "Slide 15"
+    ],
+    "previewSlides": [
+      {
+        "title": "Food and",
+        "url": "assets/slidescarnival/previews/lemonade-cards-01.webp"
+      },
+      {
+        "title": "Today,",
+        "url": "assets/slidescarnival/previews/lemonade-cards-02.webp"
+      },
+      {
+        "title": "Ask a question or share a fun fact to engage your students.",
+        "url": "assets/slidescarnival/previews/lemonade-cards-03.webp"
+      },
+      {
+        "title": "A balanced diet",
+        "url": "assets/slidescarnival/previews/lemonade-cards-04.webp"
+      },
+      {
+        "title": "Introduction",
+        "url": "assets/slidescarnival/previews/lemonade-cards-05.webp"
+      },
+      {
+        "title": "Brain bite",
+        "url": "assets/slidescarnival/previews/lemonade-cards-06.webp"
+      },
+      {
+        "title": "Food labels",
+        "url": "assets/slidescarnival/previews/lemonade-cards-07.webp"
+      },
+      {
+        "title": "Slide 15",
+        "url": "assets/slidescarnival/previews/lemonade-cards-08.webp"
+      }
+    ]
+  },
+  "pixel-stickers": {
+    "collection": "slidescarnival",
+    "collectionLabel": "SlidesCarnival",
+    "author": "SlidesCarnival",
+    "license": "CC BY 4.0",
+    "licenseShort": "CC BY 4.0",
+    "sourceTitle": "Cute Pixelated Farm Harvest Game Slides",
+    "sourceUrl": "https://www.slidescarnival.com/download/sc02857/cute-farm-harvest-game-slides/pptx",
+    "licenseUrl": "https://creativecommons.org/licenses/by/4.0/",
+    "sourceDeckUrl": "assets/slidescarnival/decks/pixel-stickers.json",
+    "sourceSlideCount": 20,
+    "selectedSlideIndexes": [
+      0,
+      1,
+      2,
+      3,
+      4,
+      5,
+      6,
+      17,
+      19
+    ],
+    "format": "16:9",
+    "pageWidth": 1920,
+    "pageHeight": 1080,
+    "slideTitles": [
+      "Cute Farm Harvest Game",
+      "Agenda for the Day",
+      "Create Your Character",
+      "Greetings from the barnyard!",
+      "The Hardworking Community",
+      "In a quaint little village, where the sun rises over golden fields, the air is filled with the delig",
+      "This is a Section Header",
+      "Slide 18",
+      "Slide 20"
+    ],
+    "previewSlides": [
+      {
+        "title": "Cute Farm Harvest Game",
+        "url": "assets/slidescarnival/previews/pixel-stickers-01.webp"
+      },
+      {
+        "title": "Agenda for the Day",
+        "url": "assets/slidescarnival/previews/pixel-stickers-02.webp"
+      },
+      {
+        "title": "Create Your Character",
+        "url": "assets/slidescarnival/previews/pixel-stickers-03.webp"
+      },
+      {
+        "title": "Greetings from the barnyard!",
+        "url": "assets/slidescarnival/previews/pixel-stickers-04.webp"
+      },
+      {
+        "title": "The Hardworking Community",
+        "url": "assets/slidescarnival/previews/pixel-stickers-05.webp"
+      },
+      {
+        "title": "In a quaint little village, where the sun rises over golden fields, the air is filled with the delig",
+        "url": "assets/slidescarnival/previews/pixel-stickers-06.webp"
+      },
+      {
+        "title": "This is a Section Header",
+        "url": "assets/slidescarnival/previews/pixel-stickers-07.webp"
+      },
+      {
+        "title": "Slide 18",
+        "url": "assets/slidescarnival/previews/pixel-stickers-08.webp"
+      },
+      {
+        "title": "Slide 20",
+        "url": "assets/slidescarnival/previews/pixel-stickers-09.webp"
+      }
+    ]
+  }
+}

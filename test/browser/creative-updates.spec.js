@@ -26,3 +26,12 @@ test('carrossel respeita movimento reduzido e seleção manual de miniatura',asy
  await expect(page.locator('.eshop-slide-counter')).toHaveText('1 / 7');await page.waitForTimeout(3300);await expect(page.locator('.eshop-slide-counter')).toHaveText('1 / 7');
  await page.locator('.eshop-thumb[data-index="2"]').click();await expect(page.locator('.eshop-slide-counter')).toHaveText('3 / 7');
 });
+test('controles ficam fora do preview vertical',async({page})=>{
+ await page.goto('/?page=templates');
+ await page.locator('.tstore-card[data-deck-id="matcha-recipe"] [data-tstore-action="open-detail"]').first().click();
+ const preview=await page.locator('.eshop-hero-canvas .slide-canvas').boundingBox();
+ const previous=await page.locator('.eshop-nav.eshop-prev').boundingBox();
+ const next=await page.locator('.eshop-nav.eshop-next').boundingBox();
+ expect(previous.x+previous.width).toBeLessThan(preview.x);
+ expect(next.x).toBeGreaterThan(preview.x+preview.width);
+});

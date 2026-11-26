@@ -102,12 +102,22 @@ async function extractArtwork(root, artwork, width, height) {
   return {x:left/w*100,y:top/h*100,w:cropped.width/w*100,h:cropped.height/h*100,image:cropped.toDataURL('image/webp',.95)};
  }finally{URL.revokeObjectURL(url);}
 }
-export async function editablePptx(bytes,{signal,progress}){
+export async function editablePptx(bytes,{signal,progress,maxSlides,retainFinalSlide=false,slideIndexes}={}){
  const pres=await pptx.loadPresentation(bytes,{limits:{maxEntries:10000,maxTotalUncompressedBytes:150*1024*1024,maxXmlPartBytes:8*1024*1024,maxTotalXmlBytes:40*1024*1024}}),slides=pptx.getSlides(pres),size=pptx.getSlideSize(pres);
  if(!slides.length||slides.length>80)throw Error('Importe um arquivo com 1 a 80 slides.');
+ const indexedSlides=slides.map((slide,index)=>({slide,index}));
+ const selectedSlides=Array.isArray(slideIndexes)
+  ?slideIndexes.map(index=>{
+   if(!Number.isInteger(index)||index<0||index>=indexedSlides.length)throw Error('A seleção de slides do PPTX contém um índice inválido.');
+   return indexedSlides[index];
+  })
+  :Number.isInteger(maxSlides)&&maxSlides>0&&indexedSlides.length>maxSlides
+  ?[...indexedSlides.slice(0,maxSlides-(retainFinalSlide?1:0)),...(retainFinalSlide?[indexedSlides[indexedSlides.length-1]]:[])]
+  :indexedSlides;
+ if(!selectedSlides.length||new Set(selectedSlides.map(({index})=>index)).size!==selectedSlides.length)throw Error('A seleção de slides do PPTX está vazia ou contém duplicatas.');
  const measure=document.createElement('canvas').getContext('2d'),result=[];
  const fonts=new Map();
- for(const slide of slides)for(const shape of pptx.getSlideShapes(slide)){
+ for(const {slide} of selectedSlides)for(const shape of pptx.getSlideShapes(slide)){
   const sample=pptx.getShapeText(shape)?.trim().slice(0,130);
   if(!sample)continue;
   for(const [paragraph,items] of pptx.getShapeParagraphElements(shape).entries()){
@@ -164,8 +174,8 @@ export async function editablePptx(bytes,{signal,progress}){
   }finally{dialog.close();dialog.remove();}
  }
 
- for(const [index,source] of slides.entries()){
-  signal?.throwIfAborted();await wait();progress(index,slides.length);
+ for(const [position,{slide:source,index}] of selectedSlides.entries()){
+  signal?.throwIfAborted();await wait();progress(position,selectedSlides.length);
   const warnings=new Set(),renderOptions={textLayout:'svg',resolveFamily:family=>replacements.get(family)||family||'Arial',measureText:(text,spec)=>{measure.font=`${spec.italic?'italic ':''}${spec.bold?'bold ':''}${spec.sizePx}px "${spec.family.replace(/["\\]/g,'')}"`;const m=measure.measureText(text);return{widthPx:m.width,ascentPx:m.fontBoundingBoxAscent||spec.sizePx*.8,descentPx:m.fontBoundingBoxDescent||spec.sizePx*.2};}};
   const root=cleanPptxSvg(renderSlideToSvg(pres,source,renderOptions)).documentElement;
   const foreground=cleanPptxSvg(renderSlideToSvg(pres,source,{...renderOptions,background:false})).documentElement;
@@ -179,7 +189,7 @@ export async function editablePptx(bytes,{signal,progress}){
    }
   }
   const view=root.getAttribute('viewBox').split(/\s+/).map(Number),width=view[2],height=view[3],elements=[];
-  const preview=await raster(new XMLSerializer().serializeToString(root),320,320*height/width);
+  const preview=await raster(new XMLSerializer().serializeToString(root),1280,1280*height/width);
   const shapes=pptx.getSlideShapes(source);
   const mediaShapes=shapes.map(shape=>({shape,media:pptx.getShapeMedia(shape)})).filter(entry=>entry.media?.kind==='audio');
   let slideAudio=null;
@@ -258,7 +268,7 @@ export async function editablePptx(bytes,{signal,progress}){
    for(const renderedId of new Set(a.targetShapeIds.map(id=>animationTargets.get(id)))){const targets=elements.filter(e=>e.id==='pptx-'+renderedId||e.id==='pptx-shape-bg-'+renderedId);if(!targets.length)warnings.add('Uma animação aponta para um objeto não importado.');for(const target of targets)animations.push({id:target.id,group,effect:a.effect,duration,delay,direction:a.direction||'',orientation:a.orientation||''});}
   }
   const transition=pptx.getSlideTransition(source);if(transition?.advanceAfterMs)warnings.add('O avanço automático do PowerPoint fica manual nesta aula.');
-  result.push({...newSlide(),kind:'canvas',title:pptx.getSlideTitle(source)||'Slide '+(index+1),tag:'PPTX editável',sourceType:'pptx',image:preview,imageAlt:'Prévia do slide '+(index+1),pageWidth:width,pageHeight:height,background:'#ffffff',elements,animations,audio:slideAudio,importWarnings:[...warnings],transition:transition?.effect==='fade'?'fade':'none'});progress(index+1,slides.length);
+  result.push({...newSlide(),kind:'canvas',title:pptx.getSlideTitle(source)||'Slide '+(index+1),tag:'PPTX editável',sourceType:'pptx',image:preview,imageAlt:'Prévia do slide '+(index+1),pageWidth:width,pageHeight:height,background:'#ffffff',elements,animations,audio:slideAudio,importWarnings:[...warnings],transition:transition?.effect==='fade'?'fade':'none'});progress(position+1,selectedSlides.length);
  }
  return result;
 }

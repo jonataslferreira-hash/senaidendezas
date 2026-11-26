@@ -1,6 +1,8 @@
 import {canvasThemes, mixHex, newElement} from './canvas-data.js';
-import {newLesson, newQuestion, newSlide} from './lessons.js';
+import {clone, newLesson, newQuestion, newSlide} from './lessons.js';
 import {openSourceLicenses} from './open-community-themes.js';
+import {creativeDecks, creativeSlide, newRepositoryDecks} from './creative-slide-templates.js';
+import {creativeSlideThemes} from './creative-slide-themes.js';
 
 export {openSourceLicenses};
 
@@ -882,6 +884,48 @@ function makeCreditNote(deck) {
   return `Modelo adaptado de "${deck.upstreamName || deck.name}" (${deck.author}) sob licença ${deck.license}. Fonte: ${deck.sourceUrl}`;
 }
 
+const importedCreativeDeckCache = new Map();
+
+async function importedCreativeSlides(deck) {
+  if (!importedCreativeDeckCache.has(deck.id)) {
+    const base = typeof document === 'undefined' ? 'http://localhost/' : document.baseURI;
+    const url = new URL(deck.sourceDeckUrl, base);
+    const request = fetch(url).then(async response => {
+      if (!response.ok) throw Error(`Não foi possível carregar o modelo ${deck.name} (${response.status}).`);
+      const data = await response.json();
+      if (!Array.isArray(data.slides) || data.slides.length < 8) {
+        throw Error(`O modelo ${deck.name} está incompleto: são necessários pelo menos 8 slides.`);
+      }
+      return data.slides;
+    });
+    importedCreativeDeckCache.set(deck.id, request);
+    request.catch(() => importedCreativeDeckCache.delete(deck.id));
+  }
+  return importedCreativeDeckCache.get(deck.id);
+}
+
+async function buildImportedCreativeDeck(deck, options) {
+  const sourceSlides = await importedCreativeSlides(deck);
+  const credit = makeCreditNote(deck);
+  const theme = canvasThemes[options.theme] ? options.theme : deck.theme;
+  const slides = sourceSlides.map((slide, index) => ({
+    ...clone(slide),
+    id: newSlide().id,
+    visualTheme: theme,
+    backgroundFill: slide.backgroundFill || {mode: 'solid', color: slide.background || '#ffffff'},
+    ...(index === 0 && credit ? {note: credit} : {})
+  }));
+  const lesson = {
+    ...newLesson(),
+    title: options.title?.trim() || deck.name,
+    description: options.description?.trim() || deck.description,
+    slides,
+    questions: []
+  };
+  if (options.thumbnail) lesson.thumbnail = options.thumbnail;
+  return lesson;
+}
+
 function deckQuestion(prompt, options, answer = 0, explanation = 'Reveja os pontos principais dos slides.') {
   return {
     ...newQuestion(),
@@ -898,6 +942,11 @@ function deckQuestion(prompt, options, answer = 0, explanation = 'Reveja os pont
 // Categorias principais do catálogo
 export const templateCategories = [
   {id: 'all', label: 'Todos'},
+  {id: 'festas', label: 'Festas & convites'},
+  {id: 'memorias', label: 'Álbuns & memórias'},
+  {id: 'viagens', label: 'Viagens'},
+  {id: 'cotidiano', label: 'Vida & hobbies'},
+  {id: 'cultura', label: 'Música, cinema & jogos'},
   {id: 'escolar', label: 'Escolar'},
   {id: 'ciencias', label: 'Ciências'},
   {id: 'tecnologia', label: 'Tecnologia'},
@@ -1009,28 +1058,78 @@ const categoryScripts = {
   ]
 };
 
-function buildStandardDeck(deck, opts = {}) {
-  const options = typeof opts === 'string' ? {theme: opts} : (opts || {});
-  const theme = canvasThemes[options.theme] ? options.theme : deck.theme;
-  const script = (categoryScripts[deck.category] || categoryScripts.escolar)(deck.name);
-  const creditNote = makeCreditNote(deck);
-  const coverTitle = options.title?.trim() || deck.coverTitle || deck.name;
-  const coverSubtitle = options.description?.trim() || deck.coverSubtitle || deck.description;
-  const coverSlide = createSlideFromTemplate('cover', theme, {
+const revisedScripts = {
+  workshop: [
+    ['spotlight', {title: 'Que ideia vamos testar?', subtitle: 'Escolha um desafio que caiba em uma tarde.'}],
+    ['image-left', {title: 'Colete referências', kicker: 'INSPIRAÇÃO', imageLabel: 'Foto, recorte ou rascunho'}],
+    ['cards-3', {title: 'Três direções possíveis', kicker: 'EXPERIMENTAÇÃO'}],
+    ['grid-4', {title: 'Monte o painel de ideias', kicker: 'COLAGEM'}],
+    ['quote', {title: 'Pergunta para o grupo', quote: 'O que você tentaria se tivesse só dez minutos?', author: 'Pergunta para o grupo'}],
+    ['closing', {title: 'Mostre o protótipo', subtitle: 'Compartilhe uma descoberta e uma ideia para a próxima versão.'}]
+  ],
+  'minimal-white': [
+    ['spotlight', {title: 'A ideia em uma frase', subtitle: 'Abra com a mensagem que você quer deixar.'}],
+    ['two-columns', {title: 'Duas perspectivas', kicker: 'CONTRASTE', columns: [
+      {heading: 'O ponto de partida', body: 'Descreva a situação em poucas linhas.'},
+      {heading: 'O que mudou', body: 'Registre o detalhe que mudou sua leitura.'}
+    ]}],
+    ['image-right', {title: 'Um detalhe em foco', kicker: 'IMAGEM', imageLabel: 'Fotografia ou ilustração'}],
+    ['quote', {title: 'Uma voz', quote: 'Encontre uma frase que mereça uma página inteira.', author: 'Nome da pessoa ou da obra'}],
+    ['summary', {title: 'O que fica', kicker: 'SÍNTESE'}],
+    ['closing', {title: 'Até a próxima', subtitle: 'Deixe um contato, uma referência ou uma pergunta.'}]
+  ],
+  'pastel-class': [
+    ['agenda', {title: 'Nosso percurso', kicker: 'GUIA DA AULA', items: [
+      ['01', 'Observar', 'Repare nas cores, formas e detalhes.'],
+      ['02', 'Perguntar', 'Conte o que chamou sua atenção.'],
+      ['03', 'Experimentar', 'Crie um exemplo com o grupo.'],
+      ['04', 'Compartilhar', 'Mostre o que descobriu.']
+    ]}],
+    ['image-left', {title: 'O que você vê?', kicker: 'OBSERVAÇÃO', imageLabel: 'Imagem para a turma explorar'}],
+    ['two-columns', {title: 'Antes e depois', kicker: 'COMPARAÇÃO', columns: [
+      {heading: 'Primeira impressão', body: 'Registre sua primeira hipótese.'},
+      {heading: 'Nova descoberta', body: 'Conte o que percebeu depois da atividade.'}
+    ]}],
+    ['cards-3', {title: 'Três coisas que descobrimos', kicker: 'PARTILHA'}],
+    ['summary', {title: 'O que aprendemos juntos', kicker: 'REVISÃO'}],
+    ['closing', {title: 'Experimente em casa', subtitle: 'Procure outro exemplo e traga para a próxima aula.'}]
+  ]
+};
+
+function scriptFor(deck) {
+  return revisedScripts[deck.id] || (categoryScripts[deck.category] || categoryScripts.escolar)(deck.name);
+}
+
+function buildCatalogCover(deck, theme, options = {}) {
+  if (deck.pages) {
+    const slide = creativeSlide(deck, theme, paletteFor(theme), 0, options);
+    if (deck.source === 'open-source') slide.note = makeCreditNote(deck);
+    return slide;
+  }
+  const title = options.title?.trim() || deck.coverTitle || deck.name;
+  return createSlideFromTemplate('cover', theme, {
     coverStyle: deck.coverStyle,
     iconName: iconForDeck(deck),
     tag: (deck.tag || deck.categoryLabel || 'APRESENTAÇÃO').toUpperCase(),
-    title: coverTitle,
-    subtitle: coverSubtitle,
+    title,
+    subtitle: options.description?.trim() || deck.coverSubtitle || deck.description,
     footer: deck.source === 'open-source'
       ? `${deck.author} · ${deck.license} · Editável no Storage Lab`
-      : 'Professor(a) · Turma · Editável no Storage Lab'
+      : 'Storage Lab · Pronto para editar'
   }, {
-    title: coverTitle,
+    title,
     kicker: 'Capa',
-    note: creditNote
+    note: makeCreditNote(deck)
   });
-  const bodySlides = script.map(([tplId, content]) => createSlideFromTemplate(tplId, theme, content));
+}
+
+function buildStandardDeck(deck, options) {
+  const theme = canvasThemes[options.theme] ? options.theme : deck.theme;
+  const coverSlide = buildCatalogCover(deck, theme, options);
+  const palette = deck.pages ? paletteFor(theme) : null;
+  const bodySlides = deck.pages
+    ? deck.pages.map((_, i) => creativeSlide(deck, theme, palette, i + 1))
+    : scriptFor(deck).map(([tplId, content]) => createSlideFromTemplate(tplId, theme, content));
   const slides = [coverSlide, ...bodySlides];
   const questions = deck.hasQuiz ? [
     deckQuestion(
@@ -1055,8 +1154,8 @@ function buildStandardDeck(deck, opts = {}) {
 
   const lesson = {
     ...newLesson(),
-    title: coverTitle,
-    description: coverSubtitle,
+    title: coverSlide.title,
+    description: options.description?.trim() || deck.description,
     slides,
     questions
   };
@@ -1066,8 +1165,8 @@ function buildStandardDeck(deck, opts = {}) {
 
 function buildOutlineFor(deck) {
   if (deck.id === 'basic') return ['Título do slide'];
-  const script = (categoryScripts[deck.category] || categoryScripts.escolar)(deck.name);
-  return [deck.coverTitle || deck.name, ...script.map(([, c]) => c.title || 'Slide')];
+  const titles = deck.pages ? deck.pages.map(([title]) => title) : scriptFor(deck).map(([, c]) => c.title || 'Slide');
+  return [deck.coverTitle || deck.name, ...titles];
 }
 
 // ============================================================================
@@ -1083,7 +1182,7 @@ const nativeDeckDefs = [
   ['history-timeline', 'História & Narrativa', 'Moldura editorial clássica com linha do tempo, fontes históricas, causas e debate.', 'humanas', 'sand', 'frame-classic', 'HISTÓRIA'],
   ['academic-tcc', 'Seminário & TCC', 'Estrutura formal para bancas, relatórios de pesquisa, metodologia e resultados.', 'academico', 'paper', 'swiss-grid', 'ACADÊMICO'],
   ['case-study', 'Estudo de Caso', 'Apresentação limpa para análise de cenários, indicadores e plano de ação.', 'negocios', 'sage', 'band-top', 'PROJETO'],
-  ['workshop', 'Oficina & Dinâmica', 'Composição geométrica vibrante para oficinas criativas, dinâmicas e desafios em grupo.', 'criativo', 'citrus', 'bauhaus-blocks', 'OFICINA'],
+  ['workshop', 'Oficina & Dinâmica', 'Blocos em verde-limão e laranja para reunir referências, testar ideias e compartilhar um protótipo.', 'criativo', 'atelier-soda', 'bauhaus-blocks', 'OFICINA'],
   ['lesson-plus-quiz', 'Aula + Quiz Pronto', 'Revisão enxuta já integrada com 3 perguntas interativas prontas para jogar ao vivo.', 'quiz', 'iris', 'split-right', 'AULA + QUIZ', true],
   ['math-exercises', 'Matemática & Exatas', 'Enquadramento técnico limpo para fórmulas, resolução passo a passo e exercícios.', 'ciencias', 'glacier', 'blueprint-tech', 'EXATAS'],
   ['literature-essay', 'Literatura & Redação', 'Tipografia serifa em moldura suave para análise de obras, citações e repertório.', 'humanas', 'rose', 'frame-classic', 'LITERATURA'],
@@ -1091,8 +1190,8 @@ const nativeDeckDefs = [
   ['geography-world', 'Geografia & Atualidades', 'Faixas laterais organizadas para mapas, dados territoriais e debates contemporâneos.', 'humanas', 'ocean', 'ribbon-side', 'GEOGRAFIA'],
   ['pitch-project', 'Pitch & Feira de Projetos', 'Enquadramento widescreen de alto impacto para apresentar ideias, protótipos e resultados.', 'negocios', 'cosmos', 'cinema-frame', 'PITCH'],
   ['debate-class', 'Debate & Seminário Ativo', 'Layout direto em contraste quente para argumentação, contrapontos e mediação em sala.', 'escolar', 'ember', 'split-left', 'DEBATE'],
-  ['minimal-white', 'Minimalista Editorial', 'Máximo respiro visual e tipografia limpa — sem distrações para apresentações autorais.', 'minimalista', 'paper', 'minimal-type', 'EDITORIAL'],
-  ['pastel-class', 'Pastel Didático', 'Caderno suave e acolhedor pensado para ensino fundamental, tutoriais e oficinas leves.', 'escolar', 'pastel', 'notebook-cover', 'ENSINO'],
+  ['minimal-white', 'Minimalista Editorial', 'Paleta de argila em papel creme, com espaço para uma imagem central e uma citação.', 'minimalista', 'atelier-clay', 'minimal-type', 'EDITORIAL'],
+  ['pastel-class', 'Pastel Didático', 'Caderno em azul e rosa para observar, comparar e registrar descobertas da turma.', 'escolar', 'atelier-sky', 'notebook-cover', 'ENSINO'],
   ['data-report', 'Relatório de Dados', 'Grade suíça escura de alto contraste para dashboards, métricas e fechamento trimestral.', 'negocios', 'midnight', 'swiss-grid', 'DADOS'],
   ['review-quiz-pack', 'Revisão de Prova + Quiz', 'Faixa superior clara para revisão rápida de conteúdos seguida de rodada interativa.', 'quiz', 'studio-orbit', 'band-top', 'REVISÃO + QUIZ', true]
 ];
@@ -1230,6 +1329,7 @@ const aooDeckDefs = [
 
 function hydrateDeck(raw) {
   const deck = {
+    format: '16:9',
     ...raw,
     categoryLabel: categoryLabelMap[raw.category] || 'Geral',
     tone: deckTone(raw.theme),
@@ -1259,23 +1359,38 @@ function hydrateDeck(raw) {
       if (options.thumbnail) lesson.thumbnail = options.thumbnail;
       return lesson;
     }
+    if (deck.sourceDeckUrl) return buildImportedCreativeDeck(deck, options);
     return buildStandardDeck(deck, options);
   };
   return deck;
 }
 
+function hydrateNativeDeck(raw) {
+  return hydrateDeck({
+    ...raw,
+    source: raw.source === 'open-source' ? 'open-source' : 'native',
+    collection: raw.collection || 'storage-lab',
+    collectionLabel: raw.collectionLabel || 'Storage Lab',
+    author: raw.author || 'Storage Lab',
+    license: raw.license || 'Integrado · Livre para editar',
+    licenseShort: raw.licenseShort || 'SL',
+    sourceUrl: raw.sourceUrl || '',
+    licenseUrl: raw.licenseUrl || ''
+  });
+}
+
+const removedCatalogIds = new Set([
+  'coastal-postcards', 'moonlight-playlist', 'rainy-book-club', 'neighborhood-art',
+  'birthday-story', 'roadtrip-vertical', 'moon-zine', 'market-story', 'pet-story',
+  'outfit-stories', 'matcha-recipe', 'pocket-quest', 'friends-scrapbook',
+  'tiny-bakery', 'ocean-photo-dump', 'vinyl-swap', 'kitchen-letters',
+  'city-window-gallery', 'vinyl-side-stories', 'strawberry-poster'
+]);
+const repositoryDeckIds = new Set(newRepositoryDecks.map(deck => deck.id));
+
 export const deckTemplates = [
-  ...nativeDeckDefs.map(([id, name, description, category, theme, coverStyle, tag, hasQuiz]) => hydrateDeck({
-    id, name, description, category, theme, coverStyle, tag, hasQuiz: Boolean(hasQuiz),
-    source: 'native',
-    collection: 'storage-lab',
-    collectionLabel: 'Storage Lab',
-    author: 'Storage Lab',
-    license: 'Integrado · Livre para editar',
-    licenseShort: 'SL',
-    sourceUrl: '',
-    licenseUrl: ''
-  })),
+  ...nativeDeckDefs.filter(([id]) => id === 'basic').map(nativeDeck).map(hydrateNativeDeck),
+  ...nativeDeckDefs.filter(([id]) => id !== 'basic').map(nativeDeck).map(hydrateNativeDeck),
   ...opfDeckDefs.map(([id, name, description, category, theme, coverStyle]) => hydrateDeck({
     id, name, upstreamName: name, description, category, theme, coverStyle,
     tag: 'OPENPRESENTATION · MIT',
@@ -1327,8 +1442,14 @@ export const deckTemplates = [
     licenseShort,
     sourceUrl: `${LO_REPO}/tree/master/${upstreamPath}`,
     licenseUrl: licenseUrl || AOO_REPO
-  }))
-];
+  })),
+  ...creativeDecks.filter(deck => !repositoryDeckIds.has(deck.id)).map(hydrateNativeDeck),
+  ...newRepositoryDecks.map(hydrateNativeDeck)
+].filter(deck => !removedCatalogIds.has(deck.id));
+
+function nativeDeck([id, name, description, category, theme, coverStyle, tag, hasQuiz]) {
+  return {id, name, description, category, theme, coverStyle, tag, hasQuiz: Boolean(hasQuiz)};
+}
 
 export const deckGalleryTabs = [
   {id: 'all', label: 'Todos'},
@@ -1339,6 +1460,7 @@ export const deckGalleryTabs = [
 ];
 
 export const templateThemeChoices = [
+  ...Object.entries(creativeSlideThemes).map(([id, theme]) => [id, theme.name, 'native']),
   ['candy-cloud', 'Nuvem de algodão', 'native'],
   ['citrus-party', 'Festa cítrica', 'native'],
   ['night-dream', 'Sonho noturno', 'native'],
@@ -1363,7 +1485,7 @@ export const templateThemeChoices = [
 ].filter(([id]) => canvasThemes[id]).map(([id, label, group]) => ({id, label, group}));
 
 export function getDeckTemplate(id) {
-  return deckTemplates.find(d => d.id === id) || deckTemplates[0];
+  return deckTemplates.find(d => d.id === id) || deckTemplates.find(d => d.id === 'basic');
 }
 
 export function createDeckFromTemplate(deckId, opts = {}) {
@@ -1392,21 +1514,7 @@ export function deckCoverPreview(deckOrId, themeOverride) {
   const theme = canvasThemes[themeOverride] ? themeOverride : deck.theme;
   const key = `${deck.id}:${theme}`;
   if (coverCache.has(key)) return coverCache.get(key);
-  let slide;
-  if (deck.id === 'basic') {
-    slide = createSlideFromTemplate('basic', theme);
-  } else {
-    slide = createSlideFromTemplate('cover', theme, {
-      coverStyle: deck.coverStyle,
-      iconName: iconForDeck(deck),
-      tag: (deck.tag || deck.categoryLabel || 'APRESENTAÇÃO').toUpperCase(),
-      title: deck.coverTitle || deck.name,
-      subtitle: deck.coverSubtitle || deck.description,
-      footer: deck.source === 'open-source'
-        ? `${deck.author} · ${deck.license}`
-        : 'Storage Lab · Pronto para editar'
-    });
-  }
+  const slide = deck.id === 'basic' ? createSlideFromTemplate('basic', theme) : buildCatalogCover(deck, theme);
   if (coverCache.size > 260) coverCache.clear();
   coverCache.set(key, slide);
   return slide;
@@ -1421,13 +1529,21 @@ export function deckPreviewSlides(deckOrId, themeOverride) {
   const theme = canvasThemes[themeOverride] ? themeOverride : deck.theme;
   const key = `${deck.id}:${theme}`;
   if (deckSlidesCache.has(key)) return deckSlidesCache.get(key);
-  const lesson = deck.buildLesson({theme});
+  const lesson = deck.previewSlides
+    ? {
+      ...newLesson(),
+      title: deck.name,
+      description: deck.description,
+      slides: deck.previewSlides.map((_, index) => creativeSlide(deck, theme, paletteFor(theme), index)),
+      questions: []
+    }
+    : deck.buildLesson({theme});
   if (deckSlidesCache.size > 48) deckSlidesCache.clear();
   deckSlidesCache.set(key, lesson);
   return lesson;
 }
 
-export function searchDecks({query = '', sourceTab = 'all', category = 'all', tone = 'all', favorites = new Set()} = {}) {
+export function searchDecks({query = '', sourceTab = 'all', category = 'all', tone = 'all', format = 'all', favorites = new Set()} = {}) {
   const q = String(query || '').trim().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
   return deckTemplates.filter(deck => {
     if (sourceTab === 'native' && deck.source !== 'native') return false;
@@ -1435,8 +1551,10 @@ export function searchDecks({query = '', sourceTab = 'all', category = 'all', to
     if (sourceTab === 'favorites' && !favorites.has(deck.id)) return false;
     if (category !== 'all' && deck.category !== category) return false;
     if (tone !== 'all' && deck.tone !== tone) return false;
+    const deckFormat = deck.format;
+    if (format !== 'all' && deckFormat !== format) return false;
     if (!q) return true;
-    const hay = `${deck.name} ${deck.description} ${deck.categoryLabel} ${deck.author} ${deck.collectionLabel} ${deck.license} ${deck.coverStyle}`
+    const hay = `${deck.name} ${deck.description} ${deck.categoryLabel} ${deck.author} ${deck.collectionLabel} ${deck.license} ${deck.coverStyle} ${themeVisuals(deck.theme).name} ${deckFormat}`
       .toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
     return q.split(/\s+/).every(part => hay.includes(part));
   });
@@ -1450,6 +1568,7 @@ export function findSimilarDecks(deck, limit = 4) {
       score: (item.category === deck.category ? 3 : 0)
         + (item.tone === deck.tone ? 1 : 0)
         + (item.collection === deck.collection ? 1 : 0)
+        + (item.format === deck.format ? 1 : 0)
         + (item.coverStyle !== deck.coverStyle ? 0.5 : 0)
     }))
     .sort((a, b) => b.score - a.score)
