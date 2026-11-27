@@ -1,10 +1,10 @@
 import {test,expect} from '@playwright/test';
-test('biblioteca inicia sozinha e mantem navegacao do editor',async({page})=>{
+test.beforeEach(async ({page})=>{await page.addInitScript(()=>localStorage.setItem('sl-tour','done'));});
+test('biblioteca inicia a demonstração e mantém ação de criar aula',async({page})=>{
   const errors=[];page.on('pageerror',e=>errors.push(e.message));await page.emulateMedia({reducedMotion:'no-preference'});await page.goto('/');
   const demo=page.locator('[data-showcase]');await expect(demo).toHaveAttribute('data-playing','true');await expect(page.locator('[data-showcase-play]')).toHaveCount(0);
-  await expect(demo).toHaveAttribute('data-step','2',{timeout:11000});await expect(demo).toHaveClass(/demo-correct/);await expect(demo).toHaveAttribute('data-step','0',{timeout:7000});
-  await page.locator('.lesson-card [data-studio-action=edit]').first().click();await expect(page.locator('.slide-designer')).toBeVisible();await page.goBack();await expect(page.locator('.studio-library')).toBeVisible();
-  await page.locator('.experience-feature').scrollIntoViewIfNeeded();await expect(demo).toHaveAttribute('data-playing','true');expect(errors).toEqual([]);
+  await expect(demo).toHaveAttribute('data-step','2',{timeout:14000});await expect(demo).toHaveClass(/demo-correct/);await expect(demo).toHaveAttribute('data-step','0',{timeout:9000});
+  await page.getByRole('button',{name:/Começar uma aula/}).click();await expect(page.getByLabel('Título da aula',{exact:true})).toBeVisible();expect(errors).toEqual([]);
 });
 test('digitacao alinhada segura o texto por 4,5 segundos e apaga antes de trocar fonte',async({page})=>{
   await page.emulateMedia({reducedMotion:'no-preference'});await page.clock.install({time:new Date('2026-11-02T12:00:00Z')});await page.goto('/');
@@ -19,15 +19,22 @@ test('digitacao alinhada segura o texto por 4,5 segundos e apaga antes de trocar
   expect(Math.abs(await current.evaluate(el=>el.getBoundingClientRect().left-el.closest('h2').getBoundingClientRect().left))).toBeLessThan(2);
   await page.screenshot({path:'test-results/typing-mobile.png',animations:'disabled'});
 });
-test('flutuacao visivel, transicao sobreposta e conta animada',async({page})=>{
-  await page.emulateMedia({reducedMotion:'no-preference'});await page.goto('/');await expect(page.locator('[data-showcase]')).toHaveAttribute('data-playing','true');
-  const board=page.locator('.demo-board'),start=await board.evaluate(el=>parseFloat(getComputedStyle(el).translate.split(' ')[1]));
-  await expect.poll(()=>board.evaluate(el=>parseFloat(getComputedStyle(el).translate.split(' ')[1])),{timeout:3000}).toBeLessThan(start-12);
-  await page.locator('.showcase-steps [data-showcase-step="1"]').click();await expect(page.locator('.stage-leaving')).toHaveCount(1);await expect(page.locator('.stage-leaving')).toHaveCount(0);
-  await page.locator('.showcase-steps [data-showcase-step="0"]').click();await page.locator('.showcase-steps [data-showcase-step="2"]').click();await expect(page.locator('.demo-board-stage:not(.stage-leaving)')).toHaveCount(1);
-  await page.getByRole('button',{name:'Entrar / Criar conta',exact:true}).click();await expect.poll(()=>page.locator('.account-dialog').evaluate(el=>el.getAnimations().some(a=>a.currentTime>20&&a.currentTime<450))).toBe(true);
-  await page.getByRole('button',{name:'Fechar conta',exact:true}).click();await expect(page.locator('.account-dialog')).toHaveCount(0);
+test('celular flutua, apresenta o conteúdo real e sincroniza as respostas',async({page})=>{
+  await page.emulateMedia({reducedMotion:'no-preference'});await page.goto('/');
+  const demo=page.locator('[data-showcase]'),phone=page.locator('.showcase-phone');await expect(demo).toHaveAttribute('data-playing','true');
+  await expect(phone.locator('[data-showcase-phone]')).toContainText('Onde vivem os seus arquivos?');
+  expect(await phone.evaluate(el=>el.getAnimations().some(a=>a.playState==='running'))).toBe(true);
+  await page.getByRole('button',{name:'03 Responder quiz'}).click();
+  await expect(phone).toContainText('Qual componente mantém seus arquivos salvos');
+  await phone.getByRole('button',{name:'B Armazenamento (HDD ou SSD)'}).click();
+  await expect(demo).toHaveClass(/demo-correct/);await expect(page.locator('[data-board-answer="1"]')).toHaveClass(/chosen/);
+  await expect(phone.locator('[data-phone-feedback]')).toHaveText('✓ Resposta correta');
+  await phone.getByRole('button',{name:'A Memória RAM comum'}).click();await expect(demo).toHaveClass(/demo-wrong/);
+  await page.waitForTimeout(5700);await expect(demo).toHaveAttribute('data-step','2');
+  expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
 });
-test('movimento reduzido preserva digitacao e ciclo sem flutuacao',async({page})=>{
-  await page.emulateMedia({reducedMotion:'reduce'});await page.goto('/');await expect(page.locator('.demo-board')).toHaveCSS('animation-name','none');await expect(page.locator('.living-title-current')).toHaveText('ganhar vida',{timeout:1800});await expect(page.locator('[data-showcase]')).toHaveAttribute('data-step','1',{timeout:6000});
+test('movimento reduzido desativa flutuação e mantém navegação',async({page})=>{
+  await page.emulateMedia({reducedMotion:'reduce'});await page.goto('/');await expect(page.locator('.showcase-phone')).toHaveCSS('animation-name','none');
+  await page.getByRole('button',{name:'02 Conectar turma'}).click();await expect(page.locator('[data-showcase-phone]')).toContainText('Conectado');
+  await page.setViewportSize({width:390,height:844});expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
 });

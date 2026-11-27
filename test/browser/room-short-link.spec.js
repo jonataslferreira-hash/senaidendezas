@@ -8,7 +8,7 @@ async function qrText(page){
 }
 test('link curto para digitar, cópia e QR direto usam a mesma sala',async({page})=>{
  let calls=0;await page.route('https://is.gd/create.php*',route=>{calls++;const url=new URL(route.request().url());expect(url.searchParams.get('callback')).toBe('roomShortResult');expect(url.searchParams.get('url')).toMatch(/^https:\/\/jonataslferreira-hash\.github\.io\/senaidendezas\/\?s=\d{6}$/);return route.fulfill({contentType:'application/javascript',body:'roomShortResult({"shorturl":"https://is.gd/Abc123"});'});});
- await page.goto('/',{waitUntil:'domcontentloaded'});await page.locator('.lesson-card [data-studio-action=present]').first().click();await expect(page.locator('.share-modal')).toBeVisible();
+ await page.goto('/',{waitUntil:'domcontentloaded'});await page.locator('.lesson-card [data-studio-action=present]').first().click();await expect(page.locator('.share-modal')).toBeVisible();await expect(page.locator('.share-modal')).not.toContainText('A AULA FICA MELHOR JUNTO');
  await expect(page.getByLabel('Link de convite')).toHaveValue('https://is.gd/Abc123');await expect(page.locator('[data-short-link-status]')).toHaveText('Link curto para digitar ou copiar');
  const code=(await page.locator('.big-code').innerText()).replace(/\s/g,'');await expect(page.locator('#room-qr')).toHaveAttribute('src',/^data:image/);expect(await qrText(page)).toBe(`https://jonataslferreira-hash.github.io/senaidendezas/?s=${code}`);
  await page.getByRole('button',{name:'Copiar link'}).click();expect(await page.evaluate(()=>window.copiedInvite)).toBe('https://is.gd/Abc123');await page.screenshot({path:'test-results/invite-short.png',animations:'disabled'});await page.evaluate(async()=>{if(document.fullscreenElement)await document.exitFullscreen();});await page.setViewportSize({width:390,height:844});await expect(page.getByLabel('Link de convite')).toBeVisible();expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);await page.screenshot({path:'test-results/invite-short-mobile.png',animations:'disabled'});await page.setViewportSize({width:1280,height:720});
@@ -24,4 +24,10 @@ test('JSONP roda isolado, valida resposta e ignora código remoto em caso de err
  await page.goto('/',{waitUntil:'domcontentloaded'});
  await page.route('https://is.gd/create.php*',route=>route.fulfill({contentType:'application/javascript',body:'try {parent.document.body.dataset.compromised="yes"} catch(e) {} roomShortResult({shorturl:"https://evil.example/phish"});'}));
  const short=await page.evaluate(async()=>{const {shortenRoomLink}=await import('/src/room-short-link.js');return shortenRoomLink('https://jonataslferreira-hash.github.io/senaidendezas/?s=123456',{timeout:4000});});expect(short).toBeNull();expect(await page.locator('body').getAttribute('data-compromised')).toBeNull();await expect(page.locator('iframe[title="Gerar link curto"]')).toHaveCount(0);
+});
+test('atalho para o quiz continua funcionando após fechar o convite',async({page})=>{
+ await page.goto('/?localSignal',{waitUntil:'domcontentloaded'});await page.locator('.lesson-card [data-studio-action=present]').first().click();
+ await expect(page.locator('.share-modal')).toBeVisible();await expect(page.locator('.share-modal')).not.toContainText('A AULA FICA MELHOR JUNTO');
+ const code=(await page.locator('.big-code').innerText()).replace(/\s/g,'');await expect(page.locator('#room-qr')).toHaveAttribute('src',/^data:image/);expect(await qrText(page)).toBe(`http://localhost:5173/?localSignal=&s=${code}`);
+ await page.getByRole('button',{name:'Fechar convite'}).click();await page.evaluate(async()=>{if(document.fullscreenElement)await document.exitFullscreen();});const shortcut=page.getByRole('button',{name:'Ir para o quiz'});await expect(shortcut).toBeVisible();await shortcut.click();await expect(page.locator('.quiz-lobby')).toBeVisible();
 });

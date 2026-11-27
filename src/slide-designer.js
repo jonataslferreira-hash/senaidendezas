@@ -13,7 +13,7 @@ import { MAX_CANVAS_ELEMENTS, canvasFromSlide, newElement, canvasThemes, applyCa
 import {openLayouts, applyOpenLayout} from './open-slide-layouts.js';
 import {slideStylePicker,localLayouts} from './slide-style-picker.js';
 import { canvasMarkup, CanvasModels, esc } from './canvas-view.js';
-import { reconcileCanvas } from './stage-keep.js';
+import { reconcileCanvas, stageCache, invalidateStageSource } from './stage-keep.js';
 import { importModelFiles } from './model-files.js';
 import { openOnlineLibrary } from './online-library.js';
 import { modelOptionsMarkup, modelSubject, modelShortName } from './model-catalog.js';
@@ -147,9 +147,9 @@ export class SlideDesigner {
       }
     });
     root.addEventListener('input', e => this.input(e));
-    root.addEventListener('focusout', e => { if (e.target.matches('.canvas-text[contenteditable]')) { e.target.removeAttribute('contenteditable'); this.lastTap = null; } });
+    root.addEventListener('focusout', e => { if(this.lastInputTarget===e.target){this.lastInput=0;this.lastInputTarget=null;} if (e.target.matches('.canvas-text[contenteditable]')) { e.target.removeAttribute('contenteditable'); this.lastTap = null; } });
     root.addEventListener('change', e => this.change(e).catch(error => studio.callbacks.toast(error.message)));
-    root.addEventListener('keydown', e => this.key(e));
+    document.addEventListener('keydown', e => this.key(e));
   }
   get original() { return this.studio.draft.slides[this.studio.index]; }
   selectionIds(){
@@ -183,8 +183,27 @@ export class SlideDesigner {
     if (!this.histories.has(id)) this.histories.set(id, { undo: [], redo: [] });
     return this.histories.get(id);
   }
+  syncHistoryButtons() {
+    const h=this.history();
+    for(const b of this.studio.root.querySelectorAll('[data-designer-action="undo"],[data-designer-action="redo"]'))
+      b.disabled=!this.studio.groups.canEdit||!h[b.dataset.designerAction].length;
+  }
   record(before = copy(this.original)) {
     const h = this.history(before.id); h.undo.push(before); if (h.undo.length > 40) h.undo.shift(); h.redo = [];
+    this.lastInput=0;this.lastInputTarget=null;
+    const cache=stageCache();if(cache?.node?.isConnected){
+      cache.html=null;
+      if(before.kind==='canvas'&&this.original.kind==='canvas')for(const element of this.original.elements){
+        const previous=before.elements.find(item=>item.id===element.id);
+        if(previous&&JSON.stringify(previous)!==JSON.stringify(element))invalidateStageSource(cache.node.querySelector('[data-object-id="'+CSS.escape(element.id)+'"]'));
+      }
+    }
+    if(before.id===this.original.id)this.syncHistoryButtons();
+  }
+  recordInput(target) {
+    const now=Date.now();
+    if(this.lastInputTarget!==target||!this.lastInput||now-this.lastInput>700)this.record();
+    this.lastInputTarget=target;this.lastInput=now;
   }
   mutate(fn, preserveInspector = false) {
     const scroll = preserveInspector ? this.studio.root.querySelector("#designer-inspector")?.scrollTop : undefined;
@@ -596,7 +615,7 @@ export class SlideDesigner {
   }
   editText(node) {
     const text = node.querySelector('.canvas-text'); if (!text) return;
-    this.record(); this.ensure(); text.contentEditable = 'plaintext-only'; text.focus();
+    this.lastInput=0;this.lastInputTarget=null;this.ensure(); text.contentEditable = 'plaintext-only'; text.focus();
     const range = document.createRange(); range.selectNodeContents(text);
     const selection = window.getSelection(); selection.removeAllRanges(); selection.addRange(range);
   }
@@ -604,15 +623,15 @@ export class SlideDesigner {
     const target = event.target;
     if (!this.studio.groups.canEdit || this.studio.receivingRemote || !this.studio.root.contains(target)) return;
     if (target.closest('.canvas-text[contenteditable]')) {
-      const el = this.selectedElement(); el.text = target.innerText.slice(0, 6000); if (el.role === 'title') this.original.title = el.text.slice(0, 200);
+      const el = this.selectedElement(); if(!el)return;this.recordInput(target);el.text = target.innerText.slice(0, 6000); if (el.role === 'title') this.original.title = el.text.slice(0, 200);
       const label = this.studio.root.querySelector('[data-current-label]'); if (label && el.role === 'title') label.textContent = this.original.title;
+      const cache=stageCache();if(cache?.node?.isConnected){cache.html=null;invalidateStageSource(target.closest('[data-object-id]'));}
       this.studio.markDirty(); return;
     }
     const background = target.matches('#designer-background,[data-background-end],[data-background-angle]');
     if (!target.dataset.elementField && !target.dataset.slideField && !background) return;
     if (!this.studio.root.querySelector('.slide-designer')) return;
-    if (!this.lastInput || Date.now() - this.lastInput > 700) this.record();
-    this.lastInput = Date.now();
+    this.recordInput(target);
     const s = this.ensure(), key = target.dataset.elementField, el = s.elements.find(e => e.id === this.selected);
     if (background) {
       if(target.id==='designer-background')s.background=target.value;
@@ -652,6 +671,7 @@ export class SlideDesigner {
     if (t.matches('[data-slide-transition]')) {
       const allowed = ['slide', 'fade', 'zoom', 'rise', 'wipe', 'iris', 'split', 'flip', 'none'];
       const value = allowed.includes(t.value) ? t.value : 'slide';
+      if(this.original.transition!==value)this.record();
       this.original.transition = value;
       this.studio.markDirty();
       return;
@@ -809,7 +829,7 @@ export class SlideDesigner {
     if (action === 'online-library-model') { this.replaceId = e?.id; this.openOnlineModel(); return; }
     if (action === 'interact') { this.interacting = this.interacting === e.id ? '' : e.id; this.refreshSelection(); return; }
     if (action === 'undo' || action === 'redo') {
-      clearTimeout(this.cropWheelTimer);this.cropWheelBefore=null;
+      clearTimeout(this.cropWheelTimer);this.cropWheelBefore=null;this.lastInput=0;this.lastInputTarget=null;
       const h = this.history(), from = action === 'undo' ? h.undo : h.redo, to = action === 'undo' ? h.redo : h.undo;
       if (!from.length) return; to.push(copy(this.original)); this.studio.draft.slides[this.studio.index] = from.pop(); this.studio.markDirty(); this.studio.callbacks.render(); return;
     }
@@ -1323,9 +1343,29 @@ export class SlideDesigner {
     clearTimeout(this.cropWheelTimer);const slideId=this.original.id;this.cropWheelTimer=setTimeout(()=>{this.cropWheelBefore=null;if(this.original?.id===slideId)this.studio.callbacks.render();},350);
   }
   key(event) {
-    const editor=event.target.closest('.studio-editor')||this.studio.root.querySelector('.studio-editor');
-    if(!editor||!this.studio.groups.canEdit||event.target.closest?.('input,textarea,select,[contenteditable],dialog,.lesson-chat')||document.querySelector('dialog[open]'))return;
-    if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'z') { event.preventDefault(); this.action(event.shiftKey ? 'redo' : 'undo', {}); return; }
+    const editor=this.studio.root.querySelector('.studio-editor');
+    if(!editor||!this.studio.root.querySelector('.slide-designer')||!this.studio.groups.canEdit||event.target.closest?.('dialog,[role=dialog],.lesson-chat')||document.querySelector('dialog[open]')||(!editor.contains(event.target)&&event.target!==document.body))return;
+    const target=event.target,editable=target.closest?.('input,textarea,select,[contenteditable]');
+    const inDesigner=editable?.closest('.slide-designer');
+    const slideField=inDesigner&&(editable.matches('[data-element-field],[data-slide-field],#designer-background,[data-background-end],[data-background-angle],.canvas-text[contenteditable]'));
+    const key=event.key.toLowerCase(),shortcut=(event.ctrlKey||event.metaKey)&&!event.altKey&&(key==='z'||key==='y');
+    if(shortcut){
+      if(editable&&!slideField)return; // Campos de chat, títulos e outros formulários mantêm o histórico nativo.
+      event.preventDefault();
+      const action=key==='y'||event.shiftKey?'redo':'undo';
+      const field=slideField?editable:null, isText=field?.matches('.canvas-text[contenteditable]'), objectId=isText?field.closest('[data-object-id]')?.dataset.objectId:null;
+      const selector=field&&!isText?(field.id?'#'+CSS.escape(field.id):field.dataset.elementField?'[data-element-field="'+CSS.escape(field.dataset.elementField)+'"]':field.dataset.slideField?'[data-slide-field="'+CSS.escape(field.dataset.slideField)+'"]':field.hasAttribute('data-background-end')?'[data-background-end]':'[data-background-angle]'):null;
+      const position=field&&!isText&&typeof field.selectionStart==='number'?field.selectionStart:null;
+      this.action(action,{}).then(()=>{
+        if(!field)return;
+        const next=isText?this.studio.root.querySelector('.canvas-object[data-object-id="'+CSS.escape(objectId)+'"] .canvas-text'):this.studio.root.querySelector(selector);
+        if(!next)return;
+        if(isText){next.contentEditable='plaintext-only';next.focus();const range=document.createRange();range.selectNodeContents(next);range.collapse(false);const selection=window.getSelection();selection.removeAllRanges();selection.addRange(range);}
+        else {next.focus();if(position!==null)try{next.setSelectionRange(position,position);}catch{}}
+      }).catch(error=>this.studio.callbacks.toast(error.message));
+      return;
+    }
+    if(editable)return;
     if (event.key==='Delete' && this.selected) { event.preventDefault(); this.action('delete', {}).catch(error=>this.studio.callbacks.toast(error.message)); }
     if (event.target.closest?.('.slide-designer')&&event.key.startsWith('Arrow') && this.selected) {
       event.preventDefault(); const amount = event.shiftKey ? 5 : 1;
