@@ -1,0 +1,36 @@
+name: Diagnóstico temporário de convite
+on:
+  push:
+    branches: [arena/c09be721-senaidendezas]
+    paths: [.github/workflows/diagnostico-convite.yml]
+permissions:
+  contents: read
+jobs:
+  browser:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium
+      - name: Testar serviço e navegador reais
+        run: |
+          curl -sSI --max-time 15 'https://is.gd/create.php?format=json&callback=roomShortResult&url=https%3A%2F%2Fjonataslferreira-hash.github.io%2Fsenaidendezas%2F%3Fs%3D123456'
+          npm run dev -- --port 5173 > /tmp/vite.log 2>&1 &
+          node --input-type=module <<'JS'
+          import { chromium } from '@playwright/test';
+          const browser = await chromium.launch({headless:true});
+          const page = await browser.newPage();
+          page.on('console', m => console.log('console:', m.type(), m.text()));
+          page.on('requestfailed', r => console.log('falha:', r.url(), r.failure()?.errorText));
+          page.on('response', r => { if (r.url().startsWith('https://is.gd/')) console.log('resposta:', r.status(), JSON.stringify(r.headers())); });
+          await page.goto('http://127.0.0.1:5173/', {waitUntil:'domcontentloaded',timeout:20000});
+          const result = await page.evaluate(async () => (await import('/src/room-short-link.js')).shortenRoomLink('https://jonataslferreira-hash.github.io/senaidendezas/?s=123456',{timeout:12000}));
+          console.log('resultado:', result);
+          await browser.close();
+          if (!result) process.exitCode=1;
+          JS
