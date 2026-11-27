@@ -8,6 +8,7 @@ import { isValidModelId } from './model-catalog.js';
 import { openSlideThemes } from './open-slide-themes.js';
 import { communitySlideThemes } from './open-community-themes.js';
 import { studioSlideThemes } from './studio-slide-themes.js';
+import { creativeSlideThemes } from './creative-slide-themes.js';
 import { resolveSimulation } from './simulations.js';
 export const canvasThemes = {
   midnight: { name: 'Noite violeta', background: '#171324', color: '#f1eaff', accent: '#baa4f4' },
@@ -32,7 +33,8 @@ export const canvasThemes = {
   'night-dream': {name:'Sonho noturno',background:'#262046',color:'#fff4fb',accent:'#f2a9d5',end:'#34305b',tints:['#d6a8e8','#89bde6','#f9d89d']},
   ...openSlideThemes,
   ...communitySlideThemes,
-  ...studioSlideThemes
+  ...studioSlideThemes,
+  ...creativeSlideThemes
 };
 // Mistura duas cores hexadecimais. O editor só aceita #rrggbb, então toda
 // transparência visual é feita calculando a cor final.
@@ -50,6 +52,11 @@ export function layoutPanelColor(background, accent) {
     return Math.round(base*.88+tint*.12).toString(16).padStart(2,'0');
   }).join('');
 }
+export const creativeFramePrefix = 'creative-frame-';
+export const creativeArtPrefix = 'creative-art-';
+export const hasCreativeArtwork = slide => slide.elements.some(element =>
+  element.id.startsWith(creativeArtPrefix) || element.id.startsWith(creativeFramePrefix));
+
 export function applyCanvasTheme(slide, key) {
   if (!Object.hasOwn(canvasThemes, key)) return false;
   const theme = canvasThemes[key];
@@ -66,6 +73,12 @@ export function applyCanvasTheme(slide, key) {
       if (font) element.fontFamily = font;
     }
     if (element.type === 'shape') {
+      if (element.id.startsWith(creativeArtPrefix)) continue;
+      if (element.id.startsWith(creativeFramePrefix)) {
+        element.background = element.id.startsWith(creativeFramePrefix + 'line-') ? theme.accent : theme.background;
+        element.borderColor = mixHex(theme.background, theme.accent, .26);
+        continue;
+      }
       const tints = Array.isArray(theme.tints) && theme.tints.length ? theme.tints : [theme.accent];
       // As formas de apoio da IA guardam a cor da paleta: as grandes ficam
       // pastel (misturadas ao fundo) e as linhas finas usam o destaque.

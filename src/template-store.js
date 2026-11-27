@@ -19,6 +19,7 @@ import './template-store.css';
 
 const FAVORITES_KEY = 'sl-template-favorites-v1';
 const BATCH_SIZE = 24;
+const FORMATS = [['all', 'Todos os formatos'], ['16:9', '16:9'], ['9:16', '9:16'], ['1:1', '1:1'], ['4:3', '4:3']];
 
 function loadFavorites() {
   try {
@@ -71,8 +72,9 @@ function themeChoicesFor(deck) {
     list.push({ id, label: label || canvasThemes[id].label || id });
   };
   add(deck.theme, 'Original');
+  let standardCount = 0;
   for (const choice of templateThemeChoices) {
-    if (list.length >= 9) break;
+    if (!choice.id.startsWith('atelier-') && ++standardCount > 8) continue;
     add(choice.id, choice.label);
   }
   return list;
@@ -82,16 +84,18 @@ function ambientMarkup() {
   return `<div class="tstore-ambient" aria-hidden="true"><canvas class="tstore-fluid-canvas" data-tstore-fluid></canvas></div>`;
 }
 
-export function createTemplateStore({ render, useDeck, downloadDeckPptx, onRouteChange }) {
+export function createTemplateStore({ render, useDeck, downloadDeckPptx, onRouteChange, onError }) {
   const state = {
     sourceTab: 'all',
     category: 'all',
     tone: 'all',
+    format: 'all',
     query: '',
     visibleCount: BATCH_SIZE,
     detailId: '',
     detailTheme: '',
     detailSlide: 0,
+    catalogScrollY: null,
     manualNavigation: false,
     favorites: loadFavorites(),
     busy: ''
@@ -109,6 +113,7 @@ export function createTemplateStore({ render, useDeck, downloadDeckPptx, onRoute
       sourceTab: state.sourceTab === 'external' ? 'all' : state.sourceTab,
       category: state.category,
       tone: state.tone,
+      format: state.format,
       favorites: state.favorites
     });
   }
@@ -117,11 +122,12 @@ export function createTemplateStore({ render, useDeck, downloadDeckPptx, onRoute
     const cover = deckCoverPreview(deck);
     const fav = state.favorites.has(deck.id);
     return `<article class="tstore-card" data-deck-id="${esc(deck.id)}">
-      <div class="tstore-card-media" style="--preview-ratio:${cover.pageWidth/cover.pageHeight||16/9}" role="button" tabindex="0" data-tstore-action="open-detail" data-deck-id="${esc(deck.id)}" aria-label="Ver detalhes de ${esc(deck.name)}">
+      <div class="tstore-card-media" data-slide-format="${deck.format}" style="--cover-background:${cover.background || themeVisuals(deck.theme).background}" role="button" tabindex="0" data-tstore-action="open-detail" data-deck-id="${esc(deck.id)}" aria-label="Ver detalhes de ${esc(deck.name)}">
         <div class="tstore-card-canvas" inert aria-hidden="true">${renderSlideBox(cover)}</div>
         <div class="tstore-card-badges">
           ${deck.hasQuiz ? '<span class="tstore-pill tstore-pill-quiz">Quiz</span>' : ''}
-          <span class="tstore-pill">${deck.slideCount} slides</span>${deck.width?`<span class="tstore-pill">${deck.width===deck.height?'1:1':deck.width<deck.height?'9:16':'16:9'}</span>`:''}
+          <span class="tstore-pill">${deck.slideCount} ${deck.slideCount === 1 ? 'slide' : 'slides'}</span>
+          <span class="tstore-pill">${deck.format}</span>
         </div>
         <button type="button" class="tstore-fav-btn ${fav ? 'is-saved' : ''}" data-tstore-action="toggle-favorite" data-deck-id="${esc(deck.id)}" aria-label="${fav ? 'Remover dos salvos' : 'Salvar apresentação'}" aria-pressed="${fav}">${heartIcon(fav)}</button>
       </div>
@@ -176,7 +182,7 @@ export function createTemplateStore({ render, useDeck, downloadDeckPptx, onRoute
 
     return `<div class="tstore-results-bar">
         <span data-tstore-count>${items.length} ${items.length === 1 ? 'apresentação' : 'apresentações'}</span>
-        ${state.query || state.category !== 'all' || state.tone !== 'all' || state.sourceTab !== 'all'
+        ${state.query || state.category !== 'all' || state.tone !== 'all' || state.format !== 'all' || state.sourceTab !== 'all'
           ? '<button type="button" class="tstore-clear-btn" data-tstore-action="reset-filters">Limpar filtros</button>'
           : ''}
       </div>
@@ -227,6 +233,11 @@ export function createTemplateStore({ render, useDeck, downloadDeckPptx, onRoute
                 `<button type="button" class="tstore-tone-btn ${state.tone === id ? 'is-active' : ''}" data-tstore-action="tone" data-value="${id}" aria-pressed="${state.tone === id}">${label}</button>`
               ).join('')}
             </div>` : ''}
+            ${state.sourceTab !== 'external' ? `<div class="tstore-tones tstore-formats" role="group" aria-label="Formato dos slides">
+              ${FORMATS.map(([id, label]) =>
+                `<button type="button" class="tstore-tone-btn ${state.format === id ? 'is-active' : ''}" data-tstore-action="format" data-value="${id}" aria-pressed="${state.format === id}">${label}</button>`
+              ).join('')}
+            </div>` : ''}
           </div>
 
           ${state.sourceTab !== 'external' ? `<div class="tstore-cats" role="group" aria-label="Categorias">
@@ -246,7 +257,7 @@ export function createTemplateStore({ render, useDeck, downloadDeckPptx, onRoute
     const slides = lesson.slides || [];
     const slideIndex = Math.max(0, Math.min(state.detailSlide, slides.length - 1));
     const currentSlide = slides[slideIndex] || slides[0];
-    const nextSlide = slides.length > 1 ? slides[(slideIndex + 1) % slides.length] : null;
+    const nextSlide = deck.format === '16:9' && slides.length > 1 ? slides[(slideIndex + 1) % slides.length] : null;
     const fav = state.favorites.has(deck.id);
     const themes = themeChoicesFor(deck);
     const similar = findSimilarDecks(deck, 4);
@@ -261,20 +272,20 @@ export function createTemplateStore({ render, useDeck, downloadDeckPptx, onRoute
 
         <div class="eshop-main">
           <div class="eshop-gallery">
-            <div class="eshop-hero-stage ${nextSlide ? 'has-peek' : ''}" style="--preview-ratio:${currentSlide.pageWidth/currentSlide.pageHeight||16/9}">
+            <div class="eshop-hero-stage ${slides.length > 1 ? 'has-nav' : ''} ${nextSlide ? 'has-peek' : ''}" style="--preview-ratio:${currentSlide.pageWidth/currentSlide.pageHeight||16/9}">
+              ${slides.length > 1 ? `<button type="button" class="eshop-nav eshop-prev" data-tstore-action="detail-prev" aria-label="Slide anterior">‹</button>` : ''}
               <div class="eshop-hero-frame" style="--preview-ratio:${currentSlide.pageWidth/currentSlide.pageHeight||16/9}">
                 <div class="eshop-hero-canvas" inert aria-hidden="true">${renderSlideBox(currentSlide)}</div>
-                ${slides.length > 1 ? `<button type="button" class="eshop-nav eshop-prev" data-tstore-action="detail-prev" aria-label="Slide anterior">‹</button>
-                  <button type="button" class="eshop-nav eshop-next" data-tstore-action="detail-next" aria-label="Próximo slide">›</button>` : ''}
                 <span class="eshop-slide-counter">${slideIndex + 1} / ${slides.length}</span>
               </div>
+              ${slides.length > 1 ? `<button type="button" class="eshop-nav eshop-next" data-tstore-action="detail-next" aria-label="Próximo slide">›</button>` : ''}
               ${nextSlide ? `<button type="button" class="eshop-peek" data-tstore-action="detail-next" aria-label="Avançar para o próximo slide">
                 <div class="eshop-peek-canvas" inert aria-hidden="true">${renderSlideBox(nextSlide)}</div>
               </button>` : ''}
             </div>
 
             <div class="eshop-thumbs" role="list" aria-label="Slides desta apresentação">
-              ${slides.map((s, idx) => `<button type="button" class="eshop-thumb ${idx === slideIndex ? 'is-active' : ''}" data-tstore-action="detail-slide" data-index="${idx}" aria-label="Slide ${idx + 1}: ${esc(s.title || 'Slide')}" aria-current="${idx === slideIndex ? 'true' : 'false'}">
+              ${slides.map((s, idx) => `<button type="button" class="eshop-thumb ${idx === slideIndex ? 'is-active' : ''}" style="--thumb-ratio:${s.pageWidth / s.pageHeight || 16 / 9}" data-tstore-action="detail-slide" data-index="${idx}" aria-label="Slide ${idx + 1}: ${esc(s.title || 'Slide')}" aria-current="${idx === slideIndex ? 'true' : 'false'}">
                 <div class="eshop-thumb-canvas" inert aria-hidden="true">${renderSlideBox(s)}</div>
                 <span class="eshop-thumb-idx">${String(idx + 1).padStart(2, '0')}</span>
               </button>`).join('')}
@@ -333,7 +344,7 @@ export function createTemplateStore({ render, useDeck, downloadDeckPptx, onRoute
                 <div><dt>Origem</dt><dd>${esc(deck.collectionLabel)}</dd></div>
                 <div><dt>Licença</dt><dd>${deck.credit?.licenseUrl ? `<a href="${esc(deck.credit.licenseUrl)}" target="_blank" rel="noopener noreferrer">${esc(deck.license)} ↗</a>` : esc(deck.license)}</dd></div>
                 <div><dt>Autoria</dt><dd>${deck.credit?.sourceUrl ? `<a href="${esc(deck.credit.sourceUrl)}" target="_blank" rel="noopener noreferrer">${esc(deck.author)} ↗</a>` : esc(deck.author)}</dd></div>
-                <div><dt>Formato</dt><dd>${deck.width&&deck.height&&deck.width===deck.height?'1:1':deck.width&&deck.width<deck.height?'9:16':'16:9'} · Editável + PPTX + PDF</dd></div>
+                <div><dt>Formato</dt><dd>${deck.format} · Editável + PPTX + PDF</dd></div>
               </dl>
             </div>
           </aside>
@@ -416,6 +427,7 @@ export function createTemplateStore({ render, useDeck, downloadDeckPptx, onRoute
 
   function openDetail(deckId) {
     const deck = getDeckTemplate(deckId);
+    if (!state.detailId) state.catalogScrollY = window.scrollY;
     state.detailId = deck.id;
     state.detailTheme = deck.theme;
     state.detailSlide = 0;
@@ -429,6 +441,14 @@ export function createTemplateStore({ render, useDeck, downloadDeckPptx, onRoute
     state.detailId = '';
     state.detailSlide = 0;
     onRouteChange?.();
+    restoreCatalogScroll();
+  }
+
+  function restoreCatalogScroll() {
+    if (state.catalogScrollY === null) return;
+    const scrollY = state.catalogScrollY;
+    state.catalogScrollY = null;
+    requestAnimationFrame(() => window.scrollTo?.({ top: scrollY, behavior: 'instant' }));
   }
 
   function updateDetailSlide(root) {
@@ -468,6 +488,12 @@ export function createTemplateStore({ render, useDeck, downloadDeckPptx, onRoute
       render();
       return true;
     }
+    if (action === 'format') {
+      state.format = el.dataset.value || 'all';
+      state.visibleCount = BATCH_SIZE;
+      render();
+      return true;
+    }
     if (action === 'clear-search') {
       state.query = '';
       state.visibleCount = BATCH_SIZE;
@@ -479,6 +505,7 @@ export function createTemplateStore({ render, useDeck, downloadDeckPptx, onRoute
       state.sourceTab = 'all';
       state.category = 'all';
       state.tone = 'all';
+      state.format = 'all';
       state.query = '';
       state.visibleCount = BATCH_SIZE;
       render();
@@ -501,6 +528,7 @@ export function createTemplateStore({ render, useDeck, downloadDeckPptx, onRoute
       state.detailSlide = 0;
       onRouteChange?.();
       render();
+      restoreCatalogScroll();
       return true;
     }
     if (action === 'detail-slide') {
@@ -528,7 +556,8 @@ export function createTemplateStore({ render, useDeck, downloadDeckPptx, onRoute
       const deckId = el.dataset.deckId || state.detailId;
       const theme = state.detailTheme || undefined;
       state.busy = 'use';
-      Promise.resolve(useDeck(deckId, theme)).finally(() => {
+      render();
+      Promise.resolve(useDeck(deckId, theme)).catch(error => onError?.(error)).finally(() => {
         state.busy = '';
         state.detailId = '';
       });
@@ -539,7 +568,7 @@ export function createTemplateStore({ render, useDeck, downloadDeckPptx, onRoute
       const theme = state.detailTheme || undefined;
       state.busy = 'pptx';
       render();
-      Promise.resolve(downloadDeckPptx(deckId, theme)).finally(() => {
+      Promise.resolve(downloadDeckPptx(deckId, theme)).catch(error => onError?.(error)).finally(() => {
         state.busy = '';
         render();
       });

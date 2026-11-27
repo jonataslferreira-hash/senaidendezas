@@ -1,3 +1,5 @@
+let liveSlide = null;
+let studioReady = false;
 import {studioIcon} from './studio-icons.js';
 import { reconcileStageSafely, tagStageSources, setStageCache } from './stage-keep.js';
 import { SiteTour, shouldOfferTour, markTourSeen, noteFirstVisit } from './tour.js';
@@ -228,7 +230,11 @@ const roomQr = createRoomQrCache();
 let shortInvite = null, shortInviteEpoch = 0;
 const params = routeParams();
 let codeDraft = (params.get('s') || '').replace(/\D/g, '').slice(0, 6);
+let lastStudioView = null;
+let introStageKey = '';
 const studio = new Studio(app, { render, toast, joinForm, preview, remoteAction:(name,value)=>{if(name==='sim')remoteInteract(value);else action(name);}, present: (lesson,startIndex,fromEditor) => connectSession({host:true,lesson,startIndex,fromEditor}) });
+studioReady = true;
+queueMicrotask(render);
 const tour = new SiteTour(studio);
 document.addEventListener('start-tour', () => tour.start());
 // Só a PRIMEIRA visita deste navegador recebe o tour sozinho. Antes o critério
@@ -416,7 +422,6 @@ function shareDialog() {
 // tela (clique de animação, aluno entrando…). Enquanto o slide é o mesmo e o
 // conteúdo dele não mudou, o quadro do slide fica onde está e só o resto é trocado.
 const LIVE_SLIDE = '.canvas-frame.canvas-presenting';
-let liveSlide = null;
 // Palco do editor preservado entre renders: evita que salvar ou abrir
 // diálogos reconstruam o canvas (imagens, modelos 3D e simulações piscando).
 let editorStage = null;
@@ -498,7 +503,6 @@ function keepEditorStage(markup) {
   } catch { return false; }
 }
 // Abertura das etapas: cartela animada com o nome da etapa e fanfarra curta.
-let introStageKey = '';
 function stageIntro() {
   if (!state) { introStageKey = ''; return; }
   let key = '', label = '', icon = '';
@@ -528,14 +532,14 @@ function stageIntro() {
 // Última visualização do studio renderizada: trocar de visualização (editor,
 // Storage AI, biblioteca…) entra com transição suave de cross-fade do
 // navegador — sem a sensação de o site inteiro recarregar.
-let lastStudioView = null;
 function render() {
   const arrive = !state && !sharedLoading && !sharedError && !(busy && host) && lastStudioView !== null && lastStudioView !== studio.view;
   if (!state && arrive) app.dataset.viewArrive = '1'; else delete app.dataset.viewArrive;
   applyRender();
-  lastStudioView = state ? null : studio.view;
+  try { lastStudioView = state ? null : studio.view; } catch { lastStudioView = null; }
 }
 function applyRender() {
+  if (!studioReady) return;
   // Em sala ao vivo (slides, quiz e jogos) animações e transições definidas na aula sempre tocam, exceto se o usuário escolher "reduzido" no perfil.
   document.documentElement.toggleAttribute('data-play', Boolean(state));
   stageIntro();
@@ -546,7 +550,7 @@ function applyRender() {
   const outlineScroll=previousOutline?.scrollTop;
   const previewsScroll=app.querySelector('.mobile-slide-previews')?.scrollLeft;
   const outlineLesson=previousOutline?.closest('[data-outline-lesson]')?.dataset.outlineLesson;
-  studio.editorMusic.setEditing(!state && studio.view === 'editor');
+  try { studio.editorMusic.setEditing(!state && studio.view === 'editor'); } catch {}
   const form = document.querySelector('#join-form');
   const draftName = form?.querySelector('#player-name')?.value;
   // O que a pessoa digitou nunca é sobrescrito pelo perfil da conta — mas só

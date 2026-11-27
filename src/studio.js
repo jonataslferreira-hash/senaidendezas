@@ -92,16 +92,17 @@ export class Studio {
     this.templateStore = createTemplateStore({
       render: () => callbacks.render(),
       onRouteChange: () => this.writeRoute('templates', null, false),
-      useDeck: (deckId, theme) => {
-        const lesson = this.library.save(createDeckFromTemplate(deckId, theme ? { theme } : {}));
+      useDeck: async (deckId, theme) => {
+        const lesson = this.library.save(await createDeckFromTemplate(deckId, theme ? { theme } : {}));
         this.open(lesson.id);
         callbacks.render();
         callbacks.toast('Apresentação aberta no editor.');
       },
       downloadDeckPptx: async (deckId, theme) => {
-        const sample = createDeckFromTemplate(deckId, theme ? { theme } : {});
+        const sample = await createDeckFromTemplate(deckId, theme ? { theme } : {});
         await this.exportVisual(sample, 'pptx');
-      }
+      },
+      onError: error => callbacks.toast(error.message || 'Não foi possível carregar o modelo.')
     });
     root.addEventListener('before-account-change',event=>{event.detail.tasks.push((async()=>{
       if(this.groups.live)await this.groups.live.persist();else if(this.draft&&this.dirty){this.library.save(validateLesson(this.draft,{draft:true}));this.dirty=false;}
@@ -1114,13 +1115,13 @@ export class Studio {
       window.scrollTo?.({ top: 0, behavior: 'instant' });
     }
     else if (action === 'use-deck-template') {
-      const lesson = this.library.save(createDeckFromTemplate(target.dataset.template || 'basic'));
+      const lesson = this.library.save(await createDeckFromTemplate(target.dataset.template || 'basic'));
       this.dialog = null;
       this.open(lesson.id);
       this.callbacks.toast('Modelo pronto aberto no editor.');
     }
     else if (action === 'download-deck-pptx') {
-      const sample = createDeckFromTemplate(target.dataset.template || 'basic');
+      const sample = await createDeckFromTemplate(target.dataset.template || 'basic');
       await this.exportVisual(sample, 'pptx');
       return;
     }
@@ -1147,7 +1148,7 @@ export class Studio {
     else if(action==='confirm-new'){
       const form=this.dialog?.form,title=form?.title.trim();
       if(!title){this.root.querySelector('#rename-lesson').reportValidity();return;}
-      const l=this.library.save(createDeckFromTemplate(form.template||'basic',{title,description:form.description,thumbnail:form.thumbnail}));
+      const l=this.library.save(await createDeckFromTemplate(form.template||'basic',{title,description:form.description,thumbnail:form.thumbnail}));
       this.dialog=null;this.open(l.id);
     }
     else if(action==='cover')this.openCoverDialog(lookup());

@@ -4,8 +4,8 @@ import {readFile} from 'node:fs/promises';
 import {existsSync} from 'node:fs';
 test('PPTX entra como objetos editáveis e mantém a alteração depois de recarregar',async({page})=>{
  await page.goto('/');await page.locator('#import-slides-file').setInputFiles({name:'editavel.pptx',mimeType:'application/vnd.openxmlformats-officedocument.presentationml.presentation',buffer:await pptxFixture()});
- await expect(page.locator('.outline-item')).toHaveCount(2,{timeout:60000});await expect(page.locator('.canvas-object[data-type=text]')).toHaveCount(2);
- await page.locator('[data-designer-action=select]').nth(1).click();await page.getByLabel('Texto do elemento',{exact:true}).fill('Texto editado dentro do site');await page.getByRole('button',{name:'Salvar aula',exact:true}).click();await page.reload();await expect(page.locator('.canvas-text')).toContainText(['Texto editado dentro do site','Uma aula importada do PowerPoint.']);
+ await expect(page.locator('.outline-item')).toHaveCount(2,{timeout:60000});await expect(page.locator('.designer-stage .canvas-object[data-type=text]')).toHaveCount(2);
+ await page.locator('[data-designer-action=select]').nth(1).click();await page.getByLabel('Texto do elemento',{exact:true}).fill('Texto editado dentro do site');await page.getByRole('button',{name:'Salvar neste dispositivo',exact:true}).click();await page.reload();await expect(page.locator('.canvas-text')).toContainText(['Texto editado dentro do site','Uma aula importada do PowerPoint.']);
 });
 test('modelo Netflix do usuário importa sem confundir hyperlinks com imagens externas',async({page})=>{
  test.skip(!process.env.STORAGE_LAB_PPTX_TEST_FILE,'Defina o caminho do arquivo real para a validação local.');test.setTimeout(120000);

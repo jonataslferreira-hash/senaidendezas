@@ -1,25 +1,231 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { readFile } from 'node:fs/promises';
 import {
   slideTemplates, deckTemplates, externalTemplateSites, openSourceLicenses,
-  createSlideFromTemplate, createDeckFromTemplate, detectDeckTheme,
-  searchDecks, findSimilarDecks, deckCoverPreview, deckPreviewSlides
+  createSlideFromTemplate, createDeckFromTemplate, getDeckTemplate, detectDeckTheme,
+  searchDecks, findSimilarDecks, deckCoverPreview, deckPreviewSlides, templateCategories
 } from '../src/slide-templates.js';
 import { communitySlideThemes } from '../src/open-community-themes.js';
-import { canvasThemes } from '../src/canvas-data.js';
+import { applyCanvasTheme, canvasThemes, creativeArtPrefix } from '../src/canvas-data.js';
 import { newLesson, validateLesson } from '../src/lessons.js';
 import { composeAISlide, fitPhoto } from '../src/storage-ai-layouts.js';
 import { createR2Handler } from '../cloudflare/r2-worker.js';
+import { isCatalogPhoto } from '../src/catalog-photos.js';
+import importedSourceDecks from '../src/creative-slide-imported-data.json' with {type: 'json'};
 
-const PERMISSIVE_LICENSES = new Set(['MIT', 'CC0 1.0', 'BSD', 'Apache 2.0', 'CC-BY 3.0', 'BSD / Apache 2.0 / CC-BY 3.0']);
+const PERMISSIVE_LICENSES = new Set(['MIT', 'CC0 1.0', 'BSD', 'Apache 2.0', 'CC-BY 3.0', 'CC BY 4.0', 'BSD / Apache 2.0 / CC-BY 3.0']);
+const expectedCreativeDecks = [
+  ['strawberry-party', 'Festa de Morango', '16:9'],
+  ['strawberry-poster', 'Festa de Morango · Cartaz', '16:9'],
+  ['strawberry-album', 'Festa de Morango · Álbum', '16:9'],
+  ['coastal-postcards', 'Cartões do Litoral', '16:9'],
+  ['moonlight-playlist', 'Playlist de Meia-Noite', '16:9'],
+  ['indie-arcade', 'Pequeno Arcade', '16:9'],
+  ['sunset-at-home', 'Cinema no Quintal', '16:9'],
+  ['clay-studio', 'Ateliê de Barro', '16:9'],
+  ['easy-brunch', 'Brunch sem Pressa', '16:9'],
+  ['rainy-book-club', 'Clube da Janela', '16:9'],
+  ['neighborhood-art', 'Museu do Meu Bairro', '16:9'],
+  ['picnic-with-friends', 'Piquenique de Domingo', '16:9'],
+  ['birthday-story', 'Parabéns em Stories', '16:9'],
+  ['morning-vlog', 'Manhã em Cenas', '16:9'],
+  ['roadtrip-vertical', 'Diário de Estrada', '16:9'],
+  ['moon-zine', 'Zine da Lua', '16:9'],
+  ['market-story', 'Feirinha no Bolso', '16:9'],
+  ['pet-story', 'Diário de Patinhas', '4:3'],
+  ['outfit-stories', 'Vitrine de Looks', '16:9'],
+  ['matcha-recipe', 'Receita de Matchá', '16:9'],
+  ['concert-pocket', 'Ingresso de Bolso', '16:9'],
+  ['pocket-quest', 'Missão de Bolso', '16:9'],
+  ['friends-scrapbook', 'Colagem de Amizade', '16:9'],
+  ['bloom-feed', 'Flores na Varanda', '16:9'],
+  ['tiny-bakery', 'Confeitaria em Miniatura', '16:9'],
+  ['ocean-photo-dump', 'Álbum de Água Salgada', '16:9'],
+  ['after-dark-gallery', 'Galeria Depois do Escuro', '16:9'],
+  ['sunset-invite', 'Convite Pôr do Sol', '16:9'],
+  ['lemonade-cards', 'Clube da Limonada', '16:9'],
+  ['vinyl-swap', 'Troca de Discos', '16:9'],
+  ['kitchen-letters', 'Caderno de Receitas de Casa', '16:9'],
+  ['pixel-stickers', 'Figurinhas Pixel', '16:9']
+];
+const expectedOnlineCreativeDecks = [
+  ['analog-film-notes', 'Caderno de Filme', '16:9'],
+  ['slow-coffee-ritual', 'Café em Camadas', '16:9'],
+  ['city-window-gallery', 'Janelas da Cidade', '16:9'],
+  ['garden-seed-swap', 'Troca de Sementes', '16:9'],
+  ['vinyl-side-stories', 'Lados do Vinil', '16:9'],
+  ['weekend-market-route', 'Rota da Feira', '9:16'],
+  ['night-bus-postcards', 'Último Ônibus', '9:16'],
+  ['backstage-show-diary', 'Bastidores do Show', '9:16'],
+  ['pet-park-moments', 'Passeio de Patinhas', '9:16'],
+  ['thrift-store-lookbook', 'Achados de Brechó', '9:16'],
+  ['recipe-zine-oven', 'Zine de Fornada', '1:1'],
+  ['sea-glass-collection', 'Coleção à Beira-Mar', '1:1'],
+  ['board-game-night', 'Noite de Jogos de Mesa', '1:1'],
+  ['flower-color-club', 'Arranjo de Estação', '1:1'],
+  ['rooftop-movie-night', 'Cinema no Terraço', '1:1']
+];
+const expectedRepositoryDeckIds = [
+  'coastal-postcards', 'moonlight-playlist', 'indie-arcade', 'rainy-book-club', 'neighborhood-art',
+  'birthday-story', 'morning-vlog', 'roadtrip-vertical', 'moon-zine', 'market-story', 'pet-story',
+  'outfit-stories', 'matcha-recipe', 'concert-pocket', 'pocket-quest', 'friends-scrapbook',
+  'bloom-feed', 'tiny-bakery', 'ocean-photo-dump', 'after-dark-gallery', 'sunset-invite',
+  'lemonade-cards', 'vinyl-swap', 'kitchen-letters', 'pixel-stickers'
+];
+const expectedVisibleRepositoryDeckIds = [
+  'indie-arcade', 'morning-vlog', 'concert-pocket', 'bloom-feed',
+  'after-dark-gallery', 'sunset-invite', 'lemonade-cards', 'pixel-stickers'
+];
+const removedCatalogDeckIds = new Set([
+  ...[2, 3, 5, 6, 7, 9, 10, 11, 12, 13, 14, 16, 17, 19, 20, 24, 25]
+    .map(position => expectedRepositoryDeckIds[position - 2]),
+  'city-window-gallery', 'vinyl-side-stories', 'strawberry-poster'
+]);
+const retainedOriginalDeckIds = [
+  'strawberry-party', 'strawberry-album',
+  'sunset-at-home', 'clay-studio', 'easy-brunch', 'picnic-with-friends'
+];
 
 function textBoxesOverlap(a, b) {
   return !(a.x + a.w <= b.x + 0.1 || b.x + b.w <= a.x + 0.1 || a.y + a.h <= b.y + 0.1 || b.y + b.h <= a.y + 0.1);
 }
 
-test('modelos prontos de slides e apresentações geram aulas válidas, sem sobreposição e preservam o template básico', () => {
+function colorContrast(a, b) {
+  const luminance = hex => {
+    const values = [1, 3, 5].map(i => parseInt(hex.slice(i, i + 2), 16) / 255)
+      .map(value => value <= 0.04045 ? value / 12.92 : ((value + 0.055) / 1.055) ** 2.4);
+    return values[0] * 0.2126 + values[1] * 0.7152 + values[2] * 0.0722;
+  };
+  const [low, high] = [luminance(a), luminance(b)].sort((x, y) => x - y);
+  return (high + 0.05) / (low + 0.05);
+}
+
+async function withLocalImportedDecks(run) {
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = async (input, init) => {
+    const requestUrl = typeof input === 'string' || input instanceof URL ? input : input.url;
+    const url = new URL(requestUrl, 'http://localhost/');
+    const match = url.pathname.match(/^\/assets\/slidescarnival\/decks\/([a-z0-9-]+)\.json$/);
+    if (!match) return originalFetch(input, init);
+    const file = new URL(`../public/assets/slidescarnival/decks/${match[1]}.json`, import.meta.url);
+    return new Response(await readFile(file), { status: 200, headers: { 'content-type': 'application/json' } });
+  };
+  try {
+    return await run();
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+}
+
+test('modelos de repositórios ficam no fim, preservando IDs, nomes e formatos dos 32 antigos', async () => withLocalImportedDecks(async () => {
+  const collection = deckTemplates.filter(deck => deck.pages);
+  assert.equal(collection.length, 27);
+  assert.deepEqual(Object.keys(importedSourceDecks).sort(), [...expectedVisibleRepositoryDeckIds].sort());
+  const repositoryDecks = collection.slice(-expectedVisibleRepositoryDeckIds.length);
+  assert.deepEqual(repositoryDecks.map(deck => deck.id), expectedVisibleRepositoryDeckIds);
+  assert.ok([...removedCatalogDeckIds].every(id => !deckTemplates.some(deck => deck.id === id)));
+  assert.equal(deckTemplates[0].id, 'basic');
+  assert.deepEqual(deckTemplates.slice(-expectedVisibleRepositoryDeckIds.length).map(deck => deck.id), expectedVisibleRepositoryDeckIds);
+  const visibleOnlineCreativeDecks = expectedOnlineCreativeDecks.filter(([id]) => !removedCatalogDeckIds.has(id));
+  assert.deepEqual(collection.slice(0, visibleOnlineCreativeDecks.length)
+    .map(({id, name, format}) => [id, name, format]), visibleOnlineCreativeDecks);
+  assert.deepEqual(collection.slice(visibleOnlineCreativeDecks.length, -expectedVisibleRepositoryDeckIds.length)
+    .map(deck => deck.id), retainedOriginalDeckIds);
+  assert.deepEqual(searchDecks().filter(deck => deck.pages), collection);
+  for (const [id, name, format] of expectedCreativeDecks.filter(([id]) => !removedCatalogDeckIds.has(id))) {
+    const deck = collection.find(item => item.id === id);
+    const expectedFormat = expectedVisibleRepositoryDeckIds.includes(id) ? importedSourceDecks[id].format : format;
+    assert.deepEqual(deck && [deck.id, deck.name, deck.format], [id, name, expectedFormat]);
+  }
+  const onlineDecks = collection.filter(deck => visibleOnlineCreativeDecks.some(([id]) => id === deck.id));
+  assert.ok(onlineDecks.every(deck => deck.source === 'open-source'));
+  assert.ok(onlineDecks.every(deck => deck.license === 'MIT' && deck.sourceUrl && deck.licenseUrl));
+  assert.equal(new Set(onlineDecks.map(deck => deck.sourceUrl)).size, visibleOnlineCreativeDecks.length);
+  assert.equal(repositoryDecks.length, 8);
+  assert.ok(repositoryDecks.every(deck => deck.source === 'open-source' && deck.license === 'CC BY 4.0'));
+  assert.ok(repositoryDecks.every(deck => deck.sourceDeckUrl && deck.sourceSlideCount >= 8));
+  assert.ok(repositoryDecks.every(deck => deck.selectedSlideIndexes?.length >= 8 && deck.selectedSlideIndexes[0] === 0));
+  assert.ok(repositoryDecks.every(deck => deck.sourceUrl && deck.licenseUrl && !/reveal\.js|slidev/i.test(deck.sourceUrl)));
+  assert.deepEqual(collection.filter(deck => deck.source !== 'open-source').map(deck => deck.id), retainedOriginalDeckIds);
+  assert.deepEqual(
+    searchDecks({sourceTab: 'open-source'}).filter(deck => deck.pages).map(({id, name, format}) => [id, name, format]),
+    [...visibleOnlineCreativeDecks, ...repositoryDecks.map(({id, name, format}) => [id, name, format])]
+  );
+  for (const deck of collection) {
+    assert.ok(deck.slidesCount >= 8, `${deck.id} tem pelo menos oito slides`);
+    const lesson = await createDeckFromTemplate(deck.id);
+    assert.equal(lesson.slides.length, deck.slidesCount);
+    assert.ok(lesson.slides.every(slide => slide.kind === 'canvas'));
+    assert.ok(lesson.slides.every(slide => slide.elements.some(element => element.type === 'text' || element.type === 'image')));
+  }
+}));
+
+test('capas escuras mantêm contraste legível no título do painel', () => {
+  for (const id of ['indie-arcade', 'concert-pocket', 'pixel-stickers']) {
+    const deck = deckTemplates.find(item => item.id === id);
+    if (deck.sourceDeckUrl) {
+      assert.match(deck.previewSlides[0].url, /^assets\/slidescarnival\/previews\//);
+      continue;
+    }
+    const title = deckCoverPreview(deck).elements.find(element =>
+      element.type === 'text' && element.text.toLocaleLowerCase().includes(deck.name.toLocaleLowerCase()));
+    assert.ok(title, `capa ${id} tem título editável`);
+    assert.ok(colorContrast(title.color, canvasThemes[deck.theme].background) >= 4.5, `título de ${id} contrasta com o painel escuro`);
+  }
+});
+
+test('catálogo criativo preserva proporção, ilustrações e paleta ao abrir e salvar', async () => withLocalImportedDecks(async () => {
+  const formats = {'16:9': 16 / 9, '9:16': 9 / 16, '1:1': 1};
+  const collection = deckTemplates.filter(deck => deck.pages);
+  assert.ok(collection.length >= 25);
+  assert.deepEqual(searchDecks().filter(deck => deck.pages), collection);
+  for (const [format, ratio] of Object.entries(formats)) {
+    const matching = searchDecks({format});
+    const newDecks = matching.filter(deck => deck.pages);
+    assert.ok(newDecks.length >= 5);
+    assert.ok(matching.every(deck => deck.format === format));
+    for (const deck of newDecks) {
+      assert.ok(templateCategories.some(category => category.id === deck.category && category.label === deck.categoryLabel));
+      const theme = 'atelier-blue';
+      const cover = deckCoverPreview(deck, theme);
+      const preview = deckPreviewSlides(deck, theme);
+      const saved = validateLesson(await createDeckFromTemplate(deck.id, {theme}));
+      assert.equal(saved.slides.length, deck.slideOutline.length);
+      assert.equal(saved.slides.length, deck.slidesCount);
+      if (!deck.sourceDeckUrl) assert.ok(new Set(deck.pages.map(page => page[2])).size >= 3);
+      assert.equal(cover.title, preview.slides[0].title);
+      if (!deck.sourceDeckUrl) assert.deepEqual(cover.backgroundFill, saved.slides[0].backgroundFill);
+      for (const slide of [cover, ...preview.slides, ...saved.slides]) {
+        assert.equal(slide.pageWidth / slide.pageHeight, ratio);
+        assert.equal(slide.visualTheme, theme);
+        assert.ok(slide.elements.some(e => e.type === 'image' || e.type === 'shape'));
+        if (deck.sourceDeckUrl) {
+          assert.ok(slide.elements.filter(e => e.type === 'image').every(e =>
+            e.image.startsWith('data:image/webp') || e.image.startsWith('assets/slidescarnival/previews/')));
+        } else {
+          assert.ok(slide.elements.filter(e => e.type === 'image').every(e => isCatalogPhoto(e.image) && e.imageSource && e.imageLicense));
+        }
+        const copy = slide.elements.filter(e => e.type === 'text');
+        if (!deck.sourceDeckUrl) assert.ok(copy.every(e => e.x >= 0 && e.y >= 0 && e.x + e.w <= 100 && e.y + e.h <= 100));
+        if (!deck.sourceDeckUrl) assert.ok(copy.every((a, i) => copy.slice(i + 1).every(b => !textBoxesOverlap(a, b))));
+      }
+      const [savedCover] = saved.slides;
+      if (deck.sourceDeckUrl) continue;
+      const art = () => savedCover.elements.filter(e => e.id.startsWith(creativeArtPrefix));
+      const illustration = structuredClone(art());
+      assert.ok(illustration.length > 0);
+      assert.ok(applyCanvasTheme(savedCover, 'atelier-lilac'));
+      assert.equal(savedCover.background, canvasThemes['atelier-lilac'].background);
+      assert.deepEqual(art(), illustration);
+    }
+  }
+}));
+
+test('modelos prontos de slides e apresentações geram aulas válidas, sem sobreposição e preservam o template básico', async () => withLocalImportedDecks(async () => {
   assert.equal(slideTemplates[0].id, 'basic', 'template básico do site aparece primeiro');
-  assert.equal(deckTemplates[0].id, 'basic', 'template básico é o padrão ao criar nova aula');
+  assert.equal(deckTemplates[0].id, 'basic', 'template básico de apresentações permanece fixo em primeiro');
+  assert.equal(getDeckTemplate('missing-template').id, 'basic', 'template básico continua sendo o padrão de fallback');
   assert.ok(slideTemplates.length >= 18, 'galeria expandida de modelos de slide');
   assert.ok(deckTemplates.length >= 100, `catálogo gigante com 100+ modelos legais (atual: ${deckTemplates.length})`);
   const basic = createSlideFromTemplate('basic');
@@ -78,7 +284,7 @@ test('modelos prontos de slides e apresentações geram aulas válidas, sem sobr
     uniqueIds.add(deck.id);
     assert.ok(Object.hasOwn(canvasThemes, deck.theme), `tema ${deck.theme} do deck ${deck.id} existe em canvasThemes`);
 
-    const lesson = createDeckFromTemplate(deck.id, { title: 'Aula ' + deck.name, description: 'Descrição teste' });
+    const lesson = await createDeckFromTemplate(deck.id, { title: 'Aula ' + deck.name, description: 'Descrição teste' });
     const checked = validateLesson(lesson, { draft: true });
     assert.equal(checked.slides.length, deck.slidesCount, `deck ${deck.id} gera ${deck.slidesCount} slide(s)`);
     assert.equal(checked.title, 'Aula ' + deck.name);
@@ -103,9 +309,9 @@ test('modelos prontos de slides e apresentações geram aulas válidas, sem sobr
   assert.equal(deckPreviewSlides(sampleDeck, 'lo-material-blue').slides[0].visualTheme, 'lo-material-blue', 'troca de paleta ao vivo aplica o novo tema');
   assert.equal(findSimilarDecks(sampleDeck, 4).length, 4, 'sugestão de modelos parecidos retorna 4 itens');
 
-  const orbitDeck = createDeckFromTemplate('modern-class', { title: 'Órbita' });
+  const orbitDeck = await createDeckFromTemplate('modern-class', { title: 'Órbita' });
   assert.equal(detectDeckTheme(orbitDeck.slides, orbitDeck.slides[0]), 'studio-orbit');
-});
+}));
 
 test('atalhos externos oficiais e créditos Open Source respeitam 100% as licenças', () => {
   assert.ok(externalTemplateSites.length >= 4, 'diretório oficial de sites externos preenchido');

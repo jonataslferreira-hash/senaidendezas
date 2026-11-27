@@ -641,7 +641,11 @@ html[data-appearance="dark"] .tstore-icon-util.is-active {
 }
 
 .eshop-hero-stage.has-peek {
-  grid-template-columns: minmax(0, 1fr) 74px;
+  grid-template-columns: 40px minmax(0, 1fr) 40px 74px;
+}
+
+.eshop-hero-stage.has-nav {
+  grid-template-columns: 40px minmax(0, 1fr) 40px;
 }
 
 .eshop-hero-frame {
@@ -664,10 +668,8 @@ html[data-appearance="dark"] .tstore-icon-util.is-active {
 }
 
 .eshop-nav {
-  position: absolute;
-  top: 50%;
-  transform: translateY(-50%);
-  z-index: 3;
+  align-self: center;
+  justify-self: center;
   width: 40px;
   height: 40px;
   border-radius: 50%;
@@ -685,11 +687,8 @@ html[data-appearance="dark"] .tstore-icon-util.is-active {
 
 .eshop-nav:hover {
   background: var(--ui-accent, #7c52d9);
-  transform: translateY(-50%) scale(1.06);
+  transform: scale(1.06);
 }
-
-.eshop-prev { left: 12px; }
-.eshop-next { right: 12px; }
 
 .eshop-slide-counter {
   position: absolute;
@@ -1164,9 +1163,14 @@ html[data-appearance="dark"] .tstore-icon-util.is-active {
   .tstore-fav-btn { top: 7px; right: 7px; width: 30px; height: 30px; }
 
   /* Mobile detail: full 16:9 hero, zero peek bleed, clean horizontal strip */
-  .eshop-hero-stage,
-  .eshop-hero-stage.has-peek {
+  .eshop-hero-stage {
     grid-template-columns: 1fr;
+  }
+
+  .eshop-hero-stage.has-nav,
+  .eshop-hero-stage.has-peek {
+    grid-template-columns: 32px minmax(0, 1fr) 32px;
+    gap: 8px;
   }
 
   .eshop-peek {
@@ -1245,3 +1249,22 @@ html[data-motion=reduced] .eshop-hero-canvas.is-arriving{animation:none}
 .eshop-peek {container-type:size;isolation:isolate}
 .eshop-peek-canvas {width:calc(100cqh * var(--preview-ratio,1.7778));height:100%;aspect-ratio:auto;opacity:.60;filter:blur(2px) saturate(.7);pointer-events:none}
 .eshop-peek::after {content:'';position:absolute;inset:0;pointer-events:none;background:color-mix(in srgb,var(--ui-panel) 24%,transparent)}
+
+.tstore-card-media[data-slide-format="9:16"],
+.tstore-card-media[data-slide-format="1:1"] {
+  aspect-ratio: 4 / 3;
+  background: color-mix(in srgb, var(--cover-background) 18%, var(--ui-panel) 82%);
+}
+
+.eshop-thumb {
+  --thumb-height: 75px;
+  flex: 0 0 calc(var(--thumb-height) * var(--thumb-ratio, 1.7778));
+  width: calc(var(--thumb-height) * var(--thumb-ratio, 1.7778));
+  height: var(--thumb-height);
+  aspect-ratio: auto;
+}
+
+@media (max-width: 720px) {
+  .tstore-formats { grid-template-columns: minmax(0, 2fr) repeat(3, minmax(0, 1fr)); }
+  .eshop-thumb { --thumb-height: 64px; }
+}

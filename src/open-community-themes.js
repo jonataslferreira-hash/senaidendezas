@@ -165,5 +165,14 @@ export const openSourceLicenses = [
     notice: 'Licenças permissivas BSD, Apache 2.0 e CC-BY 3.0 (via LibreOffice Impress Templates)',
     url: 'https://github.com/dohliam/libreoffice-impress-templates/tree/master/apache-oo',
     licenseUrl: 'https://www.apache.org/licenses/LICENSE-2.0'
+  },
+  {
+    id: 'slidescarnival-cc-by-4',
+    project: 'SlidesCarnival Presentation Templates',
+    author: 'SlidesCarnival',
+    license: 'CC BY 4.0',
+    notice: 'Modelos adaptados com atribuição sob Creative Commons Attribution 4.0 International',
+    url: 'https://www.slidescarnival.com/',
+    licenseUrl: 'https://creativecommons.org/licenses/by/4.0/'
   }
 ];

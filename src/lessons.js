@@ -10,6 +10,7 @@ import { canvasThemes, colorValue, normalizeElements, normalizeBackground } from
 import { validateAudio } from './audio-data.js';
 import { openLayouts } from './open-slide-layouts.js';
 import { validateGame } from './stage-games.js';
+import {isCatalogPhoto} from './catalog-photos.js';
 
 export const LIBRARY_KEY = 'storage-lab-lessons-v1';
 export const MAX_LESSON_BYTES = 48 * 1024 * 1024;
@@ -32,6 +33,7 @@ const text = (value, max = 6000) => typeof value === 'string' ? value.slice(0, m
 export function imageURL(value) {
   if (!value) return '';
   if (typeof value !== 'string' || value.length > 2_000_000) throw Error('Use uma imagem de até 1,4 MB.');
+  if (isCatalogPhoto(value) || /^assets\/slidescarnival\/previews\/[a-z0-9-]+-\d{2}\.webp$/.test(value)) return value;
   if (/^data:image\/(png|jpeg|webp|gif);base64,[A-Za-z0-9+/=\r\n]+$/.test(value)) return value;
   try {
     const url = new URL(value);
