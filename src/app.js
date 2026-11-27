@@ -50,7 +50,7 @@ import { teacherControls, captureInteraction, applyInteraction, InteractionBroad
 import { cleanSimEvents, cleanSimValues } from './custom-sim-bridge.js';
 import { VideoSync } from './video-sync.js';
 import {createRoomQrCache} from './room-qr.js';
-import {isPublicRoomLink,shortenRoomLink} from './room-short-link.js';
+import {shortRoomLink,roomFragmentUrl} from './room-short-link.js';
 import './style.css';
 import './experience.css';
 import './appearance.css';
@@ -227,7 +227,8 @@ async function enterImmersiveRoom() {
   } catch { /* sem gesto do usuário ainda: o primeiro toque tenta de novo */ }
 }
 const roomQr = createRoomQrCache();
-let shortInvite = null, shortInviteEpoch = 0;
+const fragmentRoomUrl=roomFragmentUrl(location.href);
+if(fragmentRoomUrl)history.replaceState(history.state,'',fragmentRoomUrl);
 const params = routeParams();
 let codeDraft = (params.get('s') || '').replace(/\D/g, '').slice(0, 6);
 let lastStudioView = null;
@@ -396,27 +397,11 @@ function joinUrl() {
   url.searchParams.set('s',state.code);
   return url.href;
 }
-function displayedInvite(url) {return shortInvite?.url===url&&shortInvite.short?shortInvite.short:url;}
-function shortInviteStatus(url) {
-  if(!isPublicRoomLink(url))return '';
-  if(shortInvite?.url!==url||shortInvite.status==='loading')return 'Gerando link curto…';
-  return shortInvite.short?'Link curto para digitar ou copiar':'Link curto indisponível. Use o link direto ou o código.';
-}
-function startShortInvite(url){
-  if(!isPublicRoomLink(url)||shortInvite?.url===url)return;
-  const epoch=++shortInviteEpoch;shortInvite={url,status:'loading',short:null};
-  shortenRoomLink(url).then(short=>{
-    if(epoch!==shortInviteEpoch||!state||!host||joinUrl()!==url)return;
-    shortInvite={url,status:short?'ready':'failed',short};
-    const field=app.querySelector('[data-share-dialog] [aria-label="Link de convite"]');
-    if(field)field.value=displayedInvite(url);
-    const status=app.querySelector('[data-share-dialog] [data-short-link-status]');
-    if(status)status.textContent=shortInviteStatus(url);
-  }).catch(()=>{if(epoch===shortInviteEpoch&&state&&host&&joinUrl()===url){shortInvite={url,status:'failed',short:null};const status=app.querySelector('[data-short-link-status]');if(status)status.textContent=shortInviteStatus(url);}});
-}
+function displayedInvite(url) {return shortRoomLink(url)||url;}
+function shortInviteStatus(url) {return shortRoomLink(url)?'Link curto para digitar ou copiar':'';}
 function shareDialog() {
   const url=joinUrl();
-  return `<div class="modal-backdrop" data-share-dialog><section class="share-modal" role="dialog" aria-modal="true" aria-labelledby="share-title"><button class="icon-btn close-modal" data-action="close-share" aria-label="Fechar convite">${icon('close')}</button><h2 id="share-title">Conecte a turma<span>.</span></h2><p>Aponte a câmera. Escolha um avatar. Entre na aula.</p><div class="qr-wrap"><img id="room-qr" width="230" height="230" alt="QR Code para entrar nesta sala"></div><span class="eyebrow">OU ENTRE COM O CÓDIGO</span><div class="big-code">${esc(state.code.slice(0, 3))}<span> </span>${esc(state.code.slice(3))}</div><div class="share-link"><input readonly aria-label="Link de convite" value="${esc(displayedInvite(url))}"><button class="icon-btn" data-action="copy-link" aria-label="Copiar link">${icon('copy')}</button></div><small class="share-link-status" data-short-link-status role="status">${esc(shortInviteStatus(url))}</small>${host ? `<button class="btn secondary small share-manage" data-action="manage-people">Ver e remover pessoas</button>` : ''}${import.meta.env.DEV&&/^(localhost|127\.0\.0\.1)$/.test(location.hostname)&&!routeParams().has('localSignal')?`<details><summary>Configurar endereço público</summary><label for="public-url">URL publicada no GitHub Pages</label><input id="public-url" type="url" placeholder="https://usuario.github.io/senaidendezas/"><button class="btn secondary small" data-action="save-url">Salvar endereço</button></details>`:''}</section></div>`;
+  return `<div class="modal-backdrop" data-share-dialog><section class="share-modal" role="dialog" aria-modal="true" aria-labelledby="share-title"><button class="icon-btn close-modal" data-action="close-share" aria-label="Fechar convite">${icon('close')}</button><h2 id="share-title">Conecte a turma<span>.</span></h2><p>Aponte a câmera. Escolha um avatar. Entre na aula.</p><div class="qr-wrap"><img id="room-qr" width="230" height="230" alt="QR Code para entrar nesta sala"></div><span class="eyebrow">OU ENTRE COM O CÓDIGO</span><div class="big-code">${esc(state.code.slice(0, 3))}<span> </span>${esc(state.code.slice(3))}</div><div class="share-link"><input readonly aria-label="Link de convite" value="${esc(displayedInvite(url))}"><button class="icon-btn" data-action="copy-link" aria-label="Copiar link">${icon('copy')}</button></div><small class="share-link-status" data-short-link-status role="status">${esc(shortInviteStatus(url))}</small>${shortRoomLink(url)?'<button class="text-btn share-copy-direct" data-action="copy-direct-link">Copiar link direto</button>':''}${host ? `<button class="btn secondary small share-manage" data-action="manage-people">Ver e remover pessoas</button>` : ''}${import.meta.env.DEV&&/^(localhost|127\.0\.0\.1)$/.test(location.hostname)&&!routeParams().has('localSignal')?`<details><summary>Configurar endereço público</summary><label for="public-url">URL publicada no GitHub Pages</label><input id="public-url" type="url" placeholder="https://usuario.github.io/senaidendezas/"><button class="btn secondary small" data-action="save-url">Salvar endereço</button></details>`:''}</section></div>`;
 }
 // Vídeos, experimentos e modelos 3D recomeçariam do zero a cada atualização da
 // tela (clique de animação, aluno entrando…). Enquanto o slide é o mesmo e o
@@ -653,7 +638,6 @@ function applyRender() {
   canvasModels.preload(upcoming ? presentationSlide(upcoming) : null);
   focusView.sync(state?.phase==='lesson'?slides[state.slide]?.id:'');
   fillAssetImages(app);simulations.mount(state?.phase==='lesson'||state?.game?.type==='challenge'?app:null);syncInteraction();publishRemote();if(state?.phase==='lesson')loadSlideFonts(slides[state.slide],activeLesson.customFonts);
-  if (state && shareOpen && host && !demo) startShortInvite(joinUrl());
   if (state && (shareOpen || (host && !demo && presenterSettings.qrVisible && state.phase === 'lesson'))) {
     const url = joinUrl();
     const setQR = src => { if (state && joinUrl() === url) for (const image of document.querySelectorAll('#room-qr, [data-pinned-qr]')) image.src = src; };
@@ -747,7 +731,6 @@ async function connectSession(mode) {
   } finally { busy = false; render(); }
 }
 function leave(show = true) {
-  shortInviteEpoch++; shortInvite=null;
   clearInterval(clockTimer); clockTimer = null;
   editDraft = null; editError = ''; clearTimeout(controlsTimer);
   if (document.fullscreenElement) document.exitFullscreen().catch(() => {});
@@ -1021,6 +1004,7 @@ async function action(name) {
     case 'share': if (!demo) { shareOpen = true; render(); document.querySelector('.close-modal')?.focus(); } break;
     case 'close-share': shareOpen = false; render(); document.querySelector('[data-action="share"]')?.focus(); break;
     case 'copy-link': try { await navigator.clipboard.writeText(displayedInvite(joinUrl())); toast('Link copiado!'); } catch { toast('Copie o endereço no campo de convite.'); } break;
+    case 'copy-direct-link': try { await navigator.clipboard.writeText(joinUrl()); toast('Link direto copiado!'); } catch { toast('Não foi possível copiar o link direto. Use o QR Code ou o código da sala.'); } break;
     case 'save-url': {
       try {
         const url = new URL(document.querySelector('#public-url').value);

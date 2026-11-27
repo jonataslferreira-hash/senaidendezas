@@ -19,24 +19,22 @@ jobs:
       - run: npx playwright install --with-deps chromium
       - name: Testar serviço e navegador reais
         run: |
-          curl -sSI --max-time 15 'https://is.gd/create.php?format=json&callback=roomShortResult&url=https%3A%2F%2Fjonataslferreira-hash.github.io%2Fsenaidendezas%2F%3Fs%3D123456'
           npm run dev -- --port 5173 > /tmp/vite.log 2>&1 &
           node --input-type=module <<'JS'
           import { chromium } from '@playwright/test';
           const browser = await chromium.launch({headless:true});
           const page = await browser.newPage();
-          page.on('console', m => console.log('console:', m.type(), m.text()));
-          page.on('requestfailed', r => console.log('falha:', r.url(), r.failure()?.errorText));
-          page.on('response', r => { if (r.url().startsWith('https://is.gd/')) console.log('resposta:', r.status(), JSON.stringify(r.headers())); });
-          await page.goto('http://127.0.0.1:5173/', {waitUntil:'domcontentloaded',timeout:20000});
-          const result = await page.evaluate(async () => (await import('/src/room-short-link.js')).shortenRoomLink('https://jonataslferreira-hash.github.io/senaidendezas/?s=123456',{timeout:12000}));
-          console.log('resultado:', result);
-          if (!result) process.exitCode=1;
-          const redirect = await browser.newPage();
-          await redirect.addInitScript(() => { if (location.hostname === 'jonataslferreira-hash.github.io') sessionStorage.setItem('test-arrival',location.href); });
-          await redirect.goto('https://is.gd/h4bAV2#s=123456', {waitUntil:'domcontentloaded',timeout:30000});
-          const arrival = await redirect.evaluate(() => sessionStorage.getItem('test-arrival'));
-          console.log('destino inicial:',arrival);
-          if (arrival !== 'https://jonataslferreira-hash.github.io/senaidendezas/#s=123456') process.exitCode=1;
+          await page.addInitScript(() => localStorage.setItem('sl-tour','done'));
+          let reachedPublishedOrigin = false;
+          await page.route('https://jonataslferreira-hash.github.io/senaidendezas/', route => {
+            reachedPublishedOrigin = true;
+            return route.fulfill({status:302,headers:{location:'http://127.0.0.1:5173/'}});
+          });
+          await page.goto('https://is.gd/h4bAV2#s=123456', {waitUntil:'domcontentloaded',timeout:30000});
+          await page.locator('#room-code').waitFor({timeout:30000});
+          const code = await page.locator('#room-code').inputValue();
+          const actualUrl = page.url();
+          console.log('redirecionou para o destino esperado:',reachedPublishedOrigin,'código:',code,'url:',actualUrl);
+          if (!reachedPublishedOrigin || code !== '123456' || new URL(actualUrl).searchParams.get('s') !== '123456') process.exitCode=1;
           await browser.close();
           JS
