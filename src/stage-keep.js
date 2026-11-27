@@ -19,6 +19,8 @@ let cachedStage = null;
 export function stageCache() { return cachedStage; }
 export function setStageCache(entry) { cachedStage = entry; }
 
+export function invalidateStageSource(node) { if (node) sourceMarkup.delete(node); }
+
 export function tagStageSources(scope) {
   for (const node of scope.querySelectorAll('[data-object-id]')) sourceMarkup.set(node, cleanMarkup(node));
 }

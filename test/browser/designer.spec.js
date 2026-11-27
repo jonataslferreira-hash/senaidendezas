@@ -1,5 +1,6 @@
 import {createProject} from './project-fixture.js';
 import { test, expect } from '@playwright/test';
+test.beforeEach(async ({page})=>{await page.addInitScript(()=>localStorage.setItem('sl-tour','done'));});
 import { readFile } from 'node:fs/promises';
 import { objFixture, glbFixture } from '../model-fixtures.js';
 const image = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAusB9Wl6Xb8AAAAASUVORK5CYII=', 'base64');
@@ -99,4 +100,41 @@ test('editor no celular aceita toque e arraste, campos acessíveis e desfazer se
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
   await page.screenshot({ path: 'test-results/visual-editor-mobile.png', fullPage: true });
   await context.close();
+});
+test('histórico atualiza imediatamente e atalhos funcionam dentro e fora dos campos', async ({page}) => {
+  await page.setViewportSize({width:1440,height:900});await page.goto('/');await createProject(page);
+  const undo=page.locator('.designer-toolbar .desktop-history[data-designer-action="undo"]'),redo=page.locator('.designer-toolbar .desktop-history[data-designer-action="redo"]');
+  await expect(undo).toBeDisabled();
+  await page.locator('.designer-layer-list button').first().click();
+  let text=page.getByLabel('Texto do elemento',{exact:true}),before=await text.inputValue();
+  await text.fill('Primeira alteração');await expect(undo).toBeEnabled();await expect(redo).toBeDisabled();
+  await undo.click();await expect(page.getByLabel('Texto do elemento',{exact:true})).toHaveValue(before);await expect(redo).toBeEnabled();
+  await redo.click();await expect(page.getByLabel('Texto do elemento',{exact:true})).toHaveValue('Primeira alteração');
+  text=page.getByLabel('Texto do elemento',{exact:true});await text.fill('Outra alteração');await text.press('Control+z');
+  await expect(page.getByLabel('Texto do elemento',{exact:true})).toHaveValue('Primeira alteração');
+  await page.keyboard.press('Control+Shift+z');await expect(page.getByLabel('Texto do elemento',{exact:true})).toHaveValue('Outra alteração');
+  await page.keyboard.press('Control+z');await page.keyboard.press('Control+y');await expect(page.getByLabel('Texto do elemento',{exact:true})).toHaveValue('Outra alteração');
+  await page.locator('.designer-stage .canvas-object[data-type="text"]').first().locator('.canvas-text').dblclick();
+  const inline=page.locator('.canvas-text[contenteditable]');await inline.fill('Texto no palco');await expect(undo).toBeEnabled();await inline.press('Control+z');
+  await expect(page.locator('.designer-stage .canvas-object[data-type="text"]').first()).not.toContainText('Texto no palco');
+  await page.keyboard.press('Control+Shift+z');await expect(page.locator('.designer-stage .canvas-object[data-type="text"]').first()).toContainText('Texto no palco');
+});
+test('setas de histórico no celular habilitam após editar sem outra ação', async ({browser}) => {
+  const context=await browser.newContext({viewport:{width:390,height:844},isMobile:true,hasTouch:true}),page=await context.newPage();
+  await page.addInitScript(()=>localStorage.setItem('sl-tour','done'));await page.goto('/');await createProject(page);await page.locator('.designer-stage .canvas-object[data-type="text"]').first().click();await page.locator('[data-designer-action="mobile-object-edit"]').click();
+  const input=page.getByLabel('Texto do elemento',{exact:true}),before=await input.inputValue();await input.fill('Mudança no celular');
+  const undo=page.locator('.mobile-editor-history [data-designer-action="undo"]'),redo=page.locator('.mobile-editor-history [data-designer-action="redo"]');
+  await expect(undo).toBeEnabled();await undo.click();await expect(page.getByLabel('Texto do elemento',{exact:true})).toHaveValue(before);
+  await expect(redo).toBeEnabled();await redo.click();await expect(page.getByLabel('Texto do elemento',{exact:true})).toHaveValue('Mudança no celular');await context.close();
+});
+test('desfazer texto no palco mantém imagens dos outros elementos montadas',async({page})=>{
+ await page.setViewportSize({width:1440,height:900});await page.goto('/');await createProject(page);
+ const png=await page.evaluate(()=>{const c=document.createElement('canvas');c.width=c.height=8;const ctx=c.getContext('2d');ctx.fillStyle='purple';ctx.fillRect(0,0,8,8);return c.toDataURL().split(',')[1];});
+ await page.locator('#designer-image-file').setInputFiles({name:'imagem.png',mimeType:'image/png',buffer:Buffer.from(png,'base64')});
+ const stage=page.locator('.designer-stage'), imageNode=stage.locator('.canvas-object[data-type="image"]');await expect(imageNode).toBeVisible();
+ await imageNode.evaluate(el=>{el.dataset.testIdentity='original';});
+ const text=stage.locator('.canvas-object[data-type="text"]').first();await text.locator('.canvas-text').dblclick({position:{x:5,y:5}});
+ await page.locator('.canvas-text[contenteditable]').fill('Texto editado');await page.keyboard.press('Control+z');
+ await expect(text).not.toContainText('Texto editado');await expect(stage.locator('.canvas-object[data-type="image"]')).toHaveAttribute('data-test-identity','original');
+ await page.keyboard.press('Control+Shift+z');await expect(text).toContainText('Texto editado');await expect(stage.locator('.canvas-object[data-type="image"]')).toHaveAttribute('data-test-identity','original');
 });
