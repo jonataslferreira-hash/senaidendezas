@@ -25,19 +25,18 @@ jobs:
           const browser = await chromium.launch({headless:true});
           const page = await browser.newPage();
           try {
-            await page.addInitScript(() => localStorage.setItem('sl-tour','done'));
-            let reachedPublishedOrigin = false;
-            await page.route('https://jonataslferreira-hash.github.io/senaidendezas/', route => {
-              reachedPublishedOrigin = true;
-              return route.fulfill({status:302,headers:{location:'http://127.0.0.1:5173/'}});
-            });
+            await page.addInitScript(() => { if (location.hostname === 'jonataslferreira-hash.github.io') sessionStorage.setItem('test-arrival',location.href); });
             await page.goto('https://is.gd/h4bAV2#s=123456', {waitUntil:'domcontentloaded',timeout:30000});
-            await page.locator('#room-code').waitFor({timeout:30000});
-            const code = await page.locator('#room-code').inputValue();
-            const actualUrl = page.url();
-            if (!reachedPublishedOrigin || code !== '123456' || new URL(actualUrl).searchParams.get('s') !== '123456') throw Error('Resposta inesperada: '+JSON.stringify({reachedPublishedOrigin,code,actualUrl}));
+            const arrival = await page.evaluate(() => sessionStorage.getItem('test-arrival'));
+            if (arrival !== 'https://jonataslferreira-hash.github.io/senaidendezas/#s=123456') throw Error('Redirecionamento inesperado: '+arrival);
+            const local = await browser.newPage();
+            await local.addInitScript(() => localStorage.setItem('sl-tour','done'));
+            await local.goto('http://127.0.0.1:5173/'+new URL(arrival).hash,{waitUntil:'domcontentloaded'});
+            await local.locator('#room-code').waitFor({timeout:30000});
+            const code=await local.locator('#room-code').inputValue();
+            if(code!=='123456'||new URL(local.url()).searchParams.get('s')!=='123456')throw Error('Código incorreto: '+code+' '+local.url());
           } catch(error) {
-            const summary = String(error).replace(/\s+/g,' ').slice(0,600);
+            const summary=String(error).replace(/\s+/g,' ').slice(0,600);
             console.log('::error::'+summary+' URL '+page.url());
             process.exitCode=1;
           }
