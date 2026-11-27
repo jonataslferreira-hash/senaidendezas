@@ -644,7 +644,7 @@ html[data-appearance="dark"] .tstore-icon-util.is-active {
   grid-template-columns: 40px minmax(0, 1fr) 40px 74px;
 }
 
-.eshop-hero-stage.has-nav {
+.eshop-hero-stage.has-nav:not(.has-peek) {
   grid-template-columns: 40px minmax(0, 1fr) 40px;
 }
 
