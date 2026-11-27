@@ -16,7 +16,6 @@ import { applyAudioPlayback, audioGraph } from './audio-data.js';
 import {Simulations} from './simulations.js';
 import {loadSlideFonts} from './fonts.js';
 import {editParticipant,participantPhoto,manageParticipants} from './participant-profile.js';
-import {scanRoomCode} from './qr-reader.js';
 import './school-upgrade.css';
 import {presentationSlide,mobileMarkup} from './slide-display.js';
 import {fillAssetImages} from './assets.js';
@@ -48,7 +47,8 @@ import { HardwareViewer } from './models.js';
 import { teacherControls, captureInteraction, applyInteraction, InteractionBroadcaster, describeSims, applySimCommand, describeModels, applyModelCommand } from './live-interaction.js';
 import { cleanSimEvents, cleanSimValues } from './custom-sim-bridge.js';
 import { VideoSync } from './video-sync.js';
-import QRCode from 'qrcode';
+import {createRoomQrCache} from './room-qr.js';
+import {isPublicRoomLink,shortenRoomLink} from './room-short-link.js';
 import './style.css';
 import './experience.css';
 import './appearance.css';
@@ -224,7 +224,8 @@ async function enterImmersiveRoom() {
     try { await screen.orientation?.lock?.('landscape'); } catch { /* iPhone e afins: segue na orientação da tela */ }
   } catch { /* sem gesto do usuário ainda: o primeiro toque tenta de novo */ }
 }
-const qrCache = new Map();
+const roomQr = createRoomQrCache();
+let shortInvite = null, shortInviteEpoch = 0;
 const params = routeParams();
 let codeDraft = (params.get('s') || '').replace(/\D/g, '').slice(0, 6);
 const studio = new Studio(app, { render, toast, joinForm, preview, remoteAction:(name,value)=>{if(name==='sim')remoteInteract(value);else action(name);}, present: (lesson,startIndex,fromEditor) => connectSession({host:true,lesson,startIndex,fromEditor}) });
@@ -389,9 +390,27 @@ function joinUrl() {
   url.searchParams.set('s',state.code);
   return url.href;
 }
+function displayedInvite(url) {return shortInvite?.url===url&&shortInvite.short?shortInvite.short:url;}
+function shortInviteStatus(url) {
+  if(!isPublicRoomLink(url))return '';
+  if(shortInvite?.url!==url||shortInvite.status==='loading')return 'Gerando link curto…';
+  return shortInvite.short?'Link curto para digitar ou copiar':'Link curto indisponível. Use o link direto ou o código.';
+}
+function startShortInvite(url){
+  if(!isPublicRoomLink(url)||shortInvite?.url===url)return;
+  const epoch=++shortInviteEpoch;shortInvite={url,status:'loading',short:null};
+  shortenRoomLink(url).then(short=>{
+    if(epoch!==shortInviteEpoch||!state||!host||joinUrl()!==url)return;
+    shortInvite={url,status:short?'ready':'failed',short};
+    const field=app.querySelector('[data-share-dialog] [aria-label="Link de convite"]');
+    if(field)field.value=displayedInvite(url);
+    const status=app.querySelector('[data-share-dialog] [data-short-link-status]');
+    if(status)status.textContent=shortInviteStatus(url);
+  }).catch(()=>{if(epoch===shortInviteEpoch&&state&&host&&joinUrl()===url){shortInvite={url,status:'failed',short:null};const status=app.querySelector('[data-short-link-status]');if(status)status.textContent=shortInviteStatus(url);}});
+}
 function shareDialog() {
   const url=joinUrl();
-  return `<div class="modal-backdrop" data-share-dialog><section class="share-modal" role="dialog" aria-modal="true" aria-labelledby="share-title"><button class="icon-btn close-modal" data-action="close-share" aria-label="Fechar convite">${icon('close')}</button><span class="eyebrow purple-text">A AULA FICA MELHOR JUNTO</span><h2 id="share-title">Conecte a turma<span>.</span></h2><p>Aponte a câmera. Escolha um avatar. Entre na aula.</p><div class="qr-wrap"><img id="room-qr" width="230" height="230" alt="QR Code para entrar nesta sala"></div><span class="eyebrow">OU ENTRE COM O CÓDIGO</span><div class="big-code">${esc(state.code.slice(0, 3))}<span> </span>${esc(state.code.slice(3))}</div><div class="share-link"><input readonly aria-label="Link de convite" value="${esc(url)}"><button class="icon-btn" data-action="copy-link" aria-label="Copiar link">${icon('copy')}</button></div>${host ? `<button class="btn secondary small share-manage" data-action="manage-people">Ver e remover pessoas</button>` : ''}${import.meta.env.DEV&&/^(localhost|127\.0\.0\.1)$/.test(location.hostname)&&!routeParams().has('localSignal')?`<details><summary>Configurar endereço público</summary><label for="public-url">URL publicada no GitHub Pages</label><input id="public-url" type="url" placeholder="https://usuario.github.io/senaidendezas/"><button class="btn secondary small" data-action="save-url">Salvar endereço</button></details>`:''}</section></div>`;
+  return `<div class="modal-backdrop" data-share-dialog><section class="share-modal" role="dialog" aria-modal="true" aria-labelledby="share-title"><button class="icon-btn close-modal" data-action="close-share" aria-label="Fechar convite">${icon('close')}</button><span class="eyebrow purple-text">A AULA FICA MELHOR JUNTO</span><h2 id="share-title">Conecte a turma<span>.</span></h2><p>Aponte a câmera. Escolha um avatar. Entre na aula.</p><div class="qr-wrap"><img id="room-qr" width="230" height="230" alt="QR Code para entrar nesta sala"></div><span class="eyebrow">OU ENTRE COM O CÓDIGO</span><div class="big-code">${esc(state.code.slice(0, 3))}<span> </span>${esc(state.code.slice(3))}</div><div class="share-link"><input readonly aria-label="Link de convite" value="${esc(displayedInvite(url))}"><button class="icon-btn" data-action="copy-link" aria-label="Copiar link">${icon('copy')}</button></div><small class="share-link-status" data-short-link-status role="status">${esc(shortInviteStatus(url))}</small>${host ? `<button class="btn secondary small share-manage" data-action="manage-people">Ver e remover pessoas</button>` : ''}${import.meta.env.DEV&&/^(localhost|127\.0\.0\.1)$/.test(location.hostname)&&!routeParams().has('localSignal')?`<details><summary>Configurar endereço público</summary><label for="public-url">URL publicada no GitHub Pages</label><input id="public-url" type="url" placeholder="https://usuario.github.io/senaidendezas/"><button class="btn secondary small" data-action="save-url">Salvar endereço</button></details>`:''}</section></div>`;
 }
 // Vídeos, experimentos e modelos 3D recomeçariam do zero a cada atualização da
 // tela (clique de animação, aluno entrando…). Enquanto o slide é o mesmo e o
@@ -630,11 +649,11 @@ function applyRender() {
   canvasModels.preload(upcoming ? presentationSlide(upcoming) : null);
   focusView.sync(state?.phase==='lesson'?slides[state.slide]?.id:'');
   fillAssetImages(app);simulations.mount(state?.phase==='lesson'||state?.game?.type==='challenge'?app:null);syncInteraction();publishRemote();if(state?.phase==='lesson')loadSlideFonts(slides[state.slide],activeLesson.customFonts);
+  if (state && shareOpen && host && !demo) startShortInvite(joinUrl());
   if (state && (shareOpen || (host && !demo && presenterSettings.qrVisible && state.phase === 'lesson'))) {
     const url = joinUrl();
     const setQR = src => { if (state && joinUrl() === url) for (const image of document.querySelectorAll('#room-qr, [data-pinned-qr]')) image.src = src; };
-    if (qrCache.has(url)) setQR(qrCache.get(url));
-    else QRCode.toDataURL(url, { width: 460, margin: 2 }).then(src => { qrCache.set(url, src); setQR(src); }).catch(() => toast('Não foi possível gerar o QR Code. Use o link ou código.'));
+    roomQr(url).then(setQR).catch(() => toast('Não foi possível gerar o QR Code. Use o link ou código.'));
   }
   if(state?.phase==='lesson'){pptxAnimations.mount(app,slides[state.slide],activeLesson.id+':'+state.slide,state.animationStep||0);}else{pptxAnimations.key=null;}
   // Desafio do experimento: trilha de fundo (as músicas de 120 s+ dos
@@ -724,6 +743,7 @@ async function connectSession(mode) {
   } finally { busy = false; render(); }
 }
 function leave(show = true) {
+  shortInviteEpoch++; shortInvite=null;
   clearInterval(clockTimer); clockTimer = null;
   editDraft = null; editError = ''; clearTimeout(controlsTimer);
   if (document.fullscreenElement) document.exitFullscreen().catch(() => {});
@@ -944,7 +964,7 @@ async function action(name) {
   switch (name) {
     case 'choose-guest-photo':app.querySelector('[data-guest-photo]')?.click();break;
     case 'take-guest-photo':{const file=await takePhoto();if(file){selectedAvatar=await participantPhoto(file);avatarChanged=true;render();}break;}
-    case 'scan-qr':{const code=await scanRoomCode();if(code){codeDraft=code;const field=app.querySelector('#room-code');if(field)field.value=code;studio.view='join';render();}break;}
+    case 'scan-qr':{try{const {scanRoomCode}=await import('./qr-reader.js');const code=await scanRoomCode();if(code){codeDraft=code;const field=app.querySelector('#room-code');if(field)field.value=code;studio.view='join';render();}}catch(error){toast(error?.message||'Não foi possível abrir o leitor de QR Code. Use o código da sala.');}break;}
     case 'participants':if(state)manageParticipants(state,host&&!demo?id=>control('kick',id):null,control,{host});break;
     case 'room-invite':if(state){if(host){shareOpen=true;render();}else manageParticipants(state,null);}break;
     case 'manage-people':if(state)manageParticipants(state,host&&!demo?id=>control('kick',id):null,control,{host});break;
@@ -996,7 +1016,7 @@ async function action(name) {
     case 'solution': solutionOpen = !solutionOpen; render(); break;
     case 'share': if (!demo) { shareOpen = true; render(); document.querySelector('.close-modal')?.focus(); } break;
     case 'close-share': shareOpen = false; render(); document.querySelector('[data-action="share"]')?.focus(); break;
-    case 'copy-link': try { await navigator.clipboard.writeText(joinUrl()); toast('Link copiado!'); } catch { toast('Copie o endereço no campo de convite.'); } break;
+    case 'copy-link': try { await navigator.clipboard.writeText(displayedInvite(joinUrl())); toast('Link copiado!'); } catch { toast('Copie o endereço no campo de convite.'); } break;
     case 'save-url': {
       try {
         const url = new URL(document.querySelector('#public-url').value);

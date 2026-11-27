@@ -73,3 +73,10 @@ html #app .studio-shell button.studio-wordmark::before,html #app .studio-shell b
   display:none;
  }
 }
+/* Link da sala permanece legível no telão e em telas pequenas. */
+#app .share-modal .share-link input {font-size:clamp(12px,1.2vw,15px);font-weight:650;letter-spacing:0}
+#app .share-modal .share-link-status {display:block;min-height:1.3em;margin-top:5px;font-size:11px;line-height:1.35;color:var(--ui-muted,#a297b5)}
+#app .share-modal .share-link-status:empty {display:none}
+/* O convite tem fundo escuro em todos os temas; manter contraste. */
+#app .share-modal h2 {color:#f1ebfa}
+#app .share-modal .share-link-status {color:#cabed6}
