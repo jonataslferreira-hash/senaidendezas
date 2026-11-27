@@ -31,6 +31,12 @@ jobs:
           await page.goto('http://127.0.0.1:5173/', {waitUntil:'domcontentloaded',timeout:20000});
           const result = await page.evaluate(async () => (await import('/src/room-short-link.js')).shortenRoomLink('https://jonataslferreira-hash.github.io/senaidendezas/?s=123456',{timeout:12000}));
           console.log('resultado:', result);
-          await browser.close();
           if (!result) process.exitCode=1;
+          const redirect = await browser.newPage();
+          await redirect.addInitScript(() => { if (location.hostname === 'jonataslferreira-hash.github.io') sessionStorage.setItem('test-arrival',location.href); });
+          await redirect.goto('https://is.gd/h4bAV2#s=123456', {waitUntil:'domcontentloaded',timeout:30000});
+          const arrival = await redirect.evaluate(() => sessionStorage.getItem('test-arrival'));
+          console.log('destino inicial:',arrival);
+          if (arrival !== 'https://jonataslferreira-hash.github.io/senaidendezas/#s=123456') process.exitCode=1;
+          await browser.close();
           JS
