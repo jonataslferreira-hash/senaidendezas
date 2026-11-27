@@ -1,9 +1,7 @@
 # Link curto da sala
 
-O QR continua apontando diretamente para o endereço original da sala. Ao abrir o convite de uma sala no site público, o navegador tenta gerar um link curto gratuito pelo is.gd; o botão Copiar passa a copiar o curto quando estiver pronto. Enquanto carrega, ou caso o serviço falhe, permaneçam disponíveis o endereço direto e o código da sala. O encurtamento é tentado uma vez por sala nesta sessão, não em cada renderização.
+O convite do site público usa o endereço fixo `https://is.gd/h4bAV2`, que redireciona à página inicial do Storage Lab. O código de seis dígitos é acrescentado no fragmento, por exemplo `https://is.gd/h4bAV2#s=123456`. O navegador preserva o fragmento no redirecionamento; na chegada, o site o converte ao parâmetro normal `?s=123456` antes de abrir a tela da sala. A confirmação da participação continua dependendo do aluno.
 
-Apenas URLs HTTPS públicas do projeto com o parâmetro numérico `s` são enviadas ao is.gd; links locais, de prévia e convites privados não são enviados. O serviço conhece o endereço e os links são permanentes, portanto o código de sala não deve ser tratado como segredo. Uma sala encerrada não é reativada pelo link; um código pode eventualmente ser usado por outra sala.
+Não há mais chamadas à API do is.gd para cada sala, nem espera pela criação de um novo link. O fragmento não é enviado ao servidor do encurtador na requisição HTTP. O link curto continua dependendo de o is.gd estar acessível na rede e manter o redirecionamento; se não estiver, o convite oferece **Copiar link direto**, QR Code direto e o código da sala. Nenhum URL privado ou de desenvolvimento é convertido para o atalho público.
 
-A API JSONP do provedor é executada em iframe sandbox de origem opaca, sem acesso ao DOM, aos dados ou às credenciais da aplicação. A resposta é validada e limitada ao domínio `is.gd`. O acesso à API e ao destino depende da rede do usuário; se o is.gd for bloqueado, o QR direto e o código continuam disponíveis. Não requer publicar um Worker novo.
-
-Referências: https://is.gd/apishorteningreference.php, https://is.gd/usagelimits.php, https://is.gd/terms.php.
+O QR Code continua usando diretamente o endereço completo da sala. O código não deve ser tratado como segredo: qualquer pessoa que receba o link pode lê-lo. Uma sala encerrada não é reativada pelo link; o código pode eventualmente ser reutilizado por outra sala.

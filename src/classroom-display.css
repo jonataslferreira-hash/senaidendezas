@@ -80,3 +80,4 @@ html #app .studio-shell button.studio-wordmark::before,html #app .studio-shell b
 /* O convite tem fundo escuro em todos os temas; manter contraste. */
 #app .share-modal h2 {color:#f1ebfa}
 #app .share-modal .share-link-status {color:#cabed6}
+#app .share-modal .share-copy-direct {display:block;margin:4px auto 8px;padding:7px 12px;min-height:34px;color:#d9c9ff;font-weight:650}
