@@ -895,7 +895,9 @@ export function mountCatalogFluid({ page, canvas, existingSim = null }) {
       rafId = 0;
       return;
     }
-    const dt = lastTs ? (ts - lastTs) / 1000 : 1 / 60;
+    // O líquido decorativo não precisa calcular física e repintar a 60–144 Hz.
+    if (lastTs && ts - lastTs < 1000 / 30 - 2) { rafId = requestAnimationFrame(tick); return; }
+    const dt = lastTs ? (ts - lastTs) / 1000 : 1 / 30;
     lastTs = ts;
     if (!lastInputAt) lastInputAt = ts;
     autoDrift(ts);
@@ -908,6 +910,13 @@ export function mountCatalogFluid({ page, canvas, existingSim = null }) {
     if (destroyed || rafId || isReducedMotion() || document.hidden) return;
     lastTs = 0;
     rafId = requestAnimationFrame(tick);
+  }
+
+  function onMotionChange() {
+    if (isReducedMotion()) {
+      if (rafId) { cancelAnimationFrame(rafId); rafId = 0; }
+      drawFrame();
+    } else startLoop();
   }
 
   function onVisibility() {
@@ -938,7 +947,7 @@ export function mountCatalogFluid({ page, canvas, existingSim = null }) {
   if (typeof MutationObserver === 'function' && document.documentElement) {
     themeObserver = new MutationObserver(() => {
       refreshPalette();
-      if (isReducedMotion()) drawFrame();
+      onMotionChange();
     });
     themeObserver.observe(document.documentElement, {
       attributes: true,
@@ -952,6 +961,8 @@ export function mountCatalogFluid({ page, canvas, existingSim = null }) {
   window.addEventListener('pointercancel', onPointerClear, { passive: true });
   window.addEventListener('blur', onWindowBlur, { passive: true });
   document.addEventListener('visibilitychange', onVisibility);
+  const motionMedia = window.matchMedia?.('(prefers-reduced-motion: reduce)');
+  motionMedia?.addEventListener?.('change', onMotionChange);
 
   if (!isReducedMotion()) {
     startLoop();
@@ -970,6 +981,7 @@ export function mountCatalogFluid({ page, canvas, existingSim = null }) {
       window.removeEventListener('pointercancel', onPointerClear);
       window.removeEventListener('blur', onWindowBlur);
       document.removeEventListener('visibilitychange', onVisibility);
+      motionMedia?.removeEventListener?.('change', onMotionChange);
       pointers.clear();
     }
   };

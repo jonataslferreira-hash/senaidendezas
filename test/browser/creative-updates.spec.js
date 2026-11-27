@@ -27,8 +27,8 @@ test('carrossel respeita movimento reduzido e seleção manual de miniatura',asy
  await page.locator('.eshop-thumb[data-index="2"]').click();await expect(page.locator('.eshop-slide-counter')).toHaveText('3 / 7');
 });
 test('controles ficam fora do preview vertical',async({page})=>{
- await page.goto('/?page=templates');
- await page.locator('.tstore-card[data-deck-id="matcha-recipe"] [data-tstore-action="open-detail"]').first().click();
+ await page.goto('/?page=templates&template=weekend-market-route');
+ await expect(page.locator('.tstore-detail-page')).toBeVisible();
  const preview=await page.locator('.eshop-hero-canvas .slide-canvas').boundingBox();
  const previous=await page.locator('.eshop-nav.eshop-prev').boundingBox();
  const next=await page.locator('.eshop-nav.eshop-next').boundingBox();
