@@ -24,17 +24,22 @@ jobs:
           import { chromium } from '@playwright/test';
           const browser = await chromium.launch({headless:true});
           const page = await browser.newPage();
-          await page.addInitScript(() => localStorage.setItem('sl-tour','done'));
-          let reachedPublishedOrigin = false;
-          await page.route('https://jonataslferreira-hash.github.io/senaidendezas/', route => {
-            reachedPublishedOrigin = true;
-            return route.fulfill({status:302,headers:{location:'http://127.0.0.1:5173/'}});
-          });
-          await page.goto('https://is.gd/h4bAV2#s=123456', {waitUntil:'domcontentloaded',timeout:30000});
-          await page.locator('#room-code').waitFor({timeout:30000});
-          const code = await page.locator('#room-code').inputValue();
-          const actualUrl = page.url();
-          console.log('redirecionou para o destino esperado:',reachedPublishedOrigin,'código:',code,'url:',actualUrl);
-          if (!reachedPublishedOrigin || code !== '123456' || new URL(actualUrl).searchParams.get('s') !== '123456') process.exitCode=1;
+          try {
+            await page.addInitScript(() => localStorage.setItem('sl-tour','done'));
+            let reachedPublishedOrigin = false;
+            await page.route('https://jonataslferreira-hash.github.io/senaidendezas/', route => {
+              reachedPublishedOrigin = true;
+              return route.fulfill({status:302,headers:{location:'http://127.0.0.1:5173/'}});
+            });
+            await page.goto('https://is.gd/h4bAV2#s=123456', {waitUntil:'domcontentloaded',timeout:30000});
+            await page.locator('#room-code').waitFor({timeout:30000});
+            const code = await page.locator('#room-code').inputValue();
+            const actualUrl = page.url();
+            if (!reachedPublishedOrigin || code !== '123456' || new URL(actualUrl).searchParams.get('s') !== '123456') throw Error('Resposta inesperada: '+JSON.stringify({reachedPublishedOrigin,code,actualUrl}));
+          } catch(error) {
+            const summary = String(error).replace(/\s+/g,' ').slice(0,600);
+            console.log('::error::'+summary+' URL '+page.url());
+            process.exitCode=1;
+          }
           await browser.close();
           JS
