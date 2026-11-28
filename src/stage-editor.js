@@ -1,5 +1,5 @@
 // Editor das etapas interativas (equipes, relâmpago, sobrevivência, desafio, sorteio, cabo de guerra, corrida).
-import { gameNames, gameHints, defaultGame, isGameType } from './stage-games.js';
+import { gameNames, gameHints, isGameType } from './stage-games.js';
 import { gameIcon } from './stage-games-view.js';
 import { studioIcon } from './studio-icons.js';
 import {flashcardRequest,cardsFromQuestions} from './flashcards.js';
@@ -162,7 +162,8 @@ export class StageEditor {
     const s = this.studio, slide = s.draft.slides[s.index];
     // Uma etapa vazia nunca deve criar um jogo no slide selecionado de outra etapa.
     if (s.currentBlock && !s.currentBlock()?.items.includes(slide?.id)) return '<div class="editor-empty"><h2>Etapa vazia</h2><p>Use as opções da etapa para removê-la ou adicione uma nova atividade.</p></div>';
-    if (!slide.game) slide.game = defaultGame(s.currentBlock()?.type);
+    // Renderizar não deve criar uma atividade nem alterar o conteúdo da aula.
+    if (!slide?.game || (isGameType(s.currentBlock?.()?.type) && slide.game.type !== s.currentBlock().type)) return '<div class="editor-empty"><h2>Atividade indisponível</h2><p>Esta etapa não contém uma atividade compatível. Nenhum conteúdo foi alterado.</p></div>';
     const g = slide.game, off = s.groups?.canEdit === false ? 'disabled' : '';
     // Etapas salvas no formato antigo: relâmpago de uma pergunta só e cabo de guerra com lista única.
     if (g.type === 'flash' && !Array.isArray(g.questions)) { g.questions = [{ text: g.text || '', options: Array.isArray(g.options) && g.options.length >= 2 ? g.options : ['', ''], correct: g.correct || 0 }]; g.text = 'Desafio relâmpago'; g.seconds = 10; delete g.options; delete g.correct; }

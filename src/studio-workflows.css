@@ -980,3 +980,7 @@ html[data-theme][data-ui-style][data-appearance=dark] #app .studio-shell .studio
   #app .studio-join.join-v3 { min-height:0; grid-template-columns:minmax(0,410px); justify-content:center; align-content:start; }
 }
 .review-page{max-width:1000px}.review-page h1{margin-bottom:.5rem}.review-list,.review-options{display:grid;gap:.65rem;margin:1.2rem 0}.review-list button{display:flex;justify-content:space-between;gap:1rem;text-align:left;padding:1rem}.review-card{padding:clamp(1rem,3vw,2rem);border:1px solid var(--border,#ddd);border-radius:18px;background:var(--surface,#fff)}.review-card h2{font-size:1.2rem;overflow-wrap:anywhere}.review-options button{text-align:left;white-space:normal;justify-content:flex-start}.review-options .review-correct{outline:2px solid #198754}.review-options .review-incorrect{outline:2px solid #bc3947}.review-controls{display:flex;flex-wrap:wrap;gap:.6rem;margin-top:1rem}
+
+.slide-recovery{margin:0 0 14px;padding:14px 16px;border:1px solid var(--ui-line);border-radius:12px;background:var(--ui-soft);color:var(--ui-ink)}
+.slide-recovery p{margin:6px 0 10px;font-size:.9em;line-height:1.45}
+.slide-recovery .studio-btn{margin-top:2px}
