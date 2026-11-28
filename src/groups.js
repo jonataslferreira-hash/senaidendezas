@@ -12,14 +12,18 @@ const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&
 const uuid=/^[a-f0-9-]{36}$/i;
 export class GroupsPanel {
   constructor(studio){
-    this.studio=studio;this.client=studio.account.client;this.documents=[];this.groups=[];this.lessonIds=new Map();this.resolvedSharedDocuments=new Set();this.sharedLessons=new Map();this.photos=new Map();this.message='';this.status='';this.members=[];this.role='';
+    this.studio=studio;this.client=studio.account.client;this.documents=[];this.groups=[];this.lessonIds=new Map();this.resolvedSharedDocuments=new Set();this.sharedLessons=new Map();this.photos=new Map();this.message='';this.status='';this.members=[];this.role='';this.inviteQuery='';this.inviteRole='editor';this.inviteContacts=[];this.inviteMatches=[];this.inviteGeneration=0;this.inviteHighlight=-1;this.inviteSuppressed=false;
     studio.root.addEventListener('click',e=>{const b=e.target.closest('[data-group-action]');if(b&&!b.disabled)this.action(b.dataset.groupAction,b).catch(error=>{this.message=error.message;studio.callbacks.toast(error.message);this.paint();});});
+    studio.root.addEventListener('input',e=>{if(e.target.id!=='collaborator-email')return;this.inviteQuery=e.target.value;this.inviteHighlight=-1;this.inviteSuppressed=false;this.paintInviteSuggestions();});
+    studio.root.addEventListener('change',e=>{if(e.target.id==='invite-role')this.inviteRole=e.target.value;});
+    studio.root.addEventListener('click',e=>{const item=e.target.closest('[data-invite-choice]');if(item)this.selectInviteContact(Number(item.dataset.inviteChoice));});
+    studio.root.addEventListener('keydown',e=>{if(e.target.id!=='collaborator-email')return;if(e.key==='Escape'&&this.inviteMatches.length){e.preventDefault();e.stopPropagation();this.inviteMatches=[];this.inviteSuppressed=true;this.paintInviteSuggestions(true);return;}if(e.key==='ArrowDown'||e.key==='ArrowUp'){if(!this.inviteMatches.length)return;e.preventDefault();this.inviteHighlight=this.inviteHighlight<0?(e.key==='ArrowDown'?0:this.inviteMatches.length-1):(this.inviteHighlight+(e.key==='ArrowDown'?1:-1)+this.inviteMatches.length)%this.inviteMatches.length;this.paintInviteSuggestions(true);}else if(e.key==='Enter'&&this.inviteHighlight>=0){e.preventDefault();this.selectInviteContact(this.inviteHighlight);}});
     studio.root.addEventListener('change',e=>{if(!e.target.matches('[data-group-role]'))return;const input=e.target;input.disabled=true;rpc(this.client,'sl_set_collaborator_role',{p_document_id:this.live.row.id,p_user_id:input.dataset.groupRole,p_role:input.value}).then(()=>this.refreshMembers()).then(()=>studio.callbacks.render()).catch(error=>{input.disabled=false;this.message=error.message;this.paint();});});
     studio.root.addEventListener('compositionstart',()=>{if(this.live)this.live.composing=true;});
     studio.root.addEventListener('compositionend',()=>{if(this.live){this.live.composing=false;this.live.schedule();this.live.drain();}});
     studio.root.addEventListener('account-changed',()=>{
       if(this.live&&!this.live.current()){this.live.close();this.live=null;studio.draft=null;studio.dirty=false;studio.view='library';studio.callbacks.render();}
-      this.documents=[];this.groups=[];this.lessonIds.clear();this.resolvedSharedDocuments.clear();this.sharedLessons.clear();this.resume().catch(e=>{this.message=e.message;this.paint();});
+      this.inviteGeneration++;this.inviteContacts=[];this.inviteMatches=[];this.inviteQuery='';this.documents=[];this.groups=[];this.lessonIds.clear();this.resolvedSharedDocuments.clear();this.sharedLessons.clear();this.resume().catch(e=>{this.message=e.message;this.paint();});
     });
     queueMicrotask(()=>this.resume().catch(e=>{this.message=e.message;this.paint();}));
   }
@@ -67,7 +71,23 @@ export class GroupsPanel {
       ${cards?`<div class="shared-grid">${cards}</div>`:`<div class="shared-empty"><span>${studioIcon('collaborate')}</span><strong>Nenhuma aula compartilhada ainda</strong><p>Abra uma aula no editor e convide alguém pelo e-mail. O convite também aparece no Chat.</p></div>`}
     </section>`;
   }
-  editorMarkup(){return `${this.shareDialog?`<dialog class="group-dialog" data-group-dialog aria-labelledby="collaboration-title"><button type="button" class="group-close" data-group-action="close" aria-label="Fechar colaboração">×</button><span class="studio-kicker">CRIEM JUNTOS</span><h2 id="collaboration-title">Convide alguém para sua aula.</h2><p>Convide por e-mail. A pessoa também recebe o convite no Chat da conta dela.</p><div class="collaborator-list">${this.members.map(p=>`<article>${this.studio.people.avatar(p.user_id,p.display_name)}<div><strong>${esc(p.display_name)}</strong><small>${p.role==='owner'?'Dono':'Colaborador'}</small></div>${p.role==='owner'?'':`<select data-group-role="${p.user_id}" aria-label="Permissão de ${esc(p.display_name)}" ${this.role==='owner'?'':'disabled'}>${[['viewer','Visualizar'],['commenter','Comentar'],['editor','Editar']].map(([v,t])=>`<option value="${v}" ${v===p.role?'selected':''}>${t}</option>`).join('')}</select>`}</article>`).join('')}</div><label for="collaborator-email">E-mail do colaborador</label><input id="collaborator-email" type="email" autocomplete="email" maxlength="254" placeholder="pessoa@exemplo.com"><label for="invite-role">Permissão</label><select id="invite-role"><option value="editor">Pode editar</option><option value="commenter">Pode comentar</option><option value="viewer">Pode visualizar</option></select><button type="button" class="studio-btn accent" data-group-action="invite" ${this.busy?'disabled':''}>${this.busy?'Preparando convite…':'Enviar convite'}</button><p role="status" data-group-message>${esc(this.message)}</p>${this.inviteLink?`<label for="collaborator-link">Link do convite</label><input id="collaborator-link" readonly value="${esc(this.inviteLink)}"><button type="button" class="studio-btn quiet" data-group-action="copy-link">Copiar convite</button>`:''}</dialog>`:''}`;}
+  editorMarkup(){return `${this.shareDialog?`<dialog class="group-dialog collaboration-dialog" data-group-dialog aria-labelledby="collaboration-title"><button type="button" class="group-close" data-group-action="close" aria-label="Fechar colaboração">×</button><h2 id="collaboration-title">Convide alguém para sua aula.</h2><p>Convide por e-mail. A pessoa também recebe o convite no Chat da conta dela.</p><div class="collaborator-list">${this.members.map(p=>`<article>${this.studio.people.avatar(p.user_id,p.display_name)}<div><strong>${esc(p.display_name)}</strong><small>${p.role==='owner'?'Dono':'Colaborador'}</small></div>${p.role==='owner'?'':`<select data-group-role="${p.user_id}" aria-label="Permissão de ${esc(p.display_name)}" ${this.role==='owner'?'':'disabled'}>${[['viewer','Visualizar'],['commenter','Comentar'],['editor','Editar']].map(([v,t])=>`<option value="${v}" ${v===p.role?'selected':''}>${t}</option>`).join('')}</select>`}</article>`).join('')}</div><label for="collaborator-email">Nome ou e-mail do colaborador</label><input id="collaborator-email" type="text" value="${esc(this.inviteQuery)}" autocomplete="off" maxlength="254" placeholder="Busque um contato ou digite o e-mail" role="combobox" aria-autocomplete="list" aria-expanded="false" aria-controls="invite-suggestions" ${this.busy?'disabled':''}><small class="invite-search-hint">Busque pelo nome ou e-mail dos seus contatos aceitos. Para outras pessoas, digite o e-mail completo.</small><div id="invite-suggestions" class="invite-suggestions" role="listbox" aria-label="Contatos encontrados" hidden></div><div class="collaboration-invite-actions"><div><label for="invite-role">Permissão</label><select id="invite-role"><option value="editor" ${this.inviteRole==='editor'?'selected':''}>Pode editar</option><option value="commenter" ${this.inviteRole==='commenter'?'selected':''}>Pode comentar</option><option value="viewer" ${this.inviteRole==='viewer'?'selected':''}>Pode visualizar</option></select></div><button type="button" class="studio-btn accent" data-group-action="invite" ${this.busy?'disabled':''}>${this.busy?'Preparando convite…':'Enviar convite'}</button></div><p role="status" data-group-message>${esc(this.message)}</p>${this.inviteLink?`<label for="collaborator-link">Link do convite</label><input id="collaborator-link" readonly value="${esc(this.inviteLink)}"><button type="button" class="studio-btn quiet" data-group-action="copy-link">Copiar convite</button>`:''}</dialog>`:''}`;}
+  async loadInviteContacts(){
+    const generation=++this.inviteGeneration,uid=this.studio.account.user?.id;
+    try{const rows=await rpc(this.client,'sl_list_contacts');if(generation!==this.inviteGeneration||!this.shareDialog||this.studio.account.user?.id!==uid)return;
+      this.inviteContacts=(Array.isArray(rows)?rows:[]).filter(c=>c.status==='accepted'&&typeof c.other_name==='string'&&typeof c.other_email==='string'&&uuid.test(c.other_id||''));
+      this.paintInviteSuggestions();
+    }catch{if(generation===this.inviteGeneration&&this.shareDialog){this.inviteContacts=[];this.paintInviteSuggestions();}}
+  }
+  paintInviteSuggestions(preserve=false){
+    const input=this.studio.root.querySelector('#collaborator-email'),box=this.studio.root.querySelector('#invite-suggestions');if(!input||!box)return;
+    if(!preserve){const norm=v=>String(v).normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase();const query=norm(this.inviteQuery.trim());this.inviteMatches=!this.inviteSuppressed&&query.length>=2?this.inviteContacts.filter(c=>norm(c.other_name).includes(query)||norm(c.other_email).includes(query)).slice(0,8):[];}
+    box.hidden=!this.inviteMatches.length;input.setAttribute('aria-expanded',String(!box.hidden));
+    if(this.inviteHighlight>=0&&this.inviteMatches[this.inviteHighlight])input.setAttribute('aria-activedescendant','invite-option-'+this.inviteHighlight);else input.removeAttribute('aria-activedescendant');
+    box.innerHTML=this.inviteMatches.map((c,i)=>`<button type="button" id="invite-option-${i}" role="option" aria-selected="${i===this.inviteHighlight}" data-invite-choice="${i}">${this.studio.people.avatar(c.other_id,c.other_name)}<span><strong>${esc(c.other_name)}</strong><small>${esc(c.other_email)}</small></span></button>`).join('');
+    for(const c of this.inviteMatches)this.studio.people.load(c.other_id).catch(()=>{});
+  }
+  selectInviteContact(index){const contact=this.inviteMatches[index],input=this.studio.root.querySelector('#collaborator-email');if(!contact||!input)return;this.inviteQuery=contact.other_email;input.value=contact.other_email;this.inviteSuppressed=true;this.inviteMatches=[];this.inviteHighlight=-1;this.paintInviteSuggestions(true);input.focus();}
   presenceAvatar(p){
     const photo=this.studio.people.get(p.uid).photo||this.photos.get(p.uid);
     const index=this.studio.draft?.slides.findIndex(slide=>slide.id===p.slideId)??-1;
@@ -84,6 +104,7 @@ export class GroupsPanel {
       slot.innerHTML=people.map(p=>this.presenceAvatar(p)).join('');
     }
     this.loadPhotos();
+    if(this.shareDialog)this.paintInviteSuggestions();
     for(const node of this.studio.root.querySelectorAll('[data-person]')){const person=this.studio.people.get(node.dataset.person);if(person.photo&&!node.querySelector('img'))node.innerHTML=`<img src="${esc(person.photo)}" alt="">`;}
   }
   afterRender(){const dialog=this.studio.root.querySelector('[data-group-dialog]');if(dialog&&!dialog.open){dialog.showModal();dialog.addEventListener('cancel',e=>{e.preventDefault();this.shareDialog=false;this.studio.callbacks.render();});}this.paint();}
@@ -179,16 +200,16 @@ export class GroupsPanel {
     if(action==='refresh'){await this.refresh();this.studio.callbacks.render();return;}
     if(action==='open'){await this.open(button.dataset.doc);return;}
     if(action==='present'){this.studio.requestPresentationFullscreen();await this.open(button.dataset.doc);await this.studio.launch(this.studio.draft,false,false);return;}
-    if(action==='close'){if(this.busy)return;this.shareDialog=false;this.studio.callbacks.render();return;}
+    if(action==='close'){if(this.busy)return;this.inviteGeneration++;this.shareDialog=false;this.studio.callbacks.render();return;}
     if(action==='share'){
       if(!this.studio.account.user){this.studio.account.show('login');return;}
-      if(this.live)await this.refreshMembers();this.shareDialog=true;this.message='';this.inviteLink='';this.studio.callbacks.render();return;
+      if(this.live)await this.refreshMembers();this.shareDialog=true;this.inviteQuery='';this.inviteRole='editor';this.inviteContacts=[];this.inviteMatches=[];this.inviteSuppressed=false;this.inviteHighlight=-1;this.message='';this.inviteLink='';this.studio.callbacks.render();this.loadInviteContacts();return;
     }
     if(action==='copy-link'){try{await navigator.clipboard.writeText(this.inviteLink);this.message='Convite copiado.';}catch{this.message='Copie o link no campo acima.';}this.paint();return;}
     if(action==='copy'){const archived=await archiveImportedPages(validateLesson(await hydrateLesson(this.studio.draft,true),{draft:true}));this.studio.library.import(archived.lesson);this.studio.callbacks.toast('Cópia salva neste navegador.');return;}
     if(action==='invite'){
-      const input=this.studio.root.querySelector('#collaborator-email');if(!input.reportValidity()||!input.value.trim()){input.focus();return;}
-      if(this.busy)return;const email=input.value.trim(),role=this.studio.root.querySelector('#invite-role')?.value||'editor';this.busy=true;this.message='';this.studio.callbacks.render();
+      const input=this.studio.root.querySelector('#collaborator-email'),email=input.value.trim();if(!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)){this.message='Selecione um contato ou informe o e-mail completo.';this.paint();input.focus();return;}
+      if(this.busy)return;const role=this.studio.root.querySelector('#invite-role')?.value||'editor';this.inviteQuery=email;this.inviteRole=role;this.busy=true;this.message='';this.studio.callbacks.render();
       try{
         if(!this.live)await this.createShared();await this.live.persist();
         const response=await groupRequest(this.client,'/collaboration/invite',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({documentId:this.live.row.id,email,role})}),result=await response.json();

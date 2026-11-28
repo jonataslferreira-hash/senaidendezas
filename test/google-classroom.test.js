@@ -38,3 +38,10 @@ test('sugere somente o aluno exato e não pré-seleciona quando duas pessoas usa
  ui.context.quiz.players.push({name:'Outra pessoa',correct:1,googleUserId:'12345'});assert.doesNotMatch(ui.mappingMarkup(),/value="sub" selected/);
  ui.context.quiz.players=[{name:'Ana',correct:1}];assert.doesNotMatch(ui.mappingMarkup(),/value="sub" selected/);
 });
+test('upload envia bytes ao Drive e publica referência como material visualizável',async()=>{
+ const calls=[];const api=new ClassroomApi('token',async (url,opt)=>{calls.push({url,opt});return Response.json(url.includes('upload/drive')?{id:'file-id'}:{id:'work-id'});});
+ const file=await api.uploadFile({name:'Aula.pdf',blob:new Blob(['%PDF-dados'],{type:'application/pdf'})});await api.create('curso',{title:'Aula',description:'',fileId:file.id});
+ assert.match(calls[0].url,/uploadType=multipart/);assert.match(calls[0].opt.headers['Content-Type'],/^multipart\/related; boundary=/);assert.equal(calls[0].opt.headers.Authorization,'Bearer token');assert.match(await calls[0].opt.body.text(),/%PDF-dados/);
+ assert.deepEqual(JSON.parse(calls[1].opt.body).materials,[{driveFile:{driveFile:{id:'file-id'},shareMode:'VIEW'}}]);
+ const blocked=new ClassroomApi('token',async()=>Response.json({error:{message:'Drive desativado'}},{status:403}));await assert.rejects(blocked.uploadFile({name:'x',blob:new Blob(['x'],{type:'application/pdf'})}),/Drive desativado/);
+});

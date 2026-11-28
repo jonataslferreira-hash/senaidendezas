@@ -404,7 +404,7 @@ function joinUrl() {
   return url.href;
 }
 function displayedInvite(url) {return shortRoomLink(url)||url;}
-function shortInviteStatus(url) {return shortRoomLink(url)?'Link curto para digitar ou copiar':'';}
+function shortInviteStatus(url) {if(shortRoomLink(url))return 'Link curto para digitar ou copiar';if(import.meta.env.DEV)return 'Link direto desta prévia. O link curto funciona no site publicado.';return '';}
 function shareDialog() {
   const url=joinUrl();
   return `<div class="modal-backdrop" data-share-dialog><section class="share-modal" role="dialog" aria-modal="true" aria-labelledby="share-title"><button class="icon-btn close-modal" data-action="close-share" aria-label="Fechar convite">${icon('close')}</button><h2 id="share-title">Conecte a turma<span>.</span></h2><p>Aponte a câmera. Escolha um avatar. Entre na aula.</p><div class="qr-wrap"><img id="room-qr" width="230" height="230" alt="QR Code para entrar nesta sala"></div><span class="eyebrow">OU ENTRE COM O CÓDIGO</span><div class="big-code">${esc(state.code.slice(0, 3))}<span> </span>${esc(state.code.slice(3))}</div><div class="share-link"><input readonly aria-label="Link de convite" value="${esc(displayedInvite(url))}"><button class="icon-btn" data-action="copy-link" aria-label="Copiar link">${icon('copy')}</button></div><small class="share-link-status" data-short-link-status role="status">${esc(shortInviteStatus(url))}</small>${shortRoomLink(url)?'<button class="text-btn share-copy-direct" data-action="copy-direct-link">Copiar link direto</button>':''}${host ? `<button class="btn secondary small share-manage" data-action="manage-people">Ver e remover pessoas</button>` : ''}${import.meta.env.DEV&&/^(localhost|127\.0\.0\.1)$/.test(location.hostname)&&!routeParams().has('localSignal')?`<details><summary>Configurar endereço público</summary><label for="public-url">URL publicada no GitHub Pages</label><input id="public-url" type="url" placeholder="https://usuario.github.io/senaidendezas/"><button class="btn secondary small" data-action="save-url">Salvar endereço</button></details>`:''}</section></div>`;
@@ -1295,3 +1295,5 @@ import './study-visuals.css';
 import './review-redesign.css';
 
 import './showcase-redesign.css';
+
+import './collaboration-polish.css';

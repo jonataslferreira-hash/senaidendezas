@@ -1,5 +1,6 @@
 import { createUuid } from './uuid.js';
 import { r2ApiUrl } from './cloud-files.js';
+import { serviceNetworkMessage } from './service-errors.js';
 import { packLesson, unpackLesson } from './file-codec.js';
 export async function rpc(client,name,args) {
   const {data,error}=await client.rpc(name,args);
@@ -9,7 +10,7 @@ export async function rpc(client,name,args) {
 export async function groupRequest(client,path,options={}){
   const {data}=await client.auth.getSession();if(!data.session)throw Error('Entre na conta para colaborar.');
   if(!r2ApiUrl)throw Error('Configure o Worker do R2 para compartilhar aulas.');
-  const response=await fetch(r2ApiUrl+path,{...options,signal:AbortSignal.timeout(30000),headers:{...options.headers,Authorization:'Bearer '+data.session.access_token}});
+  let response;try{response=await fetch(r2ApiUrl+path,{...options,signal:AbortSignal.timeout(30000),headers:{...options.headers,Authorization:'Bearer '+data.session.access_token}});}catch{throw Error(serviceNetworkMessage('o servidor de colaboração'));}
   if(!response.ok){let code='';try{code=(await response.json()).error||'';}catch{}
     if(response.status===404)throw Error('O Worker publicado está desatualizado. Publique cloudflare/wrangler.toml no Cloudflare para ativar a colaboração.');
     if(response.status===401)throw Error('Sua sessão expirou ou o Worker está com configuração antiga. Entre novamente; se continuar, republique o Worker atualizado.');

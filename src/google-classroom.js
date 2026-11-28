@@ -1,5 +1,6 @@
 // Integração opcional: token Google em memória, nunca na conta Storage Lab nem no servidor.
 const API='https://classroom.googleapis.com/v1';
+export const DRIVE_FILE_SCOPE='https://www.googleapis.com/auth/drive.file';
 export const CLASSROOM_SCOPES=['https://www.googleapis.com/auth/classroom.courses.readonly','https://www.googleapis.com/auth/classroom.coursework.students','https://www.googleapis.com/auth/classroom.rosters.readonly'];
 const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const id=v=>encodeURIComponent(String(v));
@@ -28,7 +29,15 @@ export class ClassroomApi {
  async activities(course){const list=await this.all('/courses/'+id(course)+'/courseWork','courseWork');return list.filter(a=>a.associatedWithDeveloper===true&&a.workType==='ASSIGNMENT'&&Number(a.maxPoints)>0);}
  students(course){return this.all('/courses/'+id(course)+'/students','students');}
  submissions(course,activity){return this.all('/courses/'+id(course)+'/courseWork/'+id(activity)+'/studentSubmissions','studentSubmissions');}
- create(course,{title,description,link}){return this.request('/courses/'+id(course)+'/courseWork',{method:'POST',body:JSON.stringify({title,description,materials:[{link:{url:link}}],workType:'ASSIGNMENT',state:'PUBLISHED',maxPoints:100})});}
+ create(course,{title,description,link,fileId}){const material=fileId?{driveFile:{driveFile:{id:fileId},shareMode:'VIEW'}}:{link:{url:link}};return this.request('/courses/'+id(course)+'/courseWork',{method:'POST',body:JSON.stringify({title,description,materials:[material],workType:'ASSIGNMENT',state:'PUBLISHED',maxPoints:100})});}
+ async uploadFile({blob,name}){
+  if(!(blob instanceof Blob)||!blob.size)throw Error('Não foi possível montar o arquivo.');
+  const boundary='storage-lab-'+crypto.randomUUID();
+  const body=new Blob(['--'+boundary+'\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n',JSON.stringify({name,mimeType:blob.type}),'\r\n--'+boundary+'\r\nContent-Type: '+blob.type+'\r\n\r\n',blob,'\r\n--'+boundary+'--\r\n']);
+  let response;const fetcher=this.fetcher;try{response=await fetcher('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id,name',{method:'POST',headers:{Authorization:'Bearer '+this.token,'Content-Type':'multipart/related; boundary='+boundary},body,signal:AbortSignal.timeout(120000)});}catch{throw Error('Não foi possível enviar o arquivo ao Google Drive. Confira sua conexão e o Drive antes de tentar novamente.');}
+  if(!response.ok){const error=await response.json().catch(()=>({}));throw Error('O Google Drive não aceitou o arquivo. Confira as permissões e a configuração do projeto. '+(error.error?.message||''));}
+  const file=await response.json();if(typeof file.id!=='string'||!file.id)throw Error('O Drive não confirmou o arquivo. Confira seu Drive antes de tentar novamente.');return file;
+ }
  grade(course,activity,submission,grade){return this.request('/courses/'+id(course)+'/courseWork/'+id(activity)+'/studentSubmissions/'+id(submission)+'?updateMask=draftGrade',{method:'PATCH',body:JSON.stringify({draftGrade:grade})});}
 }
 let scriptPromise;
@@ -45,8 +54,8 @@ const DEFAULT_CLIENT_ID='865628950020-b2mff73uuh3b594ag7sgsqsp06j92epj.apps.goog
 const configuredClient=()=>String(import.meta.env?.VITE_GOOGLE_CLASSROOM_CLIENT_ID||savedClient()||DEFAULT_CLIENT_ID).trim();
 
 export class GoogleClassroomDialog {
- constructor(){this.dialog=null;this.token='';this.expires=0;this.ready=false;this.loadingGoogle=false;this.reset();}
- reset(){this.context={};this.courses=[];this.course='';this.activities=[];this.activity='';this.students=[];this.submissions=[];this.error='';this.message='';this.busy=false;this.mode='';this.outcomes=[];}
+ constructor(){this.dialog=null;this.token='';this.expires=0;this.granted=[];this.ready=false;this.loadingGoogle=false;this.reset();}
+ reset(){this.context={};this.courses=[];this.course='';this.activities=[];this.activity='';this.students=[];this.submissions=[];this.error='';this.message='';this.busy=false;this.mode='';this.outcomes=[];this.uploadedFile=null;this.published=false;}
  open(context){
   if(this.busy&&this.dialog?.open)return;
   if(this.dialog?.open)this.dialog.close();this.dialog?.remove();this.reset();this.context=context;
@@ -57,19 +66,20 @@ export class GoogleClassroomDialog {
   this.loadingGoogle=true;loadGoogle().then(()=>{this.ready=true;this.loadingGoogle=false;this.paint();}).catch(()=>{this.ready=false;this.loadingGoogle=false;this.paint();});
  }
  close(){if(!this.busy)this.dialog?.close();}
- clearAuthorization(){this.token='';this.expires=0;if(!this.busy){this.courses=[];this.course='';this.activities=[];this.activity='';this.students=[];this.submissions=[];this.message='Conexão Google removida desta página.';this.paint();}}
- get connected(){return Boolean(this.token&&Date.now()<this.expires-10000);}
+ clearAuthorization(){this.token='';this.expires=0;this.granted=[];this.uploadedFile=null;if(!this.busy){this.courses=[];this.course='';this.activities=[];this.activity='';this.students=[];this.submissions=[];this.message='Conexão Google removida desta página.';this.paint();}}
+ get scopes(){return this.context.file?[CLASSROOM_SCOPES[0],CLASSROOM_SCOPES[1],DRIVE_FILE_SCOPE]:CLASSROOM_SCOPES;}
+ get connected(){return Boolean(this.token&&Date.now()<this.expires-10000&&this.scopes.every(scope=>this.granted.includes(scope)));}
  paint(){
   const d=this.dialog;if(!d?.isConnected)return;
-  const link=this.context.link,quiz=this.context.quiz,client=configuredClient();
+  const link=this.context.link,quiz=this.context.quiz,file=this.context.file,client=configuredClient();
   const courses=this.courses.map(c=>`<option value="${esc(c.id)}" ${c.id===this.course?'selected':''}>${esc(c.name)}${c.section?' · '+esc(c.section):''}</option>`).join('');
   const activities=this.activities.map(a=>`<option value="${esc(a.id)}" ${a.id===this.activity?'selected':''}>${esc(a.title)} · ${esc(a.maxPoints)} pontos</option>`).join('');
   let body='';
-  if(!this.connected){body=`<div class="gclass-intro"><p>Conecte sua conta Google para acessar suas turmas, criar atividades e preparar notas.</p><p>O Google solicitará acesso às suas turmas, atividades e alunos. A autorização é temporária e não é armazenada pelo Storage Lab.</p>${client?'':`<label>ID do cliente OAuth do Google<input data-gclass-client autocomplete="off" placeholder="…apps.googleusercontent.com"></label><small>É necessário configurar um projeto Google Cloud com a API Classroom e a origem deste site. O ID é público; não use uma senha ou segredo aqui.</small>`}<button type="button" class="gclass-primary" data-gclass="connect" ${this.busy||this.loadingGoogle?'disabled':''}>${this.loadingGoogle?'Carregando Google…':'Conectar Google'}</button>${!this.ready&&!this.loadingGoogle?'<p role="status">Não foi possível carregar o Google. Tente conectar novamente.</p>':''}</div>`;}
+  if(!this.connected){body=`<div class="gclass-intro"><p>Conecte sua conta Google para acessar suas turmas, criar atividades e preparar notas.</p><p>${file?'O Google solicitará acesso às turmas, às atividades e aos arquivos criados pelo Storage Lab no Drive.':'O Google solicitará acesso às suas turmas, atividades e alunos.'} A autorização é temporária e não é armazenada pelo Storage Lab.</p>${client?'':`<label>ID do cliente OAuth do Google<input data-gclass-client autocomplete="off" placeholder="…apps.googleusercontent.com"></label><small>É necessário configurar um projeto Google Cloud com a API Classroom e a origem deste site. O ID é público; não use uma senha ou segredo aqui.</small>`}<button type="button" class="gclass-primary" data-gclass="connect" ${this.busy||this.loadingGoogle?'disabled':''}>${this.loadingGoogle?'Carregando Google…':'Conectar Google'}</button>${!this.ready&&!this.loadingGoogle?'<p role="status">Não foi possível carregar o Google. Tente conectar novamente.</p>':''}</div>`;}
   else {body=`<div class="gclass-connected"><div class="gclass-account"><span>● Conta Google autorizada</span><button type="button" data-gclass="disconnect" ${this.busy?'disabled':''}>Desconectar</button></div><label>Turma<select data-gclass-course ${this.busy?'disabled':''}><option value="">Escolha uma turma</option>${courses}</select></label>${!this.courses.length&&!this.busy?'<p>Nenhuma turma ativa encontrada para esta conta.</p>':''}
-   ${this.course&&link?`<div class="gclass-create"><h3>Criar atividade</h3><label>Título<input data-gclass-title maxlength="300" value="${esc(this.context.title||'Atividade Storage Lab')}"></label><label>Orientações<textarea data-gclass-description maxlength="3000" rows="2" placeholder="Opcional"></textarea></label><p>Será publicada uma atividade de 100 pontos com o link da apresentação.</p><button type="button" class="gclass-primary" data-gclass="create" ${this.busy?'disabled':''}>Publicar atividade</button></div>`:''}
+   ${this.course&&(link||file)?`<div class="gclass-create"><h3>Criar atividade</h3><label>Título<input data-gclass-title maxlength="300" value="${esc(this.context.title||'Atividade Storage Lab')}"></label><label>Orientações<textarea data-gclass-description maxlength="3000" rows="2" placeholder="Opcional">${esc(this.context.description||'')}</textarea></label><p>${file?`O ${esc(file.format.toUpperCase())} será criado no seu Drive e anexado a uma atividade de 100 pontos. Confira a turma antes de publicar.`:'Será publicada uma atividade de 100 pontos com o link da apresentação.'}</p><button type="button" class="gclass-primary" data-gclass="create" ${this.busy||this.published?'disabled':''}>${file?'Enviar arquivo e publicar atividade':'Publicar atividade'}</button></div>`:''}
    ${this.course&&quiz?`<div class="gclass-grades"><h3>Preparar notas do quiz</h3><p>Selecione uma atividade criada por este aplicativo no mesmo projeto Google. Confira cada aluno: quem autorizou a identificação Google pode aparecer pré-selecionado; apelidos não confirmam identidade.</p><label>Atividade<select data-gclass-activity ${this.busy?'disabled':''}><option value="">Escolha uma atividade</option>${activities}</select></label>${!this.activities.length&&!this.busy?'<p>Nenhuma atividade compatível encontrada nesta turma.</p>':''}${this.activity&&this.submissions.length?this.mappingMarkup():this.activity&&!this.busy?'<p>Não há entregas disponíveis nesta atividade.</p>':''}</div>`:''}</div>`;}
-  d.innerHTML=`<div class="gclass-head"><div><span>INTEGRAÇÃO</span><h2 id="gclass-title">Google Classroom</h2></div><button type="button" data-gclass="close" aria-label="Fechar" ${this.busy?'disabled':''}>×</button></div>${link?`<div class="gclass-share"><div><strong>Compartilhar apresentação</strong><small>Escolha a turma no próprio Google Classroom.</small></div><a href="${esc(classroomShareUrl(link))}" target="_blank" rel="noopener noreferrer">Compartilhar ↗</a></div>`:''}${body}${this.busy?'<p role="status">Aguarde…</p>':''}${this.error?`<p class="gclass-error" role="alert">${esc(this.error)}</p>`:''}${this.message?`<p class="gclass-message" role="status">${esc(this.message)}</p>`:''}${this.outcomes.length?`<ul class="gclass-outcomes">${this.outcomes.map(o=>`<li>${esc(o)}</li>`).join('')}</ul>`:''}`;
+  d.innerHTML=`<div class="gclass-head"><div><h2 id="gclass-title">Google Classroom</h2></div><button type="button" data-gclass="close" aria-label="Fechar" ${this.busy?'disabled':''}>×</button></div>${link?`<div class="gclass-share"><div><strong>Compartilhar apresentação</strong><small>Escolha a turma no próprio Google Classroom.</small></div><a href="${esc(classroomShareUrl(link))}" target="_blank" rel="noopener noreferrer">Compartilhar ↗</a></div>`:''}${body}${this.busy?'<p role="status">Aguarde…</p>':''}${this.error?`<p class="gclass-error" role="alert">${esc(this.error)}</p>`:''}${this.message?`<p class="gclass-message" role="status">${esc(this.message)}</p>`:''}${this.outcomes.length?`<ul class="gclass-outcomes">${this.outcomes.map(o=>`<li>${esc(o)}</li>`).join('')}</ul>`:''}`;
  }
  mappingMarkup(){
   const quiz=this.context.quiz,activity=this.activities.find(a=>a.id===this.activity);if(!quiz||!activity)return '';
@@ -84,9 +94,9 @@ export class GoogleClassroomDialog {
    if(!validClientId(client||'')){this.error='Informe um ID de cliente OAuth válido do Google.';return this.paint();}
    try{localStorage.setItem('sl-classroom-client-id',client);}catch{}
    if(!this.ready){this.error='Carregando o Google. Tente novamente em instantes.';this.loadingGoogle=true;this.paint();try{await loadGoogle();this.ready=true;this.error='';}catch(e){this.error=e.message;}finally{this.loadingGoogle=false;this.paint();}return;}
-   this.error='';this.message='';const activeDialog=this.dialog;
+   this.error='';this.message='';const activeDialog=this.dialog,scopes=this.scopes;
    try{
-    const auth=google.accounts.oauth2.initTokenClient({client_id:client,scope:CLASSROOM_SCOPES.join(' '),callback:response=>{if(this.dialog!==activeDialog||!activeDialog.open)return;if(response.error||!response.access_token){this.error='Autorização do Google não concluída.';this.paint();return;}if(!google.accounts.oauth2.hasGrantedAllScopes(response,...CLASSROOM_SCOPES)){this.error='Para usar turmas e notas, conceda as permissões solicitadas.';this.paint();return;}this.token=response.access_token;this.expires=Date.now()+Number(response.expires_in||0)*1000;this.loadCourses();},error_callback:()=>{if(this.dialog!==activeDialog||!activeDialog.open)return;this.error='A janela do Google foi fechada ou bloqueada. Tente novamente.';this.paint();}});
+    const auth=google.accounts.oauth2.initTokenClient({client_id:client,scope:scopes.join(' '),callback:response=>{if(this.dialog!==activeDialog||!activeDialog.open)return;if(response.error||!response.access_token){this.error='Autorização do Google não concluída.';this.paint();return;}if(!google.accounts.oauth2.hasGrantedAllScopes(response,...scopes)){this.error=this.context.file?'Para enviar o arquivo, conceda as permissões de turmas, atividades e Drive.':'Para usar turmas e notas, conceda as permissões solicitadas.';this.paint();return;}this.token=response.access_token;this.granted=scopes;this.uploadedFile=null;this.expires=Date.now()+Number(response.expires_in||0)*1000;this.loadCourses();},error_callback:()=>{if(this.dialog!==activeDialog||!activeDialog.open)return;this.error='A janela do Google foi fechada ou bloqueada. Tente novamente.';this.paint();}});
     auth.requestAccessToken({prompt:'select_account'});
    }catch(e){this.error=e.message||'Não foi possível abrir a autorização do Google.';this.paint();}return;
   }
@@ -94,8 +104,14 @@ export class GoogleClassroomDialog {
    const title=this.dialog.querySelector('[data-gclass-title]')?.value.trim(),description=this.dialog.querySelector('[data-gclass-description]')?.value.trim()||'';
    if(!title){this.error='Dê um título à atividade.';return this.paint();}
    const course=this.courses.find(c=>c.id===this.course);
-   if(!confirm(`Publicar “${title}” na turma “${course?.name||this.course}”? O link da apresentação ficará disponível para a turma.`))return;
-   await this.run(async api=>{const result=await api.create(this.course,{title,description,link:this.context.link});this.message='Atividade publicada no Classroom.';if(result.alternateLink)this.message+=' Abra o Classroom para conferir.';});return;
+   const file=this.context.file;this.context.title=title;this.context.description=description;
+   if(!confirm(`Publicar “${title}” na turma “${course?.name||this.course}”? ${file?'O arquivo será criado no Google Drive e compartilhado com a turma.':'O link da apresentação ficará disponível para a turma.'}`))return;
+   await this.run(async api=>{
+    let fileId;
+    if(file){if(!this.uploadedFile){const generated=await file.generate();this.uploadedFile=await api.uploadFile(generated);}fileId=this.uploadedFile.id;}
+    let result;try{result=await api.create(this.course,{title,description,link:this.context.link,fileId});}catch(error){if(fileId)throw Error(error.message+' O arquivo já está no Drive; confira o Classroom antes de tentar novamente, pois a publicação pode ter ocorrido.');throw error;}
+    this.published=true;this.message='Atividade publicada no Classroom'+(file?' com o arquivo anexado.':'.');if(result.alternateLink)this.message+=' Abra o Classroom para conferir.';
+   });return;
   }
   if(action==='review'){
    const a=this.activities.find(x=>x.id===this.activity), selections=[...this.dialog.querySelectorAll('[data-gclass-map]')].filter(x=>x.value).map(x=>({player:this.context.quiz.players[Number(x.dataset.gclassMap)],submission:this.submissions.find(s=>s.id===x.value)}));

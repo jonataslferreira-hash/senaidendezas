@@ -6,19 +6,20 @@ import { studioIcon } from './studio-icons.js';
 import { spotifyMetadata } from './spotify.js';
 import { AUDIO_ACCEPT, isSupportedAudioFile } from './audio-data.js';
 import { applyEditorPlayback } from './editor-audio.js';
+import { nextEditorTrack } from './editor-playback-order.js';
 import './editor-music.css';
 const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const time=value=>Number.isFinite(value)?Math.floor(value/60)+':'+String(Math.floor(value%60)).padStart(2,'0'):'—:—';
 const readFile=file=>new Promise((resolve,reject)=>{const r=new FileReader();r.onload=()=>resolve(r.result);r.onerror=()=>reject(Error('Não foi possível ler o arquivo.'));r.readAsDataURL(file);});
-function musicIcon(name){const shapes={play:'<path d="m9 5 11 7-11 7z"/>',pause:'<path d="M8 5v14M16 5v14"/>',previous:'<path d="M5 5v14m14-14L8 12l11 7z"/>',next:'<path d="M19 5v14M5 5l11 7-11 7z"/>',shuffle:'<path d="M3 7h3l12 10h3m-4-4 4 4-4 4M3 17h3l4-4m4-2 4-4h3m-4-4 4 4-4 4"/>'};return `<svg viewBox="0 0 24 24" width="18" height="18" fill="${name==='play'?'currentColor':'none'}" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${shapes[name]}</svg>`;}
+function musicIcon(name){const shapes={play:'<path d="m9 5 11 7-11 7z"/>',pause:'<path d="M8 5v14M16 5v14"/>',previous:'<path d="M5 5v14m14-14L8 12l11 7z"/>',next:'<path d="M19 5v14M5 5l11 7-11 7z"/>',shuffle:'<path d="M3 7h3l12 10h3m-4-4 4 4-4 4M3 17h3l4-4m4-2 4-4h3m-4-4 4 4-4 4"/>',repeat:'<path d="M17 2l4 4-4 4M3 11V9a3 3 0 0 1 3-3h15M7 22l-4-4 4-4m14-1v2a3 3 0 0 1-3 3H3"/>'};return `<svg viewBox="0 0 24 24" width="18" height="18" fill="${name==='play'?'currentColor':'none'}" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${shapes[name]}</svg>`;}
 let spotifyApi;
 function loadSpotify(){return spotifyApi ||= new Promise((resolve,reject)=>{window.onSpotifyIframeApiReady=resolve;const script=document.createElement('script');script.src='https://open.spotify.com/embed/iframe-api/v1';script.onerror=()=>{spotifyApi=null;reject(Error('Não foi possível abrir o Spotify.'));};document.head.append(script);});}
 export class EditorMusic {
   constructor(studio){
     this.studio=studio;this.audio=new Audio();this.audio.hidden=true;this.audio.dataset.editorSoundtrack='';document.body.append(this.audio);this.audio.preload='metadata';this.rate=.85;applyEditorPlayback(this.audio,{volume:.35,rate:.85});this.index=0;this.editing=false;this.playing=false;this.wantsPlay=false;this.open=false;this.spotifyFormOpen=false;this.position=0;this.duration=NaN;this.message='';this.selection=0;this.spotifyGeneration=0;
     try{const items=JSON.parse(localStorage.getItem('sl-editor-music')||'[]');this.custom=Array.isArray(items)?items.filter(t=>t&&typeof t.id==='string'&&(t.assetId||spotifyItem(t.url))).slice(0,25):[];}catch{this.custom=[];}
-    this.shuffle=true;this.queue=[];this.history=[];
-    this.index=this.randomAudioIndex();
+    this.shuffle=true;this.repeat='all';try{const shuffle=localStorage.getItem('sl-music-shuffle'),repeat=localStorage.getItem('sl-music-repeat');if(shuffle==='true'||shuffle==='false')this.shuffle=shuffle==='true';if(['off','all','one'].includes(repeat))this.repeat=repeat;}catch{}this.queue=[];this.history=[];this.played=[];
+    this.index=this.shuffle?this.randomAudioIndex():0;
     try{this.covers=JSON.parse(localStorage.getItem('sl-editor-music-covers')||'{}');for(const track of editorTracks)if(this.covers[track.id])Object.assign(track,this.covers[track.id]);}catch{this.covers={};}
     for(const track of editorTracks)this.coverColor(track);
     const root=studio.root;
@@ -46,8 +47,18 @@ export class EditorMusic {
       this.playing=!this.audio.paused;this.updateProgress();
     });
     this.audio.addEventListener('pause',()=>{if(this.track.kind!=='spotify'){this.playing=!this.audio.paused;this.updateProgress();}});
-    this.audio.addEventListener('ended',()=>{if(this.editing)this.select(this.randomAudioIndex(),true).catch(e=>{this.message=e.message;this.paint();});});
+    this.audio.addEventListener('ended',()=>{if(!this.editing||!this.wantsPlay)return;const next=nextEditorTrack(this.tracks,this.index,{shuffle:this.shuffle,repeat:this.repeat,played:this.played});this.played=next.played;if(next.index===null){this.wantsPlay=false;this.playing=false;this.updateProgress();return;}this.select(next.index,true).catch(e=>{this.message=e.message;this.paint();});});
     this.audio.addEventListener('error',()=>{if(this.track.kind==='spotify'||!this.audio.error)return;this.playing=false;this.wantsPlay=false;this.loadedSelection=null;this.message='Não foi possível carregar esta música externa. Confira a conexão, tente novamente ou envie um arquivo.';this.paint();});
+  }
+  // Reduz e restaura suavemente o áudio local sem alterar a preferência do usuário.
+  setSuspense(active){
+    if(this.suspense===active)return;
+    this.suspense=active;
+    if(this.track.kind==='spotify')return; // player em iframe não expõe volume ou filtro
+    cancelAnimationFrame(this.suspenseFrame);
+    const start=this.audio.volume, target=(this.volume??.35)*(active?.24:1),begin=performance.now(),duration=650;
+    const tick=now=>{const t=Math.min(1,(now-begin)/duration),ease=t*t*(3-2*t);this.audio.volume=Math.max(0,Math.min(1,start+(target-start)*ease));if(t<1)this.suspenseFrame=requestAnimationFrame(tick);};
+    this.suspenseFrame=requestAnimationFrame(tick);
   }
   nextIndex(){if(!this.shuffle)return (this.index+1)%this.tracks.length;this.queue=this.queue.filter(i=>i<this.tracks.length&&i!==this.index);if(!this.queue.length){this.queue=this.tracks.map((_,i)=>i).filter(i=>i!==this.index);for(let i=this.queue.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[this.queue[i],this.queue[j]]=[this.queue[j],this.queue[i]];}}return this.queue.pop()??this.index;}
   get tracks(){return [...editorTracks,...this.custom];}get track(){return this.tracks[this.index]||this.tracks[0];}
@@ -82,6 +93,10 @@ export class EditorMusic {
           <span data-music-duration>${time(this.duration)}</span>
         </div>
       </div>
+      <div class="mp3-playback-modes" role="group" aria-label="Modo de reprodução">
+        <button type="button" data-music-action="shuffle" aria-label="Reprodução aleatória" aria-pressed="${this.shuffle}" ${t.kind==='spotify'?'disabled':''}>${musicIcon('shuffle')}<span>Aleatório <strong>${this.shuffle?'ligado':'desligado'}</strong></span></button>
+        <button type="button" data-music-action="repeat" ${t.kind==='spotify'?'disabled':''} aria-label="${this.repeat==='one'?'Repetição: música':this.repeat==='all'?'Repetição: playlist':'Repetição: desligada'}">${musicIcon('repeat')}<span>Repetir <strong>${this.repeat==='one'?'música':this.repeat==='all'?'playlist':'desligado'}</strong></span></button>
+      </div>
       <div class="mp3-controls">
         <label class="mp3-vol" title="Volume">
           ${studioIcon('volume')}
@@ -93,7 +108,7 @@ export class EditorMusic {
           <select aria-label="Velocidade" data-music-rate ${t.kind==='spotify'?'disabled':''}>${[.75,.85,1].map(n=>`<option value="${n}" ${this.audio.playbackRate===n?'selected':''}>${n.toFixed(2).replace('.',',')}×</option>`).join('')}</select>
         </label>
       </div>
-      ${t.kind==='spotify'?'<p class="mp3-hint">No Spotify, volume e velocidade são ajustados no próprio player.</p>':''}
+      ${t.kind==='spotify'?'<p class="mp3-hint">No Spotify, repetição, aleatório, volume e avanço da playlist são controlados pelo próprio Spotify.</p>':''}
       <div class="mp3-actions">
         <button type="button" class="mp3-act-btn" data-music-action="spotify-form" aria-expanded="${this.spotifyFormOpen}">${studioIcon('spotify')}<span>Adicionar do Spotify</span></button>
         <label class="mp3-act-btn">${studioIcon('upload')}<span>Enviar música</span><input type="file" accept="${AUDIO_ACCEPT}" data-music-upload hidden></label>
@@ -130,7 +145,7 @@ export class EditorMusic {
     panel.style.maxHeight=Math.round(Math.min(600,innerHeight-top-edge))+'px';
   }
   updateProgress(){this.mountPanel();const label=time(this.position)+' / '+time(this.duration);const bar=this.studio.root.querySelector('[data-music-bar]');if(bar){bar.style.width=(this.duration>0?Math.min(100,this.position/this.duration*100):0)+'%';const a=this.studio.root.querySelector('[data-music-position]'),b=this.studio.root.querySelector('[data-music-duration]');if(a)a.textContent=time(this.position);if(b)b.textContent=time(this.duration);}for(const el of this.studio.root.querySelectorAll('[data-music-time]'))if(el.textContent!==label)el.textContent=label;const shell=this.studio.root.querySelector('.editor-music');if(shell)shell.dataset.playing=String(this.playing);for(const button of this.studio.root.querySelectorAll('[data-music-play]')){const icon=this.playing?'pause':'play';if(button.dataset.musicIcon===icon)continue;/* Trocar o SVG a cada timeupdate cancelava o clique em andamento. */button.dataset.musicIcon=icon;button.innerHTML=musicIcon(icon);button.setAttribute('aria-label',this.playing?'Pausar música':'Tocar música');}}
-  setEditing(value){const entering=value&&!this.editing;this.editing=value;if(!value){this.wantsPlay=false;this.audio.pause();this.selection++;this.stopSpotify();}else if(entering)this.select(this.randomAudioIndex(),true).catch(()=>{});}
+  setEditing(value){const entering=value&&!this.editing;this.editing=value;if(!value){this.wantsPlay=false;this.audio.pause();this.selection++;this.stopSpotify();}else if(entering){this.played=[];this.select(this.shuffle?this.randomAudioIndex():this.index,true).catch(()=>{});}}
   async select(index,play=true){
     if(index!==this.index&&!this.rewinding){this.history.push(this.index);if(this.history.length>50)this.history.shift();}
     const selection=++this.selection;this.stopSpotify();this.spotifyShouldPlay=play;this.wantsPlay=play;
@@ -140,7 +155,7 @@ export class EditorMusic {
     if(t.kind==='spotify'){this.paint();const controller=await this.openSpotify(t,selection);if(selection===this.selection&&play&&this.spotifyShouldPlay&&this.editing&&this.track===t){this.startSpotify(controller,selection);}return;}
     const url=t.assetId?await getPageImage(t.assetId):t.url;if(this.track!==t||selection!==this.selection||!this.editing)return;
     if(this.audio.src!==url||this.audio.error){this.audio.src=url;this.audio.load();}else this.audio.currentTime=0;this.loadedSelection=selection;
-    applyEditorPlayback(this.audio,{volume:this.volume??.35,rate:this.rate||.85});this.paint();
+    applyEditorPlayback(this.audio,{volume:(this.volume??.35)*(this.suspense?.24:1),rate:this.rate||.85});this.paint();
     if(this.wantsPlay&&this.editing)await this.playFile(selection);
   }
   persist(){try{localStorage.setItem('sl-editor-music',JSON.stringify(this.custom));localStorage.setItem('sl-editor-music-covers',JSON.stringify(this.covers||{}));}catch{throw Error('Não foi possível guardar a playlist neste navegador.');}}
@@ -230,6 +245,8 @@ export class EditorMusic {
   }
   async action(name,button){
         if(name==='open'){this.open=!this.open;if(this.open&&this.custom.some(t=>t.kind==='spotify'))loadSpotify().catch(()=>{});this.paint();return;}
+    if(name==='shuffle'){this.shuffle=!this.shuffle;this.queue=[];this.played=[];try{localStorage.setItem('sl-music-shuffle',String(this.shuffle));}catch{}this.paint();return;}
+    if(name==='repeat'){this.repeat=({off:'all',all:'one',one:'off'})[this.repeat]||'all';this.played=[];try{localStorage.setItem('sl-music-repeat',this.repeat);}catch{}this.paint();return;}
     if(name==='spotify-form'){
       this.spotifyFormOpen=!this.spotifyFormOpen;this.paint();
       if(this.spotifyFormOpen)this.studio.root.querySelector('#music-spotify')?.focus();
@@ -269,9 +286,9 @@ export class EditorMusic {
       }
       return;
     }
-    if(name==='next'||name==='previous'){const index=name==='next'?this.nextIndex():this.shuffle?(this.history.pop()??((this.index-1+this.tracks.length)%this.tracks.length)):((this.index-1+this.tracks.length)%this.tracks.length);this.rewinding=name==='previous';try{await this.select(index,true);}finally{this.rewinding=false;}return;}
-    if(name==='select'){await this.select(Number(button.dataset.track),true);return;}
-    if(name==='remove'){const i=Number(button.dataset.track),track=this.tracks[i];if(i<editorTracks.length)return;const active=i===this.index;this.custom.splice(i-editorTracks.length,1);if(this.index>=i)this.index=Math.max(0,this.index-1);this.persist();if(track.assetId)await removePageAssets([track.assetId]);if(active)await this.select(this.index,false);this.paint();return;}
+    if(name==='next'||name==='previous'){this.played=[];const index=name==='next'?this.nextIndex():this.shuffle?(this.history.pop()??((this.index-1+this.tracks.length)%this.tracks.length)):((this.index-1+this.tracks.length)%this.tracks.length);this.rewinding=name==='previous';try{await this.select(index,true);}finally{this.rewinding=false;}return;}
+    if(name==='select'){this.played=[];await this.select(Number(button.dataset.track),true);return;}
+    if(name==='remove'){this.queue=[];this.played=[];const i=Number(button.dataset.track),track=this.tracks[i];if(i<editorTracks.length)return;const active=i===this.index;this.custom.splice(i-editorTracks.length,1);if(this.index>=i)this.index=Math.max(0,this.index-1);this.persist();if(track.assetId)await removePageAssets([track.assetId]);if(active)await this.select(this.index,false);this.paint();return;}
     if(name==='spotify'){
       const value=this.studio.root.querySelector('#music-spotify').value,id=spotifyItem(value)?.id;if(!id)throw Error('Cole o link de uma música, playlist ou álbum do Spotify.');
       if(this.custom.length>=25)throw Error('Remova uma faixa antes de adicionar outra.');
