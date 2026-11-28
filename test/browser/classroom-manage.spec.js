@@ -1,0 +1,20 @@
+import {test,expect} from '@playwright/test';
+import {mockAccounts} from './auth-fixture.js';
+
+test('Classroom restaura sessão ao recarregar e permite agendar, editar e excluir atividade do aplicativo',async({page})=>{
+ await mockAccounts(page);await page.addInitScript(()=>{localStorage.setItem('sl-tour','done');window.authCount=0;window.google={accounts:{oauth2:{hasGrantedAllScopes:()=>true,initTokenClient:options=>({requestAccessToken:()=>{window.authCount++;options.callback({access_token:'temporary-token',expires_in:3600});}})}}};});
+ let work={id:'w1',title:'Primeira',description:'Antes',workType:'ASSIGNMENT',state:'DRAFT',maxPoints:40,associatedWithDeveloper:true},created,patch,deleted=false;
+ await page.route('https://classroom.googleapis.com/**',async route=>{const req=route.request(),url=new URL(req.url()),method=req.method();const headers={'access-control-allow-origin':'*','access-control-allow-methods':'GET,POST,PATCH,DELETE,OPTIONS','access-control-allow-headers':'authorization,content-type'};if(method==='OPTIONS')return route.fulfill({status:204,headers});
+  if(url.pathname.endsWith('/courses'))return route.fulfill({json:{courses:[{id:'c1',name:'Turma A'}]},headers});
+  if(method==='POST'){created=req.postDataJSON();return route.fulfill({json:{id:'new'},headers});}
+  if(method==='PATCH'){patch={body:req.postDataJSON(),mask:url.searchParams.get('updateMask')};Object.assign(work,patch.body);return route.fulfill({json:work,headers});}
+  if(method==='DELETE'){deleted=true;return route.fulfill({status:204,headers});}
+  return route.fulfill({json:{courseWork:url.searchParams.get('courseWorkStates')==='DRAFT'&&!deleted?[work]:[]},headers});
+ });
+ await page.goto('/');await expect(page.locator('[data-account-action=open]').first()).toContainText('Ana');await page.evaluate(async()=>{const {googleClassroom}=await import('/src/google-classroom.js');googleClassroom.open({title:'Criar',link:'https://example.com/'});});let dialog=page.locator('.gclass-dialog');await dialog.getByRole('button',{name:'Conectar Google'}).click();await expect(dialog.locator('[data-gclass-course] option')).toHaveCount(2);await page.reload();await expect(page.locator('[data-account-action=open]').first()).toContainText('Ana');
+ await page.evaluate(async()=>{const {googleClassroom}=await import('/src/google-classroom.js');googleClassroom.open({title:'Criar',link:'https://example.com/'});});dialog=page.locator('.gclass-dialog');await expect(dialog.locator('[data-gclass-course] option')).toHaveCount(2);expect(await page.evaluate(()=>window.authCount)).toBe(0);
+ await dialog.locator('[data-gclass-course]').selectOption('c1');await expect(dialog.locator('[data-gclass-manage] option')).toHaveCount(2);await dialog.locator('[data-gclass-manage]').selectOption('w1');await dialog.locator('[data-gclass-edit-title]').fill('Atualizada');await dialog.locator('[data-gclass-edit-points]').fill('75');page.once('dialog',d=>d.accept());await dialog.getByRole('button',{name:'Salvar alterações'}).click();await expect(dialog).toContainText('Atividade atualizada');expect(patch.body.title).toBe('Atualizada');expect(patch.body.maxPoints).toBe(75);expect(patch.mask).toContain('maxPoints');
+ page.once('dialog',d=>d.accept());await dialog.getByRole('button',{name:'Excluir atividade'}).click();await expect(dialog).toContainText('Atividade excluída');expect(deleted).toBe(true);
+ await dialog.locator('[data-gclass-title]').fill('Agendada');await dialog.locator('[data-gclass-points]').fill('25');await dialog.locator('[data-gclass-schedule]').fill('2030-05-01T15:30');page.once('dialog',d=>d.accept());await dialog.getByRole('button',{name:'Publicar atividade'}).click();await expect(dialog).toContainText('Atividade agendada');expect(created.title).toBe('Agendada');expect(created.maxPoints).toBe(25);expect(created.state).toBe('DRAFT');expect(created.scheduledTime).toBeTruthy();
+ await dialog.getByRole('button',{name:'Desconectar'}).click();await expect(dialog.getByRole('button',{name:'Conectar Google'})).toBeVisible();expect(await page.evaluate(()=>sessionStorage.getItem('sl-classroom-session'))).toBeNull();
+});

@@ -39,3 +39,9 @@ test('numeração na lista corresponde à posição dentro da etapa, sem contar 
  const lesson=newLesson(),first=createSlideFromTemplate('cover'),last=createSlideFromTemplate('basic'),game=newSlide();first.title='Capa';last.title='Slide final';game.title='Equipes';game.game=defaultGame('teams');lesson.slides=[first,game,last];lesson.activityBlocks=[{id:'slides',type:'slides',items:[first.id,last.id]},{id:'team',type:'teams',items:[game.id]}];
  await page.addInitScript(data=>{localStorage.setItem('sl-tour','done');localStorage.setItem('storage-lab-lessons-v1',JSON.stringify([data]));},lesson);await page.goto('/');await page.locator('.lesson-card [data-studio-action=edit]').first().click();await expect(page.locator('.editor-heading-hint')).toContainText('2 slides');const items=page.locator('.outline-item');await expect(items).toHaveCount(2);await expect(items.nth(0).locator(':scope > span').first()).toHaveText('01');await expect(items.nth(1).locator(':scope > span').first()).toHaveText('02');await items.nth(1).click();await expect(page.locator('.item-number')).toHaveText('SLIDE 02');await expect(page.locator('.outline-item.active strong')).toHaveText('Slide final');
 });
+
+test('prévia lateral mostra o modelo 3D do slide',async({page})=>{
+ await page.setViewportSize({width:1600,height:900});const lesson=newLesson();lesson.slides[0].kind='model';lesson.slides[0].model='ssd';
+ await page.addInitScript(data=>{localStorage.setItem('sl-tour','done');localStorage.setItem('storage-lab-lessons-v1',JSON.stringify([data]));},lesson);await page.goto('/');await page.locator('.lesson-card [data-studio-action=edit]').first().click();
+ await page.getByLabel('Mais opções da aula').click();await page.getByRole('button',{name:'Opções do slide',exact:true}).click();await expect(page.locator('#editor-mini-preview .canvas-model-slot canvas')).toBeVisible();
+});

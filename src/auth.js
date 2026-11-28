@@ -44,7 +44,7 @@ export class Account {
       queueMicrotask(() => {
         this.updateProfile(root);
         if (previousUid !== this.user?.id) {
-          disconnectCloud().catch(() => {});googleClassroom.clearAuthorization();
+          disconnectCloud().catch(() => {});googleClassroom.setOwner(this.user?.id);
           root.dispatchEvent(new CustomEvent('account-changed'));
         }
         this.settings.applyPreferences();this.settings.refreshAvatar();if(event==='SIGNED_IN'||event==='INITIAL_SESSION')setTimeout(()=>this.refreshPreferences(),0);

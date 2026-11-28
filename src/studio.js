@@ -6,7 +6,7 @@ import { stageCache } from './stage-keep.js';
 import {avatarContent} from './player-avatar.js';
 import {StorageAI} from './storage-ai.js';
 import {cropLessonCover,projectFields} from './lesson-cover.js';
-import {canvasMarkup} from './canvas-view.js';
+import {canvasMarkup,CanvasModels} from './canvas-view.js';
 import {presentationSlide} from './slide-display.js';
 import {editorShortcut,routeParams} from './editor-route.js';
 import {activityBlocks,normalizeBlocks,isLiveStage,blockNames} from './activity-blocks.js';
@@ -86,6 +86,7 @@ export class Studio {
     }
     this.flashcards = new Flashcards(this);
     this.sharing = new PresentationSharing(this);
+    this.miniModels = new CanvasModels();
     this.editorMusic = new EditorMusic(this);
     try{this.cloudLinks=JSON.parse(localStorage.getItem('sl-cloud-links')||'{}');}catch{this.cloudLinks={};}
     this.bindIconHints();
@@ -734,7 +735,7 @@ export class Studio {
       return q ? `<div class="mini-slide"><span>✦ QUIZ · ${esc(q.seconds)} s</span><h3>${esc(q.text || 'Sua pergunta')}</h3><div class="mini-answers">${q.options.map((o, i) => `<p><b>${'ABCD'[i]}</b>${esc(o)}</p>`).join('')}</div></div>` : '<div class="mini-slide"><span>✦ SEU QUIZ</span><h3>A próxima descoberta começa com uma pergunta.</h3></div>';
     }
     const s = this.draft.slides[this.index];
-    if (s.kind === 'canvas') return `<div class="mini-slide"><span>SLIDE LIVRE</span><h3>${esc(s.title)}</h3><p>${s.elements.length} elementos · visual editável</p></div>`;
+    if (s.kind === 'canvas' || s.kind === 'model') return `<div class="mini-canvas-preview" aria-label="Prévia do slide">${canvasMarkup(this.miniSlide(s),{interactive:false})}</div>`;
     if (s.kind === 'document') return `<div class="mini-slide mini-imported"><span>${esc(s.sourceType.toUpperCase())} · ${esc(s.title)}</span>${assetImage(s)}</div>`;
     let media = '';
     try { if (s.kind === 'image' && (s.image || s.assetId)) media = assetImage(s); } catch { media = '<p>Adicione uma imagem válida.</p>'; }
@@ -843,12 +844,14 @@ export class Studio {
     if (key === 'kind' || key === 'optionCount' || key === 'model') this.callbacks.render();
     else {
       const preview = document.querySelector('#editor-mini-preview');
-      if (preview) { preview.innerHTML = this.previewMarkup(); fillAssetImages(preview); }
+      if (preview) { preview.innerHTML = this.previewMarkup(); fillAssetImages(preview); this.mountMiniPreview(); }
       const label = document.querySelector('[data-current-label]');
       if (label && scope !== 'lesson') label.textContent = (this.tab === 'slides' ? item.title : item.text) || 'Sem título';
       if (key === 'difficulty') document.querySelector('#difficulty-points').textContent = 'Até ' + item.base.toLocaleString('pt-BR') + ' pontos';
     }
   }
+  miniSlide(slide){const preview=canvasFromSlide(slide);return slide.kind==='canvas'?preview:{...preview,elements:preview.elements.map((element,i)=>({...element,id:'mini-preview-'+i}))};}
+  mountMiniPreview(){const root=this.root.querySelector('#editor-mini-preview .mini-canvas-preview');const slide=this.draft?.slides?.[this.index];if(root&&slide&&root.getClientRects().length)this.miniModels.mount(root,this.miniSlide(slide));else this.miniModels.mount(null,null);}
   // Texto único do estado de salvamento: evita piscar "Alterações não salvas"
   // durante um salvamento em andamento (local, nuvem ou automático).
   saveStateText() {
@@ -985,6 +988,7 @@ export class Studio {
       this.root.querySelector('#rename-description').value=this.dialog.form.description;
     }
     if (this.view === 'editor' && this.tab === 'slides') this.designer.afterRender(); else if (!stageCache()?.node) this.designer.models.mount(null, null); // palco em cache: modelos 3D ficam vivos para reanexo
+    this.mountMiniPreview();
     this.stages.afterRender();
     this.designer.simulations.mountStatic(this.root);
     const slot = this.root.querySelector('.native-model-preview');
