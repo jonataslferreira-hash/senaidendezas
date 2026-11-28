@@ -129,7 +129,7 @@ html:not([data-motion=reduced]) dialog.stage-options.stage-confirm {animation:st
 #app .invite-suggestions strong,#app .invite-suggestions small {display:block;overflow-wrap:anywhere}
 #app .invite-suggestions small {color:var(--ui-muted);font-size:11px}
 
-#app :is(.publish-dialog,.collaboration-dialog) .dialog-title-row{display:flex;align-items:center;justify-content:space-between;gap:14px;margin:0 0 16px}
-#app :is(.publish-dialog,.collaboration-dialog) .dialog-title-row h2{margin:0;min-width:0;flex:1}
-#app :is(.publish-dialog,.collaboration-dialog) .dialog-title-row .group-close{float:none;display:grid;place-items:center;align-self:center;flex:0 0 36px;width:36px;height:36px;min-width:36px;min-height:36px;padding:0;line-height:1;border-radius:50%;box-sizing:border-box}
+#app :is(.publish-dialog,.collaboration-dialog) .dialog-title-row{display:grid;grid-template-columns:minmax(0,1fr) 32px;align-items:center;gap:14px;margin:0 0 16px}
+#app :is(.publish-dialog,.collaboration-dialog) .dialog-title-row h2{margin:0;min-width:0;line-height:1.2}
+#app :is(.publish-dialog,.collaboration-dialog) .dialog-title-row .group-close{float:none;position:static;display:grid;place-items:center;align-self:center;justify-self:center;width:32px;height:32px;min-width:32px;min-height:32px;padding:0;line-height:1;border-radius:50%;box-sizing:border-box}
 #app :is(.account-dialog header button[data-account-action=close],.dialog-title-row .group-close) svg{display:block;width:16px;height:16px;flex:none}
