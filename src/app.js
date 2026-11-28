@@ -544,6 +544,7 @@ function applyRender() {
   const previousOutline=app.querySelector('.editor-outline');
   const outlineScroll=previousOutline?.scrollTop;
   const previewsScroll=app.querySelector('.mobile-slide-previews')?.scrollLeft;
+  const tabsScroll=app.querySelector('.editor-tabs')?.scrollLeft;
   const outlineLesson=previousOutline?.closest('[data-outline-lesson]')?.dataset.outlineLesson;
   try { studio.editorMusic.setEditing(!state && studio.view === 'editor'); } catch {}
   const form = document.querySelector('#join-form');
@@ -636,6 +637,8 @@ function applyRender() {
   syncPresentationMode();
   if (editDraft) for (const el of app.querySelectorAll('.header, .classroom, .document-classroom, .presentation-toolbar, .pinned-room-qr')) el.inert = true;
   if (!state && !sharedLoading && !(busy && host)) studio.afterRender();
+  const nextTabs=app.querySelector('.editor-tabs');
+  if(nextTabs&&tabsScroll!=null&&outlineLesson===app.querySelector('[data-outline-lesson]')?.dataset.outlineLesson)nextTabs.scrollLeft=tabsScroll;
   const nextPreviews=app.querySelector('.mobile-slide-previews');
   if(nextPreviews&&previewsScroll!=null&&outlineLesson===app.querySelector('[data-outline-lesson]')?.dataset.outlineLesson)nextPreviews.scrollLeft=previewsScroll;
   const nextOutline=app.querySelector('.editor-outline');

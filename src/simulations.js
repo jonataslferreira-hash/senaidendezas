@@ -886,3 +886,40 @@ export class Simulations {
     }
   }
 }
+
+// Quadros determinísticos para exportação: apenas simulações com movimento
+// próprio são animadas; outras continuam como uma imagem da cena inicial.
+export function paintSimulationExportFrame(node, seconds = 0) {
+  const type=node?.dataset.simulation;
+  if (!type || !node.querySelector('svg')) return false;
+  const p=readSimulationValues(node),sim=labSims[type];
+  if (sim) {
+    if (!sim.drive && !sim.ambient) return false;
+    const next={...p};
+    if (sim.drive) {
+      const d=sim.drive,span=d.max-d.min;
+      next[d.param]=Math.round((d.min+((p[d.param]-d.min+seconds*d.speed)%span))/d.step)*d.step;
+    }
+    paintLab(node,next,seconds);return true;
+  }
+  if(type==='pendulum'){
+    const angle=Math.sin(seconds*Math.sqrt(p.gravity/p.length))*24;
+    node.querySelector('[data-motion]')?.setAttribute('transform',`rotate(${angle} 200 20)`);
+    node.querySelector('[data-trajectory]')?.setAttribute('transform',`rotate(${angle} 200 20)`);
+  }else if(type==='circuit'){
+    const current=p.voltage/p.resistance;paintElectrons(node,seconds*(30+current*900),current);
+  }else if(type==='projectile'){
+    const r=projectile(p.speed||12,p.angle||45,p.gravity||9.81),t=Math.min(r.time,seconds%(r.time+.6));
+    const x=p.speed*Math.cos(p.angle*Math.PI/180)*t,y=p.speed*Math.sin(p.angle*Math.PI/180)*t-p.gravity*t*t/2;
+    node.querySelector('[data-motion]')?.setAttribute('transform',`translate(${x/Math.max(1,r.range)*340} ${-y/Math.max(1,r.height)*140})`);
+  }else if(type==='waves')paintWave(node,p,seconds*(2+p.frequency*1.6));
+  else if(type==='states'){const info=matterState(p.temperature,p.substance);paintParticles(node,seconds*(.35+info.kinetic*1.1),info.kinetic);}
+  else if(type==='trigonometry'){
+    const t=trigValues(Math.round((p.angle+seconds*65)%360)),cx=200+74*t.cos,cy=110-74*t.sin;
+    node.querySelector('[data-cos]')?.setAttribute('x2',cx.toFixed(1));node.querySelector('[data-sin]')?.setAttribute('x1',cx.toFixed(1));node.querySelector('[data-sin]')?.setAttribute('x2',cx.toFixed(1));node.querySelector('[data-sin]')?.setAttribute('y2',cy.toFixed(1));node.querySelector('[data-radius]')?.setAttribute('x2',cx.toFixed(1));node.querySelector('[data-radius]')?.setAttribute('y2',cy.toFixed(1));node.querySelector('[data-tip]')?.setAttribute('cx',cx.toFixed(1));node.querySelector('[data-tip]')?.setAttribute('cy',cy.toFixed(1));
+  }else if(type==='seasons'){
+    const m=((Math.round(p.month)-1+Math.floor(seconds*1.8))%12)+1,s=seasonInfo(m,p.tilt);
+    node.querySelector('[data-tilt]')?.setAttribute('transform',`rotate(${(p.tilt*Math.cos(2*Math.PI*(s.month%12)/12)).toFixed(1)})`);
+  }else return false;
+  return true;
+}
