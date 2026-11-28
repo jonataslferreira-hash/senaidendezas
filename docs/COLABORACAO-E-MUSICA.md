@@ -208,3 +208,16 @@ A verificação pública confirmou /health=200, apresentação inexistente=404,
 avatar sem sessão=401 e funções de contatos existentes com execução anônima
 bloqueada (42501), conforme esperado. A entrega real de convites por e-mail
 continua dependendo da configuração do provedor no Worker.
+
+### Encontrar um colaborador
+
+No campo de convite, pesquise pelo nome ou e-mail de um contato aceito, escolha uma sugestão (clique ou setas e Enter) e confirme o convite. A foto é carregada quando disponível e autorizada; caso contrário aparece a inicial. Para outras pessoas, informe o e-mail completo. A busca de nomes não expõe uma lista geral de contas: usa somente os contatos aceitos já disponíveis pela função `sl_list_contacts`, sem nova migração de banco. O convite só é enviado depois do botão de confirmação.
+
+Em prévias hospedadas, o erro de rede pode ser CORS: a variável `ALLOWED_ORIGINS` do Worker precisa conter a origem HTTPS **exata da prévia**, além das origens já necessárias. Publique a configuração, preserve os demais valores e teste novamente; a mensagem também pode indicar rede ou serviço indisponível. Não libere todas as origens de prévia indiscriminadamente. No site publicado, confirme que a origem de produção continua autorizada.
+
+
+## Ordem e repetição da música do editor
+
+O painel de músicas oferece **Aleatório** ligado/desligado e **Repetir**: playlist, música ou desligado. A escolha é guardada neste navegador. Com repetição desligada, a reprodução automática para após a última faixa; com playlist, recomeça; com música, repete a faixa atual. No aleatório, as faixas locais/externas controladas pelo site não se repetem até completar a rodada. Selecionar uma faixa manualmente reinicia essa rodada. Os botões de próxima/anterior continuam permitindo navegação manual.
+
+O Spotify usa um player externo: os controles de aleatório e repetição do Storage Lab ficam desabilitados enquanto ele estiver selecionado. Ordem, repetição e término dentro do Spotify dependem dos controles e das limitações do próprio Spotify; não é possível garantir o avanço automático da playlist Spotify pelo site.

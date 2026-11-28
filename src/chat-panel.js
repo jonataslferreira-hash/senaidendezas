@@ -13,6 +13,16 @@ export function chatComposer({ id, field, action, draft, placeholder, disabled, 
   </form>`;
 }
 
+
+// Reuse the optimistic bubble once the server supplies its canonical ID.
+export function settlePendingMessage(root, slot, pendingId, row, formatTime) {
+  if (!pendingId || !row?.id) return;
+  const node=[...root.querySelectorAll(`${slot} .chat-message.pending`)].find(el=>el.dataset.messageId===pendingId);
+  if (!node) return;
+  node.dataset.messageId=String(row.id);node.classList.remove('pending');
+  const time=node.querySelector('time');if(time)time.textContent=formatTime(row.created_at);
+}
+
 // Keep the panel, composer and message nodes mounted while requests and
 // Realtime update their contents. In particular, preserve playing voice notes.
 export function resizeChatField(field) {
@@ -41,11 +51,13 @@ export function paintChatPanel(slot, markup) {
       if (!target) continue;
       if (source.matches('[role=log]')) {
         const existing = new Map([...target.children].map(row => [row.dataset.messageId, row]));
+        const hasHistory=existing.size>0;
         let position = target.firstElementChild;
         for (const row of [...source.children]) {
           const current = existing.get(row.dataset.messageId);
           if (current) {
             existing.delete(row.dataset.messageId);
+            if(current.classList.contains('chat-day')&&current.textContent!==row.textContent){current.innerHTML=row.innerHTML;current.setAttribute('aria-label',row.getAttribute('aria-label'));}
             current.style.cssText = row.style.cssText;
             current.dataset.senderStyle = row.dataset.senderStyle;
             const avatar = current.querySelector('.person-avatar');
@@ -53,6 +65,7 @@ export function paintChatPanel(slot, markup) {
             if (avatar && updated && avatar.innerHTML !== updated.innerHTML) avatar.replaceWith(updated);
           }
           const message = current || row;
+          if(!current&&hasHistory&&row.classList.contains('chat-message'))row.dataset.arrival=row.classList.contains('mine')?'sent':'received';
           if (message !== position) target.insertBefore(message, position);
           position = message.nextElementSibling;
         }

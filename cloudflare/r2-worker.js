@@ -1,4 +1,5 @@
 import { classroomIdentity } from './classroom-identity-worker.js';
+import { handleChatPreview } from './chat-preview-worker.js';
 import { handleStorageAI, storageAIEnabled } from './storage-ai-worker.js';
 import {handleStorageAIImages} from './storage-ai-images-worker.js';
 import {handleStorageAIHistory} from './storage-ai-history-worker.js';
@@ -31,6 +32,7 @@ export function createR2Handler(verifyUser = async (token, env) => {
     try { user = await verifyUser(token, env); } catch { return json({ error: 'unauthorized' }, 401); }
     if (!user || !/^[a-f0-9-]{36}$/i.test(user.id) || !user.email_confirmed_at || user.is_anonymous) return json({ error: 'unauthorized' }, 401);
     const identity=await classroomIdentity(request,env,headers,user);if(identity)return identity;
+    const preview=await handleChatPreview(request,user,headers);if(preview)return preview;
     const ai=await handleStorageAI(request,env,user,headers);
     if(ai)return ai;
     const images=await handleStorageAIImages(request,env,user,headers);

@@ -160,6 +160,8 @@ export class StageEditor {
   }
   markup() {
     const s = this.studio, slide = s.draft.slides[s.index];
+    // Uma etapa vazia nunca deve criar um jogo no slide selecionado de outra etapa.
+    if (s.currentBlock && !s.currentBlock()?.items.includes(slide?.id)) return '<div class="editor-empty"><h2>Etapa vazia</h2><p>Use as opções da etapa para removê-la ou adicione uma nova atividade.</p></div>';
     if (!slide.game) slide.game = defaultGame(s.currentBlock()?.type);
     const g = slide.game, off = s.groups?.canEdit === false ? 'disabled' : '';
     // Etapas salvas no formato antigo: relâmpago de uma pergunta só e cabo de guerra com lista única.

@@ -31,6 +31,6 @@ test('convite curto leva à mesma sala, com QR e cópia direta preservados',asyn
 test('atalho para o quiz continua funcionando após fechar o convite',async({page})=>{
  await page.goto('/?localSignal',{waitUntil:'domcontentloaded'});await page.locator('.lesson-card [data-studio-action=present]').first().click();
  await expect(page.locator('.share-modal')).toBeVisible();await expect(page.locator('.share-modal')).not.toContainText('A AULA FICA MELHOR JUNTO');
- const code=(await page.locator('.big-code').innerText()).replace(/\s/g,'');await expect(page.locator('#room-qr')).toHaveAttribute('src',/^data:image/);expect(await qrText(page)).toBe(`http://localhost:5173/?localSignal=&s=${code}`);
+ const code=(await page.locator('.big-code').innerText()).replace(/\s/g,'');await expect(page.locator('#room-qr')).toHaveAttribute('src',/^data:image/);expect(await qrText(page)).toBe(`${new URL(page.url()).origin}/?localSignal=&s=${code}`);
  await page.getByRole('button',{name:'Fechar convite'}).click();await page.evaluate(async()=>{if(document.fullscreenElement)await document.exitFullscreen();});const shortcut=page.getByRole('button',{name:'Ir para o quiz'});await expect(shortcut).toBeVisible();await shortcut.click();await expect(page.locator('.quiz-lobby')).toBeVisible();
 });

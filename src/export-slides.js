@@ -5,7 +5,7 @@ import {canvasMarkup,CanvasModels} from './canvas-view.js';
 import {loadSlideFonts,slideFontCSS} from './fonts.js';
 import {Simulations} from './simulations.js';
 const bytes=url=>Uint8Array.from(atob(url.split(',')[1]),c=>c.charCodeAt(0));
-function save(data,name,type){const url=URL.createObjectURL(new Blob([data],{type})),a=document.createElement('a');a.href=url;a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(url),30000);}
+function save(data,name,type){const url=URL.createObjectURL(new Blob([data],{type})),a=document.createElement('a');a.href=url;a.download=name;document.body.append(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),30000);}
 async function modelGif(viewer) {
  const module = await import('gifenc');
  const { GIFEncoder, quantize, applyPalette } = module.GIFEncoder ? module : module.default;
@@ -59,7 +59,7 @@ async function cropPng(url,x,y,width,height){
  canvas.getContext('2d').drawImage(image,-x,-y);
  return canvas.toDataURL('image/png');
 }
-export async function exportSlides(input,format,onProgress=()=>{}){
+export async function exportSlides(input,format,onProgress=()=>{},{download=true}={}){
  const hydrated=await hydrateLesson(input,true),pages=hydrated.slides.filter(slide=>!slide.game),lesson=pages.length?{...hydrated,slides:pages}:hydrated,host=document.createElement('div'),models=new CanvasModels(),simulations=new Simulations();host.className='export-canvas-host';host.setAttribute('aria-hidden','true');host.style.cssText='position:fixed;left:-20000px;top:0;pointer-events:none;z-index:-1;';document.body.append(host);
  const pngOnly=format==='png',pdf=format==='pdf'?await import('pdf-lib'):null,pptx=format==='pptx'?await import('@office-kit/pptx'):null,deck=pdf?await pdf.PDFDocument.create():pptx?.createPresentation(),first=presentationSlide(lesson.slides[0]),ratio=first.pageWidth/first.pageHeight||16/9,deckW=pptx?.inches(13.333333),deckH=deckW/ratio;
  if(pptx)pptx.setSlideSize(deck,{width:deckW,height:Math.round(deckH)});
@@ -130,6 +130,6 @@ export async function exportSlides(input,format,onProgress=()=>{}){
   }
   models.mount(null,null);onProgress(index+1,lesson.slides.length);
  }
- const name=(lesson.title||'Aula').replace(/[^\p{L}\p{N}_ -]/gu,'').slice(0,80);save(pdf?await deck.save():await pptx.savePresentation(deck),name+'.'+format,pdf?'application/pdf':'application/vnd.openxmlformats-officedocument.presentationml.presentation');
+ const name=((lesson.title||'Aula').replace(/[^\p{L}\p{N}_ -]/gu,'').slice(0,80)||'Aula')+'.'+format,mime=pdf?'application/pdf':'application/vnd.openxmlformats-officedocument.presentationml.presentation';const data=pdf?await deck.save():await pptx.savePresentation(deck);if(download)save(data,name,mime);return {blob:new Blob([data],{type:mime}),name};
  }finally{models.mount(null,null);simulations.mount(null);host.remove();}
 }

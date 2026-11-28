@@ -38,7 +38,7 @@ test('dono cria link público sem notas, recupera o link ao reabrir e pode desat
     if(route.request().method()==='DELETE'){removed=true;return route.fulfill({json:{ok:true}});}
     snapshot=await unpackLesson(new Blob([route.request().postDataBuffer()]));return route.fulfill({status:201,json:{token}});
   });
-  await page.goto('/');await createProject(page);await page.getByRole('button',{name:'Campos',exact:true}).click();
+  await page.goto('/');await createProject(page);await page.locator('.editor-more:not(.editor-download):not(.editor-sharing) > summary').click();await page.getByRole('button',{name:'Opções do slide',exact:true}).click();
   await page.getByText('Roteiro do apresentador',{exact:false}).click();await page.getByLabel('Notas só para o professor',{exact:true}).fill('Nota particular que não deve ser publicada.');
   await page.locator('.editor-sharing > summary').click();await page.getByRole('button',{name:'Compartilhar',exact:true}).click();await page.getByRole('button',{name:'Criar link de apresentação',exact:true}).click();
   await expect(page.locator('#presentation-link')).toHaveValue('https://jonataslferreira-hash.github.io/senaidendezas/?presentation='+token);

@@ -1,6 +1,8 @@
-import { chatComposer, paintChatPanel, resizeChatField } from './chat-panel.js';
+import { chatComposer, paintChatPanel, resizeChatField, settlePendingMessage } from './chat-panel.js';
 import {chatMessageBody,chatDate} from './chat-audio.js';
 import { ChatTyping } from './chat-typing.js';
+import {chatRows,sortChatMessages} from './chat-format.js';
+import {createUuid} from './uuid.js';
 const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 export class LessonChat {
   constructor(studio){
@@ -23,9 +25,9 @@ export class LessonChat {
     this.typing.close();
     if(this.channel)this.studio.account.client.removeChannel(this.channel);
     this.channel=null;
-    this.sending=false;
+    this.sending=false;this.pending=null;this.deferred=[];
   }
-  markup(){if(!this.open)return '';return `<aside class="lesson-chat" aria-label="Chat da aula" data-chat-view="${esc(this.documentId)}"><header class="chat-panel-header" data-chat-part="header"><h2>${this.studio.people.avatar(this.studio.account.user?.id,this.studio.account.user?.user_metadata?.display_name||'Você')} <span>${esc(this.studio.account.user?.user_metadata?.display_name||'Chat')}</span></h2><button type="button" data-chat-action="close" aria-label="Fechar chat">×</button></header><div class="chat-document-choice" data-chat-part="documents"><label for="chat-document">Aula compartilhada</label><select id="chat-document"><option value="">Escolha uma aula</option>${this.studio.groups.documents.map(d=>`<option value="${esc(d.id)}" ${d.id===this.documentId?'selected':''}>${esc(d.title)}</option>`).join('')}</select>${!this.studio.groups.documents.length?'<p>Compartilhe uma aula pelo botão Colaborar para conversar com a equipe.</p>':''}</div><div class="chat-messages" data-chat-part="messages" role="log" aria-label="Mensagens da aula">${this.messages.map(m=>`<article data-message-id="${esc(m.id)}" class="chat-message ${m.author_id===this.studio.account.user?.id?'mine':''}" ${this.studio.people.bubble(m.author_id)}>${m.author_id===this.studio.account.user?.id?'':this.studio.people.avatar(m.author_id,m.author_name||'Colaborador')}<div><header><strong>${m.author_id===this.studio.account.user?.id?'Você':esc(m.author_name||'Colaborador')}</strong><time>${esc(chatDate(m.created_at))}</time></header>${chatMessageBody(m.body,'doc',m.document_id)}${m.slide_id?`<button type="button" data-chat-action="slide" data-slide="${esc(m.slide_id)}">Ver slide citado ↗</button>`:''}</div></article>`).join('')}</div><p class="chat-typing" data-lesson-typing data-chat-part="typing"></p><p role="status" class="chat-status" data-chat-part="status">${esc(this.status)}</p>${chatComposer({id:'chat-form',field:'chat-message',action:'data-chat-action',draft:this.draft,placeholder:'Converse sobre a aula…',disabled:!this.canComment,sending:this.sending,reference:`<label class="chat-reference"><input type="checkbox" id="chat-reference" ${(this.reference??(this.studio.groups.live?.row.id===this.documentId))?'checked':''}> Citar o slide atual</label>`})}</aside>`;}
+  markup(){if(!this.open)return '';return `<aside class="lesson-chat" aria-label="Chat da aula" data-chat-view="${esc(this.documentId)}"><header class="chat-panel-header" data-chat-part="header"><h2>${this.studio.people.avatar(this.studio.account.user?.id,this.studio.account.user?.user_metadata?.display_name||'Você')} <span>Chat da aula</span></h2><button type="button" data-chat-action="close" aria-label="Fechar chat">×</button></header><div class="chat-document-choice" data-chat-part="documents"><label for="chat-document">Aula compartilhada</label><select id="chat-document"><option value="">Escolha uma aula</option>${this.studio.groups.documents.map(d=>`<option value="${esc(d.id)}" ${d.id===this.documentId?'selected':''}>${esc(d.title)}</option>`).join('')}</select>${!this.studio.groups.documents.length?'<p>Compartilhe uma aula pelo botão Colaborar para conversar com a equipe.</p>':''}</div><div class="chat-messages" data-chat-part="messages" role="log" aria-label="Mensagens da aula">${chatRows(sortChatMessages(this.pending?[...this.messages,this.pending]:this.messages),m=>`<article data-message-id="${esc(m.id)}" class="chat-message ${m.pending?'pending':''} ${m.author_id===this.studio.account.user?.id?'mine':''}" ${this.studio.people.bubble(m.author_id)}>${m.author_id===this.studio.account.user?.id?'':this.studio.people.avatar(m.author_id,m.author_name||'Colaborador')}<div><header><strong>${m.author_id===this.studio.account.user?.id?'Você':esc(m.author_name||'Colaborador')}</strong><time>${esc(chatDate(m.created_at))}${m.pending?' · Enviando…':''}</time></header>${chatMessageBody(m.body,'doc',m.document_id)}${m.slide_id?`<button type="button" data-chat-action="slide" data-slide="${esc(m.slide_id)}">Ver slide citado ↗</button>`:''}</div></article>`)}</div><p class="chat-typing" data-lesson-typing data-chat-part="typing"></p><p role="status" class="chat-status" data-chat-part="status">${esc(this.status)}</p>${chatComposer({id:'chat-form',field:'chat-message',action:'data-chat-action',draft:this.draft,placeholder:'Converse sobre a aula…',disabled:!this.canComment,sending:this.sending,reference:`<label class="chat-reference"><input type="checkbox" id="chat-reference" ${(this.reference??(this.studio.groups.live?.row.id===this.documentId))?'checked':''}> Citar o slide atual</label>`})}</aside>`;}
   paintTyping(){const node=this.studio.root.querySelector('[data-lesson-typing]');if(node)node.textContent=this.typing.names.length?this.typing.names.join(', ')+' está digitando…':'';}
   paint(){
     paintChatPanel(this.studio.root.querySelector('[data-chat-slot]'),this.markup());
@@ -71,6 +73,7 @@ export class LessonChat {
       event:'INSERT',schema:'public',table:'sl_chat_messages',filter:'document_id=eq.'+id
     },event=>{
       if(this.generation!==generation)return;
+      if(this.pending&&event.new.author_id===this.studio.account.user?.id){this.deferred.push(event.new);return;}
       this.merge([event.new]);this.status='';this.paint();
     }).subscribe(status=>{if(status==='SUBSCRIBED')this.syncHistory(id,generation).catch(()=>{});});
     this.historyTimer=setInterval(()=>{
@@ -106,14 +109,14 @@ export class LessonChat {
     if(error.code==='42501')return 'Sua conta não tem permissão para esta ação. Confira sua função nesta aula.';
     return 'Falha na conexão do chat. A mensagem digitada fica disponível para tentar novamente.';
   }
-  merge(rows){const messages=new Map(this.messages.map(m=>[m.id,m]));for(const m of rows)if(m&&m.document_id===this.documentId&&typeof m.body==='string')messages.set(m.id,m);this.messages=[...messages.values()].sort((a,b)=>a.created_at.localeCompare(b.created_at)||a.id.localeCompare(b.id)).slice(-100);}
+  merge(rows){const messages=new Map(this.messages.map(m=>[m.id,m]));for(const m of rows)if(m&&m.document_id===this.documentId&&typeof m.body==='string'){if(this.pending&&m.author_id===this.studio.account.user?.id&&!messages.has(m.id)){this.deferred.push(m);continue;}messages.set(m.id,m);}this.messages=sortChatMessages(messages.values()).slice(-100);}
   async send(){
     if(this.sending||!this.documentId||!this.draft.trim())return;
     const generation=this.generation,body=this.draft.trim(),slide=this.studio.root.querySelector('#chat-reference')?.checked&&this.studio.groups.live?.row.id===this.documentId?this.studio.draft.slides[this.studio.index]?.id||null:null;
     if(!this.canComment){this.status='Sua permissão permite apenas visualizar.';this.paint();return;}this.typing.send(false);
-    this.sending=true;this.status='';this.paint();
-    try{const {data,error}=await this.studio.account.client.rpc('sl_send_chat_message',{p_document_id:this.documentId,p_body:body,p_slide_id:slide});if(generation!==this.generation)return;if(error)throw error;this.merge(Array.isArray(data)?data:[data]);if(this.draft.trim()===body)this.draft='';this.status='';}
-    catch(error){if(generation===this.generation)this.status=this.chatError(error);}
+    this.sending=true;this.status='';this.deferred=[];this.pending={id:'pending:'+createUuid(),document_id:this.documentId,author_id:this.studio.account.user.id,body,slide_id:slide,created_at:new Date().toISOString(),pending:true};this.paint();const log=this.studio.root.querySelector('[data-chat-slot] [role=log]');if(log)log.scrollTop=log.scrollHeight;
+    try{const {data,error}=await this.studio.account.client.rpc('sl_send_chat_message',{p_document_id:this.documentId,p_body:body,p_slide_id:slide});if(generation!==this.generation)return;if(error)throw error;const row=Array.isArray(data)?data[0]:data;settlePendingMessage(this.studio.root,'[data-chat-slot]',this.pending?.id,row,chatDate);this.pending=null;this.merge([...this.deferred,...(Array.isArray(data)?data:[data])]);this.deferred=[];if(this.draft.trim()===body)this.draft='';this.status='';}
+    catch(error){if(generation===this.generation){this.pending=null;this.merge(this.deferred);this.deferred=[];this.status=this.chatError(error);}}
     finally{if(generation===this.generation){this.sending=false;this.paint();}}
   }
 }
