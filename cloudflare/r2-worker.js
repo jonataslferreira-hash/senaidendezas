@@ -1,3 +1,4 @@
+import { classroomIdentity } from './classroom-identity-worker.js';
 import { handleStorageAI, storageAIEnabled } from './storage-ai-worker.js';
 import {handleStorageAIImages} from './storage-ai-images-worker.js';
 import {handleStorageAIHistory} from './storage-ai-history-worker.js';
@@ -23,11 +24,13 @@ export function createR2Handler(verifyUser = async (token, env) => {
     if(new URL(request.url).pathname==='/health'&&request.method==='GET')return json({version:26,imageChat:true,cloudflareAI:env.STORAGE_AI_FREE_CONFIRMED==='true'&&Boolean(env.AI),storageAI:storageAIEnabled(env),storageAIMedia:storageAIEnabled(env),storageAIHistory:Boolean(env.FILES),imageSearch:true,openRouterConfigured:Boolean(env.OPENROUTER_API_KEY),geminiConfigured:Boolean(env.GEMINI_API_KEY),groqConfigured:Boolean(env.GROQ_API_KEY),mistralConfigured:Boolean(env.MISTRAL_API_KEY),nvidiaConfigured:Boolean(env.NVIDIA_API_KEY),lessonCovers:true,lessonDeletion:true,voiceChat:true,collaboration:true,animatedAvatars:true,roles:true,people:true});
     if (request.method === 'OPTIONS') return new Response(null, { status: 204, headers });
     const publicPresentation=await readPublicPresentation(request,env,headers);if(publicPresentation)return publicPresentation;
+    if(new URL(request.url).pathname==='/classroom-identity/verify')return classroomIdentity(request,env,headers,null);
     const token = /^Bearer ([A-Za-z0-9_.-]{20,16384})$/.exec(request.headers.get('Authorization') || '')?.[1];
     if (!token) return json({ error: 'unauthorized' }, 401);
     let user;
     try { user = await verifyUser(token, env); } catch { return json({ error: 'unauthorized' }, 401); }
     if (!user || !/^[a-f0-9-]{36}$/i.test(user.id) || !user.email_confirmed_at || user.is_anonymous) return json({ error: 'unauthorized' }, 401);
+    const identity=await classroomIdentity(request,env,headers,user);if(identity)return identity;
     const ai=await handleStorageAI(request,env,user,headers);
     if(ai)return ai;
     const images=await handleStorageAIImages(request,env,user,headers);

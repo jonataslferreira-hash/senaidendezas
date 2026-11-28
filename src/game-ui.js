@@ -72,7 +72,7 @@ export function pickVictory(seed=''){
  return victoryNames[Math.abs(hash)%victoryNames.length];
 }
 const towerOrder=count=>count===1?[0]:count===2?[1,0]:count===3?[1,0,2]:count===4?[3,1,0,2]:count===5?[3,1,0,2,4]:[5,3,1,0,2,4];
-export function leaderboardMarkup(state,{header,host,offset=0,final=false,shareDialog=()=>'',shareOpen=false}){
+export function leaderboardMarkup(state,{header,host,demo=false,offset=0,final=false,shareDialog=()=>'',shareOpen=false}){
  const elapsed=Math.max(0,(Date.now()+offset-(state.resultStartedAt||Date.now()))/1000),step=state.podiumRevealed?4:state.podiumStep??4;
  const delay=atTime=>state.podiumRevealed?'-20s':Math.min(0,atTime-elapsed).toFixed(2)+'s';
  const victory=Number.isInteger(state.victory)&&state.victory>=0?victoryNames[state.victory%victoryNames.length]:pickVictory(`${state.code||''}:${state.resultStartedAt||0}`);
@@ -121,7 +121,7 @@ export function leaderboardMarkup(state,{header,host,offset=0,final=false,shareD
  const mine=final&&!host&&me>=0&&step>=4?`<p class="final-mine"><b>${me+1}º lugar</b> · ${board[me].score.toLocaleString('pt-BR')} pts</p>`:'';
  const actions=host
   ?(final
-    ?`${step<4?'<button class="btn secondary" data-action="podium-all">Revelar todos</button>':''}<button class="btn primary" data-action="${state.activity?.hasNext?'next-stage':'back-lesson'}">${state.activity?.hasNext?'Próxima etapa →':'Voltar aos slides'}</button><button class="btn secondary" data-action="leave">Sair</button>${!state.activity?.hasNext&&step>=4?'<button class="text-btn" data-action="export">Baixar relatório (PDF)</button>':''}`
+    ?`${step<4?'<button class="btn secondary" data-action="podium-all">Revelar todos</button>':''}<button class="btn primary" data-action="${state.activity?.hasNext?'next-stage':'back-lesson'}">${state.activity?.hasNext?'Próxima etapa →':'Voltar aos slides'}</button><button class="btn secondary" data-action="leave">Sair</button>${!state.activity?.hasNext&&step>=4?'<button class="text-btn" data-action="export">Baixar relatório (PDF)</button>':''}${!demo&&state.resultScope==='quiz'&&state.totalQuestions>0&&state.questionIndex+1===state.totalQuestions&&state.quizRanking?.length?'<button class="btn secondary" data-action="classroom-grades">Preparar notas no Classroom</button>':''}`
     :'<button class="btn primary" data-action="next-question">Próxima pergunta →</button><button class="btn secondary" data-action="leave">Sair</button>')
   :`${!final?'<p>Aguarde o professor continuar.</p>':''}<button class="btn secondary" data-action="leave">Sair</button>`;
  return `${header()}<main class="game-results ${final?'grand-finale':'round-results'}${useQuizTowers?' is-quiz-towers':''}"${final?` data-victory="${victory}" data-step="${step}"`:''}><div class="results-heading">${heading}</div>${podium}${mine}${actions?`<section class="game-results-actions">${actions}</section>`:''}${!final||step>=4?`<details class="result-standings ${final?'final-standings':''}" style="--reveal-delay:${final?delay(9):'0s'}"><summary>Classificação completa</summary><section class="standings-list">${board.map((p,i)=>`<div${p.color?` style="--c:${p.color}"`:''}><b>${i+1}</b>${avatarContent(p.accountPhoto || p.avatar)}<strong>${esc(p.name)}</strong><span>${p.score.toLocaleString('pt-BR')} pts</span><small>${p.correct?p.correct+' acertos':''}</small></div>`).join('')}</section></details>`:''}</main>${shareOpen?shareDialog():''}`;

@@ -96,3 +96,11 @@ políticas de banco/Storage) não é alterada pela chave publicável do site.
 - [Políticas por usuário](https://supabase.com/docs/guides/database/postgres/row-level-security)
 - [Acesso ao Storage](https://supabase.com/docs/guides/storage/security/access-control)
 - [Autorização do Realtime](https://supabase.com/docs/guides/realtime/authorization)
+
+## Login e conexão Google
+
+A tela de entrada oferece **Continuar com Google**. Em **Minha Conta → Conexões**, uma pessoa autenticada pode conectar uma identidade Google e depois usá-la também para entrar na mesma conta, ou desconectá-la se houver outra identidade de acesso. As configurações, nome de exibição e foto utilizados pelo Storage Lab continuam sendo os do perfil Storage Lab (`display_name` e `avatar_path`); a aplicação não usa o nome ou a foto fornecidos pelo Google como perfil. Uma identidade Google já vinculada a outra conta não pode ser vinculada novamente. Supabase pode vincular automaticamente identidades que compartilham um e-mail verificado; isso não mescla dados de contas existentes diferentes.
+
+Para habilitar o fluxo em produção, o administrador precisa configurar um cliente OAuth web no Google Cloud, adicionar o callback do Supabase (`https://qkpgiwjsqtocvjmqinii.supabase.co/auth/v1/callback`) aos URIs de redirecionamento autorizados, habilitar o provedor Google em **Authentication → Providers** no Supabase com as credenciais mantidas no painel seguro, habilitar **Enable Manual Linking** e configurar os destinos permitidos em **URL Configuration**. O ID de cliente e o segredo do provedor não devem ser adicionados ao repositório. Consulte a documentação oficial do Supabase para os passos atuais. Em teste, contas de teste e regras do consentimento Google também se aplicam.
+
+Este login não concede acesso ao Classroom: esse acesso é opcional e solicita consentimento separado. Alunos convidados continuam podendo entrar na sala sem conta ou Google. Os testes automatizados simulam o Supabase; o fluxo com uma conta real requer a configuração acima e verificação real dos redirecionamentos.

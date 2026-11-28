@@ -10,6 +10,10 @@ import {takePhoto} from './camera-photo.js';
 import {GameLayout} from './game-layout.js';
 import {GameAudio} from './game-audio.js';
 import {quizMarkup,leaderboardMarkup,animateRanking} from './game-ui.js';
+import {googleClassroom} from './google-classroom.js';
+import {RoomClassroomIdentity} from './room-classroom-identity.js';
+import './room-classroom-identity.css';
+import './google-classroom.css';
 import { gameMarkup, keepGame, animateRaffle, gameIcon } from './stage-games-view.js';
 import { gameNames } from './stage-games.js';
 import { blockNames } from './activity-blocks.js';
@@ -236,6 +240,7 @@ let introStageKey = '';
 const studio = new Studio(app, { render, toast, joinForm, preview, remoteAction:(name,value)=>{if(name==='sim')remoteInteract(value);else action(name);}, present: (lesson,startIndex,fromEditor) => connectSession({host:true,lesson,startIndex,fromEditor}) });
 studioReady = true;
 queueMicrotask(render);
+const roomClassroomIdentity=new RoomClassroomIdentity({getAccount:()=>studio.account,getClassroom:()=>classroom,openAccount:()=>{if(!app.querySelector('[data-account-dialog]'))app.insertAdjacentHTML('beforeend','<div data-account-dialog></div>');studio.account.returnRoomCode=state?.code||'';studio.account.returnToActiveRoom=true;studio.account.show(studio.account.user?'account':'login');}});
 const tour = new SiteTour(studio);
 document.addEventListener('start-tour', () => tour.start());
 // Só a PRIMEIRA visita deste navegador recebe o tour sozinho. Antes o critério
@@ -264,6 +269,7 @@ function soundButton() {
   const enabled=music&&!audioBlocked;
   return `<button class="icon-btn" data-action="sound" aria-label="${enabled?'Desativar':'Ativar'} áudio" title="Áudio da apresentação">${icon(enabled?'volume':'mute')}</button>`;
 }
+function roomIdentityButton(){return `<button type="button" class="room-classroom-button" data-room-identity-button data-action="room-classroom-identity" aria-label="Identificar para o Classroom">Classroom</button>`;}
 function header() {
   // Uma única barra para TODAS as etapas (aula, enquete, quiz, jogos, pódio):
   // os mesmos botões no mesmo lugar. "Conectados" abre a lista de pessoas e
@@ -383,7 +389,7 @@ function rankingTable(full = false) {
 }
 function quiz(){return quizMarkup(state,{header,host,demo,status,shareDialog,shareOpen});}
 function finished() {
-  return leaderboardMarkup(state,{header,host,offset:timerOffset,final:true,shareDialog,shareOpen});
+  return leaderboardMarkup(state,{header,host,demo,offset:timerOffset,final:true,shareDialog,shareOpen});
 }
 
 function joinUrl() {
@@ -422,7 +428,7 @@ function keepLiveSlide(markup, key) {
   let oldParent = app, newParent = next.content;
   oldChain.forEach((keep, index) => {
     const incoming = newChain[index];
-    for (const child of [...oldParent.childNodes]) if (child !== keep) child.remove();
+    for (const child of [...oldParent.childNodes]) if (child !== keep && !(oldParent===app&&child.nodeType===1&&child.matches('[data-account-dialog]'))) child.remove();
     let before = true;
     for (const child of [...newParent.childNodes]) {
       if (child === incoming) { before = false; continue; }
@@ -462,7 +468,7 @@ function keepEditorStage(markup) {
   let oldParent = app, newParent = next.content;
   oldChain.forEach((keep, index) => {
     const incoming = newChain[index];
-    for (const child of [...oldParent.childNodes]) if (child !== keep) child.remove();
+    for (const child of [...oldParent.childNodes]) if (child !== keep && !(oldParent===app&&child.nodeType===1&&child.matches('[data-account-dialog]'))) child.remove();
     let before = true;
     for (const child of [...newParent.childNodes]) {
       if (child === incoming) { before = false; continue; }
@@ -528,6 +534,8 @@ function applyRender() {
   // Em sala ao vivo (slides, quiz e jogos) animações e transições definidas na aula sempre tocam, exceto se o usuário escolher "reduzido" no perfil.
   document.documentElement.toggleAttribute('data-play', Boolean(state));
   stageIntro();
+  const accountSlot=state&&!host&&studio.account.mode?app.querySelector('[data-account-dialog]'):null;
+  const activeAccountSlot=accountSlot?.parentElement===app?accountSlot:null;
   const slideMotionKey = state?.phase === 'lesson' ? `${activeLesson.id}:${state.code}:${state.slide}` : '';
   const activeTransition = state?.slideTransition || slides[state?.slide]?.transition || 'slide';
   const outgoingSlide = pageMotion.captureSlide(app, slideMotionKey, activeTransition);
@@ -592,7 +600,7 @@ function applyRender() {
   } else if (keepEditorStage(markup)) {
     liveSlide = null;
   } else if (!keepLiveSlide(markup, slideMotionKey)) {
-    app.innerHTML = markup;
+    if(activeAccountSlot){for(const child of [...app.children])if(child!==activeAccountSlot)child.remove();app.insertAdjacentHTML('afterbegin',markup);}else app.innerHTML = markup;
     const frame = slideMotionKey ? app.querySelector(LIVE_SLIDE) : null;
     liveSlide = frame ? { key: slideMotionKey, node: frame, html: frame.outerHTML } : null;
     const stageFrame = !state ? app.querySelector('.designer-stage-wrap') : null;
@@ -618,8 +626,10 @@ function applyRender() {
   app.dataset.transition = state?.phase === 'lesson' ? activeTransition : 'slide';
   if (state?.phase === 'leaderboard') animateRanking(app, Math.max(0, (Date.now() + timerOffset - (state.resultStartedAt || 0)) / 1000));
   if (state?.game?.type === 'raffle') animateRaffle(app, () => Date.now() + timerOffset);
+  if(state&&!host&&!demo&&!app.querySelector('[data-room-identity-button]'))app.insertAdjacentHTML('beforeend',roomIdentityButton());
   if(state&&!app.querySelector('[data-remote-dialog]'))app.insertAdjacentHTML('beforeend','<div data-remote-dialog></div>');
   studio.remote.paint();
+  if(state&&!host&&studio.account.mode){if(!activeAccountSlot){app.insertAdjacentHTML('beforeend','<div data-account-dialog></div>');studio.account.afterRender();}}
   if(state&&readOnlyPresentation&&publicCopyAllowed){if(!app.querySelector('[data-account-dialog]'))app.insertAdjacentHTML('beforeend','<div data-account-dialog></div>');studio.account.afterRender();}
   syncPresentationMode();
   if (editDraft) for (const el of app.querySelectorAll('.header, .classroom, .document-classroom, .presentation-toolbar, .pinned-room-qr')) el.inert = true;
@@ -674,6 +684,7 @@ function receive(next) {
   if (newPage) window.scrollTo(0, 0);
 }
 function connection(next, message = '') {
+  if(next==='identity'){roomClassroomIdentity.paint();toast(message);return;}
   if(next==='removed'){leave();studio.view='join';render();toast(message);return;}
   if(next==='ended'){leave();toast(message);return;}
   status = next; statusMessage = message;
@@ -737,7 +748,7 @@ function leave(show = true) {
   clearInterval(demoTimer);
   // Professor saindo: avisa os alunos (eles voltam para a tela inicial) antes de fechar as conexões.
   if (host && !demo && classroom?.end) { const room = classroom; room.end(); clearInterval(room.timer); setTimeout(() => room.stop(), 300); } else classroom?.stop?.();
-  classroom = null;
+  classroom = null;roomClassroomIdentity.close();
   readOnlyPresentation=false;publicCopyAllowed=false;publicOriginal=null;publicPresentationToken='';sharedLoading=false;sharedError='';
   state = null; host = false; demo = false; editorLaunch=false;shareOpen = false; lastSlide = -1; immersiveDone = false; lastStageEnter = null;
   localModel = 'ssd'; localExploded = true; status = 'offline'; stopMusic();
@@ -951,11 +962,18 @@ async function action(name) {
   switch (name) {
     case 'choose-guest-photo':app.querySelector('[data-guest-photo]')?.click();break;
     case 'take-guest-photo':{const file=await takePhoto();if(file){selectedAvatar=await participantPhoto(file);avatarChanged=true;render();}break;}
+    case 'room-classroom-identity':if(state&&!host&&!demo)roomClassroomIdentity.open();break;
     case 'scan-qr':{try{const {scanRoomCode}=await import('./qr-reader.js');const code=await scanRoomCode();if(code){codeDraft=code;const field=app.querySelector('#room-code');if(field)field.value=code;studio.view='join';render();}}catch(error){toast(error?.message||'Não foi possível abrir o leitor de QR Code. Use o código da sala.');}break;}
     case 'participants':if(state)manageParticipants(state,host&&!demo?id=>control('kick',id):null,control,{host});break;
     case 'room-invite':if(state){if(host){shareOpen=true;render();}else manageParticipants(state,null);}break;
     case 'manage-people':if(state)manageParticipants(state,host&&!demo?id=>control('kick',id):null,control,{host});break;
     case 'edit-player':await editParticipant(state.me,async(name,avatar)=>{selectedAvatar=avatar;avatarChanged=true;joinNameDraft=name;joinNameTouched=true;if(demo){classroom.updateProfile(demoPlayer,{name,avatar});receive({...classroom.snapshot(demoPlayer),lesson:classroom.publicLesson(true)});}else await classroom.updateProfile(name,avatar);});break;
+    case 'classroom-grades': {
+      if(!host||demo||state?.phase!=='finished'||state.resultScope!=='quiz'||state.questionIndex+1!==state.totalQuestions||!Array.isArray(state.quizRanking))break;
+      const total=state.totalQuestions,players=state.quizRanking.filter(p=>Number.isInteger(p.correct)&&p.correct>=0&&p.correct<=total).map(p=>({id:p.id,name:p.name,correct:p.correct,...(p.googleUserId?{googleUserId:p.googleUserId}:{})}));
+      if(!total||!players.length){toast('Não há resultados do quiz para enviar.');break;}
+      googleClassroom.open({quiz:{total,players},title:activeLesson?.title});break;
+    }
     case 'show-ranking':control('ranking');break;
     case 'podium-all':control('podium-all');break;
     case 'create': if (!busy) await connectSession({ host: true }); break;
@@ -1262,6 +1280,8 @@ app.addEventListener('profile-updated',()=>{
 app.addEventListener('account-changed',()=>{
   // Só uma conta logada reaplica o perfil dela. No anônimo, a escolha local
   // (nome + foto) continua valendo.
+  if(state&&!host&&classroom?.identityUid&&classroom.identityUid!==studio.account.user?.id)classroom.clearIdentity();
+  roomClassroomIdentity.paint();
   if(studio.account.user){avatarChanged=false;joinNameTouched=false;joinNameDraft='';selectedAvatar=avatars[0];}
   if(!state&&studio.view==='join')queueMicrotask(render);
 });

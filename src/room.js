@@ -177,16 +177,16 @@ export class Room {
     const bare = Boolean(id) && !this.fullText;
     const hasScoredStages = this.lesson.questions.length > 0 || this.slides.some(s => s.game && !['teams', 'raffle', 'flashcards'].includes(s.game.type));
     const slideTransition = this.slides[d.slide]?.transition || 'slide';
-    const quizRanking = d.players.map(({ id, name, avatar, accountPhoto, score, answers, online, streak, team }) => ({
-      id, name, avatar, ...(accountPhoto ? { accountPhoto } : {}),
+    const quizRanking = d.players.map(({ id:playerId, name, avatar, accountPhoto, score, answers, online, streak, team, googleUserId }) => ({
+      id:playerId, name, avatar, ...(!id&&googleUserId?{googleUserId}:{}), ...(accountPhoto ? { accountPhoto } : {}),
       ...(Number.isInteger(team) ? { team } : {}),
       ...(d.teams?.[team] ? { color: d.teams[team].color } : {}),
       score,
       correct: Object.values(answers || {}).filter(item => item?.correct).length,
       online,
       streak: streak || 0,
-      previousScore: d.previousScores?.[id] || 0,
-      previousRank: (d.previousQuizRanking || []).indexOf(id) + 1
+      previousScore: d.previousScores?.[playerId] || 0,
+      previousRank: (d.previousQuizRanking || []).indexOf(playerId) + 1
     })).sort((a, b) => b.score - a.score || b.correct - a.correct || a.name.localeCompare(b.name, 'pt-BR'));
     return {
       code: d.code, phase: d.phase,activity:this.activity(),resultScope:d.resultScope||'',resultStartedAt:d.resultStartedAt||0,podiumRevealed:Boolean(d.podiumRevealed),podiumStep:d.phase==='finished'?(d.resultStartedAt?d.podiumStep||0:4):0,victory:d.victory||0, animationStep:d.animationStep||0, slide: d.slide, slideTransition, hasScoredStages, model: d.model, exploded: d.exploded,
