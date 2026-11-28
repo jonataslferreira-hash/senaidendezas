@@ -45,3 +45,8 @@ test('upload envia bytes ao Drive e publica referência como material visualizá
  assert.deepEqual(JSON.parse(calls[1].opt.body).materials,[{driveFile:{driveFile:{id:'file-id'},shareMode:'VIEW'}}]);
  const blocked=new ClassroomApi('token',async()=>Response.json({error:{message:'Drive desativado'}},{status:403}));await assert.rejects(blocked.uploadFile({name:'x',blob:new Blob(['x'],{type:'application/pdf'})}),/Drive desativado/);
 });
+test('atividade pode anexar arquivo e link interativo juntos',async()=>{
+ let body;const api=new ClassroomApi('token',async (_url,opt)=>{body=JSON.parse(opt.body);return new Response(JSON.stringify({id:'ok'}),{status:200});});
+ await api.create('curso',{title:'Aula',description:'',fileId:'file-id',link:'https://is.gd/h4bAV2#p=K7M2QD'});
+ assert.deepEqual(body.materials,[{driveFile:{driveFile:{id:'file-id'},shareMode:'VIEW'}},{link:{url:'https://is.gd/h4bAV2#p=K7M2QD'}}]);
+});

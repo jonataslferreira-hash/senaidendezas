@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { teacherControls, InteractionBroadcaster } from '../src/live-interaction.js';
 import { validateLesson, demoLesson } from '../src/lessons.js';
-import { validPublicCode } from '../src/public-presentations.js';
+import { validPublicCode, PresentationSharing } from '../src/public-presentations.js';
 import { shortCode, readPublicPresentation, writePublicPresentation } from '../cloudflare/presentation-worker.js';
 import { duckItems, pixabayItems, mergeEngines } from '../cloudflare/storage-ai-images-worker.js';
 import { expandImageQuery } from '../src/storage-ai-image-search.js';
@@ -416,4 +416,12 @@ test('rodada 15: corrida do saber, painel de jogos da IA e boneco do placar', as
 
   const { looksLikeImageLink } = await import('../src/cover-picker.js');
   assert.equal(looksLikeImageLink(' https://site.com/foto.jpg '), true); assert.equal(looksLikeImageLink('javascript:alert(1)'), false); assert.equal(looksLikeImageLink('texto solto'), false);
+});
+
+test('link compartilhado usa endereço compacto apenas para o site oficial',()=>{
+ const sharing=Object.create(PresentationSharing.prototype);sharing.code='K7M2QD';
+ sharing.siteUrl=()=>new URL('https://jonataslferreira-hash.github.io/senaidendezas/');
+ assert.equal(sharing.shortLink(),'https://is.gd/h4bAV2#p=K7M2QD');
+ sharing.siteUrl=()=>new URL('https://example.org/aula/');
+ assert.equal(sharing.shortLink(),'https://example.org/aula/?p=K7M2QD');
 });

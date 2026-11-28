@@ -54,7 +54,7 @@ import { teacherControls, captureInteraction, applyInteraction, InteractionBroad
 import { cleanSimEvents, cleanSimValues } from './custom-sim-bridge.js';
 import { VideoSync } from './video-sync.js';
 import {createRoomQrCache} from './room-qr.js';
-import {shortRoomLink,roomFragmentUrl} from './room-short-link.js';
+import {shortRoomLink,roomFragmentUrl,presentationFragmentUrl} from './room-short-link.js';
 import './style.css';
 import './experience.css';
 import './appearance.css';
@@ -207,6 +207,8 @@ let classroom, state, host = false, demo = false, busy = false, selectedAvatar =
 let avatarChanged=false,joinNameTouched=false,joinNameDraft='',guestPhotoPending=false;
 let shareOpen = false, solutionOpen = false, lastSlide = -1, localModel = 'ssd', localExploded = true;
 let joinDiagnostic='', status = 'offline', statusMessage = '', timerOffset = 0, music = false, audio, musicTimer, audioStep = 0;
+const fragmentPresentationUrl=presentationFragmentUrl(location.href);
+if(fragmentPresentationUrl)history.replaceState(history.state,'',fragmentPresentationUrl);
 let editorLaunch=false, readOnlyPresentation=false, publicPresentationToken='', sharedLoading=Boolean(publicLinkParam()), sharedError='';
 let clockTimer;
 const trackPlayer = new Audio(); let playingTrack = null;

@@ -67,3 +67,9 @@ test('o dono escolhe permitir salvar cópia ao criar o link',async({page})=>{
  await page.locator('[data-publish-copy]').check();await page.getByRole('button',{name:'Criar link de apresentação',exact:true}).click();
  await expect(page.locator('#presentation-link')).toBeVisible();expect(snapshot.allowCopy).toBe(true);await expect(page.locator('.publish-dialog')).toContainText('permite salvar uma cópia');
 });
+test('link curto abre a apresentação após o redirecionamento fixo',async({page})=>{
+ const lesson=newLesson();lesson.slides[0].title='Apresentação do link curto';lesson.slides=lesson.slides.map(canvasFromSlide);
+ await page.route('https://storage-lab-files.lagujf.workers.dev/presentations/code/K7M2QD',route=>route.fulfill({json:{token},headers:{'access-control-allow-origin':'*'}}));
+ await page.route('https://storage-lab-files.lagujf.workers.dev/presentations/'+token,route=>route.fulfill({json:validateLesson(lesson),headers:{'access-control-allow-origin':'*'}}));
+ await page.goto('/?page=library#p=K7M2QD');await expect(page.locator('#app')).toHaveAttribute('data-read-only','true');await expect(page.locator('.document-stage')).toContainText('Apresentação do link curto');expect(new URL(page.url()).searchParams.get('p')).toBe('K7M2QD');
+});
