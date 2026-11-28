@@ -48,3 +48,5 @@ html[data-appearance=dark] #app .lesson-chat .chat-message[data-sender-style=gla
  html[data-theme][data-ui-style] #app .editor-shell .editor-command-row .editor-tabs > *{flex:0 0 auto}
  html[data-theme][data-ui-style] #app .editor-shell .editor-top-actions{flex:0 0 auto}
 }
+
+.mini-canvas-preview{width:100%;aspect-ratio:16/9;overflow:hidden;border-radius:10px;pointer-events:none}

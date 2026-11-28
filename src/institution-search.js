@@ -3,7 +3,7 @@ const senaiLogo = new URL('./assets/institutions/senai.png', import.meta.url).hr
 export const institutionLogo = name => ['senai dendezeiros','servico nacional de aprendizagem industrial','senai','senai sao paulo','faculdade senai taubate','universidade senai cimatec','senai innovation institute for embedded systems'].includes(fold(name).trim()) ? senaiLogo : '';
 const logos=new Map();
 export const knownInstitutionId=name=>({'universidade federal da bahia':'Q159102','instituto federal da bahia':'Q4842556'})[fold(name).trim()]||'';
-export const institutionLogoInfo=(name,id)=>institutionLogo(name)?{url:institutionLogo(name),credit:(import.meta.env?.BASE_URL||'./')+'institution-credits.txt'}:logos.get(id||knownInstitutionId(name))||null;
+export const institutionLogoInfo=(name,id)=>institutionLogo(name)||id==='Q2274367'?{url:institutionLogo(name)||senaiLogo,credit:(import.meta.env?.BASE_URL||'./')+'institution-credits.txt'}:logos.get(id||knownInstitutionId(name))||null;
 export async function fetchInstitutionLogos(ids,fetcher=fetch){
  const wanted=[...new Set(ids.filter(id=>/^Q[1-9][0-9]{0,11}$/.test(id)&&!logos.has(id)))].slice(0,10);if(!wanted.length)return;
  const url=new URL('https://www.wikidata.org/w/api.php');for(const [key,value] of Object.entries({action:'wbgetentities',ids:wanted.join('|'),props:'claims',format:'json',origin:'*'}))url.searchParams.set(key,value);
@@ -31,7 +31,8 @@ export function parseInstitutions(data){
   if(typeof entry?.value!=='string'||!entry.value.trim()||entry.value.length>80)return [];
   const geo=item.locations?.[0]?.geonames_details;const place=[geo?.name,geo?.country_subdivision_name,geo?.country_name].filter(v=>typeof v==='string').join(', ').slice(0,160);
   const external=Array.isArray(item.external_ids)?item.external_ids.find(x=>x?.type==='wikidata'):null;const wikidata=Array.isArray(external?.all)?external.all.find(id=>typeof id==='string'&&/^Q[1-9][0-9]{0,11}$/.test(id)):undefined;
-  return [{name:entry.value.trim(),place,...(wikidata?{wikidata}:{})}];
+  const parents=(item.relationships||[]).filter(r=>r?.type==='parent'&&/^https:\/\/ror\.org\/[0-9a-hjkmnp-tv-z]{9}$/.test(r.id||'')).slice(0,2).map(r=>r.id);
+  return [{name:entry.value.trim(),place,...(wikidata?{wikidata}:{}),...(parents.length?{parents}:{})}];
  });
 }
 export class InstitutionSearch {
@@ -49,14 +50,20 @@ export class InstitutionSearch {
  close(){clearTimeout(this.timer);this.controller?.abort();this.sequence++;this.items=[];this.active=-1;const input=this.root.querySelector('#profile-school'),list=this.root.querySelector('#institution-options');if(input){input.setAttribute('aria-expanded','false');input.removeAttribute('aria-activedescendant');}if(list){list.hidden=true;list.replaceChildren();}const status=this.root.querySelector('#institution-status');if(status)status.textContent='';}
  render(){
   const input=this.root.querySelector('#profile-school'),list=this.root.querySelector('#institution-options');if(!input||!list)return;
-  list.replaceChildren();this.items.forEach((item,index)=>{const option=document.createElement('div');option.id='institution-option-'+index;option.setAttribute('role','option');option.setAttribute('aria-selected',String(index===this.active));option.dataset.institutionIndex=String(index);const info=institutionLogoInfo(item.name,item.wikidata),image=item.logo||info?.url;if(image){const logo=document.createElement('img');logo.src=image;logo.loading='lazy';logo.referrerPolicy='no-referrer';logo.onerror=()=>logo.remove();logo.alt='';logo.className='institution-logo';option.append(logo);}const text=document.createElement('span');const name=document.createElement('strong');name.textContent=item.name;text.append(name);if(item.place){const place=document.createElement('small');place.textContent=item.place;text.append(place);}if(image&&info?.credit){const credit=document.createElement('a');credit.href=info.credit;credit.target='_blank';credit.rel='noopener noreferrer';credit.dataset.logoCredit='';credit.textContent='Créditos';credit.setAttribute('aria-label','Créditos da marca de '+item.name);text.append(credit);}option.append(text);list.append(option);});
+  list.replaceChildren();this.items.forEach((item,index)=>{const option=document.createElement('div');option.id='institution-option-'+index;option.setAttribute('role','option');option.setAttribute('aria-selected',String(index===this.active));option.dataset.institutionIndex=String(index);const info=institutionLogoInfo(item.name,item.wikidata),image=item.logo||info?.url;if(image){const logo=document.createElement('img');logo.src=image;logo.loading='lazy';logo.referrerPolicy='no-referrer';logo.onerror=()=>logo.remove();logo.alt='';logo.className='institution-logo';option.append(logo);}const text=document.createElement('span');const name=document.createElement('strong');name.textContent=item.name;text.append(name);if(item.place){const place=document.createElement('small');place.textContent=item.place;text.append(place);}if(image&&(item.logoCredit||info?.credit)){const credit=document.createElement('a');credit.href=item.logoCredit||info.credit;credit.target='_blank';credit.rel='noopener noreferrer';credit.dataset.logoCredit='';credit.textContent='Créditos';credit.setAttribute('aria-label','Créditos da marca de '+item.name);text.append(credit);}option.append(text);list.append(option);});
   list.hidden=!this.items.length;input.setAttribute('aria-expanded',String(Boolean(this.items.length)));if(this.active>=0)input.setAttribute('aria-activedescendant','institution-option-'+this.active);else input.removeAttribute('aria-activedescendant');
  }
- async loadLogos(sequence){try{await fetchInstitutionLogos(this.items.map(item=>item.wikidata).filter(Boolean));if(sequence===this.sequence)this.render();}catch{/* Logo não disponível: o nome continua selecionável. */}}
+ async loadLogos(sequence){
+  const items=this.items;try{await fetchInstitutionLogos(items.map(item=>item.wikidata).filter(Boolean));if(sequence!==this.sequence)return;this.render();
+   await Promise.all(items.filter(item=>!institutionLogoInfo(item.name,item.wikidata)&&item.parents?.length).slice(0,5).map(async item=>{
+    for(const parent of item.parents){try{const response=await fetch('https://api.ror.org/v2/organizations/'+parent.split('/').pop(),{signal:AbortSignal.timeout(8000),credentials:'omit'});if(!response.ok)continue;const parsed=parseInstitutions({items:[await response.json()]})[0];if(!parsed)continue;await fetchInstitutionLogos([parsed.wikidata].filter(Boolean));if(sequence!==this.sequence)return;const info=institutionLogoInfo(parsed.name,parsed.wikidata);if(info&&parsed.wikidata){logos.set(parsed.wikidata,info);item.logo=info.url;item.logoCredit=info.credit;item.wikidata=parsed.wikidata;break;}}catch{/* sem vínculo ou marca confiável */}}
+   }));if(sequence===this.sequence)this.render();
+  }catch{/* Logo não disponível: o nome continua selecionável. */}
+ }
  select(index){const input=this.root.querySelector('#profile-school'),item=this.items[index];if(!input||!item)return;this.selected={name:item.name,wikidata:item.wikidata||''};input.value=item.name;input.dispatchEvent(new Event('change',{bubbles:true}));this.close();input.focus();}
  search(input){
   this.close();const query=input.value.trim(),status=this.root.querySelector('#institution-status');if(query.length<3){if(status)status.textContent='Digite pelo menos 3 letras para buscar.';return;}
-  this.items=localInstitutions(query);this.render();this.loadLogos(this.sequence);if(status)status.textContent='Buscando no cadastro ROR…';const seq=this.sequence;
+  this.items=localInstitutions(query);this.render();this.loadLogos(this.sequence);if(status)status.textContent='Buscando instituições…';const seq=this.sequence;
   this.timer=setTimeout(async()=>{
    this.controller=new AbortController();const controller=this.controller;const timer=setTimeout(()=>controller.abort(),8000);
    try{const url=new URL('https://api.ror.org/v2/organizations');url.searchParams.set('query',query);const response=await fetch(url,{signal:controller.signal,credentials:'omit'});if(!response.ok)throw Error('Busca indisponível');const data=await response.json();if(seq!==this.sequence||input!==this.root.querySelector('#profile-school')||input.value.trim()!==query)return;
