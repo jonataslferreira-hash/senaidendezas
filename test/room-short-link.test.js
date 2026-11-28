@@ -16,3 +16,11 @@ test('fragmento válido vira parâmetro de sala sem sobrescrever outras rotas',(
  assert.equal(roomFragmentUrl('http://localhost:5173/?localSignal#s=123456'),'http://localhost:5173/?localSignal=&s=123456');
  for(const bad of [base+'#s=12345',base+'#s=123456&deck=secret',base+'#deck=123456',base+'?s=654321#s=123456',base+'?invite=secret#s=123456',base+'?page=editor#s=123456','not a url'])assert.equal(roomFragmentUrl(bad),null,bad);
 });
+test('link curto de apresentação preserva apenas código válido e respeita outras rotas',async()=>{
+ const {shortPresentationLink,presentationFragmentUrl}=await import('../src/room-short-link.js');
+ assert.equal(shortPresentationLink('K7M2QD'),ROOM_LINK_BASE+'#p=K7M2QD');
+ assert.equal(shortPresentationLink('portable'),null);
+ const base='https://jonataslferreira-hash.github.io/senaidendezas/';
+ assert.equal(presentationFragmentUrl(base+'?page=library#p=K7M2QD'),base+'?p=K7M2QD');
+ for(const suffix of ['?invite=secret#p=K7M2QD','?page=editor#p=K7M2QD','#p=K7M2QD&other=1','#p=OOOOOO'])assert.equal(presentationFragmentUrl(base+suffix),null);
+});

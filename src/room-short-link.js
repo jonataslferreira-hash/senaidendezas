@@ -24,3 +24,16 @@ export function roomFragmentUrl(value){
   url.searchParams.set('s',match[1]);url.hash='';return url.href;
  }catch{return null;}
 }
+
+// O mesmo redirecionamento fixo também abre apresentações. Somente o código
+// viaja no fragmento; links portáteis e convites nunca são encurtados aqui.
+export function presentationFragmentUrl(value){
+ try {
+  const url=new URL(value),match=/^#p=([A-HJKMNP-Z2-9]{6})$/i.exec(url.hash),keys=[...url.searchParams.keys()];
+  if(!match || keys.some(key=>key!=='page') || keys.length>1 || (keys.length&&url.searchParams.get('page')!=='library')) return null;
+  url.search='';url.searchParams.set('p',match[1].toUpperCase());url.hash='';return url.href;
+ }catch{return null;}
+}
+export function shortPresentationLink(code){
+ return /^[A-HJKMNP-Z2-9]{6}$/i.test(code||'') ? `${ROOM_LINK_BASE}#p=${code.toUpperCase()}` : null;
+}

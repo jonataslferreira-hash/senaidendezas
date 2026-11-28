@@ -4,6 +4,8 @@ import {presentationSlide} from './slide-display.js';
 import {canvasMarkup,CanvasModels} from './canvas-view.js';
 import {loadSlideFonts,slideFontCSS} from './fonts.js';
 import {Simulations} from './simulations.js';
+import {exportableSlides} from './export-slide-selection.js';
+import {customSimMarkup} from './custom-sim.js';
 const bytes=url=>Uint8Array.from(atob(url.split(',')[1]),c=>c.charCodeAt(0));
 function save(data,name,type){const url=URL.createObjectURL(new Blob([data],{type})),a=document.createElement('a');a.href=url;a.download=name;document.body.append(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),30000);}
 async function modelGif(viewer) {
@@ -60,12 +62,12 @@ async function cropPng(url,x,y,width,height){
  return canvas.toDataURL('image/png');
 }
 export async function exportSlides(input,format,onProgress=()=>{},{download=true}={}){
- const hydrated=await hydrateLesson(input,true),pages=hydrated.slides.filter(slide=>!slide.game),lesson=pages.length?{...hydrated,slides:pages}:hydrated,host=document.createElement('div'),models=new CanvasModels(),simulations=new Simulations();host.className='export-canvas-host';host.setAttribute('aria-hidden','true');host.style.cssText='position:fixed;left:-20000px;top:0;pointer-events:none;z-index:-1;';document.body.append(host);
+ const hydrated=await hydrateLesson(input,true),pages=format==='png'?hydrated.slides:exportableSlides(hydrated);if(!pages.length)throw Error('Adicione um slide comum para exportar.');const lesson={...hydrated,slides:pages},host=document.createElement('div'),models=new CanvasModels(),simulations=new Simulations();host.className='export-canvas-host';host.setAttribute('aria-hidden','true');host.style.cssText='position:fixed;left:-20000px;top:0;pointer-events:none;z-index:-1;';document.body.append(host);
  const pngOnly=format==='png',pdf=format==='pdf'?await import('pdf-lib'):null,pptx=format==='pptx'?await import('@office-kit/pptx'):null,deck=pdf?await pdf.PDFDocument.create():pptx?.createPresentation(),first=presentationSlide(lesson.slides[0]),ratio=first.pageWidth/first.pageHeight||16/9,deckW=pptx?.inches(13.333333),deckH=deckW/ratio;
  if(pptx)pptx.setSlideSize(deck,{width:deckW,height:Math.round(deckH)});
  try{for(const [index,original]of lesson.slides.entries()){
   onProgress(index,lesson.slides.length);const slide=presentationSlide(original),aspect=slide.pageWidth/slide.pageHeight||16/9,w=Math.min(1280,1280*aspect),h=w/aspect;host.style.width=w+'px';host.style.height=h+'px';
-  await loadSlideFonts(slide,lesson.customFonts);host.innerHTML=slide.kind==='document'?`<img src="${slide.image}" style="width:100%;height:100%;object-fit:contain">`:canvasMarkup(slide);await models.mount(slide.kind==='canvas'?host:null,slide);simulations.mount(host);
+  await loadSlideFonts(slide,lesson.customFonts);host.innerHTML=slide.kind==='document'?`<img src="${slide.image}" style="width:100%;height:100%;object-fit:contain">`:canvasMarkup(slide);await models.mount(slide.kind==='canvas'?host:null,slide);for(const e of slide.elements||[]){if(e.type==='simulation'&&e.simulation==='custom'&&e.customSim?.html){const node=[...host.querySelectorAll('[data-object-id]')].find(n=>n.dataset.objectId===e.id);if(node)node.innerHTML=customSimMarkup(e.customSim,{interactive:false});}}simulations.mount(host);
   await Promise.all([...host.querySelectorAll('img')].map(img=>img.decode().catch(()=>{throw Error('Uma imagem não abriu para exportar. Envie a imagem como arquivo no editor.');})));await new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r)));
   const gifs = new Map();
   for (const [id, viewer] of models.viewers) {
@@ -111,6 +113,12 @@ export async function exportSlides(input,format,onProgress=()=>{},{download=true
      }
      shape=pptx.addSlideTextBox(out,{...rect,text:e.text,name:e.role==='title'?'Título':'Texto'});pptx.setShapeTextFormat(shape,{font:lesson.customFonts?.find(f=>f.family===e.fontFamily)?.name||e.fontFamily||'Arial',size:e.fontSize*(w/1280)*scale/914400*72,color:e.color,bold:e.bold,italic:e.italic});pptx.setShapeTextMargins(shape,{top:Math.round((e.textPadding?.[0]||0)*w/1280*scale),right:Math.round((e.textPadding?.[1]||0)*w/1280*scale),bottom:Math.round((e.textPadding?.[2]||0)*w/1280*scale),left:Math.round((e.textPadding?.[3]||0)*w/1280*scale)});pptx.setShapeTextAnchor(shape,e.verticalAlign==='center'?'center':e.verticalAlign==='end'?'bottom':'top');for(let i=0;i<pptx.getShapeParagraphElements(shape).length;i++)pptx.setParagraphAlignment(shape,i,e.align||'left');}
     else if(gifs.has(e.id)) shape=pptx.addSlideImage(out,gifs.get(e.id),{...rect,format:'gif',name:'Modelo 3D'});
+    else if(e.type==='image'&&/^data:image\/gif;base64,/i.test(e.image||'')&&!(Number(e.imageZoom||1)!==1||Number(e.imageX)||Number(e.imageY))&&(!e.imageBackground||e.imageBackground==='transparent')){
+     const img=await loadImage(e.image),iw=img.naturalWidth,ih=img.naturalHeight;let box={...rect};
+     if(e.imageFit!=='fill'&&e.imageFit!=='cover'&&iw&&ih){const k=Math.min(rect.w/iw,rect.h/ih);box.w=Math.round(iw*k);box.h=Math.round(ih*k);box.x+=Math.round((rect.w-box.w)/2);box.y+=Math.round((rect.h-box.h)/2);}
+     shape=pptx.addSlideImage(out,bytes(e.image),{...box,format:'gif',name:e.imageAlt||'GIF animado'});
+     if(e.imageFit==='cover'&&iw&&ih){const imageRatio=iw/ih,boxRatio=rect.w/rect.h;if(imageRatio>boxRatio){const crop=(1-boxRatio/imageRatio)/2;pptx.setShapeImageCrop(shape,{left:crop,right:crop,top:0,bottom:0});}else{const crop=(1-imageRatio/boxRatio)/2;pptx.setShapeImageCrop(shape,{left:0,right:0,top:crop,bottom:crop});}}
+    }
     else if(e.type==='image'&&e.image){shape=pptx.addSlideImage(out,bytes(await imageElementPng(e,Math.max(1,e.w/100*w),Math.max(1,e.h/100*h))),{...rect,format:'png',name:e.imageAlt||'Imagem'});}
     else{
      // Formas e experimentos: fotografa o slide inteiro só com este objeto e

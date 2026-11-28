@@ -13,3 +13,7 @@ html[data-motion=reduced] *,html[data-motion=reduced] *::before,html[data-motion
 .institution-options [role=option]:hover,.institution-options [aria-selected=true]{background:var(--ui-tint)}
 .institution-options strong,.institution-options small{display:block;overflow-wrap:anywhere}
 .institution-options small{margin-top:3px}
+.institution-options [data-institution-index]{display:flex;align-items:center;gap:10px}
+.institution-options [data-institution-index] > span{min-width:0}
+.institution-logo{width:70px;max-height:30px;object-fit:contain;background:#fff;border-radius:5px;padding:3px;flex:none}
+.profile-school-logo{width:82px;max-height:27px;object-fit:contain;background:#fff;border-radius:4px;padding:2px;vertical-align:middle;margin-right:5px}
