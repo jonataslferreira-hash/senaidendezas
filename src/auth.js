@@ -85,7 +85,7 @@ export class Account {
   }
   profile() { return `<button type="button" class="studio-account-button" data-account-action="open">${this.user ? this.settings.avatar() + `<span>${esc(this.user.user_metadata?.display_name || this.user.email)}</span>` : 'Entrar / Criar conta'}</button>`; }
   updateProfile(root) { const slots = root.querySelectorAll('[data-account-profile]'); for (const slot of slots) slot.innerHTML = this.profile();root.dispatchEvent(new CustomEvent('profile-updated')); }
-  show(mode) { this.panelVersion=(this.panelVersion||0)+1;this.closing=false;this.animatePanel=true;this.returnFocus ||= document.activeElement; if (this.mode === 'profile' && mode !== 'profile') this.settings.cancel(); this.mode = mode; if (mode === 'account') this.settings.refreshAvatar(); if (mode === 'profile') this.settings.begin(); this.error = ''; this.message = ''; this.paint(); }
+  show(mode) { this.panelVersion=(this.panelVersion||0)+1;this.closing=false;this.animatePanel=true;this.returnFocus ||= document.activeElement; if (this.mode === 'profile' && mode !== 'profile') this.settings.cancel(); this.mode = mode; if (mode === 'account') {this.settings.refreshAvatar();this.settings.refreshSchoolLogo();} if (mode === 'profile') this.settings.begin(); this.error = ''; this.message = ''; this.paint(); }
   close() {
     if(this.busy||this.closing)return;
     const dialog=this.root.querySelector('.account-dialog'),version=this.panelVersion;
@@ -194,7 +194,7 @@ export class Account {
       if (result.error) throw result.error;
       if (mode === 'forgot') this.message = 'Se este e-mail tiver uma conta, você receberá um link de recuperação.';
       else if (mode === 'signup' && !result.data.session) { this.mode = 'login'; this.message = 'Confira seu e-mail para confirmar o cadastro. Depois, entre na sua conta.'; }
-      else { this.user = result.data.user || this.user; this.addingAccount=false; this.mode = 'account'; this.message = ['recovery', 'password'].includes(mode) ? 'Senha atualizada.' : mode === 'profile' ? 'Perfil atualizado.' : ''; this.settings.applyPreferences();this.settings.refreshAvatar(); }
+      else { this.user = result.data.user || this.user; this.addingAccount=false; this.mode = 'account'; this.message = ['recovery', 'password'].includes(mode) ? 'Senha atualizada.' : mode === 'profile' ? 'Perfil atualizado.' : ''; this.settings.applyPreferences();this.settings.refreshAvatar();this.settings.refreshSchoolLogo(); }
     } catch (error) { this.error = error.userMessage || authError(error); }
     finally { this.busy = false; this.updateProfile(this.root); this.paint(); }
   }

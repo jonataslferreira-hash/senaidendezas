@@ -3,7 +3,7 @@ import {hydrateLesson} from './assets.js';
 import {presentationSlide} from './slide-display.js';
 import {canvasMarkup,CanvasModels} from './canvas-view.js';
 import {loadSlideFonts,slideFontCSS} from './fonts.js';
-import {Simulations} from './simulations.js';
+import {Simulations,paintSimulationExportFrame} from './simulations.js';
 import {exportableSlides} from './export-slide-selection.js';
 import {customSimMarkup} from './custom-sim.js';
 const bytes=url=>Uint8Array.from(atob(url.split(',')[1]),c=>c.charCodeAt(0));
@@ -17,10 +17,10 @@ async function modelGif(viewer) {
  frame.width = Math.max(1, Math.round(source.width * scale));
  frame.height = Math.max(1, Math.round(source.height * scale));
  const ctx = frame.getContext('2d', { willReadFrequently: true });
- const gif = GIFEncoder(), initial = group.rotation.y, frames = 24;
+ const gif = GIFEncoder(), initial = group.rotation.x, frames = 24;
  try {
   for (let index = 0; index < frames; index++) {
-   group.rotation.y = initial + index * Math.PI * 2 / frames;
+   group.rotation.x = initial + index * Math.PI * 2 / frames;
    renderer.render(scene, camera);
    ctx.clearRect(0, 0, frame.width, frame.height);
    ctx.drawImage(source, 0, 0, frame.width, frame.height);
@@ -36,7 +36,31 @@ async function modelGif(viewer) {
   }
   gif.finish();
   return gif.bytes();
- } finally { group.rotation.y = initial; }
+ } finally { group.rotation.x = initial; }
+}
+// Captura a própria cena SVG sem controles ou textos de interface. Cada
+// quadro usa o motor real da simulação, sem depender do relógio do navegador.
+async function simulationGif(node){
+ if(!paintSimulationExportFrame(node,0))return null;
+ const module=await import('gifenc'),{GIFEncoder,quantize,applyPalette}=module.GIFEncoder?module:module.default;
+ const svg=node.querySelector('svg'),box=node.getBoundingClientRect(),ratio=box.width/Math.max(1,box.height);
+ const width=Math.max(1,Math.round(Math.min(320,320*ratio))),height=Math.max(1,Math.round(width/ratio));
+ const frame=document.createElement('canvas');frame.width=width;frame.height=height;const ctx=frame.getContext('2d',{willReadFrequently:true}),gif=GIFEncoder();
+ for(let index=0;index<24;index++){
+  paintSimulationExportFrame(node,index*.12);
+  const clone=svg.cloneNode(true);clone.setAttribute('xmlns','http://www.w3.org/2000/svg');clone.setAttribute('width',width);clone.setAttribute('height',height);clone.style.color=getComputedStyle(svg).color;
+  const url=URL.createObjectURL(new Blob([new XMLSerializer().serializeToString(clone)],{type:'image/svg+xml'}));
+  try{const image=await loadImage(url);ctx.clearRect(0,0,width,height);ctx.drawImage(image,0,0,width,height);}finally{URL.revokeObjectURL(url);}
+  const pixels=ctx.getImageData(0,0,width,height).data,format='rgba4444',palette=quantize(pixels,96,{format,oneBitAlpha:true}),transparentIndex=palette.findIndex(c=>c[3]===0);
+  gif.writeFrame(applyPalette(pixels,palette,format),width,height,{palette,delay:120,repeat:0,dispose:2,transparent:transparentIndex>=0,transparentIndex:Math.max(0,transparentIndex)});
+  if(index%4===3)await new Promise(resolve=>setTimeout(resolve,0));
+ }
+ gif.finish();paintSimulationExportFrame(node,0);return gif.bytes();
+}
+function cleanSimulation(node){
+ for(const child of node.children)if(child.tagName.toLowerCase()!=='svg')child.style.display='none';
+ node.style.cssText+=';padding:0;gap:0;border:0;border-radius:0;background:transparent;overflow:hidden';
+ const svg=node.querySelector(':scope > svg');if(svg)svg.style.cssText+=';width:100%;height:100%;min-height:0;flex:1 1 auto';
 }
 const loadImage=src=>new Promise((resolve,reject)=>{const image=new Image();image.onload=()=>resolve(image);image.onerror=()=>reject(Error('Uma imagem não abriu para exportar. Envie a imagem como arquivo no editor.'));image.src=src;});
 // Desenha a imagem do slide direto num canvas, com o mesmo enquadramento do
@@ -67,9 +91,11 @@ export async function exportSlides(input,format,onProgress=()=>{},{download=true
  if(pptx)pptx.setSlideSize(deck,{width:deckW,height:Math.round(deckH)});
  try{for(const [index,original]of lesson.slides.entries()){
   onProgress(index,lesson.slides.length);const slide=presentationSlide(original),aspect=slide.pageWidth/slide.pageHeight||16/9,w=Math.min(1280,1280*aspect),h=w/aspect;host.style.width=w+'px';host.style.height=h+'px';
-  await loadSlideFonts(slide,lesson.customFonts);host.innerHTML=slide.kind==='document'?`<img src="${slide.image}" style="width:100%;height:100%;object-fit:contain">`:canvasMarkup(slide);await models.mount(slide.kind==='canvas'?host:null,slide);for(const e of slide.elements||[]){if(e.type==='simulation'&&e.simulation==='custom'&&e.customSim?.html){const node=[...host.querySelectorAll('[data-object-id]')].find(n=>n.dataset.objectId===e.id);if(node)node.innerHTML=customSimMarkup(e.customSim,{interactive:false});}}simulations.mount(host);
+  await loadSlideFonts(slide,lesson.customFonts);host.innerHTML=slide.kind==='document'?`<img src="${slide.image}" style="width:100%;height:100%;object-fit:contain">`:canvasMarkup(slide);await models.mount(slide.kind==='canvas'?host:null,slide);for(const e of slide.elements||[]){if(e.type==='simulation'&&e.simulation==='custom'&&e.customSim?.html){const node=[...host.querySelectorAll('[data-object-id]')].find(n=>n.dataset.objectId===e.id);if(node)node.innerHTML=customSimMarkup(e.customSim,{interactive:false});}}simulations.mount(host);simulations.dispose();
+  for(const node of host.querySelectorAll('.simulation-widget[data-simulation]'))cleanSimulation(node);
   await Promise.all([...host.querySelectorAll('img')].map(img=>img.decode().catch(()=>{throw Error('Uma imagem não abriu para exportar. Envie a imagem como arquivo no editor.');})));await new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r)));
   const gifs = new Map();
+  if(pptx)for(const e of slide.elements||[]){if(e.type!=='simulation'||e.simulation==='custom')continue;const object=[...host.querySelectorAll('[data-object-id]')].find(n=>n.dataset.objectId===e.id),node=object?.querySelector('.simulation-widget[data-simulation]');if(node){const animation=await simulationGif(node);if(animation)gifs.set(e.id,animation);}}
   for (const [id, viewer] of models.viewers) {
    if (!viewer.renderer || viewer.el.dataset.customLoaded === 'error') throw Error('Não foi possível renderizar um modelo 3D para exportação. Confira se ele abre no slide.');
    viewer.resize();
@@ -112,7 +138,7 @@ export async function exportSlides(input,format,onProgress=()=>{},{download=true
       if(needed>rect.h){const extra=Math.round(needed-rect.h);if(e.verticalAlign==='center')rect.y-=Math.round(extra/2);else if(e.verticalAlign==='end')rect.y-=extra;rect.h+=extra;}
      }
      shape=pptx.addSlideTextBox(out,{...rect,text:e.text,name:e.role==='title'?'Título':'Texto'});pptx.setShapeTextFormat(shape,{font:lesson.customFonts?.find(f=>f.family===e.fontFamily)?.name||e.fontFamily||'Arial',size:e.fontSize*(w/1280)*scale/914400*72,color:e.color,bold:e.bold,italic:e.italic});pptx.setShapeTextMargins(shape,{top:Math.round((e.textPadding?.[0]||0)*w/1280*scale),right:Math.round((e.textPadding?.[1]||0)*w/1280*scale),bottom:Math.round((e.textPadding?.[2]||0)*w/1280*scale),left:Math.round((e.textPadding?.[3]||0)*w/1280*scale)});pptx.setShapeTextAnchor(shape,e.verticalAlign==='center'?'center':e.verticalAlign==='end'?'bottom':'top');for(let i=0;i<pptx.getShapeParagraphElements(shape).length;i++)pptx.setParagraphAlignment(shape,i,e.align||'left');}
-    else if(gifs.has(e.id)) shape=pptx.addSlideImage(out,gifs.get(e.id),{...rect,format:'gif',name:'Modelo 3D'});
+    else if(gifs.has(e.id)) shape=pptx.addSlideImage(out,gifs.get(e.id),{...rect,format:'gif',name:e.type==='simulation'?'Experimento animado':'Modelo 3D'});
     else if(e.type==='image'&&/^data:image\/gif;base64,/i.test(e.image||'')&&!(Number(e.imageZoom||1)!==1||Number(e.imageX)||Number(e.imageY))&&(!e.imageBackground||e.imageBackground==='transparent')){
      const img=await loadImage(e.image),iw=img.naturalWidth,ih=img.naturalHeight;let box={...rect};
      if(e.imageFit!=='fill'&&e.imageFit!=='cover'&&iw&&ih){const k=Math.min(rect.w/iw,rect.h/ih);box.w=Math.round(iw*k);box.h=Math.round(ih*k);box.x+=Math.round((rect.w-box.w)/2);box.y+=Math.round((rect.h-box.h)/2);}

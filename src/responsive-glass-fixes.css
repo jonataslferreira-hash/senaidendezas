@@ -40,3 +40,11 @@ html[data-appearance=dark] #app .lesson-chat .chat-message[data-sender-style=gla
   html[data-appearance] #app .lesson-chat .chat-message[data-sender-style=glass] > div {backdrop-filter:none;-webkit-backdrop-filter:none;background:var(--ui-panel)!important;color:var(--ui-ink)}
 }
 #app .editor-music .music-header-status{display:block;white-space:normal;overflow-wrap:anywhere;font-size:10px;line-height:1.3;color:var(--ui-ink);margin-top:4px}
+/* Em 100% no desktop, mantenha as etapas e ações na mesma linha. A lista
+   desliza em vez de empurrar o palco para baixo quando há muitas etapas. */
+@media (min-width:901px) {
+ html[data-theme][data-ui-style] #app .editor-shell .editor-command-row{flex-wrap:nowrap;min-width:0}
+ html[data-theme][data-ui-style] #app .editor-shell .editor-command-row .editor-tabs{flex:1 1 0;min-width:0;max-width:100%;overflow-x:auto;overflow-y:hidden;scrollbar-width:thin;white-space:nowrap}
+ html[data-theme][data-ui-style] #app .editor-shell .editor-command-row .editor-tabs > *{flex:0 0 auto}
+ html[data-theme][data-ui-style] #app .editor-shell .editor-top-actions{flex:0 0 auto}
+}

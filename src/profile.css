@@ -17,3 +17,4 @@ html[data-motion=reduced] *,html[data-motion=reduced] *::before,html[data-motion
 .institution-options [data-institution-index] > span{min-width:0}
 .institution-logo{width:70px;max-height:30px;object-fit:contain;background:#fff;border-radius:5px;padding:3px;flex:none}
 .profile-school-logo{width:82px;max-height:27px;object-fit:contain;background:#fff;border-radius:4px;padding:2px;vertical-align:middle;margin-right:5px}
+.institution-options [data-logo-credit]{display:inline-block;margin-top:4px;font-size:10px;color:inherit;text-decoration:underline}

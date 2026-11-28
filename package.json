@@ -33,6 +33,7 @@
   "devDependencies": {
     "@playwright/test": "^1.56.0",
     "fflate": "^0.8.3",
+    "gifuct-js": "^2.1.2",
     "peer": "^1.0.2",
     "vite": "^7.1.0"
   }
