@@ -1,6 +1,7 @@
 import { createUuid } from './uuid.js';
 import Peer from 'peerjs';
 import { Room } from './room.js';
+import {issueIdentityProof,verifyIdentityProof} from './classroom-identity.js';
 import { compactLesson, hydrateLesson } from './assets.js';
 
 const prefix = 'senai-storage-lab-v1-';
@@ -120,11 +121,19 @@ export class Classroom {
           const joined = this.room.join(msg.payload);
           const previous = this.connections.get(joined.id);
           conn.playerId = joined.id;
+          const player=this.room.data.players.find(p=>p.id===joined.id);if(player)delete player.googleUserId;
           this.connections.set(joined.id, conn);
           if (previous && previous !== conn) previous.close();
           clearTimeout(timeout);
           conn.send({ type: 'joined', ...joined });
+          if(msg.payload?.identifyGoogle===true)this.challengeIdentity(conn);
           this.broadcast();
+        } else if(msg.type==='identity-request'&&conn.playerId){this.challengeIdentity(conn);
+        } else if(msg.type==='identity-clear'&&conn.playerId){conn.identityNonce=null;conn.identityVersion=(conn.identityVersion||0)+1;const player=this.room.data.players.find(p=>p.id===conn.playerId);if(player)delete player.googleUserId;this.broadcast();
+        } else if(msg.type==='identity-proof'&&conn.playerId&&conn.identityNonce){
+          const nonce=conn.identityNonce;conn.identityNonce=null;const playerId=conn.playerId,version=conn.identityVersion;
+          verifyIdentityProof(this.code,nonce,msg.proof).then(googleUserId=>{if(this.stopped||this.connections.get(playerId)!==conn||conn.identityVersion!==version)return;const player=this.room.data.players.find(p=>p.id===playerId);if(!player)return;player.googleUserId=googleUserId;conn.send({type:'identity-result',ok:true,nonce});this.broadcast();}).catch(()=>{if(conn.open&&conn.identityVersion===version)conn.send({type:'identity-result',ok:false,nonce});});
+        } else if(msg.type==='identity-failed'&&conn.playerId){conn.identityNonce=null;
         } else if(msg.type==='profile'&&conn.playerId){this.room.updateProfile(conn.playerId,msg.payload);conn.send({type:'ack',request:msg.request});this.broadcast();
         } else if (msg.type === 'answer' && conn.playerId) {
           this.room.answer(conn.playerId, msg.payload);
@@ -141,6 +150,9 @@ export class Classroom {
     };
     conn.on('close', close); conn.on('error', close);
   }
+  challengeIdentity(conn){conn.identityVersion=(conn.identityVersion||0)+1;conn.identityNonce=createUuid();const player=this.room.data.players.find(p=>p.id===conn.playerId);if(player)delete player.googleUserId;conn.send({type:'identity-challenge',nonce:conn.identityNonce});this.broadcast();}
+  enableIdentity(client,uid){if(!this.conn?.open)throw Error('Aguarde a reconexão à sala.');this.identity=client;this.identityUid=uid;this.identityVerified=false;this.identityPending=true;clearTimeout(this.identityTimer);this.identityTimer=setTimeout(()=>{if(!this.identityPending)return;this.clearIdentity();this.onStatus('identity','Não foi possível confirmar seu Google. Avise o professor; ele poderá identificar você manualmente.');},30000);this.conn.send({type:'identity-request'});}
+  clearIdentity(){clearTimeout(this.identityTimer);this.identity=null;this.identityUid=null;this.identityVerified=false;this.identityPending=false;this.identityNonce=null;if(this.conn?.open)this.conn.send({type:'identity-clear'});}
   broadcast() {
     if (this.stopped) return;
     storage.set('sl-host', { code: this.code, data: { ...this.room.data, lesson: compactLesson(this.room.data.lesson) } });
@@ -159,8 +171,8 @@ export class Classroom {
     if (!transient) this.lastLive = message;
     for (const conn of this.connections.values()) if (conn.open && conn.lessonSent) { conn.send(message); if (!transient) conn.liveSent = message; }
   }
-  async join(code, name, avatar, accountPhoto) {
-    this.host = false; this.code = code; this.name = name; this.avatar = avatar; this.accountPhoto = accountPhoto;
+  async join(code, name, avatar, accountPhoto, identity = null) {
+    this.host = false; this.code = code; this.name = name; this.avatar = avatar; this.accountPhoto = accountPhoto; this.identity=identity;
     this.peer = new Peer(options());
     await this.open();
     await this.connect();
@@ -177,7 +189,7 @@ export class Classroom {
       let timeout = setTimeout(() => { closed=true; this.peer.off('error',unavailable); conn.close(); reject(Error('Sinalização acessada, mas a conexão direta com a sala não foi concluída. Confira o código e o apresentador; teste outra rede ou peça à TI para verificar WebRTC e TURN.')); }, 18_000);
       conn.on('open', () => {
         const saved = playerStorage.get('sl-player-' + this.code);
-        conn.send({ type: 'join', payload: { name: this.name, avatar: this.avatar, accountPhoto: this.accountPhoto, token: saved?.token } });
+        conn.send({ type: 'join', payload: { name: this.name, avatar: this.avatar, accountPhoto: this.accountPhoto, token: saved?.token, identifyGoogle:Boolean(this.identity) } });
       });
       conn.on('data', msg => {
         if (msg.type === 'joined') {
@@ -187,6 +199,10 @@ export class Classroom {
           storage.set('sl-mode', { host: false, code: this.code, name: this.name, avatar: this.avatar, accountPhoto: this.accountPhoto });
           playerStorage.set('sl-active-player',{host:false,code:this.code,name:this.name,avatar:this.avatar,accountPhoto:this.accountPhoto});
           this.onStatus('online');
+        } else if(msg.type==='identity-challenge'&&this.identity){
+          const nonce=msg.nonce,identity=this.identity;this.identityNonce=nonce;this.identityPending=true;this.identityVerified=false;
+          issueIdentityProof(identity,this.code,nonce).then(proof=>{if(conn.open&&this.conn===conn&&this.identity===identity&&this.identityNonce===nonce)conn.send({type:'identity-proof',proof});}).catch(()=>{if(this.identity!==identity||this.identityNonce!==nonce)return;if(conn.open)conn.send({type:'identity-failed'});clearTimeout(this.identityTimer);this.identityPending=false;this.identityVerified=false;this.onStatus('identity','Não foi possível confirmar seu Google. Avise o professor; ele poderá identificar você manualmente.');});
+        } else if(msg.type==='identity-result'&&this.identity&&this.identityNonce===msg.nonce){this.identityNonce=null;clearTimeout(this.identityTimer);this.identityPending=false;this.identityVerified=msg.ok===true;this.onStatus('identity',msg.ok?'Identidade Google confirmada para o professor.':'Não foi possível confirmar seu Google. Avise o professor; ele poderá identificar você manualmente.');
         } else if(msg.type==='ended'){this.stopped=true;clearTimeout(timeout);try{localStorage.removeItem('sl-active-player');sessionStorage.removeItem('sl-mode');}catch{}this.onStatus('ended','O professor encerrou a apresentação.');conn.close();
         } else if(msg.type==='kicked'){this.stopped=true;clearTimeout(timeout);try{localStorage.removeItem('sl-active-player');sessionStorage.removeItem('sl-mode');}catch{}this.onStatus('removed','Você foi removido da sala pelo professor.');conn.close();
         } else if (msg.type === 'lesson') this.lesson = msg.lesson;
@@ -247,7 +263,7 @@ export class Classroom {
     try { sessionStorage.removeItem('sl-mode'); } catch { /* ignore */ }
   }
   stop() {
-    this.stopped = true; clearInterval(this.timer); clearTimeout(this.retry);
+    this.stopped = true; clearInterval(this.timer); clearTimeout(this.retry); clearTimeout(this.identityTimer);
     for (const p of this.pending.values()) { clearTimeout(p.timeout); p.reject(Error('Você saiu da sala.')); }
     this.pending.clear(); this.conn?.close(); this.peer?.destroy();
     try { sessionStorage.removeItem('sl-mode');if(!this.host)localStorage.removeItem('sl-active-player'); } catch { /* ignore */ }
